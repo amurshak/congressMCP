@@ -3,6 +3,7 @@ import os
 import asyncio
 import httpx
 import json
+import sys
 from datetime import datetime
 from typing import Dict, List, Any, Optional, AsyncIterator, Union
 from contextlib import asynccontextmanager
@@ -488,8 +489,11 @@ async def search_members(
         endpoint = f"/member/congress/{congress}"
     
     ctx = mcp.get_context()
+    print(f"Calling make_api_request with endpoint: {endpoint}, params: {params}", file=sys.stderr)
     data = await make_api_request(endpoint, ctx, params=params)
-    members = data.get("members", [])
+    print(f"make_api_request returned type: {type(data)}", file=sys.stderr)
+    print(f"make_api_request returned data: {data}", file=sys.stderr)
+    members = data.get("members", []) # This line is throwing the error
     
     if not members:
         return "No members found matching the specified criteria."
