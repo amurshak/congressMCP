@@ -18,12 +18,14 @@ from congress_api import prompts_module
 def setup_logging():
     """Configure logging for the application."""
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG,  # Changed to DEBUG for more detailed logs
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
             logging.StreamHandler(sys.stderr)
         ]
     )
+    # Set specific loggers to DEBUG level
+    logging.getLogger('congress_api.features.amendments').setLevel(logging.DEBUG)
 
 def main():
     """Main entry point for the Congress.gov API MCP server."""

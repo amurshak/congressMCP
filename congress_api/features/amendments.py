@@ -1,9 +1,13 @@
 # amendments.py
 from typing import Dict, Any, Optional, List
 import json
+import logging
 
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Formatting helpers
 def format_amendment_summary(amendment: Dict[str, Any]) -> str:
@@ -53,7 +57,25 @@ def format_amendment_details(amendment: Dict[str, Any]) -> str:
     if "actions" in amendment and amendment["actions"]:
         actions = amendment["actions"]
         result.append("## Recent Actions")
-        for action in actions[:5]:  # Show only the 5 most recent actions
+        
+        # Handle different data structures for actions
+        if isinstance(actions, list):
+            # If actions is a list, take up to 5 items
+            action_items = actions[:5] if len(actions) > 5 else actions
+        elif isinstance(actions, dict) and "item" in actions:
+            # If actions is a dict with an 'item' key (common in Congress.gov API)
+            items = actions["item"]
+            if isinstance(items, list):
+                action_items = items[:5] if len(items) > 5 else items
+            else:
+                # If there's only one item, wrap it in a list
+                action_items = [items]
+        else:
+            # If we can't determine the structure, just use an empty list
+            logger.warning(f"Unexpected actions structure: {type(actions)}")
+            action_items = []
+        
+        for action in action_items:
             date = action.get("actionDate", "Unknown date")
             text = action.get("text", "Unknown action")
             result.append(f"- {date}: {text}")
@@ -86,22 +108,31 @@ async def get_latest_amendments() -> str:
     Returns a list of the 10 most recently updated amendments across all
     Congresses, sorted by update date in descending order.
     """
+    logger.info("Accessing latest amendments resource")
     ctx = mcp.get_context()
-    data = await make_api_request("/amendment", ctx, {"limit": 10, "sort": "updateDate+desc"})
-    
-    if "error" in data:
-        return json.dumps({"error": data["error"]})
-    
-    amendments = data.get("amendments", [])
-    if not amendments:
-        return "No amendments found."
-    
-    result = ["# Latest Amendments in Congress\n"]
-    for amendment in amendments:
-        result.append("---\n")
-        result.append(format_amendment_summary(amendment))
-    
-    return "\n\n".join(result)
+    try:
+        data = await make_api_request("/amendment", ctx, {"limit": 10, "sort": "updateDate+desc"})
+        logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")  
+        
+        if "error" in data:
+            logger.error(f"Error in API response: {data['error']}")
+            return json.dumps({"error": data["error"]})
+        
+        amendments = data.get("amendments", [])
+        logger.info(f"Found {len(amendments)} amendments")
+        
+        if not amendments:
+            return "No amendments found."
+        
+        result = ["# Latest Amendments in Congress\n"]
+        for amendment in amendments:
+            result.append("---\n")
+            result.append(format_amendment_summary(amendment))
+        
+        return "\n\n".join(result)
+    except Exception as e:
+        logger.error(f"Exception in get_latest_amendments: {str(e)}")
+        return f"Error retrieving latest amendments: {str(e)}"
 
 @mcp.resource("congress://amendments/{congress}")
 async def get_amendments_by_congress(congress: str) -> str:
@@ -114,22 +145,31 @@ async def get_amendments_by_congress(congress: str) -> str:
     Returns a list of the 10 most recently updated amendments from the
     specified Congress, sorted by update date in descending order.
     """
+    logger.info(f"Accessing amendments for Congress {congress}")
     ctx = mcp.get_context()
-    data = await make_api_request(f"/amendment/{congress}", ctx, {"limit": 10, "sort": "updateDate+desc"})
-    
-    if "error" in data:
-        return json.dumps({"error": data["error"]})
-    
-    amendments = data.get("amendments", [])
-    if not amendments:
-        return f"No amendments found for the {congress}th Congress."
-    
-    result = [f"# Amendments in the {congress}th Congress\n"]
-    for amendment in amendments:
-        result.append("---\n")
-        result.append(format_amendment_summary(amendment))
-    
-    return "\n\n".join(result)
+    try:
+        data = await make_api_request(f"/amendment/{congress}", ctx, {"limit": 10, "sort": "updateDate+desc"})
+        logger.info(f"API response received for Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
+        
+        if "error" in data:
+            logger.error(f"Error in API response for Congress {congress}: {data['error']}")
+            return json.dumps({"error": data["error"]})
+        
+        amendments = data.get("amendments", [])
+        logger.info(f"Found {len(amendments)} amendments for Congress {congress}")
+        
+        if not amendments:
+            return f"No amendments found for the {congress}th Congress."
+        
+        result = [f"# Amendments in the {congress}th Congress\n"]
+        for amendment in amendments:
+            result.append("---\n")
+            result.append(format_amendment_summary(amendment))
+        
+        return "\n\n".join(result)
+    except Exception as e:
+        logger.error(f"Exception in get_amendments_by_congress for Congress {congress}: {str(e)}")
+        return f"Error retrieving amendments for the {congress}th Congress: {str(e)}"
 
 @mcp.resource("congress://amendments/{congress}/{amendment_type}")
 async def get_amendments_by_type(congress: str, amendment_type: str) -> str:
@@ -143,22 +183,31 @@ async def get_amendments_by_type(congress: str, amendment_type: str) -> str:
     Returns a list of the 10 most recently updated amendments of the specified
     type from the specified Congress, sorted by update date in descending order.
     """
+    logger.info(f"Accessing {amendment_type} amendments for Congress {congress}")
     ctx = mcp.get_context()
-    data = await make_api_request(f"/amendment/{congress}/{amendment_type}", ctx, {"limit": 10, "sort": "updateDate+desc"})
-    
-    if "error" in data:
-        return json.dumps({"error": data["error"]})
-    
-    amendments = data.get("amendments", [])
-    if not amendments:
-        return f"No {amendment_type.upper()} amendments found for the {congress}th Congress."
-    
-    result = [f"# {amendment_type.upper()} Amendments in the {congress}th Congress\n"]
-    for amendment in amendments:
-        result.append("---\n")
-        result.append(format_amendment_summary(amendment))
-    
-    return "\n\n".join(result)
+    try:
+        data = await make_api_request(f"/amendment/{congress}/{amendment_type}", ctx, {"limit": 10, "sort": "updateDate+desc"})
+        logger.info(f"API response received for {amendment_type} amendments in Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
+        
+        if "error" in data:
+            logger.error(f"Error in API response for {amendment_type} amendments in Congress {congress}: {data['error']}")
+            return json.dumps({"error": data["error"]})
+        
+        amendments = data.get("amendments", [])
+        logger.info(f"Found {len(amendments)} {amendment_type} amendments for Congress {congress}")
+        
+        if not amendments:
+            return f"No {amendment_type.upper()} amendments found for the {congress}th Congress."
+        
+        result = [f"# {amendment_type.upper()} Amendments in the {congress}th Congress\n"]
+        for amendment in amendments:
+            result.append("---\n")
+            result.append(format_amendment_summary(amendment))
+        
+        return "\n\n".join(result)
+    except Exception as e:
+        logger.error(f"Exception in get_amendments_by_type for {amendment_type} amendments in Congress {congress}: {str(e)}")
+        return f"Error retrieving {amendment_type.upper()} amendments for the {congress}th Congress: {str(e)}"
 
 # Tools
 @mcp.tool()
@@ -260,11 +309,25 @@ async def get_amendment_details(
     if "error" in data:
         return f"Error retrieving amendment details: {data['error']}"
     
-    amendment = data.get("amendment", {})
-    if not amendment:
+    # Log the data structure to help debug
+    logger.debug(f"Amendment details data structure: {data.keys() if isinstance(data, dict) else type(data)}")
+    
+    # Handle different data structures for amendment
+    amendment_data = data.get("amendment", {})
+    
+    # If amendment_data is empty, try to use the data directly
+    if not amendment_data and isinstance(data, dict):
+        # Some API responses don't have an 'amendment' wrapper
+        if 'number' in data or 'type' in data or 'congress' in data:
+            amendment_data = data
+    
+    if not amendment_data:
         return f"No details found for {amendment_type.upper()} {amendment_number} in the {congress}th Congress."
     
-    return format_amendment_details(amendment)
+    # Log the amendment structure to help debug
+    logger.debug(f"Amendment structure: {amendment_data.keys() if isinstance(amendment_data, dict) else type(amendment_data)}")
+    
+    return format_amendment_details(amendment_data)
 
 @mcp.tool()
 async def get_amendment_actions(
@@ -306,7 +369,7 @@ async def get_amendment_sponsors(
     amendment_number: int
 ) -> str:
     """
-    Get sponsors for a specific amendment.
+    Get cosponsors for a specific amendment.
     
     Args:
         congress: Congress number (e.g., 117 for 117th Congress)
@@ -314,25 +377,44 @@ async def get_amendment_sponsors(
         amendment_number: Amendment number
     """
     ctx = mcp.get_context()
-    endpoint = f"/amendment/{congress}/{amendment_type}/{amendment_number}/sponsors"
+    endpoint = f"/amendment/{congress}/{amendment_type}/{amendment_number}/cosponsors"
     data = await make_api_request(endpoint, ctx)
     
     if "error" in data:
-        return f"Error retrieving amendment sponsors: {data['error']}"
+        return f"Error retrieving amendment cosponsors: {data['error']}"
     
-    sponsors = data.get("sponsors", [])
-    if not sponsors:
-        return f"No sponsors found for {amendment_type.upper()} {amendment_number} in the {congress}th Congress."
+    # Handle different data structures for cosponsors
+    cosponsors_data = data.get("cosponsors", {})
     
-    result = [f"# Sponsors for {amendment_type.upper()} {amendment_number} - {congress}th Congress"]
-    result.append(f"Total Sponsors: {len(sponsors)}")
+    # Extract cosponsor items based on the data structure
+    if isinstance(cosponsors_data, list):
+        cosponsors = cosponsors_data
+    elif isinstance(cosponsors_data, dict) and "item" in cosponsors_data:
+        items = cosponsors_data["item"]
+        if isinstance(items, list):
+            cosponsors = items
+        else:
+            # If there's only one item, wrap it in a list
+            cosponsors = [items]
+    else:
+        # If we can't determine the structure, just use an empty list
+        logger.warning(f"Unexpected cosponsors structure: {type(cosponsors_data)}")
+        cosponsors = []
     
-    for sponsor in sponsors:
-        name = sponsor.get("name", "Unknown")
-        party = sponsor.get("party", "")
-        state = sponsor.get("state", "")
-        bioguide_id = sponsor.get("bioguideId", "")
-        sponsor_type = sponsor.get("sponsorType", "Sponsor")
-        result.append(f"- {name} ({party}-{state}), {sponsor_type}, Bioguide ID: {bioguide_id}")
+    if not cosponsors:
+        return f"No cosponsors found for {amendment_type.upper()} {amendment_number} in the {congress}th Congress."
+    
+    result = [f"# Cosponsors for {amendment_type.upper()} {amendment_number} - {congress}th Congress"]
+    result.append(f"Total Cosponsors: {len(cosponsors)}")
+    
+    for cosponsor in cosponsors:
+        full_name = cosponsor.get("fullName", "Unknown")
+        party = cosponsor.get("party", "")
+        state = cosponsor.get("state", "")
+        bioguide_id = cosponsor.get("bioguideId", "")
+        is_original = cosponsor.get("isOriginalCosponsor", False)
+        sponsorship_date = cosponsor.get("sponsorshipDate", "Unknown date")
+        original_status = "Original Cosponsor" if is_original else "Cosponsor"
+        result.append(f"- {full_name} ({party}-{state}), {original_status}, Added: {sponsorship_date}, Bioguide ID: {bioguide_id}")
     
     return "\n".join(result)
