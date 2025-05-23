@@ -1,0 +1,4 @@
+# Congress.gov API MCP Server requirements
+httpx>=0.24.0
+python-dotenv>=1.0.0
+mcp-sdk>=0.1.0
