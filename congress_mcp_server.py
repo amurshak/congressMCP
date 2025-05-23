@@ -18,6 +18,11 @@ load_dotenv()
 
 # API Configuration
 API_KEY = os.getenv("CONGRESS_API_KEY")
+if not API_KEY:
+    print("WARNING: CONGRESS_API_KEY environment variable is not set!", file=sys.stderr)
+    print("The server will start, but API requests will fail.", file=sys.stderr)
+    print("Please set the CONGRESS_API_KEY environment variable and restart the server.", file=sys.stderr)
+
 BASE_URL = "https://api.congress.gov/v3"
 
 # Create the MCP server with metadata
@@ -38,19 +43,26 @@ class AppContext:
 @asynccontextmanager
 async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """Manage API client lifecycle."""
-    if not API_KEY:
-        raise ValueError("CONGRESS_API_KEY environment variable is not set")
+    print("Initializing Congress.gov API client...", file=sys.stderr)
     
     async with httpx.AsyncClient(base_url=BASE_URL) as client:
-        # Test connection
-        try:
-            response = await client.get(f"/congress?api_key={API_KEY}")
-            response.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            raise ValueError(f"Failed to connect to Congress.gov API: {e}")
+        # Test connection if API key is available
+        if API_KEY:
+            try:
+                print(f"Testing connection to Congress.gov API...", file=sys.stderr)
+                response = await client.get(f"/congress?api_key={API_KEY}")
+                response.raise_for_status()
+                print("Successfully connected to Congress.gov API", file=sys.stderr)
+            except httpx.HTTPStatusError as e:
+                print(f"WARNING: Failed to connect to Congress.gov API: {e}", file=sys.stderr)
+                print("The server will start, but API requests may fail.", file=sys.stderr)
+        else:
+            print("No API key provided. The server will start, but API requests will fail.", file=sys.stderr)
         
         # Yield context to server
-        yield AppContext(api_key=API_KEY, client=client)
+        context = AppContext(api_key=API_KEY or "MISSING_API_KEY", client=client)
+        print("Server context initialized successfully", file=sys.stderr)
+        yield context
 
 # Initialize server with lifespan
 mcp = FastMCP("Congress.gov API", lifespan=app_lifespan)
@@ -58,17 +70,24 @@ mcp = FastMCP("Congress.gov API", lifespan=app_lifespan)
 # Helper function for API requests
 async def make_api_request(endpoint: str, ctx: Context, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Make a request to the Congress.gov API with proper error handling."""
-    app_ctx = ctx.request_context.lifespan_context
-    client = app_ctx.client
-    api_key = app_ctx.api_key
-    
-    # Prepare parameters
-    request_params = params or {}
-    request_params["api_key"] = api_key
-    
     try:
+        print(f"DEBUG: Starting make_api_request for endpoint: {endpoint}", file=sys.stderr)
+        app_ctx = ctx.request_context.lifespan_context
+        client = app_ctx.client
+        api_key = app_ctx.api_key
+        
+        # Prepare parameters
+        request_params = params or {}
+        request_params["api_key"] = api_key
+
+        # Ensure we always request JSON format
+        if "format" not in request_params:
+            request_params["format"] = "json"
+        
+        print(f"DEBUG: Making request to {endpoint} with params: {request_params}", file=sys.stderr)
         response = await client.get(endpoint, params=request_params)
         response.raise_for_status()
+        print(f"DEBUG: Request successful with status: {response.status_code}", file=sys.stderr)
         return response.json()
     except httpx.HTTPStatusError as e:
         error_message = f"API request failed: {e.response.status_code} - {e.response.text}"
@@ -128,18 +147,64 @@ def format_committee_summary(committee: Dict[str, Any]) -> str:
     result.append(f"URL: {committee.get('url', 'No URL available')}")
     return "\n".join(result)
 
+
+# Updated format_member_summary function for MCP server
 def format_member_summary(member: Dict[str, Any]) -> str:
     """Format a member into a readable summary."""
+    # Handle name field - can be string or nested object
+    name_str = "Unknown"
+    if "name" in member:
+        if isinstance(member["name"], str):
+            name_str = member["name"]
+        elif isinstance(member["name"], dict):
+            first = member["name"].get("firstName", "")
+            middle = member["name"].get("middleName", "")
+            last = member["name"].get("lastName", "")
+            name_str = f"{first} {middle} {last}".strip()
+            # Clean up extra spaces
+            name_str = " ".join(name_str.split())
+    
     result = []
-    name = member.get('name', {})
-    result.append(f"Member: {name.get('firstName', '')} {name.get('middleName', '')} {name.get('lastName', '')}")
+    result.append(f"## {name_str}")
     result.append(f"Bioguide ID: {member.get('bioguideId', 'Unknown')}")
-    result.append(f"Chamber: {member.get('chamber', 'Unknown')}")
-    result.append(f"Party: {member.get('party', 'Unknown')}")
+    
+    # Handle party information - try multiple possible fields
+    party = "Unknown"
+    if "partyName" in member:
+        party = member["partyName"]
+    elif "party" in member:
+        party = member["party"]
+    result.append(f"Party: {party}")
+    
     result.append(f"State: {member.get('state', 'Unknown')}")
-    if "district" in member:
+    
+    # District (only for House members)
+    if "district" in member and member["district"]:
         result.append(f"District: {member['district']}")
-    result.append(f"URL: {member.get('url', 'No URL available')}")
+    
+    # Handle terms information
+    if "terms" in member:
+        terms = member["terms"]
+        # Handle case where terms might be wrapped in an object with 'item' key
+        if isinstance(terms, dict) and "item" in terms:
+            terms = terms["item"]
+        
+        if terms and isinstance(terms, list) and len(terms) > 0:
+            latest_term = terms[0]
+            if isinstance(latest_term, dict):
+                chamber = latest_term.get('chamber', 'Unknown')
+                result.append(f"Chamber: {chamber}")
+                
+                # Add term years if available
+                start_year = latest_term.get('startYear', 'Unknown')
+                end_year = latest_term.get('endYear', 'Present')
+                if start_year != 'Unknown':
+                    result.append(f"Term: {start_year} - {end_year}")
+    
+    # URL
+    url = member.get("url", "No URL available")
+    result.append(f"URL: {url}")
+    
     return "\n".join(result)
 
 # Resources
@@ -473,35 +538,69 @@ async def search_members(
         congress: Optional Congress number (e.g., 117)
         limit: Maximum number of results to return (default: 10)
     """
-    params = {"limit": limit}
+    try:
+        print(f"DEBUG: search_members called with name={name}, state={state}, party={party}, chamber={chamber}, congress={congress}, limit={limit}", file=sys.stderr)
+        
+        params = {"limit": limit, "format": "json"}
+        
+        # Add search parameters (note: not all may be supported by the API)
+        if name:
+            params["name"] = name
+        if state:
+            params["state"] = state
+        if party:
+            params["party"] = party
+        
+        endpoint = "/member"
+        if congress:
+            endpoint = f"/member/congress/{congress}"
+        
+        print(f"DEBUG: Getting context for search_members", file=sys.stderr)
+        ctx = mcp.get_context()
+        print(f"DEBUG: Calling make_api_request with endpoint={endpoint}", file=sys.stderr)
+        data = await make_api_request(endpoint, ctx, params=params)
+        print(f"DEBUG: make_api_request returned successfully", file=sys.stderr)
+    except Exception as e:
+        print(f"ERROR in search_members: {str(e)}", file=sys.stderr)
+        return f"Error searching for members: {str(e)}"
     
-    if name:
-        params["name"] = name
+    # Check if there's an error in the response
+    if "error" in data:
+        return f"Error searching for members: {data['error']}"
     
-    if state:
-        params["state"] = state
-    
-    if party:
-        params["party"] = party
-    
-    endpoint = "/member"
-    if congress:
-        endpoint = f"/member/congress/{congress}"
-    
-    ctx = mcp.get_context()
-    print(f"Calling make_api_request with endpoint: {endpoint}, params: {params}", file=sys.stderr)
-    data = await make_api_request(endpoint, ctx, params=params)
-    print(f"make_api_request returned type: {type(data)}", file=sys.stderr)
-    print(f"make_api_request returned data: {data}", file=sys.stderr)
-    members = data.get("members", []) # This line is throwing the error
+    members = data.get("members", [])
     
     if not members:
         return "No members found matching the specified criteria."
     
-    # Filter by chamber if specified
+    # Client-side filtering by chamber if specified
     if chamber:
         chamber = chamber.lower()
-        members = [m for m in members if m.get("chamber", "").lower() == chamber]
+        filtered_members = []
+        for m in members:
+            # Check member's chamber from terms data
+            terms = m.get("terms", {})
+            if isinstance(terms, dict) and "item" in terms:
+                terms = terms["item"]
+            
+            if isinstance(terms, list) and len(terms) > 0:
+                latest_term = terms[0]
+                if isinstance(latest_term, dict):
+                    member_chamber = latest_term.get("chamber", "").lower()
+                    if member_chamber == chamber:
+                        filtered_members.append(m)
+            else:
+                # Fallback: check if there's a direct chamber field
+                member_chamber = m.get("chamber", "").lower()
+                if member_chamber == chamber:
+                    filtered_members.append(m)
+        members = filtered_members
+    
+    # Apply limit after filtering
+    members = members[:limit]
+    
+    if not members:
+        return "No members found matching the specified criteria after filtering."
     
     result = ["# Members of Congress"]
     for member in members:
@@ -509,7 +608,7 @@ async def search_members(
         result.append(format_member_summary(member))
     
     return "\n".join(result)
-
+    
 # ============================================================================
 # BILL DETAIL TOOLS
 # ============================================================================
@@ -1249,7 +1348,7 @@ if __name__ == "__main__":
     import logging
     import sys
 
-        # Configure logging to stderr instead of stdout
+    # Configure logging to stderr instead of stdout
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -1259,5 +1358,11 @@ if __name__ == "__main__":
     print("Starting Congress.gov MCP Server...", file=sys.stderr)
     print("Make sure to set the CONGRESS_API_KEY environment variable!", file=sys.stderr)
     
-    # Run the server
-    mcp.run()
+    try:
+        # Run the server
+        mcp.run()
+    except Exception as e:
+        print(f"ERROR: Server crashed with exception: {str(e)}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
+        sys.exit(1)
