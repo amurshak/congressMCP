@@ -995,6 +995,522 @@ https://api.congress.gov/v3/committee/house/hsag/bills?api_key=[INSERT_KEY]
 
 ---
 
+## **Members API**
+
+### **GET `/member`**
+
+**Description**: Returns a list of congressional members.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/member?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "members": [
+    {
+        "bioguideId": "L000174",
+        "depiction": {
+            "attribution": "<a href=\"http://www.senate.gov/artandhistory/history/common/generic/Photo_Collection_of_the_Senate_Historical_Office.htm\">Courtesy U.S. Senate Historical Office</a>",
+            "imageUrl": "https://www.congress.gov/img/member/l000174_200.jpg"
+        },
+        "district": null,
+        "name": "Leahy, Patrick J.",
+        "partyName": "Democratic",
+        "state": "Vermont",
+        "terms": {
+            "item": [
+                {
+                    "chamber": "Senate",
+                    "endYear": null,
+                    "startYear": 1975
+                }
+            ]
+        },
+        "updateDate": "2022-11-07T13:42:19Z",
+        "url": "https://api.congress.gov/v3/member/L000174?format=json"
+    },
+    {
+        "bioguideId": "K000377",
+        "depiction": {
+            "attribution": "<a href=\"http://www.senate.gov/artandhistory/history/common/generic/Photo_Collection_of_the_Senate_Historical_Office.htm\">Courtesy U.S. Senate Historical Office</a>",
+            "imageUrl": "https://www.congress.gov/img/member/k000377_200.jpg"
+        },
+        "district": null,
+        "name": "Kelly, Mark",
+        "partyName": "Democratic",
+        "state": "Arizona",
+        "terms": {
+            "item": [
+                {
+                    "chamber": "Senate",
+                    "end": null,
+                    "start": 2020
+                }
+            ]
+        },
+        "updateDate": "2023-04-01T12:42:17Z",
+        "url": "https://api.congress.gov/v3/member/K000377?format=json"
+    }
+  ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+| fromDateTime | The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| toDateTime | The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| currentMember | The status of the member. Use true or false. |
+
+### **GET `/member/{bioguideId}`**
+
+**Description**: Returns detailed information for a specified congressional member.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/member/L000174?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "member": {
+        "bioguideId": "L000174",
+        "birthYear": "1940",
+        "cosponsoredLegislation": {
+            "count": 7520,
+            "URL": "url": "https://api.congress.gov/v3/member/L000174/cosponsored-legislation"
+        },
+        "depiction": {
+            "attribution": "<a href=\"http://www.senate.gov/artandhistory/history/common/generic/Photo_Collection_of_the_Senate_Historical_Office.htm\">Courtesy U.S. Senate Historical Office</a>",
+            "imageUrl": "https://www.congress.gov/img/member/l000174_200.jpg"
+        },
+        "directOrderName": "Patrick J. Leahy",
+        "firstName": "Patrick",
+        "honorificName": "Mr.",
+        "invertedOrderName": "Leahy, Patrick J.",
+        "lastName": "Leahy",
+        "leadership": [
+            {
+                "congress": 113,
+                "type": "President Pro Tempore"
+            },
+            {
+                "congress": 112,
+                "type": "President Pro Tempore"
+            },
+            {
+                "congress": 117,
+                "type": "President Pro Tempore"
+            }
+        ],
+        "partyHistory": [
+            {
+                "partyAbbreviation": "D",
+                "partyName": "Democrat",
+                "startYear": 1975
+            }
+        ],
+        "sponsoredLegislation": {
+            "count": 1768,
+            "url": "https://api.congress.gov/v3/member/L000174/sponsored-legislation"
+        },
+        "state": "Vermont",
+        "terms": [
+            {
+                "chamber": "Senate",
+                "congress": 116,
+                "endYear": 2021,
+                "memberType": "Senator",
+                "startYear": 2019,
+                "stateCode": "VT",
+                "stateName": "Vermont"
+            },
+            {
+                "chamber": "Senate",
+                "congress": 117,
+                "endYear": 2023,
+                "memberType": "Senator",
+                "startYear": 2021,
+                "stateCode": "VT",
+                "stateName": "Vermont"
+            }
+        ],
+        "updateDate": "2022-11-07T13:42:19Z"
+    },
+    "request": {
+        "bioguideId": "l000174",
+        "contentType": "application/json",
+        "format": "json"
+     }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| bioguideId * | The bioguide identifier for the congressional member. For example, the value can be L000174. |
+| format | The data format. Value can be xml or json. |
+
+### **GET `/member/{bioguideId}/sponsored-legislation`**
+
+**Description**: Returns the list of legislation sponsored by a specified congressional member.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/member/L000174/sponsored-legislation?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+     "sponsoredLegislation": [
+        {
+            "congress": 117,
+            "introducedDate": "2022-06-16",
+            "latestAction": {
+                "actionDate": "2022-06-16",
+                "text": "Read twice and referred to the Committee on the Judiciary."
+            },
+            "number": "4417",
+            "policyArea": {
+                "name": "Commerce"
+            },
+            "title": "Patent Trial and Appeal Board Reform Act of 2022",
+            "type": "S",
+            "url": "https://api.congress.gov/v3/bill/117/s/4417?format=json"
+        },
+        {
+            "congress": 117,
+            "introducedDate": "2022-06-09",
+            "latestAction": {
+                "actionDate": "2022-06-09",
+                "text": "Read twice and referred to the Committee on the Judiciary."
+            },
+            "number": "4373",
+            "policyArea": {
+                "name": "Crime and Law Enforcement"
+            },
+            "title": "NDO Fairness Act",
+            "type": "S",
+            "url": "https://api.congress.gov/v3/bill/117/s/4373?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| bioguideId * | The bioguide identifier for the congressional member. For example, the value can be L000174. |
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+
+### **GET `/member/{bioguideId}/cosponsored-legislation`**
+
+**Description**: Returns the list of legislation cosponsored by a specified congressional member.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/member/L000174/cosponsored-legislation?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+     "cosponsoredLegislation": [
+        {
+            "congress": 117,
+            "introducedDate": "2021-05-11",
+            "latestAction": {
+                "actionDate": "2021-04-22",
+                "text": "Read twice and referred to the Committee on Finance."
+            },
+            "number": "1315",
+            "policyArea": {
+                "name": "Health"
+            },
+            "title": "Lymphedema Treatment Act",
+            "type": "S",
+            "url": "https://api.congress.gov/v3/bill/117/s/1315?format=json"
+        },
+        {
+            "congress": 117,
+            "introducedDate": "2021-02-22",
+            "latestAction": {
+                "actionDate": "2021-03-17",
+                "text": "Referred to the Committee on Armed Services."
+            },
+            "number": "344",
+            "policyArea": {
+                "name": "Armed Forces and National Security"
+            },
+            "title": "Major Richard Star Act",
+            "type": "S",
+            "url": "https://api.congress.gov/v3/bill/117/s/344?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| bioguideId * | The bioguide identifier for the congressional member. For example, the value can be L000174. |
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+
+### **GET `/member/congress/{congress}`**
+
+**Description**: Returns the list of members specified by Congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/member/congress/118?api_key=[INSERT_KEY]
+```
+
+**Example Request for a previous Congress**:
+
+```
+https://api.congress.gov/v3/member/congress/117?currentMember=False&api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "members": [
+    {
+        "bioguideId": "B001320",
+        "depiction": {
+            "attribution": "Image courtesy of the Senator's office",
+            "imageUrl": "https://www.congress.gov/img/member/b001320_200.jpg"
+    },
+        "name": "Butler, Laphonza R.",
+        "partyName": "Democratic",
+        "state": "California",
+        "terms": {
+            "item": [
+                {
+                    "chamber": "Senate",
+                    "startYear": 2023
+                }
+            ]
+        },
+        "updateDate": "2024-04-09T15:54:25Z",
+        "url": "http://api.congress.gov/v3/member/B001320?format=json"
+    },
+    {
+         "bioguideId": "A000376",
+         "depiction": {
+             "attribution": "Image courtesy of the Member",
+             "imageUrl": "https://www.congress.gov/img/member/a000376_200.jpg"
+    },
+          "district": 32,
+          "name": "Allred, Colin Z.",
+          "partyName": "Democratic",
+          "state": "Texas",
+          "terms": {
+              "item": [
+                  {
+                      "chamber": "House of Representatives",
+                      "startYear": 2019
+                  }
+              ]
+          },
+         "updateDate": "2024-04-09T13:26:21Z",
+         "url": "http://api.congress.gov/v3/member/A000376?format=json"
+    }
+  ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| congress * | The congress number. For example, the value can be 118. |
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+| currentMember | The status of the member. Use true or false. Use currentMember=false for the most accurate calls for past Congresses. |
+
+### **GET `/member/{stateCode}`**
+
+**Description**: Returns a list of members filtered by state.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/member/MI?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+   "members": [
+   {
+       "bioguideId": "J000307",
+       "depiction": {
+           "attribution": "Image courtesy of the Member",
+           "imageUrl": "https://www.congress.gov/img/member/j000307_200.jpg"
+   },
+       "district": 10,
+       "name": "James, John",
+       "partyName": "Republican",
+       "state": "Michigan",
+       "terms": {
+           "item": [
+               {
+                   "chamber": "House of Representatives",
+                   "startYear": 2023
+               }
+           ]
+       },
+       "updateDate": "2024-03-22T18:36:13Z",
+       "url": "http://api.congress.gov/v3/member/J000307?format=json"
+   }
+   ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| stateCode * | The two letter identifier for the state the member represents. For example, the value can be MI for Michigan. |
+| format | The data format. Value can be xml or json. |
+| currentMember | The status of the member. Use true or false. Use currentMember=True for the current congress data only. |
+
+### **GET `/member/{stateCode}/{district}`**
+
+**Description**: Returns a list of members filtered by state and district.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/member/MI/10?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+ "members": [
+ {
+     "bioguideId": "J000307",
+     "depiction": {
+         "attribution": "Image courtesy of the Member",
+         "imageUrl": "https://www.congress.gov/img/member/j000307_200.jpg"
+ },
+     "district": 10,
+     "name": "James, John",
+     "partyName": "Republican",
+     "state": "Michigan",
+     "terms": {
+         "item": [
+             {
+                 "chamber": "House of Representatives",
+                 "startYear": 2023
+             }
+         ]
+     },
+     "updateDate": "2024-03-22T18:36:13Z",
+     "url": "http://api.congress.gov/v3/member/J000307?format=json"
+  }
+ ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| stateCode * | The two letter identifier for the state the member represents. For example, the value can be MI for Michigan. |
+| district * | The district number for the district the member represents. For example, the value can be 10. |
+| format | The data format. Value can be xml or json. |
+| currentMember | The status of the member. Use true or false. Use currentMember=True for the current congress data only. |
+
+### **GET `/member/congress/{congress}/{stateCode}/{district}`**
+
+**Description**: Returns a list of members filtered by congress, state and district.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/member/congress/118/MI/10?currentMember=True&api_key=[INSERT_KEY]
+```
+
+**Example Request for a previous Congress**:
+
+```
+https://api.congress.gov/v3/member/congress/97/TX/10?currentMember=False&api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+ "members": [
+ {
+     "bioguideId": "J000307",
+     "depiction": {
+         "attribution": "Image courtesy of the Member",
+         "imageUrl": "https://www.congress.gov/img/member/j000307_200.jpg"
+ },
+     "district": 10,
+     "name": "James, John",
+     "partyName": "Republican",
+     "state": "Michigan",
+     "terms": {
+         "item": [
+             {
+                 "chamber": "House of Representatives",
+                 "startYear": 2023
+             }
+         ]
+     },
+     "updateDate": "2024-03-22T18:36:13Z",
+     "url": "http://api.congress.gov/v3/member/J000307?format=json"
+   }
+ ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| congress * | The Congress number. For example, 118. |
+| stateCode * | The two letter identifier for the state the member represents. For example, the value can be MI for Michigan. |
+| district * | The district number for the district the member represents. For example, the value can be 10. |
+| format | The data format. Value can be xml or json. |
+| currentMember | The status of the member. Use true or false. Use currentMember=True for the current congress data only. |
+
+---
+
 ## **MCP Tools for Congress API**
 
 ### **get_congress_info**
