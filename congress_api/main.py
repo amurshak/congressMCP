@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from congress_api.mcp_app import mcp
 
 # Import all features to register them with the MCP server
-from congress_api.features import bills, members, committees, congress_info, amendments
+from congress_api.features import bills, members, committees, congress_info, amendments, summaries
 
 # Import prompts
 from congress_api import prompts_module
