@@ -705,6 +705,338 @@ GET /amendment/117/hamdt/287/text?api\_key=\[INSERT\_KEY\]
 
 ---
 
+## **Congress API**
+
+### **GET `/congress`**
+
+**Description**: Returns a list of congresses and congressional sessions.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/congress?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "congresses": [
+    {
+      "endYear": "2026",
+      "name": "119th Congress",
+      "number": 119,
+      "sessions": [
+        {
+          "chamber": "Senate",
+          "endDate": null,
+          "number": 1,
+          "startDate": "2025-01-03",
+          "type": "R"
+        },
+        {
+          "chamber": "House of Representatives",
+          "endDate": null,
+          "number": 1,
+          "startDate": "2025-01-03",
+          "type": "R"
+        }
+      ],
+      "startYear": "2025",
+      "updateDate": "2025-01-03T18:29:19Z",
+      "url": "https://api.congress.gov/v3/congress/119?format=json"
+    },
+    {
+      "endYear": "2024",
+      "name": "118th Congress",
+      "number": 118,
+      "sessions": [
+        {
+          "chamber": "House of Representatives",
+          "endDate": "2024-01-03",
+          "number": 1,
+          "startDate": "2023-01-03",
+          "type": "R"
+        },
+        {
+          "chamber": "Senate",
+          "endDate": "2024-01-03",
+          "number": 1,
+          "startDate": "2023-01-03",
+          "type": "R"
+        },
+        {
+          "chamber": "Senate",
+          "endDate": "2025-01-03",
+          "number": 2,
+          "startDate": "2024-01-03",
+          "type": "R"
+        },
+        {
+          "chamber": "House of Representatives",
+          "endDate": "2025-01-03",
+          "number": 2,
+          "startDate": "2024-01-03",
+          "type": "R"
+        }
+      ],
+      "startYear": "2023",
+      "updateDate": "2023-01-03T18:29:19Z",
+      "url": "https://api.congress.gov/v3/congress/118?format=json"
+    }
+  ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+
+### **GET `/congress/{congress}`**
+
+**Description**: Returns detailed information about a specific Congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/congress/117?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "congress": {
+    "endYear": "2022",
+    "name": "117th Congress",
+    "number": 117,
+    "sessions": [
+      {
+        "chamber": "House of Representatives",
+        "endDate": "2022-01-03",
+        "number": 1,
+        "startDate": "2021-01-03",
+        "type": "R"
+      },
+      {
+        "chamber": "Senate",
+        "endDate": "2022-01-03",
+        "number": 1,
+        "startDate": "2021-01-03",
+        "type": "R"
+      },
+      {
+        "chamber": "House of Representatives",
+        "endDate": "2023-01-03",
+        "number": 2,
+        "startDate": "2022-01-03",
+        "type": "R"
+      },
+      {
+        "chamber": "Senate",
+        "endDate": "2023-01-03",
+        "number": 2,
+        "startDate": "2022-01-03",
+        "type": "R"
+      }
+    ],
+    "startYear": "2021",
+    "updateDate": "2021-01-12T20:05:52Z",
+    "url": "https://api.congress.gov/v3/congress/117?format=json"
+  }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| congress * | The congress number. For example, the value can be 117. |
+| format | The data format. Value can be xml or json. |
+| detailed | Whether to include detailed information. Value can be true or false. |
+
+### **GET `/congress/current`**
+
+**Description**: Returns detailed information about the current Congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/congress/current?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "congress": {
+    "endYear": "2026",
+    "name": "119th Congress",
+    "number": 119,
+    "sessions": [
+      {
+        "chamber": "Senate",
+        "endDate": null,
+        "number": 1,
+        "startDate": "2025-01-03",
+        "type": "R"
+      },
+      {
+        "chamber": "House of Representatives",
+        "endDate": null,
+        "number": 1,
+        "startDate": "2025-01-03",
+        "type": "R"
+      }
+    ],
+    "startYear": "2025",
+    "updateDate": "2025-01-03T18:29:19Z",
+    "url": "https://api.congress.gov/v3/congress/119?format=json"
+  }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| detailed | Whether to include detailed information. Value can be true or false. |
+
+### **GET `/committee/{chamber}`**
+
+**Description**: Returns a list of committees for a specific chamber.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/house?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "committees": [
+    {
+      "name": "Agriculture",
+      "systemCode": "hsag",
+      "url": "https://api.congress.gov/v3/committee/house/hsag?format=json"
+    },
+    {
+      "name": "Appropriations",
+      "systemCode": "hsap",
+      "url": "https://api.congress.gov/v3/committee/house/hsap?format=json"
+    },
+    {
+      "name": "Armed Services",
+      "systemCode": "hsas",
+      "url": "https://api.congress.gov/v3/committee/house/hsas?format=json"
+    }
+  ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| chamber * | The chamber of Congress. Value must be "house" or "senate". |
+| format | The data format. Value can be xml or json. |
+
+### **GET `/committee/{chamber}/{committeeCode}/bills`**
+
+**Description**: Returns a list of bills referred to a specific committee.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/house/hsag/bills?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "bills": [
+    {
+      "congress": 117,
+      "number": "4421",
+      "title": "Agriculture Innovation Act of 2021",
+      "type": "hr",
+      "updateDate": "2022-07-19T03:41:41Z",
+      "url": "https://api.congress.gov/v3/bill/117/hr/4421?format=json"
+    },
+    {
+      "congress": 117,
+      "number": "2936",
+      "title": "Healthy Soil, Resilient Farmers Act of 2021",
+      "type": "hr",
+      "updateDate": "2022-05-01T03:41:41Z",
+      "url": "https://api.congress.gov/v3/bill/117/hr/2936?format=json"
+    }
+  ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| chamber * | The chamber of Congress. Value must be "house" or "senate". |
+| committeeCode * | The committee code. For example, the value can be "hsag" for House Agriculture Committee. |
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+
+---
+
+## **MCP Tools for Congress API**
+
+### **get_congress_info**
+
+**Description**: Get information about a Congress.
+
+**Parameters**:
+
+| Name | Description | Required | Default |
+|------|-------------|----------|--------|
+| congress | Congress number (e.g., 117 for 117th Congress) | No | None |
+| current | If True, get information about the current Congress | No | False |
+| limit | Maximum number of congresses to return if no specific congress is requested | No | 10 |
+| detailed | If True, include more detailed information about the Congress | No | False |
+| format_type | Output format type ("markdown" or "table") for list of congresses | No | "markdown" |
+
+**Example**:
+
+```python
+result = await get_congress_info(congress=117, detailed=True)
+```
+
+### **get_committee_bills**
+
+**Description**: Get bills referred to a specific committee.
+
+**Parameters**:
+
+| Name | Description | Required | Default |
+|------|-------------|----------|--------|
+| chamber | The chamber of Congress ("house" or "senate") | Yes | N/A |
+| committee_code | The committee code (e.g., "hsag", "ssap") | Yes | N/A |
+| limit | Maximum number of bills to return | No | 10 |
+
+**Example**:
+
+```python
+result = await get_committee_bills(chamber="house", committee_code="hsag", limit=20)
+```
+
+---
+
 ## **Summaries API**
 
 ### **GET `/summaries`**
@@ -919,6 +1251,228 @@ https://api.congress.gov/v3/summaries/117/hr?fromDateTime=2022-04-01T00:00:00Z&t
 | fromDateTime | The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
 | toDateTime | The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
 | sort | Sort by update date in Congress.gov. Value can be updateDate+asc or updateDate+desc. |
+
+---
+
+## **Congress API**
+
+### **GET `/congress`**
+
+**Description**: Returns a list of congresses and congressional sessions.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/congress?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+     "congresses": [
+        {
+            "endYear": "2022",
+            "name": "117th Congress",
+            "sessions": [
+                {
+                    "chamber": "House of Representatives",
+                    "endDate": "2022-01-03",
+                    "number": 1,
+                    "startDate": "2021-01-03",
+                    "type": "R"
+                },
+                {
+                    "chamber": "Senate",
+                    "endDate": "2022-01-03",
+                    "number": 1,
+                    "startDate": "2021-01-03",
+                    "type": "R"
+                },
+                {
+                    "chamber": "House of Representatives",
+                    "endDate": null,
+                    "number": 2,
+                    "startDate": "2022-01-03",
+                    "type": "R"
+                },
+                {
+                    "chamber": "Senate",
+                    "endDate": null,
+                    "number": 2,
+                    "startDate": "2022-01-03",
+                    "type": "R"
+                }
+            ],
+            "startYear": "2021"
+        },
+        {
+            "endYear": "2020",
+            "name": "116th Congress",
+            "sessions": [
+                {
+                    "chamber": "House of Representatives",
+                    "endDate": "2020-01-03",
+                    "number": 1,
+                    "startDate": "2019-01-03",
+                    "type": "R"
+                },
+                {
+                    "chamber": "Senate",
+                    "endDate": "2020-01-03",
+                    "number": 1,
+                    "startDate": "2019-01-03",
+                    "type": "R"
+                },
+                {
+                    "chamber": "House of Representatives",
+                    "endDate": "2021-01-03",
+                    "number": 2,
+                    "startDate": "2020-01-03",
+                    "type": "R"
+                },
+                {
+                    "chamber": "Senate",
+                    "endDate": "2021-01-03",
+                    "number": 2,
+                    "startDate": "2020-01-03",
+                    "type": "R"
+                }
+            ],
+            "startYear": "2019"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+
+### **GET `/congress/{congress}`**
+
+**Description**: Returns detailed information for a specified congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/congress/116?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "congress": {
+      "endYear": "2020",
+      "name": "116th Congress",
+      "number": 116,
+      "sessions": [
+          {
+              "chamber": "House of Representatives",
+              "endDate": "2020-01-03",
+              "number": 1,
+              "startDate": "2019-01-03",
+              "type": "R"
+          },
+          {
+              "chamber": "Senate",
+              "endDate": "2020-01-03",
+              "number": 1,
+              "startDate": "2019-01-03",
+              "type": "R"
+          },
+          {
+              "chamber": "House of Representatives",
+              "endDate": "2021-01-03",
+              "number": 2,
+              "startDate": "2020-01-03",
+              "type": "R"
+          },
+          {
+              "chamber": "Senate",
+              "endDate": "2021-01-03",
+              "number": 2,
+              "startDate": "2020-01-03",
+              "type": "R"
+          }
+      ],
+      "startYear": "2019",
+      "updateDate": "2019-01-03T18:37:12Z",
+      "url": "https://api.congress.gov/v3/congress/116?format=json"
+  }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| congress * | The congress number. For example, the value can be 117. |
+| format | The data format. Value can be xml or json. |
+
+### **GET `/congress/current`**
+
+**Description**: Returns detailed information for the current congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/congress/current?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "congress": {
+      "endYear": "2024",
+      "name": "118th Congress",
+      "number": 118,
+      "sessions": [
+          {
+              "chamber": "House of Representatives",
+              "endDate": "2024-01-03",
+              "number": 1,
+              "startDate": "2023-01-03",
+              "type": "R"
+          },
+          {
+               "chamber": "Senate",
+               "endDate": "2024-01-03",
+               "number": 1,
+               "startDate": "2023-01-03",
+               "type": "R"
+          },
+          {
+               "chamber": "Senate",
+               "number": 2,
+               "startDate": "2024-01-03",
+               "type": "R"
+          },
+          {
+               "chamber": "House of Representatives",
+               "number": 2,
+               "startDate": "2024-01-03",
+               "type": "R"
+          }
+      ],
+      "startYear": "2023",
+      "updateDate": "2023-01-03T17:43:32Z",
+      "url": "https://api.congress.gov/v3/congress/current?format=json"
+  }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
 
 ---
 
