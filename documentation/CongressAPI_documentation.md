@@ -3368,3 +3368,488 @@ https://api.congress.gov/v3/committee-print/117/house/48144/text?api_key=[INSERT
 | `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
 
 ---
+
+## **Committee Meeting API**
+
+### **GET `/committee-meeting`**
+
+**Description**: Returns a list of committee meetings sorted by date of latest update.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-meeting?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeeMeetings": [
+        {
+            "chamber": "House",
+            "committee": {
+                "name": "Agriculture Committee",
+                "systemCode": "hsag00",
+                "url": "https://api.congress.gov/v3/committee/house/hsag00?format=json"
+            },
+            "congress": 119,
+            "eventId": 115678,
+            "meetingDate": "2025-05-28T10:00:00Z",
+            "title": "Hearing: Review of USDA Farm Programs",
+            "type": "HHRG",
+            "updateDate": "2025-05-20T14:32:18Z",
+            "url": "https://api.congress.gov/v3/committee-meeting/119/house/hsag00/115678?format=json"
+        },
+        {
+            "chamber": "Senate",
+            "committee": {
+                "name": "Appropriations Committee",
+                "systemCode": "ssap00",
+                "url": "https://api.congress.gov/v3/committee/senate/ssap00?format=json"
+            },
+            "congress": 119,
+            "eventId": 115680,
+            "meetingDate": "2025-05-27T14:30:00Z",
+            "title": "Markup: FY2026 Defense Appropriations Bill",
+            "type": "SSMT",
+            "updateDate": "2025-05-20T12:15:42Z",
+            "url": "https://api.congress.gov/v3/committee-meeting/119/senate/ssap00/115680?format=json"
+        }
+    ]
+}
+```
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `fromDateTime` | string (query) - The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `toDateTime` | string (query) - The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `scheduledFrom` | string (query) - Filter meetings scheduled on or after this date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `scheduledTo` | string (query) - Filter meetings scheduled on or before this date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `sort` | string (query) - Sort by update date or meeting date. Value can be updateDate+asc, updateDate+desc, meetingDate+asc, or meetingDate+desc. |
+
+---
+
+### **GET `/committee-meeting/{congress}`**
+
+**Description**: Returns a list of committee meetings filtered by the specified congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-meeting/119?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeeMeetings": [
+        {
+            "chamber": "House",
+            "committee": {
+                "name": "Agriculture Committee",
+                "systemCode": "hsag00",
+                "url": "https://api.congress.gov/v3/committee/house/hsag00?format=json"
+            },
+            "congress": 119,
+            "eventId": 115678,
+            "meetingDate": "2025-05-28T10:00:00Z",
+            "title": "Hearing: Review of USDA Farm Programs",
+            "type": "HHRG",
+            "updateDate": "2025-05-20T14:32:18Z",
+            "url": "https://api.congress.gov/v3/committee-meeting/119/house/hsag00/115678?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 119. |
+
+**Query Parameters**: Same as for `/committee-meeting`.
+
+---
+
+### **GET `/committee-meeting/{congress}/{chamber}`**
+
+**Description**: Returns a list of committee meetings filtered by the specified congress and chamber.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-meeting/119/house?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeeMeetings": [
+        {
+            "chamber": "House",
+            "committee": {
+                "name": "Agriculture Committee",
+                "systemCode": "hsag00",
+                "url": "https://api.congress.gov/v3/committee/house/hsag00?format=json"
+            },
+            "congress": 119,
+            "eventId": 115678,
+            "meetingDate": "2025-05-28T10:00:00Z",
+            "title": "Hearing: Review of USDA Farm Programs",
+            "type": "HHRG",
+            "updateDate": "2025-05-20T14:32:18Z",
+            "url": "https://api.congress.gov/v3/committee-meeting/119/house/hsag00/115678?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 119. |
+| `chamber` * | string (path) - The chamber name. Value can be house or senate. |
+
+**Query Parameters**: Same as for `/committee-meeting`.
+
+---
+
+### **GET `/committee-meeting/{congress}/{chamber}/{committeeCode}`**
+
+**Description**: Returns a list of committee meetings filtered by the specified congress, chamber, and committee code.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-meeting/119/house/hsag00?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeeMeetings": [
+        {
+            "chamber": "House",
+            "committee": {
+                "name": "Agriculture Committee",
+                "systemCode": "hsag00",
+                "url": "https://api.congress.gov/v3/committee/house/hsag00?format=json"
+            },
+            "congress": 119,
+            "eventId": 115678,
+            "meetingDate": "2025-05-28T10:00:00Z",
+            "title": "Hearing: Review of USDA Farm Programs",
+            "type": "HHRG",
+            "updateDate": "2025-05-20T14:32:18Z",
+            "url": "https://api.congress.gov/v3/committee-meeting/119/house/hsag00/115678?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 119. |
+| `chamber` * | string (path) - The chamber name. Value can be house or senate. |
+| `committeeCode` * | string (path) - The committee system code. For example, the value can be hsag00. |
+
+**Query Parameters**: Same as for `/committee-meeting`.
+
+---
+
+### **GET `/committee-meeting/{congress}/{chamber}/{committeeCode}/{eventId}`**
+
+**Description**: Returns detailed information for a specified committee meeting.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-meeting/119/house/hsag00/115678?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeeMeeting": {
+        "chamber": "House",
+        "committee": {
+            "name": "Agriculture Committee",
+            "systemCode": "hsag00",
+            "url": "https://api.congress.gov/v3/committee/house/hsag00?format=json"
+        },
+        "congress": 119,
+        "eventId": 115678,
+        "location": "1300 Longworth House Office Building",
+        "meetingDate": "2025-05-28T10:00:00Z",
+        "title": "Hearing: Review of USDA Farm Programs",
+        "type": "HHRG",
+        "updateDate": "2025-05-20T14:32:18Z",
+        "witnesses": [
+            {
+                "firstName": "John",
+                "lastName": "Smith",
+                "organization": "Department of Agriculture",
+                "position": "Secretary"
+            },
+            {
+                "firstName": "Jane",
+                "lastName": "Doe",
+                "organization": "American Farm Bureau Federation",
+                "position": "President"
+            }
+        ],
+        "documents": [
+            {
+                "title": "Meeting Notice",
+                "type": "NOTICE",
+                "url": "https://docs.congress.gov/meetings/119/house/hsag00/115678/notice.pdf"
+            },
+            {
+                "title": "Witness Testimony - John Smith",
+                "type": "TESTIMONY",
+                "url": "https://docs.congress.gov/meetings/119/house/hsag00/115678/testimony-smith.pdf"
+            }
+        ]
+    }
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 119. |
+| `chamber` * | string (path) - The chamber name. Value can be house or senate. |
+| `committeeCode` * | string (path) - The committee system code. For example, the value can be hsag00. |
+| `eventId` * | integer (path) - The event ID for the meeting. For example, the value can be 115678. |
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+
+---
+## **Hearings API**
+
+### **GET `/hearing`**
+
+**Description**: Returns a list of hearings sorted by date of latest update.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/hearing?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "hearings": [
+        {
+            "chamber": "House",
+            "congress": 116,
+            "jacketNumber": 41444,
+            "updateDate": "2022-06-30 03:50:43+00:00",
+            "url": "https://api.congress.gov/v3/hearing/117/house/41444?format=json"
+        },
+        {
+            "chamber": "House",
+            "congress": 116,
+            "jacketNumber": 41365,
+            "updateDate": "2022-06-30 03:50:43+00:00",
+            "url": "https://api.congress.gov/v3/hearing/117/house/41365?format=json"
+        }
+    ]
+}
+```
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/hearing/{congress}`**
+
+**Description**: Returns a list of hearings filtered by the specified congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/hearing/116?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "hearings": [
+        {
+            "chamber": "House",
+            "congress": 116,
+            "jacketNumber": 41444,
+            "updateDate": "2022-06-30 03:50:43+00:00",
+            "url": "https://api.congress.gov/v3/hearing/117/house/41444?format=json"
+        },
+        {
+            "chamber": "House",
+            "congress": 116,
+            "jacketNumber": 41365,
+            "updateDate": "2022-06-30 03:50:43+00:00",
+            "url": "https://api.congress.gov/v3/hearing/117/house/41365?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 116. |
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/hearing/{congress}/{chamber}`**
+
+**Description**: Returns a list of hearings filtered by the specified congress and chamber.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/hearing/116/house?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "hearings": [
+        {
+            "chamber": "House",
+            "congress": 116,
+            "jacketNumber": 41444,
+            "updateDate": "2022-06-30 03:50:43+00:00",
+            "url": "https://api.congress.gov/v3/hearing/117/house/41444?format=json"
+        },
+        {
+            "chamber": "House",
+            "congress": 116,
+            "jacketNumber": 41365,
+            "updateDate": "2022-06-30 03:50:43+00:00",
+            "url": "https://api.congress.gov/v3/hearing/117/house/41365?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 116. |
+| `chamber` * | string (path) - The chamber name. Value can be house, senate, or nochamber. |
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/hearing/{congress}/{chamber}/{jacketNumber}`**
+
+**Description**: Returns detailed information for a specified hearing.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/hearing/116/house/41365?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "hearing": {
+        "associatedMeeting": {
+            "eventId": "110484",
+            "url": "http://api.congress.gov/v3/committee-meeting/116/house/110484?format=xml"
+        },
+        "chamber": "House",
+        "citation": "H.Hrg.116",
+        "committees": [
+            {
+                "name": "House Agriculture Committee",
+                "systemCode": "hsag00",
+                "url": "https://api.congress.gov/v3/committee/house/hsag00?format=json"
+            }
+        ],
+        "congress": 116,
+        "dates": [
+            {
+                "date": "2020-02-11"
+            }
+        ],
+        "formats": [
+            {
+                "type": "Formatted Text",
+                "url": "https://www.congress.gov/116/chrg/CHRG-116hhrg41365/CHRG-116hhrg41365.htm"
+            },
+            {
+                "type": "PDF",
+                "url": "https://www.congress.gov/116/chrg/CHRG-116hhrg41365/CHRG-116hhrg41365.pdf"
+            }
+        ],
+        "jacketNumber": 41365,
+        "libraryOfCongressIdentifier": "LC65344",
+        "title": "ECONOMIC OPPORTUNITIES FROM LOCAL AGRICULTURAL MARKETS",
+        "updateDate": "2022-06-30 03:50:43+00:00"
+    }
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 116. |
+| `chamber` * | string (path) - The chamber name. Value can be house, senate, or nochamber. |
+| `jacketNumber` * | integer (path) - The jacket number for the hearing. For example, the value can be 41365. |
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
