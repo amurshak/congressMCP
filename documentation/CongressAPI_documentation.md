@@ -3102,3 +3102,269 @@ https://api.congress.gov/v3/committee-report/116/hrpt/617/text?api_key=[INSERT_K
 | `limit`  | integer (query) - The number of records returned. The maximum limit is 250.    |
 
 ---
+
+## **Committee Print API**
+
+### **GET `/committee-print`**
+
+**Description**: Returns a list of committee prints.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-print?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeePrints": [
+        {
+            "chamber": "House",
+            "congress": 117,
+            "jacketNumber": 48144,
+            "updateDate": "2022-08-01 21:19:33+00:00",
+            "url": "https://api.congress.gov/v3/committee-print/117/house/48144?format=json"
+        },
+        {
+            "chamber": "House",
+            "congress": 117,
+            "jacketNumber": 48031,
+            "updateDate": "2022-10-19 21:15:20+00:00",
+            "url": "https://api.congress.gov/v3/committee-print/117/house/48031?format=json"
+        }
+    ]
+}
+```
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `fromDateTime` | string (query) - The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `toDateTime` | string (query) - The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/committee-print/{congress}`**
+
+**Description**: Returns a list of committee prints filtered by the specified congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-print/117?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeePrints": [
+        {
+            "chamber": "House",
+            "congress": 117,
+            "jacketNumber": 48144,
+            "updateDate": "2022-08-01 21:19:33+00:00",
+            "url": "https://api.congress.gov/v3/committee-print/117/house/48144?format=json"
+        },
+        {
+            "chamber": "House",
+            "congress": 117,
+            "jacketNumber": 48031,
+            "updateDate": "2022-10-19 21:15:20+00:00",
+            "url": "https://api.congress.gov/v3/committee-print/117/house/48031?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `fromDateTime` | string (query) - The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `toDateTime` | string (query) - The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/committee-print/{congress}/{chamber}`**
+
+**Description**: Returns a list of committee prints filtered by the specified congress and chamber.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-print/117/house?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeePrints": [
+        {
+            "chamber": "House",
+            "congress": 117,
+            "jacketNumber": 48144,
+            "updateDate": "2022-08-01 21:19:33+00:00",
+            "url": "https://api.congress.gov/v3/committee-print/117/house/48144?format=json"
+        },
+        {
+            "chamber": "House",
+            "congress": 117,
+            "jacketNumber": 48031,
+            "updateDate": "2022-10-19 21:15:20+00:00",
+            "url": "https://api.congress.gov/v3/committee-print/117/house/48031?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `chamber` * | string (path) - The chamber name. Value can be house, senate, or nochamber. |
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `fromDateTime` | string (query) - The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `toDateTime` | string (query) - The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/committee-print/{congress}/{chamber}/{jacketNumber}`**
+
+**Description**: Returns detailed information for a specified committee print.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-print/117/house/48144?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeePrint": [
+        {
+            "associatedBills": [
+                {
+                    "congress": 117,
+                    "number": "5768",
+                    "type": "HR",
+                    "url": "https://api.congress.gov/v3/bill/117/hr/5768?format=json"
+                }
+            ],
+            "chamber": "House",
+            "citation": "117-62",
+            "committees": [
+                {
+                    "name": "Rules Committee",
+                    "systemCode": "hsru00",
+                    "url": "https://api.congress.gov/v3/committee/house/hsru00?format=json"
+                }
+            ],
+            "congress": 117,
+            "jacketNumber": 48144,
+            "number": "62",
+            "text": {
+                "count": 4,
+                "url": "https://api.congress.gov/v3/committee-print/117/house/48144/text?format=json"
+            },
+            "title": "RULES COMMITTEE PRINT 117-62 TEXT OF H.R. 5768, VIOLENT INCIDENT CLEAR- ANCE AND TECHNOLOGICAL INVESTIGATIVE METHODS ACT OF 2022",
+            "updateDate": "2022-08-01 21:19:33+00:00"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `chamber` * | string (path) - The chamber name. Value can be house, senate, or nochamber. |
+| `jacketNumber` * | integer (path) - The jacket number for the print. For example, the value can be 48144. |
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+
+---
+
+### **GET `/committee-print/{congress}/{chamber}/{jacketNumber}/text`**
+
+**Description**: Returns the list of texts for a specified committee print.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-print/117/house/48144/text?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "text": [
+        {
+            "type": "Formatted Text",
+            "url": "https://www.congress.gov/117/cprt/HPRT48144/CPRT-117HPRT48144.htm"
+        },
+        {
+            "type": "PDF",
+            "url": "https://www.congress.gov/117/cprt/HPRT48144/CPRT-117HPRT48144.pdf"
+        },
+        {
+            "type": "Formatted XML",
+            "url": "https://www.congress.gov/117/cprt/HPRT48144/CPRT-117HPRT48144.xml"
+        },
+        {
+            "type": "Generated HTML",
+            "url": "https://www.congress.gov/117/cprt/HPRT48144/CPRT-117HPRT48144_gen.htm"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `chamber` * | string (path) - The chamber name. Value can be house, senate, or nochamber. |
+| `jacketNumber` * | integer (path) - The jacket number for the print. For example, the value can be 48144. |
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
