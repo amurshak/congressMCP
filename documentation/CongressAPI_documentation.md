@@ -2002,3 +2002,287 @@ https://api.congress.gov/v3/congress/current?api_key=[INSERT_KEY]
 **Note**: All responses support `application/xml` and `application/json` content types depending on the `format` parameter.
 
 For full integration, ensure proper authentication using your API key in each request.
+
+---
+
+## **[BETA] House Vote API Documentation**
+
+Returns House of Representatives roll call vote data from the API. These endpoints are currently in beta.
+
+Base URL: `https://api.congress.gov/v3/house-vote`
+
+All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
+
+---
+
+### **GET `/house-vote`**
+
+**Description**: Returns House of Representatives roll call vote data from the API. This endpoint is currently in beta.
+
+**Example Request**:
+
+`https://api.congress.gov/v3/house-vote?api_key=[INSERT_KEY]`
+
+**Example Response**:
+
+```json
+{
+    "houseRollCallVotes": [
+        {
+           "congress": 119,
+           "identifier": 1191202517,
+           "legislationNumber": "30",
+           "legislationType": "HR",
+           "legislationUrl": "https://congress.gov/bill/119/house-bill/30",
+           "result": "Passed",
+           "rollCallNumber": 17,
+           "sessionNumber": 1,
+           "sourceDataURL": "https://clerk.house.gov/evs/2025/roll017.xml",
+           "startDate": "2025-01-16T11:00:00-05:00",
+           "updateDate": "2025-04-18T08:44:47-04:00",
+           "url": "https://api.congress.gov/v3/house-vote/119/1/17",
+           "voteType": "Yea-and-Nay"
+        }
+    ]
+ }
+```
+
+**Query Parameters**:
+
+*   `format` (string): The data format. Value can be xml or json.
+*   `offset` (integer): The starting record returned. 0 is the first record.
+*   `limit` (integer): The number of records returned. The maximum limit is 250.
+
+---
+
+### **GET `/house-vote/{congress}`**
+
+**Description**: Returns House of Representatives roll call vote data from the API filtered by the specified Congress. This endpoint is currently in beta.
+
+**Example Request**:
+
+`https://api.congress.gov/v3/house-vote/119?api_key=[INSERT_KEY]`
+
+**Example Response**:
+
+```json
+{
+    "houseRollCallVotes": [
+        {
+           "congress": 119,
+           "identifier": 1191202517,
+           "legislationNumber": "30",
+           "legislationType": "HR",
+           "legislationUrl": "https://congress.gov/bill/119/house-bill/30",
+           "result": "Passed",
+           "rollCallNumber": 17,
+           "sessionNumber": 1,
+           "sourceDataURL": "https://clerk.house.gov/evs/2025/roll017.xml",
+           "startDate": "2025-01-16T11:00:00-05:00",
+           "updateDate": "2025-04-18T08:44:47-04:00",
+           "url": "https://api.congress.gov/v3/house-vote/119/1/17",
+           "voteType": "Yea-and-Nay"
+        }
+    ]
+ }
+```
+
+**Path Parameters**:
+
+*   `congress` (integer): The congress number. For example, the value can be 119.
+
+**Query Parameters**:
+
+*   `format` (string): The data format. Value can be xml or json.
+*   `offset` (integer): The starting record returned. 0 is the first record.
+*   `limit` (integer): The number of records returned. The maximum limit is 250.
+
+---
+
+### **GET `/house-vote/{congress}/{session}`**
+
+**Description**: Returns House of Representatives roll call vote data from the API filtered by the specified Congress and session. This endpoint is currently in beta.
+
+**Example Request**:
+
+`https://api.congress.gov/v3/house-vote/119/1?api_key=[INSERT_KEY]`
+
+**Example Response**:
+
+```json
+{
+    "houseRollCallVotes": [
+        {
+           "congress": 119,
+           "identifier": 1191202517,
+           "legislationNumber": "30",
+           "legislationType": "HR",
+           "legislationUrl": "https://congress.gov/bill/119/house-bill/30",
+           "result": "Passed",
+           "rollCallNumber": 17,
+           "sessionNumber": 1,
+           "sourceDataURL": "https://clerk.house.gov/evs/2025/roll017.xml",
+           "startDate": "2025-01-16T11:00:00-05:00",
+           "updateDate": "2025-04-18T08:44:47-04:00",
+           "url": "https://api.congress.gov/v3/house-vote/119/1/17",
+           "voteType": "Yea-and-Nay"
+        }
+    ]
+ }
+```
+
+**Path Parameters**:
+
+*   `congress` (integer): The congress number. For example, the value can be 119.
+*   `session` (integer): The session number. The value can be 1 or 2.
+
+**Query Parameters**:
+
+*   `format` (string): The data format. Value can be xml or json.
+*   `offset` (integer): The starting record returned. 0 is the first record.
+*   `limit` (integer): The number of records returned. The maximum limit is 250.
+
+---
+
+### **GET `/house-vote/{congress}/{session}/{voteNumber}`**
+
+**Description**: Returns detailed information for a specified House of Representatives roll call vote. This endpoint is currently in beta.
+
+**Example Request**:
+
+`https://api.congress.gov/v3/house-vote/119/1/17?api_key=[INSERT_KEY]`
+
+**Example Response**:
+
+```json
+{
+  "houseRollCallVote": [
+    {
+        "congress": 119,
+        "identifier": 1191202517,
+        "legislationNumber": "30",
+        "legislationType": "HR",
+        "legislationUrl": "https://congress.gov/bill/119/house-bill/30",
+        "result": "Passed",
+        "rollCallNumber": 17,
+        "sessionNumber": 1,
+        "sourceDataURL": "https://clerk.house.gov/evs/2025/roll017.xml",
+        "startDate": "2025-01-16T11:00:00-05:00",
+        "updateDate": "2025-04-18T08:44:47-04:00",
+        "votePartyTotal": [
+            {
+                 "nayTotal": 0,
+                 "notVotingTotal": 6,
+                 "party": {
+                     "name": "Republican",
+                     "type": "R"
+            },
+                 "presentTotal": 0,
+                 "voteParty": "R",
+                 "yeaTotal": 213
+            },
+            {
+                 "nayTotal": 145,
+                 "notVotingTotal": 9,
+                 "party": {
+                     "name": "Democrat",
+                     "type": "D"
+            },
+                 "presentTotal": 0,
+                 "voteParty": "D",
+                 "yeaTotal": 61
+            },
+            {
+                 "nayTotal": 0,
+                 "notVotingTotal": 0,
+                 "party": {
+                     "name": "Independent",
+                     "type": "I"
+            },
+                 "presentTotal": 0,
+                 "voteParty": "I",
+                 "yeaTotal": 0
+            }
+       ],
+       "voteQuestion": "On Passage",
+       "voteType": "Yea-and-Nay"
+  }
+]
+}
+```
+
+**Path Parameters**:
+
+*   `congress` (integer): The congress number. For example, the value can be 119.
+*   `session` (integer): The session number. The value can be 1 or 2.
+*   `voteNumber` (integer): The assigned roll call vote number. For example, 17.
+
+**Query Parameters**:
+
+*   `format` (string): The data format. Value can be xml or json.
+*   `offset` (integer): The starting record returned. 0 is the first record.
+*   `limit` (integer): The number of records returned. The maximum limit is 250.
+
+---
+
+### **GET `/house-vote/{congress}/{session}/{voteNumber}/members`**
+
+**Description**: Returns detailed information for how members voted on a specified House of Representatives roll call vote. This endpoint is currently in beta.
+
+**Example Request**:
+
+`https://api.congress.gov/v3/house-vote/119/1/17/members?api_key=[INSERT_KEY]`
+
+**Example Response**:
+
+```json
+{
+  "houseRollCallMemberVotes": [
+    {
+        "congress": 119,
+        "identifier": 1191202517,
+        "legislationNumber": "30",
+        "legislationType": "HR",
+        "legislationUrl": "https://congress.gov/bill/119/house-bill/30",
+        "results": [
+            {
+              "bioguideID": "A000055",
+              "firstName": "Robert",
+              "lastName": "Aderholt",
+              "voteCast": "Yea",
+              "voteParty": "R",
+              "voteState": "AL"
+            },
+            {
+              "bioguideID": "A000148",
+              "firstName": "Jake",
+              "lastName": "Auchincloss",
+              "voteCast": "Nay",
+              "voteParty": "D",
+              "voteState": "MA"
+            }
+       ],
+       "result": "Passed",
+       "rollCallNumber": 17,
+       "sessionNumber": 1,
+       "sourceDataURL": "https://clerk.house.gov/evs/2025/roll017.xml",
+       "startDate": "2025-01-16T11:00:00-05:00",
+       "updateDate": "2025-04-18T08:44:47-04:00",
+       "voteQuestion": "On Passage",
+       "voteType": "Yea-and-Nay"
+  }
+]
+}
+```
+
+**Path Parameters**:
+
+*   `congress` (integer): The congress number. For example, the value can be 119.
+*   `session` (integer): The session number. The value can be 1 or 2.
+*   `voteNumber` (integer): The assigned roll call vote number. For example, 17.
+
+**Query Parameters**:
+
+*   `format` (string): The data format. Value can be xml or json.
+*   `offset` (integer): The starting record returned. 0 is the first record.
+*   `limit` (integer): The number of records returned. The maximum limit is 250.
