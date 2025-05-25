@@ -3853,3 +3853,97 @@ https://api.congress.gov/v3/hearing/116/house/41365?api_key=[INSERT_KEY]
 | Name | Description |
 |------|-------------|
 | `format` | string (query) - The data format. Value can be xml or json. |
+## **Congressional Record API**
+
+### **GET `/congressional-record`**
+
+**Description**: Returns a list of congressional record issues sorted by most recent.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/congressional-record/?y=2022&m=6&d=28&api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "Results": {
+        "IndexStart": 1,
+        "Issues": [
+            {
+                "Congress": "117",
+                "Id": 26958,
+                "Issue": "109",
+                "Links": {
+                    "Digest": {
+                        "Label": "Daily Digest",
+                        "Ordinal": 1,
+                        "PDF": [
+                            {
+                                "Part": "1",
+                                "Url": "https://www.congress.gov/117/crec/2022/06/28/168/109/CREC-2022-06-28-dailydigest.pdf"
+                            }
+                        ]
+                    },
+                    "FullRecord": {
+                        "Label": "Entire Issue",
+                        "Ordinal": 5,
+                        "PDF": [
+                            {
+                                "Part": "1",
+                                "Url": "https://www.congress.gov/117/crec/2022/06/28/168/109/CREC-2022-06-28.pdf"
+                            }
+                        ]
+                    },
+                    "House": {
+                        "Label": "House Section",
+                        "Ordinal": 3,
+                        "PDF": [
+                            {
+                                "Part": "1",
+                                "Url": "https://www.congress.gov/117/crec/2022/06/28/168/109/CREC-2022-06-28-house.pdf"
+                            }
+                        ]
+                    },
+                    "Remarks": {
+                        "Label": "Extensions of Remarks Section",
+                        "Ordinal": 4,
+                        "PDF": [
+                            {
+                                "Part": "1",
+                                "Url": "https://www.congress.gov/117/crec/2022/06/28/168/109/CREC-2022-06-28-extensions.pdf"
+                            }
+                        ]
+                    },
+                    "Senate": {
+                        "Label": "Senate Section",
+                        "Ordinal": 2,
+                        "PDF": [
+                            {
+                                "Part": "1",
+                                "Url": "https://www.congress.gov/117/crec/2022/06/28/168/109/CREC-2022-06-28-senate.pdf"
+                            }
+                        ]
+                    }
+                },
+                "PublishDate": "2022-06-28",
+                "Session": "2",
+                "Volume": "168"
+            }
+        ]
+    }
+}
+```
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `y` | integer (query) - The year the issue was published. For example, the value can be 2022. |
+| `m` | integer (query) - The month the issue was published. For example, the value can be 6. |
+| `d` | integer (query) - The day the issue was published. For example, the value can be 28. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |

@@ -12,6 +12,7 @@ from . import committee_reports
 from . import committee_prints
 from . import committee_meetings
 from . import hearings
+from . import congressional_record
 
 __all__ = [
     "amendments",
@@ -24,5 +25,6 @@ __all__ = [
     "committee_reports",
     "committee_prints",
     "committee_meetings",
-    "hearings"
+    "hearings",
+    "congressional_record"
 ]
