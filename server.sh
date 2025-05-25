@@ -13,10 +13,11 @@ if pids=$(lsof -t -i:6274); then kill -9 $pids 2>/dev/null; fi
 # Also attempt the original pkill for the server process itself
 echo "Attempting to stop the main server process (mcp dev run_server.py)..."
 pkill -f "mcp dev.*run_server\.py" || true
+pkill -f "mcp run.*run_server\.py" || true
 
 # Add a small delay to allow ports to be fully released by the OS
 echo "Waiting for ports to be released..."
 sleep 2
 
-echo "Starting Congressional MCP server in dev mode..."
+echo "Starting Congressional MCP server with 'mcp dev' (includes MCP Inspector)..."
 source env/bin/activate && mcp dev run_server.py

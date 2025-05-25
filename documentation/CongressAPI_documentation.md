@@ -2285,4 +2285,595 @@ All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
 
 *   `format` (string): The data format. Value can be xml or json.
 *   `offset` (integer): The starting record returned. 0 is the first record.
-*   `limit` (integer): The number of records returned. The maximum limit is 250.
+*   `limit` (integer): The number of records returned. The maximum limit is 250.# **Congress.gov Committee API Documentation**
+
+## **Overview**
+
+The Congress.gov Committee API provides structured access to congressional committee data, including committee details, subcommittees, bills referred to committees, reports, nominations, and communications.
+
+Base URL: `https://api.congress.gov/v3/committee`
+
+All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
+
+---
+
+## **Endpoints**
+
+### **GET `/committee`**
+
+**Description**: Returns a list of congressional committees.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+     "committees": [
+        {
+            "chamber": "House",
+            "committeeTypeCode": "Standing",
+            "updateDate": "2020-02-04T00:07:37Z",
+            "name": "Transportation and Infrastructure Committee",
+            "parent": null,
+            "subcommittees": [
+                {
+                    "name": "Investigations and Oversight Subcommittee",
+                    "systemCode": "hspw01",
+                    "url": "https://api.congress.gov/v3/committee/house/hspw01?format=json"
+                },
+                {
+                    "name": "Aviation Subcommittee",
+                    "systemCode": "hspw05",
+                    "url": "https://api.congress.gov/v3/committee/house/hspw05?format=json"
+                }
+            ],
+            "systemCode": "hspw00",
+            "url": "https://api.congress.gov/v3/committee/house/hspw00?format=json"
+        }
+     ]
+}
+```
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+| fromDateTime | The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| toDateTime | The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/committee/{chamber}`**
+
+**Description**: Returns a list of congressional committees filtered by the specified chamber.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/house?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+     "committees": [
+        {
+            "chamber": "House",
+            "committeeTypeCode": "Standing",
+            "name": "Transportation and Infrastructure Committee",
+            "parent": null,
+            "subcommittees": [
+                {
+                    "name": "Investigations and Oversight Subcommittee",
+                    "systemCode": "hspw01",
+                    "url": "https://api.congress.gov/v3/committee/house/hspw01?format=json"
+                },
+                {
+                    "name": "Aviation Subcommittee",
+                    "systemCode": "hspw05",
+                    "url": "https://api.congress.gov/v3/committee/house/hspw05?format=json"
+                }
+            ],
+            "systemCode": "hspw00",
+            "url": "https://api.congress.gov/v3/committee/house/hspw00?format=json"
+        }
+     ]
+}
+```
+
+**Path Parameters**:
+
+* `chamber` (string): The chamber name. Value can be house, senate, or joint.
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+| fromDateTime | The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| toDateTime | The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/committee/{congress}`**
+
+**Description**: Returns a list of congressional committees filtered by the specified congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/117?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+     "committees": [
+        {
+            "chamber": "House",
+            "committeeTypeCode": "Standing",
+            "name": "Transportation and Infrastructure Committee",
+            "parent": null,
+            "subcommittees": [
+                {
+                    "name": "Investigations and Oversight Subcommittee",
+                    "systemCode": "hspw01",
+                    "url": "https://api.congress.gov/v3/committee/house/hspw01?format=json"
+                }
+            ],
+            "systemCode": "hspw00",
+            "url": "https://api.congress.gov/v3/committee/house/hspw00?format=json"
+        }
+     ]
+}
+```
+
+**Path Parameters**:
+
+* `congress` (integer): The congress number. For example, the value can be 117.
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+| fromDateTime | The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| toDateTime | The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/committee/{congress}/{chamber}`**
+
+**Description**: Returns a list of committees filtered by the specified congress and chamber.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/117/house?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+     "committees": [
+        {
+            "chamber": "House",
+            "committeeTypeCode": "Standing",
+            "name": "Transportation and Infrastructure Committee",
+            "parent": null,
+            "subcommittees": [
+                {
+                    "name": "Investigations and Oversight Subcommittee",
+                    "systemCode": "hspw01",
+                    "url": "https://api.congress.gov/v3/committee/house/hspw01?format=json"
+                }
+            ],
+            "systemCode": "hspw00",
+            "url": "https://api.congress.gov/v3/committee/house/hspw00?format=json"
+        }
+     ]
+}
+```
+
+**Path Parameters**:
+
+* `congress` (integer): The congress number. For example, the value can be 117.
+* `chamber` (string): The chamber name. Value can be house, senate, or joint.
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+| fromDateTime | The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| toDateTime | The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/committee/{chamber}/{committeeCode}`**
+
+**Description**: Returns detailed information for a specified congressional committee.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/house/hspw00?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committee": {
+        "bills": {
+            "count": 25384,
+            "url": "https://api.congress.gov/v3/committee/house/hspw00/bills?format=json"
+        },
+        "communications": {
+            "count": 6775,
+            "url": "https://api.congress.gov/v3/committee/house/hspw00/house-communication?format=json"
+        },
+        "history": [
+            {
+                "libraryOfCongressName": "Transportation and Infrastructure",
+                "officialName": "Committee on Transportation and Infrastructure",
+                "startDate": "1995-01-04T05:00:00Z",
+                "updateDate": "2020-02-14T19:13:07Z"
+            },
+            {
+                "endDate": "1995-01-03T05:00:00Z",
+                "libraryOfCongressName": "Public Works and Transportation",
+                "officialName": "Committee on Public Works and Transportation",
+                "startDate": "1975-01-01T05:00:00Z",
+                "updateDate": "2020-02-10T16:49:05Z"
+            }
+        ],
+        "isCurrent": true,
+        "reports": {
+            "count": 1382,
+            "url": "https://api.congress.gov/v3/committee/house/hspw00/reports?format=json"
+        },
+        "subcommittees": [
+            {
+                "name": "Investigations and Oversight Subcommittee",
+                "systemCode": "hspw01",
+                "url": "https://api.congress.gov/v3/committee/house/hspw01?format=json"
+            },
+            {
+                "name": "Aviation Subcommittee",
+                "systemCode": "hspw05",
+                "url": "https://api.congress.gov/v3/committee/house/hspw05?format=json"
+            }
+        ],
+        "systemCode": "hspw00",
+        "type": "Standing",
+        "updateDate": "2020-02-04T00:07:37Z"
+    }
+}
+```
+
+**Path Parameters**:
+
+* `chamber` (string): The chamber name. Value can be house, senate, or joint.
+* `committeeCode` (string): The committee code for the committee. For example, the value can be hspw00.
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+
+---
+
+### **GET `/committee/{chamber}/{committeeCode}/bills`**
+
+**Description**: Returns the list of legislation associated with the specified congressional committee.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/house/hspw00/bills?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committee-bills": {
+        "bills": [
+            {
+                "actionDate": "2012-04-19T13:01:00Z",
+                "congress": 112,
+                "number": "117",
+                "relationshipType": "Referred to",
+                "type": "HCONRES",
+                "updateDate": "2019-02-17T21:10:13Z",
+                "url": "https://api.congress.gov/v3/bill/112/hconres/117?format=json"
+            },
+            {
+                "actionDate": "2012-02-08T14:51:00Z",
+                "congress": 112,
+                "number": "543",
+                "relationshipType": "Referred to",
+                "type": "HRES",
+                "updateDate": "2019-02-17T21:05:25Z",
+                "url": "https://api.congress.gov/v3/bill/112/hres/543?format=json"
+            }
+        ]
+    }
+}
+```
+
+**Path Parameters**:
+
+* `chamber` (string): The chamber name. Value can be house, senate, or joint.
+* `committeeCode` (string): The committee code for the committee. For example, the value can be hspw00.
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+| fromDateTime | The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| toDateTime | The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/committee/{chamber}/{committeeCode}/reports`**
+
+**Description**: Returns the list of committee reports associated with a specified congressional committee.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/house/hspw00/reports?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "reports": [
+        {
+            "chamber": "House",
+            "citation": "H. Rept. 109-570",
+            "congress": 109,
+            "number": 570,
+            "part": 1,
+            "type": "HRPT",
+            "updateDate": "2015-03-20 00:04:12+00:00",
+            "url": "https://api.congress.gov/v3/committee-report/109/HRPT/570?format=json"
+        },
+        {
+            "chamber": "House",
+            "citation": "H. Rept. 109-121",
+            "congress": 109,
+            "number": 121,
+            "part": 1,
+            "type": "HRPT",
+            "updateDate": "2015-03-20 00:06:53+00:00",
+            "url": "https://api.congress.gov/v3/committee-report/109/HRPT/121?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+* `chamber` (string): The chamber name. Value can be house, senate, or joint.
+* `committeeCode` (string): The committee code for the committee. For example, the value can be hspw00.
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+| fromDateTime | The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| toDateTime | The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/committee/{chamber}/{committeeCode}/nominations`**
+
+**Description**: Returns the list of nominations associated with a specified congressional committee.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/senate/ssas00/nominations?format=json&api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "nominations": [
+        {
+            "citation": "PN2477",
+            "congress": 117,
+            "description": " ",
+            "latestAction": {
+                "actionDate": "2022-09-29",
+                "text": "Confirmed by the Senate by Voice Vote."
+            },
+            "nominationType": {
+                "isCivilian": false,
+                "isMilitary": true
+            },
+            "number": 2477,
+            "partNumber": "00",
+            "receivedDate": "2022-08-03",
+            "updateDate": "2022-09-30 04:40:14+00:00",
+            "url": "https://api.congress.gov/v3/nomination/117/2477?format=json"
+        },
+        {
+            "citation": "PN2486",
+            "congress": 117,
+            "description": " ",
+            "latestAction": {
+                "actionDate": "2022-09-29",
+                "text": "Confirmed by the Senate by Voice Vote."
+            },
+            "nominationType": {
+                "isCivilian": false,
+                "isMilitary": true
+            },
+            "number": 2486,
+            "partNumber": "00",
+            "receivedDate": "2022-08-03",
+            "updateDate": "2022-09-30 04:40:15+00:00",
+            "url": "https://api.congress.gov/v3/nomination/117/2486?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+* `chamber` (string): The chamber name. Value will be senate.
+* `committeeCode` (string): The committee code for the committee. For example, the value can be ssas00.
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/committee/{chamber}/{committeeCode}/house-communication`**
+
+**Description**: Returns the list of House communications associated with a specified congressional committee.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/house/hspw00/house-communication?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "houseCommunications": [
+        {
+            "chamber": "House",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 114,
+            "number": 3262,
+            "referralDate": "2015-10-27",
+            "updateDate": "2018-02-02",
+            "url": "https://api.congress.gov/v3/house-communication/114/ec/3262?format=json"
+        },
+        {
+            "chamber": "House",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 115,
+            "number": 3263,
+            "referralDate": "2015-10-27",
+            "updateDate": "2018-02-02",
+            "url": "https://api.congress.gov/v3/house-communication/114/ec/3263?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+* `chamber` (string): The chamber name. Value will be house.
+* `committeeCode` (string): The committee code for the committee. For example, the value can be hspw00.
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/committee/{chamber}/{committeeCode}/senate-communication`**
+
+**Description**: Returns the list of Senate communications associated with a specified congressional committee.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee/senate/ssas00/senate-communication?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "senateCommunications": [
+        {
+            "chamber": "Senate",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 114,
+            "number": 7402,
+            "referralDate": "2016-11-16",
+            "updateDate": "2017-01-06",
+            "url": "https://api.congress.gov/v3/senate-communication/114/ec/7402?format=json"
+        },
+        {
+            "chamber": "Senate",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 114,
+            "number": 7403,
+            "referralDate": "2016-11-16",
+            "updateDate": "2017-01-06",
+            "url": "https://api.congress.gov/v3/senate-communication/114/ec/7403?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+* `chamber` (string): The chamber name. Value will be senate.
+* `committeeCode` (string): The committee code for the committee. For example, the value can be ssas00.
+
+**Query Parameters**:
+
+| Name | Description |
+|------|-------------|
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
