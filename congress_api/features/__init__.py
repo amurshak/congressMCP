@@ -8,6 +8,7 @@ from . import congress_info
 from . import house_votes
 from . import members
 from . import summaries
+from . import committee_reports
 
 __all__ = [
     "amendments",
@@ -16,5 +17,6 @@ __all__ = [
     "congress_info",
     "house_votes",
     "members",
-    "summaries"
+    "summaries",
+    "committee_reports"
 ]

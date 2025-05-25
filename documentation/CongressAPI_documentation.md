@@ -1511,48 +1511,6 @@ https://api.congress.gov/v3/member/congress/97/TX/10?currentMember=False&api_key
 
 ---
 
-## **MCP Tools for Congress API**
-
-### **get_congress_info**
-
-**Description**: Get information about a Congress.
-
-**Parameters**:
-
-| Name | Description | Required | Default |
-|------|-------------|----------|--------|
-| congress | Congress number (e.g., 117 for 117th Congress) | No | None |
-| current | If True, get information about the current Congress | No | False |
-| limit | Maximum number of congresses to return if no specific congress is requested | No | 10 |
-| detailed | If True, include more detailed information about the Congress | No | False |
-| format_type | Output format type ("markdown" or "table") for list of congresses | No | "markdown" |
-
-**Example**:
-
-```python
-result = await get_congress_info(congress=117, detailed=True)
-```
-
-### **get_committee_bills**
-
-**Description**: Get bills referred to a specific committee.
-
-**Parameters**:
-
-| Name | Description | Required | Default |
-|------|-------------|----------|--------|
-| chamber | The chamber of Congress ("house" or "senate") | Yes | N/A |
-| committee_code | The committee code (e.g., "hsag", "ssap") | Yes | N/A |
-| limit | Maximum number of bills to return | No | 10 |
-
-**Example**:
-
-```python
-result = await get_committee_bills(chamber="house", committee_code="hsag", limit=20)
-```
-
----
-
 ## **Summaries API**
 
 ### **GET `/summaries`**
@@ -1790,6 +1748,7 @@ https://api.congress.gov/v3/congress?api_key=[INSERT_KEY]
         {
             "endYear": "2022",
             "name": "117th Congress",
+            "number": 117,
             "sessions": [
                 {
                     "chamber": "House of Representatives",
@@ -1807,14 +1766,14 @@ https://api.congress.gov/v3/congress?api_key=[INSERT_KEY]
                 },
                 {
                     "chamber": "House of Representatives",
-                    "endDate": null,
+                    "endDate": "2023-01-03",
                     "number": 2,
                     "startDate": "2022-01-03",
                     "type": "R"
                 },
                 {
                     "chamber": "Senate",
-                    "endDate": null,
+                    "endDate": "2023-01-03",
                     "number": 2,
                     "startDate": "2022-01-03",
                     "type": "R"
@@ -1825,6 +1784,7 @@ https://api.congress.gov/v3/congress?api_key=[INSERT_KEY]
         {
             "endYear": "2020",
             "name": "116th Congress",
+            "number": 116,
             "sessions": [
                 {
                     "chamber": "House of Representatives",
@@ -2285,7 +2245,11 @@ All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
 
 *   `format` (string): The data format. Value can be xml or json.
 *   `offset` (integer): The starting record returned. 0 is the first record.
-*   `limit` (integer): The number of records returned. The maximum limit is 250.# **Congress.gov Committee API Documentation**
+*   `limit` (integer): The number of records returned. The maximum limit is 250.
+
+---
+
+## **Congress.gov Committee API Documentation**
 
 ## **Overview**
 
@@ -2877,3 +2841,264 @@ https://api.congress.gov/v3/committee/senate/ssas00/senate-communication?api_key
 | format | The data format. Value can be xml or json. |
 | offset | The starting record returned. 0 is the first record. |
 | limit | The number of records returned. The maximum limit is 250. |
+
+---
+
+## **Committee Report API**
+
+**Overview**
+
+Returns committee report data from the API.
+
+Base URL: `https://api.congress.gov/v3/committee-report`
+
+All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
+
+---
+
+### **GET `/committee-report`**
+
+**Description**: Returns a list of committee reports.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-report?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+      "reports": [
+        {
+            "chamber": "House",
+            "citation": "H. Rept. 117-397,Part 2",
+            "congress": 117,
+            "number": 397,
+            "part": 2,
+            "type": "HRPT",
+            "updateDate": "2022-09-29 03:27:29+00:00",
+            "url": "https://api.congress.gov/v3/committee-report/117/HRPT/397?format=json"
+        },
+        {
+            "chamber": "House",
+            "citation": "H. Rept. 117-397",
+            "congress": 117,
+            "number": 397,
+            "part": 1,
+            "type": "HRPT",
+            "updateDate": "2022-09-29 03:27:29+00:00",
+            "url": "https://api.congress.gov/v3/committee-report/117/HRPT/397?format=json"
+        }
+    ]
+}
+```
+
+**Query Parameters**:
+
+| Name         | Description                                                                    |
+|--------------|--------------------------------------------------------------------------------|
+| `format`     | string (query) - The data format. Value can be xml or json.                    |
+| `conference` | string (query) - Flag to indicate conference reports. Value can be true or false. |
+| `offset`     | integer (query) - The starting record returned. 0 is the first record.         |
+| `limit`      | integer (query) - The number of records returned. The maximum limit is 250.    |
+| `fromDateTime` | string (query) - The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `toDateTime`   | string (query) - The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z.   |
+
+---
+
+### **GET `/committee-report/{congress}`**
+
+**Description**: Returns a list of committee reports filtered by the specified congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-report/116?conference=true&api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "reports": [
+        {
+            "chamber": "House",
+            "citation": "H. Rept. 116-617",
+            "congress": 116,
+            "number": 617,
+            "part": 1,
+            "type": "HRPT",
+            "updateDate": "2022-05-20 16:27:57+00:00",
+            "url": "https://api.congress.gov/v3/committee-report/116/HRPT/617?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name       | Description                                           |
+|------------|-------------------------------------------------------|
+| `congress` * | integer (path) - The congress number. E.g., 116. |
+
+**Query Parameters**: Same as for `/committee-report`.
+
+---
+
+### **GET `/committee-report/{congress}/{reportType}`**
+
+**Description**: Returns a list of committee reports filtered by the specified congress and report type.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-report/116/hrpt?conference=true&api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "reports": [
+        {
+            "chamber": "House",
+            "citation": "H. Rept. 116-617",
+            "congress": 116,
+            "number": 617,
+            "part": 1,
+            "type": "HRPT",
+            "updateDate": "2022-05-20 16:27:57+00:00",
+            "url": "https://api.congress.gov/v3/committee-report/116/HRPT/617?format=json"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name         | Description                                                              |
+|--------------|--------------------------------------------------------------------------|
+| `congress` *   | integer (path) - The congress number. E.g., 116.                       |
+| `reportType` * | string (path) - The type of committee report. Value can be hrpt, srpt, or erpt. |
+
+**Query Parameters**: Same as for `/committee-report`.
+
+---
+
+### **GET `/committee-report/{congress}/{reportType}/{reportNumber}`**
+
+**Description**: Returns detailed information for a specified committee report.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-report/116/HRPT/617?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committeeReports": [
+        {
+            "associatedBill": [
+                {
+                    "congress": 116,
+                    "number": "6395",
+                    "type": "HR",
+                    "url": "https://api.congress.gov/v3/bill/116/hr/6395?format=json"
+                }
+            ],
+            "chamber": "House",
+            "citation": "H. Rept. 116-617",
+            "congress": 116,
+            "isConferenceReport": true,
+            "issueDate": "2020-12-03T05:00:00Z",
+            "number": 617,
+            "part": 1,
+            "reportType": "H.Rept.",
+            "sessionNumber": 2,
+            "text": {
+              "count": 2,
+              "url": "https://api.congress.gov/v3/committee-report/116/hrpt/617/text?format=json"
+            },
+            "title": "WILLIAM M. (MAC) THORNBERRY NATIONAL DEFENSE AUTHORIZATION ACT FOR FISCAL YEAR 2021",
+            "type": "HRPT",
+            "updateDate": "2022-05-20T16:27:57Z"
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name           | Description                                                              |
+|----------------|--------------------------------------------------------------------------|
+| `congress` *     | integer (path) - The congress number. E.g., 116.                       |
+| `reportType` *   | string (path) - The type of committee report. Value can be hrpt, srpt, or erpt. |
+| `reportNumber` * | integer (path) - The committee report’s assigned number. E.g., 617.    |
+
+**Query Parameters**:
+
+| Name     | Description                                                       |
+|----------|-------------------------------------------------------------------|
+| `format` | string (query) - The data format. Value can be xml or json.       |
+
+---
+
+### **GET `/committee-report/{congress}/{reportType}/{reportNumber}/text`**
+
+**Description**: Returns the list of texts for a specified committee report.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/committee-report/116/hrpt/617/text?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "text": [
+        {
+            "formats": [
+                {
+                    "isErrata": "N",
+                    "type": "Formatted Text",
+                    "url": "https://www.congress.gov/116/crpt/hrpt617/generated/CRPT-116hrpt617.htm"
+                }
+            ]
+        },
+        {
+            "formats": [
+                {
+                    "isErrata": "N",
+                    "type": "PDF",
+                    "url": "https://www.congress.gov/116/crpt/hrpt617/CRPT-116hrpt617.pdf"
+                }
+            ]
+        }
+    ]
+}
+```
+
+**Path Parameters**:
+
+| Name           | Description                                                              |
+|----------------|--------------------------------------------------------------------------|
+| `congress` *     | integer (path) - The congress number. E.g., 116.                       |
+| `reportType` *   | string (path) - The type of committee report. Value can be hrpt, srpt, or erpt. |
+| `reportNumber` * | integer (path) - The committee report’s assigned number. E.g., 617.    |
+
+**Query Parameters**:
+
+| Name     | Description                                                                    |
+|----------|--------------------------------------------------------------------------------|
+| `format` | string (query) - The data format. Value can be xml or json.                    |
+| `offset` | integer (query) - The starting record returned. 0 is the first record.         |
+| `limit`  | integer (query) - The number of records returned. The maximum limit is 250.    |
+
+---
