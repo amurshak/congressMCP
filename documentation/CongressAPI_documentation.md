@@ -4849,3 +4849,221 @@ https://api.congress.gov/v3/house-requirement/8070/matching-communications?api_k
 | `offset` | integer (query) - The starting record returned. 0 is the first record. |
 | `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
 | `requirementNumber` * | integer (path) - The requirement's assigned number. For example, the value can be 8070. |
+---
+
+# **Senate Communication API Documentation**
+
+## **Overview**
+
+The Senate Communication API provides access to Senate communication data from the Congress.gov API.
+
+Base URL: `https://api.congress.gov/v3/senate-communication`
+
+All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
+
+---
+
+## **Endpoints**
+
+### **GET `/senate-communication`**
+
+**Description**: Returns a list of Senate communications.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/senate-communication?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "senateCommunications": [
+        {
+            "chamber": "Senate",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 117,
+            "number": 1615,
+            "updateDate": "2021-08-16 20:24:19+00:00",
+            "url": "https://api.congress.gov/v3/senate-communication/117/ec/1615?format=json"
+        },
+        {
+            "chamber": "Senate",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 117,
+            "number": 2040,
+            "updateDate": "2021-09-23 07:15:14+00:00",
+            "url": "https://api.congress.gov/v3/senate-communication/117/ec/2040?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/senate-communication/{congress}`**
+
+**Description**: Returns a list of Senate communications filtered by the specified congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/senate-communication/117?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "senateCommunications": [
+        {
+            "chamber": "Senate",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 117,
+            "number": 1615,
+            "updateDate": "2021-08-16T20:24:19Z",
+            "url": "https://api.congress.gov/v3/senate-communication/117/ec/1615?format=json"
+        },
+        {
+            "chamber": "Senate",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 117,
+            "number": 2040,
+            "updateDate": "2021-09-23T07:15:14Z",
+            "url": "https://api.congress.gov/v3/senate-communication/117/ec/2040?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+
+---
+
+### **GET `/senate-communication/{congress}/{communicationType}`**
+
+**Description**: Returns a list of Senate communications filtered by the specified congress and communication type.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/senate-communication/117/ec?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "senateCommunications": [
+        {
+            "chamber": "Senate",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 117,
+            "number": 1615,
+            "updateDate": "2021-08-16 20:24:19+00:00",
+            "url": "https://api.congress.gov/v3/senate-communication/117/ec/1615?format=json"
+        },
+        {
+            "chamber": "Senate",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 117,
+            "number": 2040,
+            "updateDate": "2021-09-23T07:15:14:00Z",
+            "url": "https://api.congress.gov/v3/senate-communication/117/ec/2040?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `communicationType` * | string (path) - The type of communication. Value can be ec, pm, or pom. |
+
+---
+
+### **GET `/senate-communication/{congress}/{communicationType}/{communicationNumber}`**
+
+**Description**: Returns detailed information for a specified Senate communication.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/senate-communication/117/ec/2561?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "senateCommunication": {
+        "abstract": "A communication from the Board Chairman and Chief Executive Officer, Farm Credit Administration, transmitting, pursuant to law, the Administration's annual report for calendar year 2021; to the Committee on Agriculture, Nutrition, and Forestry.",
+        "chamber": "Senate",
+        "committees": [
+            {
+                "name": "Agriculture, Nutrition, and Forestry Committee",
+                "referralDate": "2021-11-03",
+                "systemCode": "ssaf00",
+                "url": "https://api.congress.gov/v3/committee/senate/ssaf00"
+            }
+        ],
+        "communicationType": {
+            "code": "EC",
+            "name": "Executive Communication"
+        },
+        "congress": 117,
+        "congressionalRecordDate": "2021-11-03",
+        "number": 2561,
+        "sessionNumber": 1,
+        "updateDate": "2021-11-04T07:15:16Z"
+    }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `communicationType` * | string (path) - The type of communication. Value can be ec, pm, or pom. |
+| `communicationNumber` * | integer (path) - The communication's assigned number. For example, the value can be 2561. |

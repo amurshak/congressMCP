@@ -17,6 +17,7 @@ from . import daily_congressional_record
 from . import bound_congressional_record
 from . import house_communications
 from . import house_requirements
+from . import senate_communications
 
 __all__ = [
     "amendments",
@@ -34,5 +35,6 @@ __all__ = [
     "daily_congressional_record",
     "bound_congressional_record",
     "house_communications",
-    "house_requirements"
+    "house_requirements",
+    "senate_communications"
 ]
