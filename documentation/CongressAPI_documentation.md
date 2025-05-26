@@ -4464,3 +4464,245 @@ https://api.congress.gov/v3/bound-congressional-record/1948/05/19?api_key=[INSER
 | `year` * | string (path) - The specified year of the bound Congressional record, for example 1990. |
 | `month` * | string (path) - The specified month of the bound Congressional record, for example 4 for April. |
 | `day` * | string (path) - The specified day of the bound Congressional record, for example 18. |
+---
+
+# **House Communication API Documentation**
+
+## **Overview**
+
+The House Communication API provides access to House communication data from the Congress.gov API.
+
+Base URL: `https://api.congress.gov/v3/house-communication`
+
+All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
+
+---
+
+## **Endpoints**
+
+### **GET `/house-communication`**
+
+**Description**: Returns a list of House communications.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/house-communication?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "houseCommunications": [
+        {
+            "chamber": "House",
+            "communicationNumber": 2057,
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congressNumber": 117,
+            "url": "https://api.congress.gov/v3/house-communication/117/ec/2057?format=json"
+        },
+        {
+            "chamber": "House",
+            "communicationNumber": 125,
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congressNumber": 115,
+            "url": "https://api.congress.gov/v3/house-communication/115/ec/125?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/house-communication/{congress}`**
+
+**Description**: Returns a list of House communications filtered by the specified congress.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/house-communication/117?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "houseCommunications": [
+        {
+            "chamber": "House",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congressNumber": 117,
+            "number": "2057",
+            "reportNature": "A letter reporting violations of the Antideficiency Act, by the United States Coast Guard.",
+            "submittingAgency": "Department of Homeland Security",
+            "submittingOfficial": "Secretary",
+            "updateDate": "2021-09-01",
+            "url": "https://api.congress.gov/v3/house-communication/117/ec/2057?format=json"
+        },
+        {
+            "chamber": "House",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congressNumber": 117,
+            "legalAuthority": "Public Law 93\u2013198, section 602(c)(1); (87 Stat. 814)",
+            "number": "3089",
+            "reportNature": "D.C. Act 24-267, \"Jamal Khashoggi Way Designation Way Act of 2021\".",
+            "submittingAgency": "Council of the District of Columbia",
+            "submittingOfficial": "Chairman",
+            "updateDate": "2022-01-12",
+            "url": "https://api.congress.gov/v3/house-communication/117/ec/3089?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+
+---
+
+### **GET `/house-communication/{congress}/{communicationType}`**
+
+**Description**: Returns a list of House communications filtered by the specified congress and communication type.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/house-communication/117/ec?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "houseCommunications": [
+        {
+            "chamber": "House",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congressNumber": 117,
+            "number": "2057",
+            "reportNature": "A letter reporting violations of the Antideficiency Act, by the United States Coast Guard.",
+            "submittingAgency": "Department of Homeland Security",
+            "submittingOfficial": "Secretary",
+            "updateDate": "2021-09-01",
+            "url": "https://api.congress.gov/v3/house-communication/117/ec/2057?format=json"
+        },
+        {
+            "chamber": "House",
+            "communicationNumber": 3089,
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congressNumber": 117,
+            "legalAuthority": "Public Law 93\u2013198, section 602(c)(1); (87 Stat. 814)",
+            "number": "3089",
+            "reportNature": "D.C. Act 24-267, \"Jamal Khashoggi Way Designation Way Act of 2021\".",
+            "submittingAgency": "Council of the District of Columbia",
+            "submittingOfficial": "Chairman",
+            "updateDate": "2022-01-12",
+            "url": "https://api.congress.gov/v3/house-communication/117/ec/3089?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `communicationType` * | string (path) - The type of communication. Value can be ec, ml, pm, or pt. |
+
+---
+
+### **GET `/house-communication/{congress}/{communicationType}/{communicationNumber}`**
+
+**Description**: Returns detailed information for a specified House communication.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/house-communication/117/ec/3324?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "house-communication": {
+        "abstract": "A letter from the Chairman, Council of the District of Columbia, transmitting DC Act 24-299, \"Closing of a Portion of a Public Alley in Square 5138, S.O. 20-07517, Act of 2021\", pursuant to Public Law 93\u2013198, section 602(c)(1); (87 Stat. 814); to the Committee on Oversight and Reform.",
+        "chamber": "House",
+        "committees": [
+            {
+                "name": "Oversight and Accountability Committee",
+                "referralDate": "2022-02-01",
+                "systemCode": "hsgo00",
+                "url": "api.congress.gov/v3/committee/house/hsgo00"
+            }
+        ],
+        "communicationType": {
+            "code": "EC",
+            "name": "Executive Communication"
+        },
+        "congressNumber": 117,
+        "congressionalRecordDate": "2022-02-01",
+        "isRulemaking": "False",
+        "legalAuthority": "Public Law 93\u2013198, section 602(c)(1); (87 Stat. 814)",
+        "matchingRequirements": [
+            {
+                "number": "2120",
+                "url": "http://api.congress.gov/v3/house-requirement/2120"
+            }
+        ],
+        "number": "3324",
+        "reportNature": "DC Act 24-299, \"Closing of a Portion of a Public Alley in Square 5138, S.O. 20-07517, Act of 2021\".",
+        "sessionNumber": 2,
+        "submittingAgency": "Council of the District of Columbia",
+        "submittingOfficial": "Chairman",
+        "updateDate": "2022-02-02"
+    }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `communicationType` * | string (path) - The type of communication. Value can be ec, ml, pm, or pt. |
+| `communicationNumber` * | integer (path) - The communication's assigned number. For example, the value can be 3324. |
