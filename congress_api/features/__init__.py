@@ -19,6 +19,7 @@ from . import house_communications
 from . import house_requirements
 from . import senate_communications
 from . import nominations
+from . import crs_reports
 
 __all__ = [
     "amendments",
@@ -38,5 +39,6 @@ __all__ = [
     "house_communications",
     "house_requirements",
     "senate_communications",
-    "nominations"
+    "nominations",
+    "crs_reports"
 ]

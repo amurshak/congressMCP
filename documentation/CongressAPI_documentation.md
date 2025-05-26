@@ -5439,3 +5439,158 @@ https://api.congress.gov/v3/nomination/116/389/hearings?api_key=[INSERT_KEY]
 | `format` | string (query) - The data format. Value can be xml or json. |
 | `offset` | integer (query) - The starting record returned. 0 is the first record. |
 | `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+# **Congress.gov CRS Report API Documentation**
+
+## **Overview**
+
+The Congress.gov CRS Report API provides access to Congressional Research Service (CRS) reports, which are detailed policy and legal analyses prepared for members of Congress.
+
+Base URL: `https://api.congress.gov/v3/crsreport`
+
+All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
+
+---
+
+## **Endpoints**
+
+### **GET `/crsreport`**
+
+**Description**: Returns Congressional Research Service (CRS) report data from the API.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/crsreport?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "CRSReports": [
+       {
+            "contentType": "Reports",
+            "id": "R43083",
+            "publishDate": "2025-02-05T11:34:25Z",
+            "status": "Active",
+            "title": "SBA Assistance to Small Business Startups: Client Experiences and Program Impact",
+            "updateDate": "2025-02-07T01:36:49Z",
+            "url": "http://api.congress.gov/v3/crsreport/R43083",
+            "version": 145
+        },
+        {
+            "contentType": "Reports",
+            "id": "98-202",
+            "publishDate": "2025-02-05T10:41:39Z",
+            "status": "Archived",
+            "title": "Appropriations for FY1999: Treasury, Postal Service, Executive Office of the President, and General Government",
+            "updateDate": "2025-02-05T10:41:39Z",
+            "url": "http://api1.test.congress.gov/v3/crsreport/98-202",
+            "version": 102
+        }
+     ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/crsreport/{reportNumber}`**
+
+**Description**: Returns detailed information for a specified Congressional Research Service (CRS) report.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/crsreport/R47175?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "CRSReport": {
+            "authors": [
+                 {
+                     "author": "Megan S. Lynch"
+                 }
+            ],
+            "contentType": "Reports",
+            "formats": [
+                {
+                     "format": "PDF",
+                     "url": "https://congress.gov/crs_external_products/R/PDF/R47175/R47175.2.pdf"
+                },
+                {
+                     "format": "HTML",
+                     "url": "https://congress.gov/crs_external_products/R/HTML/R47175.html"
+                }
+            ],
+            "id": "R47175",
+            "publishDate": "2025-02-05T11:34:31Z",
+            "relatedMaterials": [
+                {
+                              "URL": "https://api.congress.gov/v3/law/93/pub/344",
+                              "congress": 93,
+                              "number": "93-344",
+                              "title": null,
+                              "type": "PUB"
+                 },
+                 {
+                              "URL": "https://api.congress.gov/v3/bill/117/HRES/1151",
+                              "congress": 117,
+                              "number": 1151,
+                              "title": "Providing for budget allocations, and for other purposes.",
+                              "type": "HRES"
+                  },
+                  {
+                              "URL": "https://api.congress.gov/v3/bill/117/HRES/1151",
+                              "congress": 117,
+                              "number": 1151,
+                              "title": "Providing for budget allocations, and for other purposes.",
+                              "type": "HRES"
+                  }
+             ],
+             "status": "Active",
+             "summary": "The Congressional Budget Act of 1974 directs Congress to adopt a budget resolution each spring, providing an agreement between the House and Senate on a budget plan for the upcoming fiscal year (and at least four additional years). The annual budget resolution includes certain spending and revenue levels that become enforceable through points of order once both chambers have adopted the resolution.Congress does not always adopt a budget resolution, however, and this may complicate the development and consideration of budgetary legislation. Congress has, therefore, developed an alternative legislative tool, typically referred to as a "deeming resolution" because it is deemed to serve in place of an annual budget resolution for the purposes of establishing enforceable budgetary levels. On June 8, 2022, the House of Representatives adopted H.Res. 1151, a deeming resolution for FY2023. H.Res. 1151 provided a committee spending allocation (302(a) allocation) to the House Appropriations Committee ($1.603 trillion). It also directed the chair of the House Budget Committee to subsequently file a statement in the Congressional Record that includes committee spending allocations for all other committees, as well as aggregate spending and revenue levels. (Those levels were filed on June 21, 2022.) H.Res. 1151 specified that the levels filed in the Congressional Record be consistent with the "most recent baseline of the Congressional Budget Office," meaning that the committee spending allocations (other than for the Appropriations Committee) and the aggregate spending and revenue levels have been set at the levels currently projected under current law. In addition to providing enforceable budgetary levels within the House, H.Res. 1151 grants authority to the chair of the House Budget Committee to "adjust" the budgetary levels provided under the deeming resolution in the future under specified circumstances. In addition, the resolution states that provisions designated as "emergency" shall be effectively exempt from House budgetary rules and specifies that certain accounts may receive advance appropriations for FY2024 and FY2025.",
+            "title": "Setting Budgetary Levels: The House's FY2023 Deeming Resolution",
+            "topics": [
+                {
+                    "topic": "Budget &amp; Appropriations Procedure"
+                }
+            ],
+            "updateDate": "2025-02-07T01:36:56Z",
+            "url": "congress.gov/crs-report/R47175",
+            "version": 102
+     }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `reportNumber` * | string (path) - The number or ID of the report. For example, R47175. |
+| `format` | string (query) - The data format. Value can be xml or json. |
+
+---
+
+## **Congressional MCP Server Implementation**
+
+The Congressional MCP server provides the following resources and tools for accessing CRS Reports:
+
+### **Resources**
+
+- `congress://crs-reports/latest` - Get the most recent CRS reports
+- `congress://crs-reports/{report_number}` - Get detailed information for a specific CRS report
+
+### **Tools**
+
+- `search_crs_reports` - Search for CRS reports based on keywords or report number
