@@ -4706,3 +4706,146 @@ https://api.congress.gov/v3/house-communication/117/ec/3324?api_key=[INSERT_KEY]
 | `congress` * | integer (path) - The congress number. For example, the value can be 117. |
 | `communicationType` * | string (path) - The type of communication. Value can be ec, ml, pm, or pt. |
 | `communicationNumber` * | integer (path) - The communication's assigned number. For example, the value can be 3324. |
+---
+
+# **House Requirements API Documentation**
+
+## **Overview**
+
+The House Requirements API provides access to House requirement data from the Congress.gov API.
+
+Base URL: `https://api.congress.gov/v3/house-requirement`
+
+All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
+
+---
+
+## **Endpoints**
+
+### **GET `/house-requirement`**
+
+**Description**: Returns a list of House requirements.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/house-requirement?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "houseRequirements": [
+        {
+            "number": 8070,
+            "updateDate": "2021-08-13",
+            "url": "https://api.congress.gov/v3/house-requirement/8070?format=json"
+        },
+        {
+            "number": 6463,
+            "updateDate": "2021-08-13",
+            "url": "https://api.congress.gov/v3/house-requirement/6463?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/house-requirement/{requirementNumber}`**
+
+**Description**: Returns detailed information for a specified House requirement.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/house-requirement/8070?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "houseRequirement": {
+        "activeRecord": true,
+        "frequency": "[No deadline specified].",
+        "legalAuthority": "5 U.S.C. 801(a)(1)(A); Public Law 104\u2013121, section 251; (110 Stat. 868)",
+        "matchingCommunications": {
+            "count": 85085,
+            "url": "https://api.congress.gov/v3/house-requirement/8070/matching-communications?format=json"
+        },
+        "nature": "Congressional review of agency rulemaking.",
+        "number": 8070,
+        "parentAgency": "Multiple Executive Agencies and Departments",
+        "submittingAgency": "Multiple Executive Agencies and Departments",
+        "submittingOfficial": null,
+        "updateDate": "2021-08-13"
+    }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `requirementNumber` * | integer (path) - The requirement's assigned number. For example, the value can be 8070. |
+
+---
+
+### **GET `/house-requirement/{requirementNumber}/matching-communications`**
+
+**Description**: Returns a list of matching communications to a House requirement.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/house-requirement/8070/matching-communications?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "matchingCommunications": [
+        {
+            "chamber": "House",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 112,
+            "number": 2,
+            "url": "https://api.congress.gov/v3/house-communication/112/EC/2?format=json"
+        },
+        {
+            "chamber": "House",
+            "communicationType": {
+                "code": "EC",
+                "name": "Executive Communication"
+            },
+            "congress": 112,
+            "number": 3,
+            "url": "https://api.congress.gov/v3/house-communication/112/EC/3?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `requirementNumber` * | integer (path) - The requirement's assigned number. For example, the value can be 8070. |
