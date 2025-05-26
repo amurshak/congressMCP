@@ -4,11 +4,36 @@ This project provides a Model Context Protocol (MCP) server for accessing the Co
 
 ## Features
 
-- Access to bill information, including actions, amendments, cosponsors, and more
-- Search for members of Congress and view their details
-- Browse congressional committees and their activities
-- Get information about the current Congress
+### Legislative Information
+- **Bills**: Access bill information, including actions, amendments, cosponsors, subjects, and more
+- **Amendments**: Search and retrieve amendment details, actions, and sponsors
+- **Summaries**: Access bill summaries with keyword search capabilities
+- **Treaties**: Search and access treaty information, actions, and committees
+
+### Congressional Members & Committees
+- **Members**: Search for members of Congress by name, state, party, and other criteria
+- **Committees**: Browse congressional committees, their activities, bills, and reports
+- **Committee Reports**: Access committee reports with search capabilities
+- **Committee Prints**: Retrieve committee prints filtered by congress and chamber
+- **Committee Meetings**: Get information about scheduled and past committee meetings
+
+### Congressional Records & Communications
+- **Congressional Record**: Access the Congressional Record with search capabilities
+- **Daily Congressional Record**: Retrieve daily congressional record issues
+- **Bound Congressional Record**: Access bound congressional record issues
+- **House Communications**: Retrieve house communications by type and congress
+- **Senate Communications**: Access senate communications by type and congress
+- **CRS Reports**: Search and access Congressional Research Service reports
+
+### Other Resources
+- **Congress Information**: Get information about current and past Congresses
+- **Nominations**: Search and retrieve nomination details, actions, and committees
+- **House Requirements**: Access house requirements information
+
+### General Features
 - Pre-defined prompts for common legislative research tasks
+- Comprehensive search tools for all data types
+- Formatted outputs for better readability
 
 ## Project Structure
 
@@ -25,11 +50,25 @@ congress_api/                  # Main Python package for the server
 │
 ├── features/                  # Contains modules for different API resource types
 │   ├── __init__.py
+│   ├── amendments.py          # Amendment-related resources, tools, and formatting
 │   ├── bills.py               # Bill-related resources, tools, and formatting
-│   ├── members.py             # Member-related resources, tools, and formatting
+│   ├── bound_congressional_record.py # Bound congressional record resources and tools
+│   ├── committee_meetings.py  # Committee meetings resources and tools
+│   ├── committee_prints.py    # Committee prints resources and tools
+│   ├── committee_reports.py   # Committee reports resources and tools
 │   ├── committees.py          # Committee-related resources, tools, and formatting
 │   ├── congress_info.py       # Resources for general Congress information
-│   └── amendments.py          # Amendment-related formatting and tools
+│   ├── congressional_record.py # Congressional record resources and tools
+│   ├── crs_reports.py         # Congressional Research Service reports resources
+│   ├── daily_congressional_record.py # Daily congressional record resources
+│   ├── hearings.py            # Hearings resources and tools
+│   ├── house_communications.py # House communications resources
+│   ├── house_requirements.py  # House requirements resources
+│   ├── members.py             # Member-related resources, tools, and formatting
+│   ├── nominations.py         # Nominations resources and tools
+│   ├── senate_communications.py # Senate communications resources
+│   ├── summaries.py           # Bill summaries resources and tools
+│   └── treaties.py            # Treaties resources and tools
 │
 └── prompts_module.py          # All @mcp.prompt definitions
 ```
