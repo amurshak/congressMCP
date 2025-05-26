@@ -4215,3 +4215,252 @@ https://api.congress.gov/v3/daily-congressional-record/167/21/articles?api_key=[
 | `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
 | `volumeNumber` * | string (path) - The specified volume of the daily Congressional record, for example 166. |
 | `issueNumber` * | string (path) - The specified issue of the daily Congressional record, for example 153. |
+---
+
+# **Bound Congressional Record API Documentation**
+
+## **Overview**
+
+The Bound Congressional Record API provides access to bound Congressional Record data from the Congress.gov API.
+
+Base URL: `https://api.congress.gov/v3/bound-congressional-record`
+
+All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
+
+---
+
+## **Endpoints**
+
+### **GET `/bound-congressional-record`**
+
+**Description**: Returns a list of bound Congressional Records sorted by most recent.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/bound-congressional-record?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+  "boundCongressionalRecord": [
+          {
+          "congress": "109",
+          "date": "2005-06-20",
+          "sessionNumber": "1",
+          "updateDate": "2020-04-08",
+          "url": "http://api.congress.gov/v3/bound-congressional-record/2005/6/20?format=json",
+          "volumeNumber": "151"
+          },
+          {
+          "congress": "106",
+          "date": "1999-07-01",
+          "sessionNumber": "1",
+          "updateDate": "2020-04-08",
+          "url": "http://api.congress.gov/v3/bound-congressional-record/1999/7/1?format=json",
+          "volumeNumber": "145"
+           }
+  ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/bound-congressional-record/{year}`**
+
+**Description**: Returns a list of bound Congressional Records filtered by the specified year.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/bound-congressional-record/1990?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "boundCongressionalRecord": [
+        {
+            "congress": "101",
+            "date": "1990-02-28",
+            "sessionNumber": "2",
+            "updateDate": "2020-10-20",
+            "url": "http://api.congress.gov/v3/bound-congressional-record/1990/2/28?format=json",
+            "volumeNumber": "136"
+        },
+        {
+            "congress": "101",
+            "issueDate": "1990-03-19",
+            "sessionNumber": "2",
+            "updateDate": "2020-10-20",
+            "url": "http://api.congress.gov/v3/bound-congressional-record/1990/3/19?format=json",
+            "volumeNumber": "136"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `year` * | string (path) - The specified year of the bound Congressional record, for example 1990. |
+
+---
+
+### **GET `/bound-congressional-record/{year}/{month}`**
+
+**Description**: Returns a list of bound Congressional Records filtered by the specified year and specified month.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/bound-congressional-record/1990/5?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+   "boundCongressionalRecord": [
+       {
+           "congress": 101,
+            "date": "1990-05-01",
+            "sessionNumber": 2,
+            "updateDate": "2020-10-20",
+            "url": "http://api.congress.gov/v3/bound-congressional-record/1990/5/1?format=json",
+            "volumeNumber": 136
+        },
+        {
+           "congress": 101,
+           "date": "1990-05-01",
+           "sessionNumber": 2,
+           "updateDate": "2020-10-20",
+           "url": "http://api.congress.gov/v3/bound-congressional-record/1990/5/1?format=json",
+            "volumeNumber": 136
+        }
+   ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `year` * | string (path) - The specified year of the bound Congressional record, for example 1990. |
+| `month` * | string (path) - The specified month of the bound Congressional record, for example 4 for April. |
+
+---
+
+### **GET `/bound-congressional-record/{year}/{month}/{day}`**
+
+**Description**: Returns a list of bound Congressional Records filtered by the specified year, specified month and specified day.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/bound-congressional-record/1948/05/19?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+   "boundCongressionalRecord": [
+       {
+          "congress": 80,
+          "date": "1948-05-19",
+          "sections": [
+              {
+              "endPage": 6155,
+              "name": "House of Representatives",
+              "startPage": 6099
+              }
+          ],
+          "sessionNumber": 2,
+          "updateDate": "2023-04-27",
+          "volumeNumber": 94
+        },
+        {
+          "congress": 80,
+          "date": "1948-05-19",
+          "sections": [
+              {
+              "endPage": 6098,
+              "name": "Senate",
+              "startPage": 6051
+              }
+          ],
+          "sessionNumber": 2,
+          "updateDate": "2023-04-27",
+          "volumeNumber": 94
+        },
+        {
+          "congress": 80,
+          "date": "1948-05-19",
+          "sections": [
+              {
+              "endPage": 6155,
+              "name": "Entire Issue",
+              "startPage": 6051
+              }
+          ],
+          "sessionNumber": 2,
+          "updateDate": "2023-04-27",
+          "volumeNumber": 94
+        },
+        {
+          "congress": 80,
+          "dailyDigest": {
+                    "endPage": 365,
+                    "startPage": 362,
+                    "text": [
+                        {
+                            "type": "PDF",
+                            "url": "http://congress.gov/crecb/1948/GPO-CRECB-1948-pt14-Pages362-365.pdf"
+                        }
+                    ]
+            },
+            "date": "1948-05-19",
+            "sections": [
+                {
+                    "endPage": 365,
+                    "name": "Daily Digest",
+                    "startPage": 362
+                }
+            ],
+            "sessionNumber": 2,
+            "updateDate": "2022-11-04",
+            "volumeNumber": 94
+        }
+   ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `year` * | string (path) - The specified year of the bound Congressional record, for example 1990. |
+| `month` * | string (path) - The specified month of the bound Congressional record, for example 4 for April. |
+| `day` * | string (path) - The specified day of the bound Congressional record, for example 18. |

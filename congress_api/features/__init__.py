@@ -14,6 +14,7 @@ from . import committee_meetings
 from . import hearings
 from . import congressional_record
 from . import daily_congressional_record
+from . import bound_congressional_record
 
 __all__ = [
     "amendments",
@@ -28,5 +29,6 @@ __all__ = [
     "committee_meetings",
     "hearings",
     "congressional_record",
-    "daily_congressional_record"
+    "daily_congressional_record",
+    "bound_congressional_record"
 ]
