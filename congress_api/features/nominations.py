@@ -1,0 +1,510 @@
+"""
+Nominations API for the Congressional MCP server.
+
+This module provides access to nomination data from the Congress.gov API.
+"""
+
+import logging
+from typing import Dict, Any, List, Optional
+
+from ..mcp_app import mcp
+from ..core.client_handler import make_api_request
+
+# Set up logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+# Base endpoint for the nominations API
+BASE_ENDPOINT = "nomination"
+
+# Formatting helpers
+def format_nomination_item(nomination: Dict[str, Any]) -> str:
+    """Format a nomination for display in a list."""
+    lines = []
+    
+    # Citation (PN number)
+    lines.append(f"Citation: {nomination.get('citation', 'N/A')}")
+    
+    # Congress
+    lines.append(f"Congress: {nomination.get('congress', 'N/A')}")
+    
+    # Nomination Number
+    lines.append(f"Nomination Number: {nomination.get('number', 'N/A')}")
+    
+    # Organization (e.g., Army, Navy, etc.)
+    if "organization" in nomination:
+        lines.append(f"Organization: {nomination['organization']}")
+    
+    # Is Military
+    is_military = nomination.get('nominationType', {}).get('isMilitary', False)
+    lines.append(f"Military Nomination: {'Yes' if is_military else 'No'}")
+    
+    # Received Date
+    if "receivedDate" in nomination:
+        lines.append(f"Received Date: {nomination['receivedDate']}")
+    
+    # Latest Action
+    if "latestAction" in nomination:
+        action = nomination["latestAction"]
+        action_date = action.get("actionDate", "N/A")
+        action_text = action.get("text", "N/A")
+        lines.append(f"Latest Action ({action_date}): {action_text}")
+    
+    # Update Date
+    if "updateDate" in nomination:
+        lines.append(f"Update Date: {nomination['updateDate']}")
+    
+    # URL
+    if "url" in nomination:
+        lines.append(f"URL: {nomination['url']}")
+    
+    return "\n".join(lines)
+
+def format_nomination_detail(nomination: Dict[str, Any]) -> str:
+    """Format detailed information for a nomination."""
+    lines = []
+    
+    # Citation (PN number)
+    lines.append(f"Nomination - {nomination.get('citation', 'N/A')}")
+    
+    # Congress
+    lines.append(f"Congress: {nomination.get('congress', 'N/A')}")
+    
+    # Nomination Number
+    lines.append(f"Nomination Number: {nomination.get('number', 'N/A')}")
+    
+    # Part Number
+    if "partNumber" in nomination:
+        lines.append(f"Part Number: {nomination['partNumber']}")
+    
+    # Is List
+    is_list = nomination.get('isList', False)
+    lines.append(f"Is List Nomination: {'Yes' if is_list else 'No'}")
+    
+    # Received Date
+    if "receivedDate" in nomination:
+        lines.append(f"Received Date: {nomination['receivedDate']}")
+    
+    # Latest Action
+    if "latestAction" in nomination:
+        action = nomination["latestAction"]
+        action_date = action.get("actionDate", "N/A")
+        action_text = action.get("text", "N/A")
+        lines.append(f"\nLatest Action ({action_date}): {action_text}")
+    
+    # Nominees
+    if "nominees" in nomination and nomination["nominees"]:
+        lines.append("\nNominees:")
+        for idx, nominee in enumerate(nomination["nominees"], 1):
+            lines.append(f"  {idx}. Position: {nominee.get('positionTitle', 'N/A')}")
+            lines.append(f"     Organization: {nominee.get('organization', 'N/A')}")
+            lines.append(f"     Nominee Count: {nominee.get('nomineeCount', 'N/A')}")
+            if "introText" in nominee:
+                intro_text = nominee.get('introText', '')
+                if len(intro_text) > 100:
+                    intro_text = intro_text[:97] + "..."
+                lines.append(f"     Intro: {intro_text}")
+    
+    # Actions count and URL
+    if "actions" in nomination:
+        actions = nomination["actions"]
+        lines.append(f"\nActions: {actions.get('count', 0)}")
+        if "url" in actions:
+            lines.append(f"Actions URL: {actions['url']}")
+    
+    # Committees count and URL
+    if "committees" in nomination:
+        committees = nomination["committees"]
+        lines.append(f"\nCommittees: {committees.get('count', 0)}")
+        if "url" in committees:
+            lines.append(f"Committees URL: {committees['url']}")
+    
+    # Update Date
+    if "updateDate" in nomination:
+        lines.append(f"\nUpdate Date: {nomination['updateDate']}")
+    
+    return "\n".join(lines)
+
+def format_nominees_list(nominees: List[Dict[str, Any]]) -> str:
+    """Format a list of nominees."""
+    if not nominees:
+        return "No nominees found."
+    
+    lines = ["Nominees:"]
+    
+    for nominee in nominees:
+        lines.append("")
+        lines.append(f"First Name: {nominee.get('firstName', 'N/A')}")
+        lines.append(f"Middle Name: {nominee.get('middleName', 'N/A')}")
+        lines.append(f"Last Name: {nominee.get('lastName', 'N/A')}")
+        lines.append(f"Ordinal: {nominee.get('ordinal', 'N/A')}")
+    
+    return "\n".join(lines)
+
+def format_nomination_actions(actions: List[Dict[str, Any]]) -> str:
+    """Format a list of actions for a nomination."""
+    if not actions:
+        return "No actions found."
+    
+    lines = ["Nomination Actions:"]
+    
+    for action in actions:
+        lines.append("")
+        lines.append(f"Date: {action.get('actionDate', 'N/A')}")
+        lines.append(f"Type: {action.get('type', 'N/A')}")
+        lines.append(f"Text: {action.get('text', 'N/A')}")
+        
+        if "committees" in action and action["committees"]:
+            lines.append("Committees:")
+            for committee in action["committees"]:
+                lines.append(f"  - {committee.get('name', 'N/A')} ({committee.get('systemCode', 'N/A')})")
+    
+    return "\n".join(lines)
+
+def format_nomination_committees(committees: List[Dict[str, Any]]) -> str:
+    """Format a list of committees for a nomination."""
+    if not committees:
+        return "No committees found."
+    
+    lines = ["Nomination Committees:"]
+    
+    for committee in committees:
+        lines.append("")
+        lines.append(f"Name: {committee.get('name', 'N/A')}")
+        lines.append(f"Chamber: {committee.get('chamber', 'N/A')}")
+        lines.append(f"Type: {committee.get('type', 'N/A')}")
+        lines.append(f"System Code: {committee.get('systemCode', 'N/A')}")
+        
+        if "activities" in committee and committee["activities"]:
+            lines.append("Activities:")
+            for activity in committee["activities"]:
+                lines.append(f"  - {activity.get('name', 'N/A')} ({activity.get('date', 'N/A')})")
+    
+    return "\n".join(lines)
+
+def format_nomination_hearings(hearings: List[Dict[str, Any]]) -> str:
+    """Format a list of hearings for a nomination."""
+    if not hearings:
+        return "No hearings found."
+    
+    lines = ["Nomination Hearings:"]
+    
+    for hearing in hearings:
+        lines.append("")
+        lines.append(f"Chamber: {hearing.get('chamber', 'N/A')}")
+        lines.append(f"Citation: {hearing.get('citation', 'N/A')}")
+        lines.append(f"Date: {hearing.get('date', 'N/A')}")
+        lines.append(f"Jacket Number: {hearing.get('jacketNumber', 'N/A')}")
+        lines.append(f"Number: {hearing.get('number', 'N/A')}")
+    
+    return "\n".join(lines)
+
+# MCP Resources
+@mcp.resource("congress://nominations/latest")
+async def get_latest_nominations() -> str:
+    """
+    Get the most recent nominations.
+    Returns the 10 most recently published nominations by default.
+    """
+    logger.info("Getting latest nominations")
+    
+    # Make API request
+    context = mcp.get_context()
+    data = await make_api_request(BASE_ENDPOINT, context)
+    
+    if "error" in data:
+        logger.error(f"Error getting latest nominations: {data['error']}")
+        return f"Error: {data['error'].get('message', 'Unknown error')}"
+    
+    if 'nominations' not in data:
+        logger.warning("No nominations field in response")
+        return "No nominations found."
+    
+    nominations = data['nominations']
+    if not nominations:
+        logger.info("No nominations found")
+        return "No nominations found."
+    
+    logger.info(f"Found {len(nominations)} nominations")
+    
+    # Format the results
+    lines = ["Latest Nominations:"]
+    for nomination in nominations:
+        lines.append("")
+        lines.append(format_nomination_item(nomination))
+    
+    return "\n".join(lines)
+
+@mcp.resource("congress://nominations/{congress}")
+async def get_nominations_by_congress(congress: int) -> str:
+    """
+    Get nominations for a specific Congress.
+    
+    Args:
+        congress: The Congress number (e.g., 117 for the 117th Congress)
+    """
+    logger.info(f"Getting nominations for Congress {congress}")
+    
+    # Make API request
+    endpoint = f"{BASE_ENDPOINT}/{congress}"
+    context = mcp.get_context()
+    data = await make_api_request(endpoint, context)
+    
+    if "error" in data:
+        logger.error(f"Error getting nominations for Congress {congress}: {data['error']}")
+        return f"Error: {data['error'].get('message', 'Unknown error')}"
+    
+    if 'nominations' not in data:
+        logger.warning(f"No nominations field in response for Congress {congress}")
+        return f"No nominations found for Congress {congress}."
+    
+    nominations = data['nominations']
+    if not nominations:
+        logger.info(f"No nominations found for Congress {congress}")
+        return f"No nominations found for Congress {congress}."
+    
+    logger.info(f"Found {len(nominations)} nominations for Congress {congress}")
+    
+    # Format the results
+    lines = [f"Nominations for Congress {congress}:"]
+    for nomination in nominations:
+        lines.append("")
+        lines.append(format_nomination_item(nomination))
+    
+    return "\n".join(lines)
+
+@mcp.resource("congress://nominations/{congress}/{nomination_number}")
+async def get_nomination(congress: int, nomination_number: int) -> str:
+    """
+    Get detailed information for a specific nomination.
+    
+    Args:
+        congress: The Congress number (e.g., 117 for the 117th Congress)
+        nomination_number: The nomination number
+    """
+    logger.info(f"Getting nomination {nomination_number} for Congress {congress}")
+    
+    # Make API request
+    endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}"
+    context = mcp.get_context()
+    data = await make_api_request(endpoint, context)
+    
+    if "error" in data:
+        logger.error(f"Error getting nomination {nomination_number} for Congress {congress}: {data['error']}")
+        return f"Error: {data['error'].get('message', 'Unknown error')}"
+    
+    if 'nomination' not in data:
+        logger.warning(f"No nomination field in response for {congress}/{nomination_number}")
+        return f"No nomination found for {congress}/{nomination_number}."
+    
+    nomination = data['nomination']
+    logger.info(f"Found nomination {nomination_number} for Congress {congress}")
+    
+    # Format the result
+    return format_nomination_detail(nomination)
+
+@mcp.resource("congress://nominations/{congress}/{nomination_number}/{ordinal}")
+async def get_nomination_nominees(congress: int, nomination_number: int, ordinal: int) -> str:
+    """
+    Get nominees for a specific position within a nomination.
+    
+    Args:
+        congress: The Congress number (e.g., 117 for the 117th Congress)
+        nomination_number: The nomination number
+        ordinal: The ordinal number for the position
+    """
+    logger.info(f"Getting nominees for nomination {nomination_number}, position {ordinal}, Congress {congress}")
+    
+    # Make API request
+    endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/{ordinal}"
+    context = mcp.get_context()
+    data = await make_api_request(endpoint, context)
+    
+    if "error" in data:
+        logger.error(f"Error getting nominees for nomination {nomination_number}, position {ordinal}, Congress {congress}: {data['error']}")
+        return f"Error: {data['error'].get('message', 'Unknown error')}"
+    
+    if 'nominees' not in data:
+        logger.warning(f"No nominees field in response for {congress}/{nomination_number}/{ordinal}")
+        return f"No nominees found for {congress}/{nomination_number}/{ordinal}."
+    
+    nominees = data['nominees']
+    if not nominees:
+        logger.info(f"No nominees found for {congress}/{nomination_number}/{ordinal}")
+        return f"No nominees found for {congress}/{nomination_number}/{ordinal}."
+    
+    logger.info(f"Found {len(nominees)} nominees for {congress}/{nomination_number}/{ordinal}")
+    
+    # Format the results
+    return format_nominees_list(nominees)
+
+@mcp.tool("get_nomination_actions")
+async def get_nomination_actions(congress: int, nomination_number: int) -> str:
+    """
+    Get actions for a specific nomination.
+    
+    Args:
+        congress: The Congress number (e.g., 117 for the 117th Congress)
+        nomination_number: The nomination number
+    """
+    logger.info(f"Getting actions for nomination {nomination_number}, Congress {congress}")
+    
+    # Make API request
+    endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/actions"
+    context = mcp.get_context()
+    data = await make_api_request(endpoint, context)
+    
+    if "error" in data:
+        logger.error(f"Error getting actions for nomination {nomination_number}, Congress {congress}: {data['error']}")
+        return f"Error: {data['error'].get('message', 'Unknown error')}"
+    
+    if 'actions' not in data:
+        logger.warning(f"No actions field in response for {congress}/{nomination_number}/actions")
+        return f"No actions found for nomination {nomination_number}, Congress {congress}."
+    
+    actions = data['actions']
+    if not actions:
+        logger.info(f"No actions found for nomination {nomination_number}, Congress {congress}")
+        return f"No actions found for nomination {nomination_number}, Congress {congress}."
+    
+    logger.info(f"Found {len(actions)} actions for nomination {nomination_number}, Congress {congress}")
+    
+    # Format the results
+    return format_nomination_actions(actions)
+
+@mcp.tool("get_nomination_committees")
+async def get_nomination_committees(congress: int, nomination_number: int) -> str:
+    """
+    Get committees for a specific nomination.
+    
+    Args:
+        congress: The Congress number (e.g., 117 for the 117th Congress)
+        nomination_number: The nomination number
+    """
+    logger.info(f"Getting committees for nomination {nomination_number}, Congress {congress}")
+    
+    # Make API request
+    endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/committees"
+    context = mcp.get_context()
+    data = await make_api_request(endpoint, context)
+    
+    if "error" in data:
+        logger.error(f"Error getting committees for nomination {nomination_number}, Congress {congress}: {data['error']}")
+        return f"Error: {data['error'].get('message', 'Unknown error')}"
+    
+    if 'committees' not in data:
+        logger.warning(f"No committees field in response for {congress}/{nomination_number}/committees")
+        return f"No committees found for nomination {nomination_number}, Congress {congress}."
+    
+    committees = data['committees']
+    if not committees:
+        logger.info(f"No committees found for nomination {nomination_number}, Congress {congress}")
+        return f"No committees found for nomination {nomination_number}, Congress {congress}."
+    
+    logger.info(f"Found {len(committees)} committees for nomination {nomination_number}, Congress {congress}")
+    
+    # Format the results
+    return format_nomination_committees(committees)
+
+@mcp.tool("get_nomination_hearings")
+async def get_nomination_hearings(congress: int, nomination_number: int) -> str:
+    """
+    Get hearings for a specific nomination.
+    
+    Args:
+        congress: The Congress number (e.g., 117 for the 117th Congress)
+        nomination_number: The nomination number
+    """
+    logger.info(f"Getting hearings for nomination {nomination_number}, Congress {congress}")
+    
+    # Make API request
+    endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/hearings"
+    context = mcp.get_context()
+    data = await make_api_request(endpoint, context)
+    
+    if "error" in data:
+        logger.error(f"Error getting hearings for nomination {nomination_number}, Congress {congress}: {data['error']}")
+        return f"Error: {data['error'].get('message', 'Unknown error')}"
+    
+    if 'hearings' not in data:
+        logger.warning(f"No hearings field in response for {congress}/{nomination_number}/hearings")
+        return f"No hearings found for nomination {nomination_number}, Congress {congress}."
+    
+    hearings = data['hearings']
+    if not hearings:
+        logger.info(f"No hearings found for nomination {nomination_number}, Congress {congress}")
+        return f"No hearings found for nomination {nomination_number}, Congress {congress}."
+    
+    logger.info(f"Found {len(hearings)} hearings for nomination {nomination_number}, Congress {congress}")
+    
+    # Format the results
+    return format_nomination_hearings(hearings)
+
+# MCP Tool
+@mcp.tool("search_nominations")
+async def search_nominations(
+    keywords: Optional[str] = None,
+    congress: Optional[int] = None,
+    limit: int = 10,
+    sort: str = "updateDate+desc",
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None
+) -> str:
+    """
+    Search for nominations based on keywords.
+    
+    Args:
+        keywords: Keywords to search for in nomination information
+        congress: Optional Congress number (e.g., 117)
+        limit: Maximum number of results to return (default: 10)
+        sort: Sort order (default: "updateDate+desc")
+        from_date: Optional start date for filtering (format: YYYY-MM-DDT00:00:00Z)
+        to_date: Optional end date for filtering (format: YYYY-MM-DDT00:00:00Z)
+    """
+    logger.info(f"Searching for nominations with keywords: {keywords}, congress: {congress}")
+    
+    ctx = mcp.get_context()
+    params = {
+        "format": "json",
+        "limit": limit
+    }
+    
+    if keywords:
+        params["query"] = keywords
+    if sort:
+        params["sort"] = sort
+    if from_date:
+        params["fromDateTime"] = from_date
+    if to_date:
+        params["toDateTime"] = to_date
+    
+    # Determine endpoint based on congress parameter
+    endpoint = BASE_ENDPOINT
+    if congress:
+        endpoint = f"{BASE_ENDPOINT}/{congress}"
+    
+    # Make API request
+    data = await make_api_request(endpoint, ctx, params)
+    
+    if "error" in data:
+        logger.error(f"Error searching for nominations: {data['error']}")
+        return f"Error: {data['error'].get('message', 'Unknown error')}"
+    
+    if 'nominations' not in data:
+        logger.warning("No nominations field in response")
+        return "No nominations found matching the search criteria."
+    
+    nominations = data['nominations']
+    if not nominations:
+        logger.info("No nominations found matching the search criteria")
+        return "No nominations found matching the search criteria."
+    
+    logger.info(f"Found {len(nominations)} nominations matching the search criteria")
+    
+    # Format the results
+    lines = ["Nominations Search Results:"]
+    for nomination in nominations:
+        lines.append("")
+        lines.append(format_nomination_item(nomination))
+    
+    return "\n".join(lines)

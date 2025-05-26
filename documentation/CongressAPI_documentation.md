@@ -5067,3 +5067,375 @@ https://api.congress.gov/v3/senate-communication/117/ec/2561?api_key=[INSERT_KEY
 | `congress` * | integer (path) - The congress number. For example, the value can be 117. |
 | `communicationType` * | string (path) - The type of communication. Value can be ec, pm, or pom. |
 | `communicationNumber` * | integer (path) - The communication's assigned number. For example, the value can be 2561. |
+---
+
+# **Nominations API Documentation**
+
+## **Overview**
+
+The Nominations API provides access to nomination data from the Congress.gov API.
+
+Base URL: `https://api.congress.gov/v3/nomination`
+
+All endpoints require an API key provided via `?api_key=[INSERT_KEY]`.
+
+---
+
+## **Endpoints**
+
+### **GET `/nomination`**
+
+**Description**: Returns a list of nominations sorted by date received from the President.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/nomination?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "nominations": [
+        {
+            "citation": "PN2804",
+            "congress": 117,
+            "latestAction": {
+                "actionDate": "2022-12-07",
+                "text": "Received in the Senate and referred to the Committee on Armed Services."
+            },
+            "nominationType": {
+                "isMilitary": true
+            },
+            "number": 2804,
+            "organization": "Army",
+            "partNumber": "00",
+            "receivedDate": "2022-12-07",
+            "updateDate": "2022-12-08T05:25:17Z",
+            "url": "https://api.congress.gov/v3/nomination/117/2804?format=json"
+        },
+        {
+            "citation": "PN2803",
+            "congress": 117,
+            "latestAction": {
+                "actionDate": "2022-12-07",
+                "text": "Received in the Senate and referred to the Committee on Armed Services."
+            },
+            "nominationType": {
+                "isMilitary": true
+            },
+            "number": 2803,
+            "organization": "Army",
+            "partNumber": "00",
+            "receivedDate": "2022-12-07",
+            "updateDate": "2022-12-08T05:25:17Z",
+            "url": "https://api.congress.gov/v3/nomination/117/2803?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `fromDateTime` | string (query) - The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `toDateTime` | string (query) - The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/nomination/{congress}`**
+
+**Description**: Returns a list of nominations filtered by the specified congress and sorted by date received from the President.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/nomination/117?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "nominations": [
+        {
+            "citation": "PN2804",
+            "congress": 117,
+            "latestAction": {
+                "actionDate": "2022-12-07",
+                "text": "Received in the Senate and referred to the Committee on Armed Services."
+            },
+            "nominationType": {
+                "isMilitary": true
+            },
+            "number": 2804,
+            "organization": "Army",
+            "partNumber": "00",
+            "receivedDate": "2022-12-07",
+            "updateDate": "2022-12-08T05:25:17Z",
+            "url": "https://api.congress.gov/v3/nomination/117/2804?format=json"
+        },
+        {
+            "citation": "PN2803",
+            "congress": 117,
+            "latestAction": {
+                "actionDate": "2022-12-07",
+                "text": "Received in the Senate and referred to the Committee on Armed Services."
+            },
+            "nominationType": {
+                "isMilitary": true
+            },
+            "number": 2803,
+            "organization": "Army",
+            "partNumber": "00",
+            "receivedDate": "2022-12-07",
+            "updateDate": "2022-12-08T05:25:17Z",
+            "url": "https://api.congress.gov/v3/nomination/117/2803?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+| `fromDateTime` | string (query) - The starting timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+| `toDateTime` | string (query) - The ending timestamp to filter by update date. Use format: YYYY-MM-DDT00:00:00Z. |
+
+---
+
+### **GET `/nomination/{congress}/{nominationNumber}`**
+
+**Description**: Returns detailed information for a specified nomination.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/nomination/117/2467?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "nomination": {
+        "actions": {
+            "count": 1,
+            "url": "https://api.congress.gov/v3/nomination/117/2467/actions?format=json"
+        },
+        "citation": "PN2467",
+        "committees": {
+            "count": 1,
+            "url": "https://api.congress.gov/v3/nomination/117/2467/committees?format=json"
+        },
+        "congress": 117,
+        "isList": true,
+        "latestAction": {
+            "actionDate": "2022-08-03",
+            "text": "Received in the Senate and referred to the Committee on Armed Services."
+        },
+        "nominees": [
+            {
+                "introText": "THE FOLLOWING NAMED OFFICERS FOR APPOINTMENT TO THE GRADE INDICATED IN THE UNITED STATES AIR FORCE UNDER TITLE 10, U.S.C., SECTION 624:",
+                "nomineeCount": 12,
+                "ordinal": 1,
+                "organization": "Air Force",
+                "positionTitle": "Colonel",
+                "url": "https://api.congress.gov/v3/nomination/117/2467/1?format=json"
+            }
+        ],
+        "number": 2467,
+        "partNumber": "00",
+        "receivedDate": "2022-08-03",
+        "updateDate": "2022-08-04T04:25:12Z"
+    }
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `nominationNumber` * | integer (path) - The nomination's assigned number. For example, the value can be 2467. |
+| `format` | string (query) - The data format. Value can be xml or json. |
+
+---
+
+### **GET `/nomination/{congress}/{nominationNumber}/{ordinal}`**
+
+**Description**: Returns the list nominees for a position within the nomination.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/nomination/117/2467/1?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "nominees": [
+        {
+            "firstName": "JOHN",
+            "lastName": "SZCZEPANSKI",
+            "middleName": "T.",
+            "ordinal": 12
+        },
+        {
+            "firstName": "ERIN",
+            "lastName": "REYNOLDS",
+            "middleName": "S.",
+            "ordinal": 11
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `nominationNumber` * | integer (path) - The nomination's assigned number. For example, the value can be 2467. |
+| `ordinal` * | integer (path) - The ordinal number. For example, the value can be 1. |
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/nomination/{congress}/{nominationNumber}/actions`**
+
+**Description**: Returns the list of actions on a specified nomination.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/nomination/117/2467/actions?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "actions": [
+        {
+            "actionCode": "S05120",
+            "actionDate": "2022-08-03",
+            "committees": [
+              {
+                "name": "Armed Services Committee",
+                "systemCode": "ssas00",
+                "url": "https://api.congress.gov/v3/committee/senate/ssas00?format=json"
+              }
+            ],
+            "text": "Received in the Senate and referred to the Committee on Armed Services.",
+            "type": "IntroReferral"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `nominationNumber` * | integer (path) - The nomination's assigned number. For example, the value can be 2467. |
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/nomination/{congress}/{nominationNumber}/committees`**
+
+**Description**: Returns the list of committees associated with a specified nomination.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/nomination/117/2467/committees?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "committees": [
+        {
+            "activities": [
+                {
+                    "date": "2022-08-03T21:02:58Z",
+                    "name": "Referred to"
+                }
+            ],
+            "chamber": "Senate",
+            "name": "Armed Services Committee",
+            "systemCode": "ssas00",
+            "type": "Standing",
+            "url": "https://api.congress.gov/v3/committee/senate/ssas00?format=json"
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 117. |
+| `nominationNumber` * | integer (path) - The nomination's assigned number. For example, the value can be 2467. |
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
+
+---
+
+### **GET `/nomination/{congress}/{nominationNumber}/hearings`**
+
+**Description**: Returns the list of printed hearings associated with a specified nomination.
+
+**Example Request**:
+
+```
+https://api.congress.gov/v3/nomination/116/389/hearings?api_key=[INSERT_KEY]
+```
+
+**Example Response**:
+
+```json
+{
+    "hearings": [
+        {
+          "chamber": "Senate",
+          "citation": "S.Hrg.116-38",
+          "date": "2019-06-05",
+          "jacketNumber": 37106,
+          "number": 38
+        }
+    ]
+}
+```
+
+**Parameters**:
+
+| Name | Description |
+|------|-------------|
+| `congress` * | integer (path) - The congress number. For example, the value can be 116. |
+| `nominationNumber` * | integer (path) - The nomination's assigned number. For example, the value can be 389. |
+| `format` | string (query) - The data format. Value can be xml or json. |
+| `offset` | integer (query) - The starting record returned. 0 is the first record. |
+| `limit` | integer (query) - The number of records returned. The maximum limit is 250. |
