@@ -9,8 +9,9 @@ import asyncio
 import json
 import datetime
 
-# Force single worker for MCP compatibility
+# Force single worker for MCP compatibility (set early)
 os.environ['WEB_CONCURRENCY'] = '1'
+os.environ['GUNICORN_CMD_ARGS'] = '--workers=1'
 
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response, StreamingResponse
@@ -44,32 +45,32 @@ try:
     if hasattr(server, '_tool_manager'):
         tool_manager = server._tool_manager
         print(f"Tool manager type: {type(tool_manager)}")
-        if hasattr(tool_manager, 'tools'):
-            direct_tools_count = len(tool_manager.tools)
-            print(f"Direct tool manager tools: {direct_tools_count}")
-            if tool_manager.tools:
-                print(f"Tool names: {list(tool_manager.tools.keys())[:10]}")  # Show first 10
-        else:
-            print("Tool manager has no 'tools' attribute")
+        
+        # Check different possible attributes for tools
+        tool_attrs = ['tools', '_tools', 'registered_tools', '_registered_tools']
+        tools_found = False
+        
+        for attr in tool_attrs:
+            if hasattr(tool_manager, attr):
+                tools_dict = getattr(tool_manager, attr)
+                if tools_dict:
+                    print(f"Found tools in {attr}: {len(tools_dict)}")
+                    print(f"Tool names: {list(tools_dict.keys())[:10]}")  # Show first 10
+                    tools_found = True
+                    break
+                else:
+                    print(f"Attribute {attr} exists but is empty")
+        
+        if not tools_found:
+            print(f"Tool manager attributes: {[attr for attr in dir(tool_manager) if not attr.startswith('__')]}")
     else:
         print("Server has no '_tool_manager' attribute")
     
-    # Try alternative access methods
-    try:
-        # Test the list_tools method
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        tools_result = loop.run_until_complete(server.list_tools())
-        print(f"list_tools() result: {tools_result}")
-        if hasattr(tools_result, 'tools'):
-            print(f"Tools from list_tools(): {len(tools_result.tools)}")
-        loop.close()
-    except Exception as e:
-        print(f"Error calling list_tools(): {e}")
+    # Check if the server has any callable methods that might be tools
+    server_methods = [attr for attr in dir(server) if callable(getattr(server, attr)) and not attr.startswith('_')]
+    print(f"Server callable methods: {server_methods[:10]}")  # First 10
     
-    final_count = len(getattr(server._tool_manager, 'tools', {}))
-    print(f"Server initialized with {final_count} tools")
+    print(f"Server initialized - checking complete")
     
 except Exception as e:
     print(f"Error during server initialization: {e}")
