@@ -95,6 +95,12 @@ For testing and debugging with the MCP Inspector:
 mcp dev congress_api/main.py
 ```
 
+Or use the provided development script:
+
+```
+./server.sh
+```
+
 ### Claude Desktop Integration
 
 To install the server in Claude Desktop:
@@ -110,6 +116,103 @@ For advanced scenarios:
 ```
 python -m congress_api.main
 ```
+
+## Production Deployment
+
+This project includes production-ready deployment configurations.
+
+[![Deploy to Heroku](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
+
+### Environment Configuration
+
+1. Copy the template environment file:
+   ```
+   cp .env.template .env.production
+   ```
+
+2. Edit `.env.production` with your production settings, including your API key.
+
+### Running with Production Server
+
+The project includes a production-ready server script using Uvicorn:
+
+```
+python production_server.py --env production --workers 2
+```
+
+Options:
+- `--host`: Host to bind to (default: 0.0.0.0)
+- `--port`: Port to bind to (default: 8000)
+- `--workers`: Number of worker processes (default: 1)
+- `--env`: Environment (production, staging, development)
+- `--log-level`: Log level (debug, info, warning, error, critical)
+
+### Heroku Deployment
+
+This MCP server can be deployed directly to Heroku:
+
+1. **One-Click Deployment**:
+   
+   Click the "Deploy to Heroku" button above and follow the prompts to set up your app with the required environment variables.
+
+2. **Manual Deployment**:
+
+   ```bash
+   # Install the Heroku CLI if you haven't already
+   # https://devcenter.heroku.com/articles/heroku-cli
+   
+   # Create a new Heroku app
+   export APP_NAME=your-congressional-mcp
+   heroku create $APP_NAME
+   
+   # Set the Python buildpack
+   heroku buildpacks:set heroku/python -a $APP_NAME
+   
+   # Configure environment variables
+   heroku config:set CONGRESS_API_KEY=your_api_key_here -a $APP_NAME
+   heroku config:set CONGRESS_API_ENV=production -a $APP_NAME
+   heroku config:set LOG_LEVEL=INFO -a $APP_NAME
+   heroku config:set ENABLE_CACHING=true -a $APP_NAME
+   heroku config:set CACHE_TIMEOUT=300 -a $APP_NAME
+   
+   # Deploy the application
+   git push heroku main
+   
+   # Scale the web process (for SSE transport)
+   heroku ps:scale web=1 -a $APP_NAME
+   ```
+
+3. **Connecting to Your MCP Server**:
+
+   Your MCP server will be available at:
+   - SSE endpoint: `https://your-congressional-mcp.herokuapp.com/sse`
+   - You can also use the MCP Inspector to connect to this endpoint
+
+### Docker Deployment
+
+For containerized deployment:
+
+1. Build and run with Docker:
+   ```
+   docker build -t congress-mcp-server .
+   docker run -p 8000:8000 -e CONGRESS_API_KEY=your_key_here congress-mcp-server
+   ```
+
+2. Or use Docker Compose:
+   ```
+   CONGRESS_API_KEY=your_key_here docker-compose up -d
+   ```
+
+### Production Features
+
+The server includes several production-ready features:
+
+- **Environment-specific configuration**: Different settings for development, staging, and production
+- **Structured logging**: JSON-formatted logs in production for better parsing
+- **Caching**: Optional in-memory caching to reduce API calls
+- **Health checks**: `/health` endpoint for monitoring
+- **Connection pooling**: Optimized HTTP client settings
+- **Error handling**: Comprehensive error handling and reporting
 
 ## API Documentation
 

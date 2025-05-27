@@ -60,6 +60,11 @@ htmlcov/
 .mcp_cache/
 .mcp_data/
 
+# Heroku
+.heroku/
+*.pyc
+staticfiles/
+
 # Jupyter Notebooks
 .ipynb_checkpoints
 
