@@ -254,6 +254,11 @@ async def sse_endpoint(request):
                     }
                     return JSONResponse(response)
                 
+                elif message.get("method") == "notifications/initialized":
+                    # Handle initialized notification - just return success (notifications don't need responses)
+                    print("Received initialized notification")
+                    return JSONResponse({"status": "ok"})
+                
                 elif message.get("method") == "tools/list":
                     # Return list of tools
                     tools_list = []
