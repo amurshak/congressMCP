@@ -1,1 +1,1 @@
-web: python production_server.py --env production --port $PORT --workers 1
+web: uvicorn heroku_server:app --host=0.0.0.0 --port=$PORT
