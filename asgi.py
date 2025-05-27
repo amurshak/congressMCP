@@ -32,6 +32,14 @@ from congress_api import prompts_module
 # This is the server object that will be used by the ASGI wrapper
 server = mcp
 
+# Force initialization of the server by calling setup methods if they exist
+try:
+    if hasattr(server, '_setup_handlers'):
+        server._setup_handlers()
+    print(f"Server initialized with {len(getattr(server._tool_manager, 'tools', {}))} tools")
+except Exception as e:
+    print(f"Error during server initialization: {e}")
+
 # Initialize the API config
 from congress_api.core.api_config import get_api_config
 config = get_api_config()
@@ -77,20 +85,53 @@ async def mcp_info(request):
         if hasattr(server, 'list_tools'):
             try:
                 tools_result = await server.list_tools()
+                print(f"Tools result: {tools_result}")  # Debug logging
                 if hasattr(tools_result, 'tools'):
                     tools_count = len(tools_result.tools)
                     tools_list = [tool.name for tool in tools_result.tools[:10]]
+                else:
+                    server_attrs["tools_result_attrs"] = str(dir(tools_result))
             except Exception as e:
                 server_attrs["tools_error"] = str(e)
+                print(f"Error listing tools: {e}")  # Debug logging
         
         if hasattr(server, 'list_resources'):
             try:
                 resources_result = await server.list_resources()
+                print(f"Resources result: {resources_result}")  # Debug logging
                 if hasattr(resources_result, 'resources'):
                     resources_count = len(resources_result.resources)
                     resources_list = [resource.uri for resource in resources_result.resources[:10]]
+                else:
+                    server_attrs["resources_result_attrs"] = str(dir(resources_result))
             except Exception as e:
                 server_attrs["resources_error"] = str(e)
+                print(f"Error listing resources: {e}")  # Debug logging
+                
+        # Also try to access internal managers directly
+        if hasattr(server, '_tool_manager'):
+            try:
+                tool_manager = server._tool_manager
+                if hasattr(tool_manager, 'tools'):
+                    direct_tools_count = len(tool_manager.tools)
+                    server_attrs["direct_tools_count"] = direct_tools_count
+                    if direct_tools_count > 0:
+                        tools_count = direct_tools_count
+                        tools_list = list(tool_manager.tools.keys())[:10]
+            except Exception as e:
+                server_attrs["direct_tools_error"] = str(e)
+                
+        if hasattr(server, '_resource_manager'):
+            try:
+                resource_manager = server._resource_manager
+                if hasattr(resource_manager, 'resources'):
+                    direct_resources_count = len(resource_manager.resources)
+                    server_attrs["direct_resources_count"] = direct_resources_count
+                    if direct_resources_count > 0:
+                        resources_count = direct_resources_count
+                        resources_list = list(resource_manager.resources.keys())[:10]
+            except Exception as e:
+                server_attrs["direct_resources_error"] = str(e)
         
         # Fallback to old method if available
         if hasattr(server, 'resources'):
