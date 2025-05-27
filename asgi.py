@@ -46,31 +46,33 @@ try:
         tool_manager = server._tool_manager
         print(f"Tool manager type: {type(tool_manager)}")
         
-        # Check different possible attributes for tools
-        tool_attrs = ['tools', '_tools', 'registered_tools', '_registered_tools']
+        # Check different possible attributes for tools (based on FastMCP docs)
+        tool_attrs = ['_tools', 'tools', 'registered_tools', '_registered_tools']
         tools_found = False
+        tools_count = 0
         
         for attr in tool_attrs:
             if hasattr(tool_manager, attr):
                 tools_dict = getattr(tool_manager, attr)
                 if tools_dict:
-                    print(f"Found tools in {attr}: {len(tools_dict)}")
-                    print(f"Tool names: {list(tools_dict.keys())[:10]}")  # Show first 10
+                    tools_count = len(tools_dict)
+                    print(f"Found {tools_count} tools in {attr}: {list(tools_dict.keys())[:10]}")  # Show first 10
                     tools_found = True
                     break
                 else:
                     print(f"Attribute {attr} exists but is empty")
         
         if not tools_found:
-            print(f"Tool manager attributes: {[attr for attr in dir(tool_manager) if not attr.startswith('__')]}")
+            print(f"Tool manager attributes: {[attr for attr in dir(tool_manager) if 'tool' in attr.lower()]}")
+            print(f"All tool manager attributes: {[attr for attr in dir(tool_manager) if not attr.startswith('__')]}")
     else:
         print("Server has no '_tool_manager' attribute")
     
-    # Check if the server has any callable methods that might be tools
-    server_methods = [attr for attr in dir(server) if callable(getattr(server, attr)) and not attr.startswith('_')]
-    print(f"Server callable methods: {server_methods[:10]}")  # First 10
+    # Also check if server itself has any tool-related attributes
+    server_tool_attrs = [attr for attr in dir(server) if 'tool' in attr.lower() and not attr.startswith('__')]
+    print(f"Server tool-related attributes: {server_tool_attrs}")
     
-    print(f"Server initialized - checking complete")
+    print(f"Server initialized - found {tools_count} tools total")
     
 except Exception as e:
     print(f"Error during server initialization: {e}")
