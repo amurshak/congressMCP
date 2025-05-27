@@ -55,22 +55,46 @@ async def mcp_info(request):
     # Get basic information about the MCP server
     resources_count = 0
     tools_count = 0
+    resources_list = []
+    tools_list = []
+    server_attrs = {}
     
     # Try to get resource and tool counts safely
     try:
+        # Check server attributes
+        server_attrs = {
+            "has_resources_attr": hasattr(server, 'resources'),
+            "has_tools_attr": hasattr(server, 'tools'),
+            "server_type": str(type(server)),
+            "server_dir": str(dir(server)[:100]) + "..."
+        }
+        
+        # Get resources and tools if available
         if hasattr(server, 'resources'):
             resources_count = len(server.resources)
+            resources_list = list(server.resources.keys())[:10] if resources_count > 0 else []
+        
         if hasattr(server, 'tools'):
             tools_count = len(server.tools)
-    except Exception:
-        pass
+            tools_list = list(server.tools.keys())[:10] if tools_count > 0 else []
+    except Exception as e:
+        return JSONResponse({
+            "name": "Congress MCP",
+            "description": "Congressional API MCP Server",
+            "version": "1.0.0",
+            "error": str(e),
+            "server_attrs": server_attrs
+        })
     
     return JSONResponse({
         "name": "Congress MCP",
         "description": "Congressional API MCP Server",
         "version": "1.0.0",
         "resources_count": resources_count,
-        "tools_count": tools_count
+        "tools_count": tools_count,
+        "resources_sample": resources_list,
+        "tools_sample": tools_list,
+        "server_attrs": server_attrs
     })
 
 # Simple 404 handler
