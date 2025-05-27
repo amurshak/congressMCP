@@ -127,5 +127,19 @@ def main():
 server = main()
 
 if __name__ == "__main__":
-    # When run directly, we don't need to do anything else as main() already returns the server
-    pass
+    import argparse
+    import uvicorn
+    from mcp.server import mount_to_asgi
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Run the Congress.gov API MCP server')
+    parser.add_argument('--port', type=int, default=8000, help='Port to run the server on')
+    parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to run the server on')
+    args = parser.parse_args()
+    
+    # Create an ASGI app with the MCP server mounted
+    app = mount_to_asgi(server)
+    
+    # Run the server
+    print(f"Starting server on {args.host}:{args.port}")
+    uvicorn.run(app, host=args.host, port=args.port)

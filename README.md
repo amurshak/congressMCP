@@ -149,7 +149,7 @@ Options:
 
 ### Heroku Deployment
 
-This MCP server can be deployed directly to Heroku:
+This MCP server can be deployed directly to Heroku using the simplified direct execution approach:
 
 1. **One-Click Deployment**:
    
@@ -178,11 +178,28 @@ This MCP server can be deployed directly to Heroku:
    # Deploy the application
    git push heroku main
    
-   # Scale the web process (for SSE transport)
+   # Scale the web process
    heroku ps:scale web=1 -a $APP_NAME
    ```
 
-3. **Connecting to Your MCP Server**:
+3. **Verifying Your Deployment**:
+
+   After deploying, you can verify that your MCP server is running correctly by checking:
+   
+   ```bash
+   # Check the logs
+   heroku logs --tail -a $APP_NAME
+   
+   # Check the health endpoint
+   curl https://your-congressional-mcp.herokuapp.com/health
+   
+   # Check the MCP info endpoint
+   curl https://your-congressional-mcp.herokuapp.com/mcp-info
+   ```
+   
+   The MCP info endpoint should show non-zero counts for resources and tools, confirming that everything is registered correctly.
+
+4. **Connecting to Your MCP Server**:
 
    Your MCP server will be available at:
    - SSE endpoint: `https://your-congressional-mcp.herokuapp.com/sse`
