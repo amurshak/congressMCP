@@ -221,6 +221,10 @@ async def mcp_info(request):
 async def sse_endpoint(request):
     """SSE endpoint for MCP remote connections."""
     
+    # Handle both GET and POST requests
+    method = request.method
+    print(f"SSE endpoint called with method: {method}")
+    
     async def event_stream():
         try:
             # Send initial connection event
@@ -301,7 +305,7 @@ async def server_error(request, exc):
 routes = [
     Route("/health", health_check),
     Route("/mcp-info", mcp_info),
-    Route("/sse", sse_endpoint),  # Add SSE endpoint for mcp-remote
+    Route("/sse", sse_endpoint, methods=["GET", "POST"]),  # Add POST method support
     Route("/", health_check),     # Add root endpoint that redirects to health
 ]
 
@@ -310,7 +314,7 @@ middleware = [
     Middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_methods=["GET", "OPTIONS"],
+        allow_methods=["GET", "POST", "OPTIONS"],  # Add POST method
         allow_headers=["*"],
     ),
 ]
