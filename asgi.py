@@ -225,53 +225,151 @@ async def sse_endpoint(request):
     method = request.method
     print(f"SSE endpoint called with method: {method}")
     
-    async def event_stream():
+    if method == "POST":
+        # Handle MCP JSON-RPC messages over HTTP POST
         try:
-            # Send initial connection event
-            yield f"data: {json.dumps({'type': 'connected', 'message': 'MCP Server Connected', 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
+            body = await request.body()
+            if body:
+                import json
+                message = json.loads(body.decode('utf-8'))
+                print(f"Received MCP message: {message}")
+                
+                # Handle different MCP message types
+                if message.get("method") == "initialize":
+                    # Return MCP initialization response
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": message.get("id"),
+                        "result": {
+                            "protocolVersion": "2024-11-05",
+                            "capabilities": {
+                                "tools": {},
+                                "resources": {}
+                            },
+                            "serverInfo": {
+                                "name": "Congress MCP",
+                                "version": "1.0.0"
+                            }
+                        }
+                    }
+                    return JSONResponse(response)
+                
+                elif message.get("method") == "tools/list":
+                    # Return list of tools
+                    tools_list = []
+                    if hasattr(server, '_tool_manager') and hasattr(server._tool_manager, '_tools'):
+                        tools_dict = server._tool_manager._tools
+                        for tool_name, tool_obj in tools_dict.items():
+                            tool_info = {
+                                "name": tool_name,
+                                "description": getattr(tool_obj, 'description', 'No description available'),
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {},
+                                    "required": []
+                                }
+                            }
+                            tools_list.append(tool_info)
+                    
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": message.get("id"),
+                        "result": {
+                            "tools": tools_list
+                        }
+                    }
+                    return JSONResponse(response)
+                
+                elif message.get("method") == "resources/list":
+                    # Return list of resources
+                    resources_list = []
+                    if hasattr(server, '_resource_manager') and hasattr(server._resource_manager, '_resources'):
+                        resources_dict = server._resource_manager._resources
+                        for resource_uri, resource_obj in resources_dict.items():
+                            resource_info = {
+                                "uri": resource_uri,
+                                "name": getattr(resource_obj, 'name', resource_uri),
+                                "description": getattr(resource_obj, 'description', 'No description available')
+                            }
+                            resources_list.append(resource_info)
+                    
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": message.get("id"),
+                        "result": {
+                            "resources": resources_list
+                        }
+                    }
+                    return JSONResponse(response)
+                
+                else:
+                    # Unknown method
+                    response = {
+                        "jsonrpc": "2.0",
+                        "id": message.get("id"),
+                        "error": {
+                            "code": -32601,
+                            "message": f"Method not found: {message.get('method')}"
+                        }
+                    }
+                    return JSONResponse(response, status_code=400)
             
-            # Get server info for initial handshake
-            try:
-                tools_info = []
-                resources_info = []
-                
-                # For FastMCP servers, use the list methods
-                if hasattr(server, 'list_tools'):
-                    try:
-                        tools_list = await server.list_tools()
-                        if hasattr(tools_list, 'tools'):
-                            tools_info = [{"name": tool.name, "description": tool.description} 
-                                         for tool in tools_list.tools]
-                    except Exception as e:
-                        tools_info = [{"error": f"Error listing tools: {str(e)}"}]
-                
-                if hasattr(server, 'list_resources'):
-                    try:
-                        resources_list = await server.list_resources()
-                        if hasattr(resources_list, 'resources'):
-                            resources_info = [{"uri": resource.uri, "name": resource.name} 
-                                            for resource in resources_list.resources]
-                    except Exception as e:
-                        resources_info = [{"error": f"Error listing resources: {str(e)}"}]
-                
-                # Send server capabilities
-                yield f"data: {json.dumps({'type': 'capabilities', 'tools': tools_info, 'resources': resources_info, 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
-                
-            except Exception as e:
-                yield f"data: {json.dumps({'type': 'error', 'message': f'Error getting server info: {str(e)}', 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
+            # Empty POST body - return success
+            return JSONResponse({"status": "ok"})
             
-            # Keep connection alive with periodic heartbeats
-            heartbeat_count = 0
-            while True:
-                heartbeat_count += 1
-                yield f"data: {json.dumps({'type': 'heartbeat', 'count': heartbeat_count, 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
-                await asyncio.sleep(30)  # Send heartbeat every 30 seconds
-                
-        except asyncio.CancelledError:
-            # Client disconnected
-            yield f"data: {json.dumps({'type': 'disconnected', 'message': 'Client disconnected', 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'message': str(e), 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
+            print(f"Error handling POST request: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
+    
+    else:
+        # Handle GET request - return SSE stream
+        async def event_stream():
+            try:
+                # Send initial connection event
+                yield f"data: {json.dumps({'type': 'connected', 'message': 'MCP Server Connected', 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
+                
+                # Get server info for initial handshake
+                try:
+                    tools_info = []
+                    resources_info = []
+                    
+                    # For FastMCP servers, use the list methods
+                    if hasattr(server, 'list_tools'):
+                        try:
+                            tools_list = await server.list_tools()
+                            if hasattr(tools_list, 'tools'):
+                                tools_info = [{"name": tool.name, "description": tool.description} 
+                                             for tool in tools_list.tools]
+                        except Exception as e:
+                            tools_info = [{"error": f"Error listing tools: {str(e)}"}]
+                    
+                    if hasattr(server, 'list_resources'):
+                        try:
+                            resources_list = await server.list_resources()
+                            if hasattr(resources_list, 'resources'):
+                                resources_info = [{"uri": resource.uri, "name": resource.name} 
+                                                for resource in resources_list.resources]
+                        except Exception as e:
+                            resources_info = [{"error": f"Error listing resources: {str(e)}"}]
+                    
+                    # Send server capabilities
+                    yield f"data: {json.dumps({'type': 'capabilities', 'tools': tools_info, 'resources': resources_info, 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
+                    
+                except Exception as e:
+                    yield f"data: {json.dumps({'type': 'error', 'message': f'Error getting server info: {str(e)}', 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
+                
+                # Keep connection alive with periodic heartbeats
+                heartbeat_count = 0
+                while True:
+                    heartbeat_count += 1
+                    yield f"data: {json.dumps({'type': 'heartbeat', 'count': heartbeat_count, 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
+                    await asyncio.sleep(30)  # Send heartbeat every 30 seconds
+                    
+            except asyncio.CancelledError:
+                # Client disconnected
+                yield f"data: {json.dumps({'type': 'disconnected', 'message': 'Client disconnected', 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e), 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
     
     return StreamingResponse(
         event_stream(),
