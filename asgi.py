@@ -15,8 +15,23 @@ from starlette.middleware.cors import CORSMiddleware
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 # Import and initialize the MCP server
-import congress_api.main
-from congress_api.main import server
+from congress_api.mcp_app import mcp
+
+# Import all features to register them with the MCP server
+from congress_api.features import bills, members, committees, congress_info, amendments, summaries
+from congress_api.features import committee_reports, committee_prints, committee_meetings, hearings
+from congress_api.features import congressional_record, daily_congressional_record, bound_congressional_record
+from congress_api.features import house_communications, house_requirements, senate_communications, nominations, crs_reports, treaties
+
+# Import prompts
+from congress_api import prompts_module
+
+# Initialize the server
+from congress_api.core.api_config import get_api_config
+config = get_api_config()
+
+# This is the server object that will be used by the ASGI wrapper
+server = mcp
 
 # Configure environment
 from congress_api.core.api_config import get_api_config, ENV
