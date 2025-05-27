@@ -8,6 +8,10 @@ import sys
 import asyncio
 import json
 import datetime
+
+# Force single worker for MCP compatibility
+os.environ['WEB_CONCURRENCY'] = '1'
+
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response, StreamingResponse
 from starlette.routing import Route
@@ -32,13 +36,45 @@ from congress_api import prompts_module
 # This is the server object that will be used by the ASGI wrapper
 server = mcp
 
-# Force initialization of the server by calling setup methods if they exist
+# Force initialization and check tools registration
 try:
-    if hasattr(server, '_setup_handlers'):
-        server._setup_handlers()
-    print(f"Server initialized with {len(getattr(server._tool_manager, 'tools', {}))} tools")
+    print(f"Server type: {type(server)}")
+    
+    # Check tool manager directly
+    if hasattr(server, '_tool_manager'):
+        tool_manager = server._tool_manager
+        print(f"Tool manager type: {type(tool_manager)}")
+        if hasattr(tool_manager, 'tools'):
+            direct_tools_count = len(tool_manager.tools)
+            print(f"Direct tool manager tools: {direct_tools_count}")
+            if tool_manager.tools:
+                print(f"Tool names: {list(tool_manager.tools.keys())[:10]}")  # Show first 10
+        else:
+            print("Tool manager has no 'tools' attribute")
+    else:
+        print("Server has no '_tool_manager' attribute")
+    
+    # Try alternative access methods
+    try:
+        # Test the list_tools method
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        tools_result = loop.run_until_complete(server.list_tools())
+        print(f"list_tools() result: {tools_result}")
+        if hasattr(tools_result, 'tools'):
+            print(f"Tools from list_tools(): {len(tools_result.tools)}")
+        loop.close()
+    except Exception as e:
+        print(f"Error calling list_tools(): {e}")
+    
+    final_count = len(getattr(server._tool_manager, 'tools', {}))
+    print(f"Server initialized with {final_count} tools")
+    
 except Exception as e:
     print(f"Error during server initialization: {e}")
+    import traceback
+    traceback.print_exc()
 
 # Initialize the API config
 from congress_api.core.api_config import get_api_config
