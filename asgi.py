@@ -14,8 +14,9 @@ from starlette.middleware.cors import CORSMiddleware
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Import the MCP server
-from run_server import server
+# Import and initialize the MCP server
+import congress_api.main
+from congress_api.main import server
 
 # Configure environment
 from congress_api.core.api_config import get_api_config, ENV
