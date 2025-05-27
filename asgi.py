@@ -67,11 +67,32 @@ async def mcp_info(request):
         server_attrs = {
             "has_resources_attr": hasattr(server, 'resources'),
             "has_tools_attr": hasattr(server, 'tools'),
+            "has_list_tools": hasattr(server, 'list_tools'),
+            "has_list_resources": hasattr(server, 'list_resources'),
             "server_type": str(type(server)),
             "server_dir": str(dir(server)[:100]) + "..."
         }
         
-        # Get resources and tools if available
+        # For FastMCP servers, use the list methods
+        if hasattr(server, 'list_tools'):
+            try:
+                tools_result = await server.list_tools()
+                if hasattr(tools_result, 'tools'):
+                    tools_count = len(tools_result.tools)
+                    tools_list = [tool.name for tool in tools_result.tools[:10]]
+            except Exception as e:
+                server_attrs["tools_error"] = str(e)
+        
+        if hasattr(server, 'list_resources'):
+            try:
+                resources_result = await server.list_resources()
+                if hasattr(resources_result, 'resources'):
+                    resources_count = len(resources_result.resources)
+                    resources_list = [resource.uri for resource in resources_result.resources[:10]]
+            except Exception as e:
+                server_attrs["resources_error"] = str(e)
+        
+        # Fallback to old method if available
         if hasattr(server, 'resources'):
             resources_count = len(server.resources)
             resources_list = list(server.resources.keys())[:10] if resources_count > 0 else []
@@ -79,6 +100,7 @@ async def mcp_info(request):
         if hasattr(server, 'tools'):
             tools_count = len(server.tools)
             tools_list = list(server.tools.keys())[:10] if tools_count > 0 else []
+            
     except Exception as e:
         return JSONResponse({
             "name": "Congress MCP",
@@ -111,13 +133,26 @@ async def sse_endpoint(request):
             # Get server info for initial handshake
             try:
                 tools_info = []
-                if hasattr(server, 'tools'):
-                    tools_info = [{"name": name, "description": getattr(tool, 'description', 'No description')} 
-                                 for name, tool in server.tools.items()]
-                
                 resources_info = []
-                if hasattr(server, 'resources'):
-                    resources_info = [{"name": name} for name in server.resources.keys()]
+                
+                # For FastMCP servers, use the list methods
+                if hasattr(server, 'list_tools'):
+                    try:
+                        tools_list = await server.list_tools()
+                        if hasattr(tools_list, 'tools'):
+                            tools_info = [{"name": tool.name, "description": tool.description} 
+                                         for tool in tools_list.tools]
+                    except Exception as e:
+                        tools_info = [{"error": f"Error listing tools: {str(e)}"}]
+                
+                if hasattr(server, 'list_resources'):
+                    try:
+                        resources_list = await server.list_resources()
+                        if hasattr(resources_list, 'resources'):
+                            resources_info = [{"uri": resource.uri, "name": resource.name} 
+                                            for resource in resources_list.resources]
+                    except Exception as e:
+                        resources_info = [{"error": f"Error listing resources: {str(e)}"}]
                 
                 # Send server capabilities
                 yield f"data: {json.dumps({'type': 'capabilities', 'tools': tools_info, 'resources': resources_info, 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
