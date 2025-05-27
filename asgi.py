@@ -147,11 +147,19 @@ async def mcp_info(request):
                 server_attrs["resources_error"] = str(e)
                 print(f"Error listing resources: {e}")  # Debug logging
                 
-        # Also try to access internal managers directly
+        # Also try to access internal managers directly using the correct attribute
         if hasattr(server, '_tool_manager'):
             try:
                 tool_manager = server._tool_manager
-                if hasattr(tool_manager, 'tools'):
+                # Use _tools instead of tools (based on the logs showing it works)
+                if hasattr(tool_manager, '_tools'):
+                    direct_tools_count = len(tool_manager._tools)
+                    server_attrs["direct_tools_count"] = direct_tools_count
+                    if direct_tools_count > 0:
+                        tools_count = direct_tools_count
+                        tools_list = list(tool_manager._tools.keys())[:10]
+                        print(f"Found {direct_tools_count} tools via direct _tools access")
+                elif hasattr(tool_manager, 'tools'):
                     direct_tools_count = len(tool_manager.tools)
                     server_attrs["direct_tools_count"] = direct_tools_count
                     if direct_tools_count > 0:
@@ -163,7 +171,15 @@ async def mcp_info(request):
         if hasattr(server, '_resource_manager'):
             try:
                 resource_manager = server._resource_manager
-                if hasattr(resource_manager, 'resources'):
+                # Use _resources instead of resources 
+                if hasattr(resource_manager, '_resources'):
+                    direct_resources_count = len(resource_manager._resources)
+                    server_attrs["direct_resources_count"] = direct_resources_count
+                    if direct_resources_count > 0:
+                        resources_count = direct_resources_count
+                        resources_list = list(resource_manager._resources.keys())[:10]
+                        print(f"Found {direct_resources_count} resources via direct _resources access")
+                elif hasattr(resource_manager, 'resources'):
                     direct_resources_count = len(resource_manager.resources)
                     server_attrs["direct_resources_count"] = direct_resources_count
                     if direct_resources_count > 0:
