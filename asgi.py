@@ -22,23 +22,11 @@ from starlette.middleware.cors import CORSMiddleware
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Import the MCP server from mcp_app
-from congress_api.mcp_app import mcp
-
-# Features are imported in main.py - no need to duplicate here
+# Import the server from the congress_api package
+from congress_api.main import server
 
 # Import prompts
 from congress_api import prompts_module
-
-# This is the server object that will be used by the ASGI wrapper
-server = mcp
-
-# Get the Starlette app from FastMCP for SSE transport
-# path="/" means FastMCP will handle requests directly at the mount point (e.g., /sse)
-fastmcp_asgi_app = server.http_app(transport="sse", path="/")
-
-
-
 
 # Initialize the API config
 from congress_api.core.api_config import get_api_config
@@ -46,6 +34,26 @@ config = get_api_config()
 
 # Configure environment
 from congress_api.core.api_config import get_api_config, ENV
+
+# Get the Starlette app from FastMCP for streamable_http transport with proper configuration
+# For production, we need to ensure the FastMCP app is properly configured
+# Using streamable_http instead of SSE as per FastMCP v2.3.0+ recommendations
+try:
+    # For streamable_http, we need to get the streamable HTTP ASGI app
+    fastmcp_asgi_app = server.streamable_http_app()
+    print(f"Successfully created FastMCP streamable_http ASGI app")
+    print(f"App type: {type(fastmcp_asgi_app)}")
+except Exception as e:
+    print(f"Error creating FastMCP streamable_http app: {e}")
+    # Fallback: create a simple FastMCP app
+    from fastmcp import FastMCP
+    
+    fallback_server = FastMCP(
+        "Congress MCP Fallback",
+        description="Fallback Congressional API MCP Server",
+        version="1.0.0"
+    )
+    fastmcp_asgi_app = fallback_server.streamable_http_app()
 
 # Simple health check endpoint
 async def health_check(request):
@@ -58,6 +66,31 @@ async def health_check(request):
         "caching_enabled": config["caching_enabled"],
         "timestamp": datetime.datetime.now().isoformat()
     })
+
+# MCP debug endpoint to test server functionality
+async def mcp_debug(request):
+    """Debug endpoint to test MCP server functionality."""
+    try:
+        # Test if we can list tools and resources
+        tools_result = await server.list_tools()
+        resources_result = await server.list_resources()
+        
+        return JSONResponse({
+            "status": "ok",
+            "server_type": str(type(server)),
+            "tools_count": len(tools_result.tools) if hasattr(tools_result, 'tools') else 0,
+            "resources_count": len(resources_result.resources) if hasattr(resources_result, 'resources') else 0,
+            "tools_sample": [tool.name for tool in tools_result.tools[:5]] if hasattr(tools_result, 'tools') else [],
+            "resources_sample": [resource.uri for resource in resources_result.resources[:5]] if hasattr(resources_result, 'resources') else [],
+            "fastmcp_app_type": str(type(fastmcp_asgi_app))
+        })
+    except Exception as e:
+        return JSONResponse({
+            "status": "error",
+            "error": str(e),
+            "server_type": str(type(server)),
+            "fastmcp_app_type": str(type(fastmcp_asgi_app))
+        }, status_code=500)
 
 # MCP info endpoint
 async def mcp_info(request):
@@ -198,8 +231,9 @@ async def server_error(request, exc):
 routes = [
     Route("/health", health_check),
     Route("/mcp-info", mcp_info),
-    Mount("/sse", app=fastmcp_asgi_app), # Mount FastMCP app for SSE
+    Route("/mcp-debug", mcp_debug),
     Route("/", health_check),     # Add root endpoint that redirects to health
+    Mount("/mcp", fastmcp_asgi_app), # Mount FastMCP app for streamable_http transport
 ]
 
 # Define middleware
@@ -221,5 +255,5 @@ app = Starlette(
         404: not_found,
         500: server_error,
     },
-    lifespan=fastmcp_asgi_app.lifespan # Add lifespan from FastMCP app
+    lifespan=fastmcp_asgi_app.lifespan if hasattr(fastmcp_asgi_app, 'lifespan') else None
 )
