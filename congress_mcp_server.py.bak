@@ -219,7 +219,6 @@ async def get_current_congress() -> str:
     Returns detailed information about the currently active Congress,
     including session dates, chamber information, and leadership.
     """
-    ctx = mcp.get_context()
     data = await make_api_request("/congress/current", ctx)
     congress = data.get("congress", {})
     return json.dumps(congress, indent=2)
@@ -227,7 +226,6 @@ async def get_current_congress() -> str:
 @mcp.resource("congress://{congress_num}")
 async def get_congress(congress_num: str) -> str:
     """Get information about a specific Congress by number."""
-    ctx = mcp.get_context()
     data = await make_api_request(f"/congress/{congress_num}", ctx)
     congress = data.get("congress", {})
     return json.dumps(congress, indent=2)
@@ -244,7 +242,6 @@ async def get_latest_bills() -> str:
     Returns a list of the 10 most recently updated bills across all
     Congresses, sorted by update date in descending order.
     """
-    ctx = mcp.get_context()
     data = await make_api_request("/bill", ctx, params={"limit": 10, "sort": "updateDate+desc"})
     bills = data.get("bills", [])
     
@@ -266,7 +263,6 @@ async def get_bills_by_congress(congress_num: str) -> str:
     Returns a list of the 10 most recently updated bills from the
     specified Congress, sorted by update date in descending order.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/bill/{congress_num}", ctx, params={"limit": 10, "sort": "updateDate+desc"})
     bills = data.get("bills", [])
     
@@ -289,7 +285,6 @@ async def get_bills_by_type(congress_num: str, bill_type: str) -> str:
     Returns a list of the 10 most recently updated bills of the specified
     type from the specified Congress, sorted by update date in descending order.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/bill/{congress_num}/{bill_type}", ctx, params={"limit": 10, "sort": "updateDate+desc"})
     bills = data.get("bills", [])
     
@@ -312,7 +307,6 @@ async def get_committees() -> str:
     Returns a comprehensive list of committees in the House and Senate,
     including their names, chambers, and system codes.
     """
-    ctx = mcp.get_context()
     data = await make_api_request("/committee", ctx)
     committees = data.get("committees", [])
     
@@ -333,7 +327,6 @@ async def get_committees_by_chamber(chamber: str) -> str:
         
     Returns a list of committees in the specified chamber.
     """
-    ctx = mcp.get_context()
     data = await make_api_request("/committee", ctx)
     all_committees = data.get("committees", [])
     
@@ -362,7 +355,6 @@ async def get_committee_details(chamber: str, committee_code: str) -> str:
         
     Returns detailed information about the specified committee.
     """
-    ctx = mcp.get_context()
     endpoint = f"/committee/{chamber}/{committee_code}"
     
     try:
@@ -397,7 +389,6 @@ async def get_current_members() -> str:
     Returns a sample of 20 current members from both chambers of Congress,
     including their biographical information and contact details.
     """
-    ctx = mcp.get_context()
     current_congress_data = await make_api_request("/congress/current", ctx)
     current_congress = current_congress_data.get("congress", {}).get("number")
     
@@ -422,7 +413,6 @@ async def get_member_details(bioguide_id: str) -> str:
     Returns comprehensive information about the specified member,
     including biographical data, terms of service, and committee assignments.
     """
-    ctx = mcp.get_context()
     endpoint = f"/member/{bioguide_id}"
     
     try:
@@ -504,7 +494,6 @@ async def search_bills(
         if bill_type:
             endpoint = f"/bill/{congress}/{bill_type}"
     
-    ctx = mcp.get_context()
     data = await make_api_request(endpoint, ctx, params=params)
     bills = data.get("bills", [])
     
@@ -556,8 +545,7 @@ async def search_members(
             endpoint = f"/member/congress/{congress}"
         
         print(f"DEBUG: Getting context for search_members", file=sys.stderr)
-        ctx = mcp.get_context()
-        print(f"DEBUG: Calling make_api_request with endpoint={endpoint}", file=sys.stderr)
+            print(f"DEBUG: Calling make_api_request with endpoint={endpoint}", file=sys.stderr)
         data = await make_api_request(endpoint, ctx, params=params)
         print(f"DEBUG: make_api_request returned successfully", file=sys.stderr)
     except Exception as e:
@@ -629,7 +617,6 @@ async def get_bill_actions(
         bill_number: Bill number
         limit: Maximum number of actions to return (default: 10)
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/actions"
     params = {"limit": limit}
     
@@ -671,7 +658,6 @@ async def get_bill_details(
         bill_number: Bill number
     """
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}"
-    ctx = mcp.get_context()
     data = await make_api_request(endpoint, ctx)
     bill = data.get("bill", {})
     
@@ -733,8 +719,7 @@ async def get_member_info(
     """
     try:
         endpoint = f"/member/{bioguide_id}"
-        ctx = mcp.get_context()
-        data = await make_api_request(endpoint, ctx)
+            data = await make_api_request(endpoint, ctx)
         
         if not isinstance(data, dict):
             return f"Error: Unexpected response format for member with Bioguide ID {bioguide_id}."
@@ -925,7 +910,6 @@ async def get_bill_amendments(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/amendments"
     data = await make_api_request(endpoint, ctx)
     amendments = data.get("amendments", [])
@@ -955,8 +939,7 @@ async def get_bill_cosponsors(
         bill_number: Bill number
     """
     try:
-        ctx = mcp.get_context()
-        endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/cosponsors"
+            endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/cosponsors"
         
         data = await make_api_request(endpoint, ctx)
         cosponsors = data.get("cosponsors", [])
@@ -1042,8 +1025,7 @@ async def get_bill_subjects(
         title = f"# Legislative Subjects for {bill_type.upper()} {bill_number} - {congress}th Congress"
         
         # Get the context to access API key
-        ctx = mcp.get_context()
-        
+            
         # Define the endpoint according to the API documentation
         endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/subjects"
         
@@ -1110,7 +1092,6 @@ async def get_bill_text_versions(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/text"
     
     data = await make_api_request(endpoint, ctx)
@@ -1154,7 +1135,6 @@ async def get_bill_titles(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/titles"
     
     data = await make_api_request(endpoint, ctx)
@@ -1198,7 +1178,6 @@ async def get_bill_summaries(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/summaries"
     
     data = await make_api_request(endpoint, ctx)
@@ -1245,7 +1224,6 @@ async def get_bill_related_bills(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/relatedbills"
     
     data = await make_api_request(endpoint, ctx)

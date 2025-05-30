@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional, Union
 import json
 import logging
 from datetime import datetime
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -161,7 +161,7 @@ def handle_api_error(data: Dict[str, Any], error_message: str) -> str:
 
 # Resources
 @mcp.resource("congress://all")
-async def get_all_congresses() -> str:
+async def get_all_congresses(ctx: Context) -> str:
     """
     Get a list of all congresses.
     
@@ -169,7 +169,6 @@ async def get_all_congresses() -> str:
     including session dates and chamber information.
     """
     logger.info("Accessing all congresses resource")
-    ctx = mcp.get_context()
     try:
         data = await make_api_request("/congress", ctx, {"limit": 20})
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")
@@ -193,7 +192,7 @@ async def get_all_congresses() -> str:
         return error_msg
 
 @mcp.resource("congress://congress/{congress}")
-async def get_congress_by_number(congress: str) -> str:
+async def get_congress_by_number(ctx: Context, congress: str) -> str:
     """
     Get information about a specific Congress.
     
@@ -204,7 +203,6 @@ async def get_congress_by_number(congress: str) -> str:
     including session dates, chamber information, and other details.
     """
     logger.info(f"Accessing information for Congress {congress}")
-    ctx = mcp.get_context()
     try:
         # Use default detailed parameter
         detailed = False
@@ -230,7 +228,7 @@ async def get_congress_by_number(congress: str) -> str:
         return error_msg
 
 @mcp.resource("congress://info/current")
-async def get_current_congress() -> str:
+async def get_current_congress(ctx: Context) -> str:
     """
     Get information about the current Congress.
     
@@ -238,7 +236,6 @@ async def get_current_congress() -> str:
     including session dates, chamber information, and leadership.
     """
     logger.info("Accessing current Congress information")
-    ctx = mcp.get_context()
     try:
         # Use default detailed parameter
         detailed = False
@@ -266,6 +263,7 @@ async def get_current_congress() -> str:
 # Tools
 @mcp.tool()
 async def get_congress_info(
+    ctx: Context,
     congress: Optional[int] = None,
     current: bool = False,
     limit: int = 10,
@@ -282,7 +280,6 @@ async def get_congress_info(
         detailed: If True, include more detailed information about the Congress
         format_type: Output format type ("markdown" or "table") for list of congresses
     """
-    ctx = mcp.get_context()
     
     try:
         if current:
@@ -322,117 +319,8 @@ async def get_congress_info(
         return f"Error retrieving Congress information: {str(e)}"
 
 @mcp.tool()
-async def get_committee_bills(
-    chamber: str,
-    committee_code: str,
-    limit: int = 10
-) -> str:
-    """
-    Get bills referred to a specific committee.
-    
-    Args:
-        chamber: The chamber of Congress ("house" or "senate")
-        committee_code: The committee code (e.g., "hsag", "ssap")
-        limit: Maximum number of bills to return (default: 10)
-    """
-    ctx = mcp.get_context()
-    
-    try:
-        # Validate chamber parameter
-        if chamber.lower() not in ["house", "senate"]:
-            return f"Invalid chamber: {chamber}. Must be 'house' or 'senate'."
-        
-        # Make API request
-        params = {"limit": limit}
-        endpoint = f"/committee/{chamber.lower()}/{committee_code}/bills"
-        data = await make_api_request(endpoint, ctx, params)
-        
-        if "error" in data:
-            return handle_api_error(data, f"Error retrieving bills for committee {committee_code}")
-        
-        bills = data.get("bills", [])
-        if not bills:
-            return f"No bills found for committee {committee_code} in the {chamber}."
-        
-        # Format the bills list
-        result = [f"# Bills Referred to {chamber.title()} Committee {committee_code.upper()}", ""]
-        
-        for bill in bills:
-            bill_number = bill.get("number", "Unknown")
-            bill_type = bill.get("type", "Unknown")
-            title = bill.get("title", "No title available")
-            congress = bill.get("congress", "Unknown")
-            update_date = format_date(bill.get("updateDate", ""))
-            
-            result.append(f"## {bill_type.upper()} {bill_number} ({congress}th Congress)")
-            result.append(f"**Title**: {title}")
-            if update_date:
-                result.append(f"**Last Updated**: {update_date}")
-            result.append("")
-        
-        return "\n".join(result)
-    except Exception as e:
-        return f"Error retrieving committee bills: {str(e)}"
-
-@mcp.resource("congress://committees")
-async def get_committees() -> str:
-    """
-    Get a list of congressional committees.
-    
-    Returns a comprehensive list of committees in the House and Senate,
-    including their names, chambers, and system codes.
-    """
-    logger.info("Accessing committees resource")
-    ctx = mcp.get_context()
-    try:
-        # Get House committees
-        house_data = await make_api_request("/committee/house", ctx)
-        senate_data = await make_api_request("/committee/senate", ctx)
-        
-        if "error" in house_data and "error" in senate_data:
-            error_msg = "Error retrieving committees from both chambers"
-            logger.error(error_msg)
-            return error_msg
-        
-        house_committees = house_data.get("committees", []) if "committees" in house_data else []
-        senate_committees = senate_data.get("committees", []) if "committees" in senate_data else []
-        
-        if not house_committees and not senate_committees:
-            return "No committees found."
-        
-        # Format the committees list
-        result = ["# Congressional Committees", ""]
-        
-        if house_committees:
-            result.append("## House Committees")
-            result.append("| Committee | System Code |")
-            result.append("|-----------|-------------|")
-            
-            for committee in house_committees:
-                name = committee.get("name", "Unknown")
-                system_code = committee.get("systemCode", "Unknown")
-                result.append(f"| {name} | {system_code} |")
-            
-            result.append("")
-        
-        if senate_committees:
-            result.append("## Senate Committees")
-            result.append("| Committee | System Code |")
-            result.append("|-----------|-------------|")
-            
-            for committee in senate_committees:
-                name = committee.get("name", "Unknown")
-                system_code = committee.get("systemCode", "Unknown")
-                result.append(f"| {name} | {system_code} |")
-        
-        return "\n".join(result)
-    except Exception as e:
-        error_msg = f"Error retrieving committees: {str(e)}"
-        logger.error(f"Exception in get_committees: {str(e)}")
-        return error_msg
-
-@mcp.tool()
 async def search_congresses(
+    ctx: Context,
     keywords: str,
     start_year: Optional[int] = None,
     end_year: Optional[int] = None,
@@ -449,7 +337,6 @@ async def search_congresses(
         limit: Maximum number of results to return (default: 10)
         format_type: Output format type ("markdown" or "table")
     """
-    ctx = mcp.get_context()
     
     try:
         # Get all congresses first

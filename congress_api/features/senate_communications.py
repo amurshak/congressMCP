@@ -1,7 +1,7 @@
 # congress_api/features/senate_communications.py
 import logging
 from typing import Dict, List, Any, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -90,12 +90,11 @@ def format_senate_communication_detail(comm_data: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://senate-communications/latest")
-async def get_latest_senate_communications() -> str:
+async def get_latest_senate_communications(ctx: Context) -> str:
     """
     Get the most recent senate communications.
     Returns the 10 most recently published communications by default.
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 10,
         "format": "json"
@@ -126,14 +125,13 @@ async def get_latest_senate_communications() -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://senate-communications/{congress}")
-async def get_senate_communications_by_congress(congress: int) -> str:
+async def get_senate_communications_by_congress(ctx: Context, congress: int) -> str:
     """
     Get senate communications for a specific Congress.
     
     Args:
         congress: The Congress number (e.g., 117).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -163,7 +161,7 @@ async def get_senate_communications_by_congress(congress: int) -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://senate-communications/{congress}/{communication_type}")
-async def get_senate_communications_by_congress_and_type(congress: int, communication_type: str) -> str:
+async def get_senate_communications_by_congress_and_type(ctx: Context, congress: int, communication_type: str) -> str:
     """
     Get senate communications for a specific Congress and communication type.
     
@@ -171,7 +169,6 @@ async def get_senate_communications_by_congress_and_type(congress: int, communic
         congress: The Congress number (e.g., 117).
         communication_type: The type of communication (e.g., "ec", "pm", "pom").
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -207,7 +204,7 @@ async def get_senate_communications_by_congress_and_type(congress: int, communic
     return "\n".join(lines)
 
 @mcp.resource("congress://senate-communications/{congress}/{communication_type}/{communication_number}")
-async def get_senate_communication_detail(congress: int, communication_type: str, communication_number: int) -> str:
+async def get_senate_communication_detail(ctx: Context, congress: int, communication_type: str, communication_number: int) -> str:
     """
     Get detailed information for a specific senate communication.
     
@@ -216,7 +213,6 @@ async def get_senate_communication_detail(congress: int, communication_type: str
         communication_type: The type of communication (e.g., "ec", "pm", "pom").
         communication_number: The communication number (e.g., 2561).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -244,6 +240,7 @@ async def get_senate_communication_detail(congress: int, communication_type: str
 
 @mcp.tool("search_senate_communications")
 async def search_senate_communications(
+    ctx: Context,
     congress: Optional[int] = None,
     communication_type: Optional[str] = None,
     limit: int = 10
@@ -256,7 +253,6 @@ async def search_senate_communications(
         communication_type: Optional communication type (e.g., "ec", "pm", "pom").
         limit: Maximum number of results to return (default: 10).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json",
         "limit": limit

@@ -7,6 +7,7 @@ Handles fetching and processing House of Representatives roll call vote data fro
 from typing import Dict, List, Any, Optional
 import logging
 import json
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -72,11 +73,10 @@ def _format_house_vote_member_votes_list(member_votes_data: List[Dict[str, Any]]
     return "\n".join(formatted_votes)
 
 @mcp.resource("congress://house-votes/latest")
-async def get_latest_house_votes() -> str:
+async def get_latest_house_votes(ctx: Context) -> str:
     """Fetches the latest House of Representatives roll call votes."""
     endpoint = "house-vote"
     params = {"limit": 20, "sort": "updateDate+desc"} # Assuming sort order, adjust if needed
-    ctx = mcp.get_context()
     try:
         logger.info(f"Fetching latest House votes from {endpoint} with params: {params}")
         data = await make_api_request(endpoint, ctx, params=params)
@@ -95,11 +95,10 @@ async def get_latest_house_votes() -> str:
         return "Failed to retrieve latest House votes."
 
 @mcp.resource("congress://house-votes/{congress}")
-async def get_house_votes_by_congress(congress: int) -> str:
+async def get_house_votes_by_congress(ctx: Context, congress: int) -> str:
     """Fetches House of Representatives roll call votes for a specific Congress."""
     endpoint = f"house-vote/{congress}"
     params = {"limit": 20, "sort": "updateDate+desc"}
-    ctx = mcp.get_context()
     try:
         logger.info(f"Fetching House votes for Congress {congress} from {endpoint} with params: {params}")
         data = await make_api_request(endpoint, ctx, params=params)
@@ -118,11 +117,10 @@ async def get_house_votes_by_congress(congress: int) -> str:
         return f"Failed to retrieve House votes for Congress {congress}."
 
 @mcp.resource("congress://house-votes/{congress}/{session}")
-async def get_house_votes_by_session(congress: int, session: int) -> str:
+async def get_house_votes_by_session(ctx: Context, congress: int, session: int) -> str:
     """Fetches House of Representatives roll call votes for a specific Congress and session."""
     endpoint = f"house-vote/{congress}/{session}"
     params = {"limit": 20, "sort": "updateDate+desc"}
-    ctx = mcp.get_context()
     try:
         logger.info(f"Fetching House votes for Congress {congress}, Session {session} from {endpoint} with params: {params}")
         data = await make_api_request(endpoint, ctx, params=params)
@@ -141,12 +139,11 @@ async def get_house_votes_by_session(congress: int, session: int) -> str:
         return f"Failed to retrieve House votes for Congress {congress}, Session {session}."
 
 @mcp.resource("congress://house-votes/{congress}/{session}/{vote_number}")
-async def get_house_vote_details(congress: int, session: int, vote_number: int) -> str:
+async def get_house_vote_details(ctx: Context, congress: int, session: int, vote_number: int) -> str:
     """Retrieve and format details for a specific House roll call vote."""
     logger.info(f"Fetching details for House vote {congress}-{session}-{vote_number}")
     
     try:
-        ctx = mcp.get_context()
         endpoint = f"house-vote/{congress}/{session}/{vote_number}"
         params = {}
         data = await make_api_request(endpoint, ctx, params=params)
@@ -186,13 +183,11 @@ async def get_house_vote_details(congress: int, session: int, vote_number: int) 
         return f"Failed to retrieve details for House vote {congress}-{session}-{vote_number} due to an internal processing error."
 
 @mcp.resource("congress://house-votes/{congress}/{session}/{vote_number}/members")
-async def get_house_vote_member_votes(congress: int, session: int, vote_number: int) -> str:
+async def get_house_vote_member_votes(ctx: Context, congress: int, session: int, vote_number: int) -> str:
     """Fetches how individual members voted on a specific House roll call vote."""
     logger.info(f"Fetching member votes for House vote {congress}-{session}-{vote_number}")
     
     try:
-        ctx = mcp.get_context()
-        
         # First, get the main vote details to extract the sourceDataURL
         endpoint = f"house-vote/{congress}/{session}/{vote_number}"
         params = {}

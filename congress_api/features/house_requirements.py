@@ -1,7 +1,7 @@
 # congress_api/features/house_requirements.py
 import logging
 from typing import Dict, List, Any, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -103,12 +103,11 @@ def format_matching_communications(comms_data: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://house-requirements/latest")
-async def get_latest_house_requirements() -> str:
+async def get_latest_house_requirements(ctx: Context) -> str:
     """
     Get the most recent house requirements.
     Returns the 10 most recently updated requirements by default.
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 10,
         "format": "json"
@@ -139,14 +138,13 @@ async def get_latest_house_requirements() -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://house-requirements/{requirement_number}")
-async def get_house_requirement_detail(requirement_number: int) -> str:
+async def get_house_requirement_detail(ctx: Context, requirement_number: int) -> str:
     """
     Get detailed information for a specific house requirement.
     
     Args:
         requirement_number: The requirement number (e.g., 8070).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -165,14 +163,13 @@ async def get_house_requirement_detail(requirement_number: int) -> str:
     return format_house_requirement_detail(data)
 
 @mcp.resource("congress://house-requirements/{requirement_number}/matching-communications")
-async def get_house_requirement_matching_communications(requirement_number: int) -> str:
+async def get_house_requirement_matching_communications(ctx: Context, requirement_number: int) -> str:
     """
     Get matching communications for a specific house requirement.
     
     Args:
         requirement_number: The requirement number (e.g., 8070).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -191,6 +188,7 @@ async def get_house_requirement_matching_communications(requirement_number: int)
 
 @mcp.tool("search_house_requirements")
 async def search_house_requirements(
+    ctx: Context,
     requirement_number: Optional[int] = None,
     limit: int = 10
 ) -> str:
@@ -201,7 +199,6 @@ async def search_house_requirements(
         requirement_number: Optional specific requirement number to search for.
         limit: Maximum number of results to return (default: 10).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json",
         "limit": limit

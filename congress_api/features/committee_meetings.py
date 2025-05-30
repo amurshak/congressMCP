@@ -1,7 +1,7 @@
 # congress_api/features/committee_meetings.py
 import logging
-from typing import Dict, List, Any, Optional
-
+from typing import Dict, Any, Optional
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -61,12 +61,11 @@ def format_committee_meeting_detail(meeting_item: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://committee-meetings/latest")
-async def get_latest_committee_meetings() -> str:
+async def get_latest_committee_meetings(ctx: Context) -> str:
     """
     Get a list of the most recent committee meetings.
     Returns the 10 most recently updated meetings by default.
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 10,
         "sort": "updateDate+desc",
@@ -94,14 +93,13 @@ async def get_latest_committee_meetings() -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://committee-meetings/{congress}")
-async def get_committee_meetings_by_congress(congress: int) -> str:
+async def get_committee_meetings_by_congress(ctx: Context, congress: int) -> str:
     """
     Get committee meetings for a specific Congress.
     
     Args:
         congress: The Congress number (e.g., 117).
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 20,
         "sort": "updateDate+desc",
@@ -129,7 +127,7 @@ async def get_committee_meetings_by_congress(congress: int) -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://committee-meetings/{congress}/{chamber}")
-async def get_committee_meetings_by_congress_and_chamber(congress: int, chamber: str) -> str:
+async def get_committee_meetings_by_congress_and_chamber(ctx: Context, congress: int, chamber: str) -> str:
     """
     Get committee meetings for a specific Congress and chamber.
     
@@ -137,7 +135,6 @@ async def get_committee_meetings_by_congress_and_chamber(congress: int, chamber:
         congress: The Congress number (e.g., 117).
         chamber: The chamber name (e.g., "house", "senate").
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 20,
         "sort": "updateDate+desc",
@@ -165,7 +162,7 @@ async def get_committee_meetings_by_congress_and_chamber(congress: int, chamber:
     return "\n".join(lines)
 
 @mcp.resource("congress://committee-meetings/{congress}/{chamber}/{committee_code}")
-async def get_committee_meetings_by_committee(congress: int, chamber: str, committee_code: str) -> str:
+async def get_committee_meetings_by_committee(ctx: Context, congress: int, chamber: str, committee_code: str) -> str:
     """
     Get committee meetings for a specific committee.
     
@@ -174,7 +171,6 @@ async def get_committee_meetings_by_committee(congress: int, chamber: str, commi
         chamber: The chamber name (e.g., "house", "senate").
         committee_code: The committee system code (e.g., "hsag00").
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 20,
         "sort": "updateDate+desc",
@@ -202,7 +198,7 @@ async def get_committee_meetings_by_committee(congress: int, chamber: str, commi
     return "\n".join(lines)
 
 @mcp.resource("congress://committee-meetings/{congress}/{chamber}/{committee_code}/{event_id}")
-async def get_committee_meeting_details(congress: int, chamber: str, committee_code: str, event_id: int) -> str:
+async def get_committee_meeting_details(ctx: Context, congress: int, chamber: str, committee_code: str, event_id: int) -> str:
     """
     Get detailed information for a specific committee meeting.
     
@@ -212,7 +208,6 @@ async def get_committee_meeting_details(congress: int, chamber: str, committee_c
         committee_code: The committee system code (e.g., "hsag00").
         event_id: The event ID for the meeting.
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -240,6 +235,7 @@ async def get_committee_meeting_details(congress: int, chamber: str, committee_c
 
 @mcp.tool("search_committee_meetings")
 async def search_committee_meetings(
+    ctx: Context,
     keywords: Optional[str] = None,
     congress: Optional[int] = None,
     chamber: Optional[str] = None,
@@ -262,7 +258,6 @@ async def search_committee_meetings(
         limit: Maximum number of results to return (default: 10).
         sort: Sort order (default: "updateDate+desc").
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json",
         "limit": limit,

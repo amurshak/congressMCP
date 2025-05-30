@@ -6,7 +6,7 @@ This module provides access to nomination data from the Congress.gov API.
 
 import logging
 from typing import Dict, Any, List, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -161,7 +161,7 @@ def format_nomination_actions(actions: List[Dict[str, Any]]) -> str:
     
     return "\n".join(lines)
 
-def format_nomination_committees(committees: List[Dict[str, Any]]) -> str:
+def format_nomination_committees(ctx: Context, committees: List[Dict[str, Any]]) -> str:
     """Format a list of committees for a nomination."""
     if not committees:
         return "No committees found."
@@ -201,7 +201,7 @@ def format_nomination_hearings(hearings: List[Dict[str, Any]]) -> str:
 
 # MCP Resources
 @mcp.resource("congress://nominations/latest")
-async def get_latest_nominations() -> str:
+async def get_latest_nominations(ctx: Context) -> str:
     """
     Get the most recent nominations.
     Returns the 10 most recently published nominations by default.
@@ -236,7 +236,7 @@ async def get_latest_nominations() -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://nominations/{congress}")
-async def get_nominations_by_congress(congress: int) -> str:
+async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
     """
     Get nominations for a specific Congress.
     
@@ -274,7 +274,7 @@ async def get_nominations_by_congress(congress: int) -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://nominations/{congress}/{nomination_number}")
-async def get_nomination(congress: int, nomination_number: int) -> str:
+async def get_nomination(ctx: Context, congress: int, nomination_number: int) -> str:
     """
     Get detailed information for a specific nomination.
     
@@ -304,7 +304,7 @@ async def get_nomination(congress: int, nomination_number: int) -> str:
     return format_nomination_detail(nomination)
 
 @mcp.resource("congress://nominations/{congress}/{nomination_number}/{ordinal}")
-async def get_nomination_nominees(congress: int, nomination_number: int, ordinal: int) -> str:
+async def get_nomination_nominees(ctx: Context, congress: int, nomination_number: int, ordinal: int) -> str:
     """
     Get nominees for a specific position within a nomination.
     
@@ -339,7 +339,7 @@ async def get_nomination_nominees(congress: int, nomination_number: int, ordinal
     return format_nominees_list(nominees)
 
 @mcp.tool("get_nomination_actions")
-async def get_nomination_actions(congress: int, nomination_number: int) -> str:
+async def get_nomination_actions(ctx: Context, congress: int, nomination_number: int) -> str:
     """
     Get actions for a specific nomination.
     
@@ -373,7 +373,7 @@ async def get_nomination_actions(congress: int, nomination_number: int) -> str:
     return format_nomination_actions(actions)
 
 @mcp.tool("get_nomination_committees")
-async def get_nomination_committees(congress: int, nomination_number: int) -> str:
+async def get_nomination_committees(ctx: Context, congress: int, nomination_number: int) -> str:
     """
     Get committees for a specific nomination.
     
@@ -407,7 +407,7 @@ async def get_nomination_committees(congress: int, nomination_number: int) -> st
     return format_nomination_committees(committees)
 
 @mcp.tool("get_nomination_hearings")
-async def get_nomination_hearings(congress: int, nomination_number: int) -> str:
+async def get_nomination_hearings(ctx: Context, congress: int, nomination_number: int) -> str:
     """
     Get hearings for a specific nomination.
     
@@ -443,6 +443,7 @@ async def get_nomination_hearings(congress: int, nomination_number: int) -> str:
 # MCP Tool
 @mcp.tool("search_nominations")
 async def search_nominations(
+    ctx: Context,
     keywords: Optional[str] = None,
     congress: Optional[int] = None,
     limit: int = 10,
@@ -463,7 +464,6 @@ async def search_nominations(
     """
     logger.info(f"Searching for nominations with keywords: {keywords}, congress: {congress}")
     
-    ctx = mcp.get_context()
     params = {
         "format": "json",
         "limit": limit

@@ -2,7 +2,7 @@
 import logging
 from typing import Dict, List, Any, Optional
 from datetime import datetime
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -89,12 +89,11 @@ def format_record_detail(record_data: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://congressional-record/latest")
-async def get_latest_congressional_record() -> str:
+async def get_latest_congressional_record(ctx: Context) -> str:
     """
     Get the most recent congressional record issues.
     Returns the 10 most recently published issues by default.
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 10,
         "format": "json"
@@ -125,7 +124,7 @@ async def get_latest_congressional_record() -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://congressional-record/date/{year}/{month}/{day}")
-async def get_congressional_record_by_date(year: int, month: int, day: int) -> str:
+async def get_congressional_record_by_date(ctx: Context, year: int, month: int, day: int) -> str:
     """
     Get congressional record issues for a specific date.
     
@@ -134,7 +133,6 @@ async def get_congressional_record_by_date(year: int, month: int, day: int) -> s
         month: The month (1-12).
         day: The day (1-31).
     """
-    ctx = mcp.get_context()
     params = {
         "y": year,
         "m": month,
@@ -168,14 +166,13 @@ async def get_congressional_record_by_date(year: int, month: int, day: int) -> s
     return "\n".join(lines)
 
 @mcp.resource("congress://congressional-record/congress/{congress}")
-async def get_congressional_record_by_congress(congress: int) -> str:
+async def get_congressional_record_by_congress(ctx: Context, congress: int) -> str:
     """
     Get congressional record issues for a specific Congress.
     
     Args:
         congress: The Congress number (e.g., 117).
     """
-    ctx = mcp.get_context()
     params = {
         "congress": congress,
         "limit": 20,
@@ -207,14 +204,13 @@ async def get_congressional_record_by_congress(congress: int) -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://congressional-record/issue/{id}")
-async def get_congressional_record_by_id(id: int) -> str:
+async def get_congressional_record_by_id(ctx: Context, id: int) -> str:
     """
     Get detailed information for a specific congressional record issue.
     
     Args:
         id: The ID of the congressional record issue.
     """
-    ctx = mcp.get_context()
     params = {
         "id": id,
         "format": "json"
@@ -233,6 +229,7 @@ async def get_congressional_record_by_id(id: int) -> str:
 
 @mcp.tool("search_congressional_record")
 async def search_congressional_record(
+    ctx: Context,
     year: Optional[int] = None,
     month: Optional[int] = None,
     day: Optional[int] = None,
@@ -249,7 +246,6 @@ async def search_congressional_record(
         congress: Optional Congress number (e.g., 117).
         limit: Maximum number of results to return (default: 10).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json",
         "limit": limit

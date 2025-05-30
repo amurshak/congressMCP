@@ -1,7 +1,7 @@
 # congress_api/features/daily_congressional_record.py
 import logging
 from typing import Dict, List, Any, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -131,12 +131,11 @@ def format_daily_record_articles(articles_data: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://daily-congressional-record/latest")
-async def get_latest_daily_congressional_record() -> str:
+async def get_latest_daily_congressional_record(ctx: Context) -> str:
     """
     Get the most recent daily congressional record issues.
     Returns the 10 most recently published issues by default.
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 10,
         "format": "json"
@@ -167,14 +166,13 @@ async def get_latest_daily_congressional_record() -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://daily-congressional-record/{volume_number}")
-async def get_daily_congressional_record_by_volume(volume_number: str) -> str:
+async def get_daily_congressional_record_by_volume(ctx: Context, volume_number: str) -> str:
     """
     Get daily congressional record issues for a specific volume.
     
     Args:
         volume_number: The volume number (e.g., "166").
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -204,7 +202,7 @@ async def get_daily_congressional_record_by_volume(volume_number: str) -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://daily-congressional-record/{volume_number}/{issue_number}")
-async def get_daily_congressional_record_issue(volume_number: str, issue_number: str) -> str:
+async def get_daily_congressional_record_issue(ctx: Context, volume_number: str, issue_number: str) -> str:
     """
     Get detailed information for a specific daily congressional record issue.
     
@@ -212,7 +210,6 @@ async def get_daily_congressional_record_issue(volume_number: str, issue_number:
         volume_number: The volume number (e.g., "168").
         issue_number: The issue number (e.g., "153").
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -234,7 +231,7 @@ async def get_daily_congressional_record_issue(volume_number: str, issue_number:
     return format_daily_record_detail(data)
 
 @mcp.resource("congress://daily-congressional-record/{volume_number}/{issue_number}/articles")
-async def get_daily_congressional_record_articles(volume_number: str, issue_number: str) -> str:
+async def get_daily_congressional_record_articles(ctx: Context, volume_number: str, issue_number: str) -> str:
     """
     Get articles from a specific daily congressional record issue.
     
@@ -242,7 +239,6 @@ async def get_daily_congressional_record_articles(volume_number: str, issue_numb
         volume_number: The volume number (e.g., "167").
         issue_number: The issue number (e.g., "21").
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -261,6 +257,7 @@ async def get_daily_congressional_record_articles(volume_number: str, issue_numb
 
 @mcp.tool()
 async def search_daily_congressional_record(
+    ctx: Context,
     volume_number: Optional[str] = None,
     issue_number: Optional[str] = None,
     limit: int = 10
@@ -273,7 +270,6 @@ async def search_daily_congressional_record(
         issue_number: Optional issue number to filter by (e.g., "118").
         limit: Maximum number of results to return (default: 10).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json",
         "limit": limit

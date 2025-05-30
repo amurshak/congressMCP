@@ -1,5 +1,6 @@
 # bills.py
 from typing import Dict, List, Any, Optional
+from fastmcp import Context
 
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
@@ -22,14 +23,13 @@ def format_bill_summary(bill: Dict[str, Any]) -> str:
 
 # Resources
 @mcp.resource("congress://bills/latest")
-async def get_latest_bills() -> str:
+async def get_latest_bills(ctx: Context) -> str:
     """
     Get the most recent bills introduced in Congress.
     
     Returns a list of the 10 most recently updated bills across all
     Congresses, sorted by update date in descending order.
     """
-    ctx = mcp.get_context()
     data = await make_api_request("/bill", ctx, {"limit": 10, "sort": "updateDate+desc"})
     
     if "error" in data:
@@ -46,7 +46,7 @@ async def get_latest_bills() -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://bills/congress/{congress_num}")
-async def get_bills_by_congress(congress_num: str) -> str:
+async def get_bills_by_congress(ctx: Context, congress_num: str) -> str:
     """
     Get bills from a specific Congress.
     
@@ -56,7 +56,6 @@ async def get_bills_by_congress(congress_num: str) -> str:
     Returns a list of the 10 most recently updated bills from the
     specified Congress, sorted by update date in descending order.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/bill/{congress_num}", ctx, {"limit": 10, "sort": "updateDate+desc"})
     
     if "error" in data:
@@ -73,7 +72,7 @@ async def get_bills_by_congress(congress_num: str) -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://bills/congress/{congress_num}/type/{bill_type}")
-async def get_bills_by_type(congress_num: str, bill_type: str) -> str:
+async def get_bills_by_type(ctx: Context, congress_num: str, bill_type: str) -> str:
     """
     Get bills from a specific Congress and bill type.
     
@@ -84,7 +83,6 @@ async def get_bills_by_type(congress_num: str, bill_type: str) -> str:
     Returns a list of the 10 most recently updated bills of the specified
     type from the specified Congress, sorted by update date in descending order.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/bill/{congress_num}/{bill_type}", ctx, {"limit": 10, "sort": "updateDate+desc"})
     
     if "error" in data:
@@ -103,6 +101,7 @@ async def get_bills_by_type(congress_num: str, bill_type: str) -> str:
 # Tools
 @mcp.tool()
 async def search_bills(
+    ctx: Context,
     keywords: str, 
     congress: Optional[int] = None, 
     bill_type: Optional[str] = None,
@@ -123,8 +122,6 @@ async def search_bills(
         from_date: Optional start date for filtering (format: YYYY-MM-DDT00:00:00Z)
         to_date: Optional end date for filtering (format: YYYY-MM-DDT00:00:00Z)
     """
-    ctx = mcp.get_context()
-    
     # Build parameters
     params = {
         "query": keywords,
@@ -158,6 +155,7 @@ async def search_bills(
 
 @mcp.tool()
 async def get_bill_details(
+    ctx: Context,
     congress: int,
     bill_type: str,
     bill_number: int
@@ -170,7 +168,6 @@ async def get_bill_details(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}"
     data = await make_api_request(endpoint, ctx)
     
@@ -216,7 +213,7 @@ async def get_bill_details(
     
     # Summary
     if "summaries" in bill and "count" in bill["summaries"] and bill["summaries"]["count"] > 0:
-        result.append("\n**Summary Available:** Use get_bill_summaries tool for detailed summary.")
+        result.append("\n**Summary Available:** Use congress://summaries/{congress}/{bill_type}/{bill_number} for detailed summary.")
     
     # Text Versions
     if "textVersions" in bill and "count" in bill["textVersions"] and bill["textVersions"]["count"] > 0:
@@ -230,6 +227,7 @@ async def get_bill_details(
 
 @mcp.tool()
 async def get_bill_actions(
+    ctx: Context,
     congress: int,
     bill_type: str,
     bill_number: int,
@@ -244,7 +242,6 @@ async def get_bill_actions(
         bill_number: Bill number
         limit: Maximum number of actions to return (default: 10)
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/actions"
     data = await make_api_request(endpoint, ctx, {"limit": limit})
     
@@ -265,6 +262,7 @@ async def get_bill_actions(
 
 @mcp.tool()
 async def get_bill_cosponsors(
+    ctx: Context,
     congress: int,
     bill_type: str,
     bill_number: int
@@ -277,7 +275,6 @@ async def get_bill_cosponsors(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/cosponsors"
     data = await make_api_request(endpoint, ctx)
     
@@ -309,6 +306,7 @@ async def get_bill_cosponsors(
 
 @mcp.tool()
 async def get_bill_subjects(
+    ctx: Context,
     congress: int,
     bill_type: str,
     bill_number: int
@@ -321,7 +319,6 @@ async def get_bill_subjects(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/subjects"
     data = await make_api_request(endpoint, ctx)
     
@@ -347,42 +344,8 @@ async def get_bill_subjects(
     return "\n".join(result)
 
 @mcp.tool()
-async def get_bill_summaries(
-    congress: int,
-    bill_type: str,
-    bill_number: int
-) -> str:
-    """
-    Get summaries for a specific bill.
-    
-    Args:
-        congress: Congress number (e.g., 117 for 117th Congress)
-        bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
-        bill_number: Bill number
-    """
-    ctx = mcp.get_context()
-    endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/summaries"
-    data = await make_api_request(endpoint, ctx)
-    
-    if "error" in data:
-        return f"Error retrieving bill summaries: {data['error']}"
-    
-    summaries = data.get("summaries", [])
-    if not summaries:
-        return f"No summaries found for {bill_type.upper()} {bill_number} in the {congress}th Congress."
-    
-    result = [f"Summaries for {bill_type.upper()} {bill_number} in the {congress}th Congress:"]
-    for i, summary in enumerate(summaries, 1):
-        date = summary.get("actionDate", "Unknown date")
-        text = summary.get("text", "No summary text available")
-        
-        result.append(f"\n**Summary {i} ({date}):**")
-        result.append(text)
-    
-    return "\n".join(result)
-
-@mcp.tool()
 async def get_bill_text_versions(
+    ctx: Context,
     congress: int,
     bill_type: str,
     bill_number: int
@@ -395,7 +358,6 @@ async def get_bill_text_versions(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/text"
     data = await make_api_request(endpoint, ctx)
     
@@ -424,6 +386,7 @@ async def get_bill_text_versions(
 
 @mcp.tool()
 async def get_bill_titles(
+    ctx: Context,
     congress: int,
     bill_type: str,
     bill_number: int
@@ -436,7 +399,6 @@ async def get_bill_titles(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/titles"
     data = await make_api_request(endpoint, ctx)
     
@@ -458,6 +420,7 @@ async def get_bill_titles(
 
 @mcp.tool()
 async def get_bill_related_bills(
+    ctx: Context,
     congress: int,
     bill_type: str,
     bill_number: int
@@ -470,7 +433,6 @@ async def get_bill_related_bills(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/relatedbills"
     data = await make_api_request(endpoint, ctx)
     

@@ -1,6 +1,6 @@
 # congress_api/features/committee_reports.py
 from typing import Dict, List, Any, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -57,12 +57,11 @@ def format_committee_report_text_version(text_version_item: Dict[str, Any]) -> s
 # --- MCP Resources ---
 
 @mcp.resource("congress://committee-reports/latest")
-async def get_latest_committee_reports() -> str:
+async def get_latest_committee_reports(ctx: Context) -> str:
     """
     Get a list of the most recent committee reports.
     Returns the 10 most recently updated reports by default.
     """
-    ctx = mcp.get_context()
     # Default parameters for fetching latest reports
     # Assuming 'updateDate+desc' is a valid sort for /committee-report endpoint
     # If not, this might need adjustment based on API capabilities for sorting
@@ -84,7 +83,7 @@ async def get_latest_committee_reports() -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://committee-reports/{congress}")
-async def get_committee_reports_by_congress(
+async def get_committee_reports_by_congress(ctx: Context,
     congress: int,
 ) -> str:
     """
@@ -93,7 +92,6 @@ async def get_committee_reports_by_congress(
     Args:
         congress: The Congress number (e.g., 117).
     """
-    ctx = mcp.get_context()
     params = {}
     # Example of how you might still want to pass these if needed, e.g., from a config or fixed values
     # if conference is not None: params["conference"] = conference 
@@ -120,6 +118,7 @@ async def get_committee_reports_by_congress(
 
 @mcp.resource("congress://committee-reports/{congress}/{report_type}")
 async def get_committee_reports_by_congress_and_type(
+    ctx: Context,
     congress: int, 
     report_type: str,
 ) -> str:
@@ -130,7 +129,6 @@ async def get_committee_reports_by_congress_and_type(
         congress: The Congress number (e.g., 117).
         report_type: The type of report (e.g., "hrpt", "srpt").
     """
-    ctx = mcp.get_context()
     params = {}
     # Add any default or internally decided params here if needed
     # params["limit"] = 10 # Example
@@ -153,6 +151,7 @@ async def get_committee_reports_by_congress_and_type(
 
 @mcp.resource("congress://committee-reports/{congress}/{report_type}/{report_number}")
 async def get_committee_report_details(
+    ctx: Context,
     congress: int,
     report_type: str, # hrpt, srpt, or erpt
     report_number: int
@@ -160,7 +159,6 @@ async def get_committee_report_details(
     """
     Get detailed information for a specific committee report.
     """
-    ctx = mcp.get_context()
     endpoint = f"/committee-report/{congress}/{report_type.lower()}/{report_number}"
     data = await make_api_request(endpoint, ctx)
     
@@ -178,6 +176,7 @@ async def get_committee_report_details(
 
 @mcp.resource("congress://committee-reports/{congress}/{report_type}/{report_number}/text")
 async def get_committee_report_text_versions(
+    ctx: Context,
     congress: int, 
     report_type: str, 
     report_number: int,
@@ -190,7 +189,6 @@ async def get_committee_report_text_versions(
         report_type: The type of report (e.g., "hrpt").
         report_number: The report number.
     """
-    ctx = mcp.get_context()
     params = {}
     # Add any default or internally decided params here if needed
     # if offset is not None: params["offset"] = offset # If passed via other means
@@ -216,6 +214,7 @@ async def get_committee_report_text_versions(
 
 @mcp.tool()
 async def search_committee_reports(
+    ctx: Context,
     conference: Optional[str] = None,
     offset: Optional[int] = None,
     limit: Optional[int] = None,
@@ -232,7 +231,6 @@ async def search_committee_reports(
         fromDateTime: Start date for filtering by update date (YYYY-MM-DDT00:00:00Z).
         toDateTime: End date for filtering by update date (YYYY-MM-DDT00:00:00Z).
     """
-    ctx = mcp.get_context()
     params = {}
     endpoint = "/committee-report"
 

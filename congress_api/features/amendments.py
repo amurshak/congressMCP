@@ -2,7 +2,7 @@
 from typing import Dict, Any, Optional, List
 import json
 import logging
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -101,7 +101,7 @@ def format_amendment_action(action: Dict[str, Any]) -> str:
 
 # Resources
 @mcp.resource("congress://amendments/latest")
-async def get_latest_amendments() -> str:
+async def get_latest_amendments(ctx: Context) -> str:
     """
     Get the most recent amendments introduced in Congress.
     
@@ -109,7 +109,6 @@ async def get_latest_amendments() -> str:
     Congresses, sorted by update date in descending order.
     """
     logger.info("Accessing latest amendments resource")
-    ctx = mcp.get_context()
     try:
         data = await make_api_request("/amendment", ctx, {"limit": 10, "sort": "updateDate+desc"})
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")  
@@ -135,7 +134,7 @@ async def get_latest_amendments() -> str:
         return f"Error retrieving latest amendments: {str(e)}"
 
 @mcp.resource("congress://amendments/{congress}")
-async def get_amendments_by_congress(congress: str) -> str:
+async def get_amendments_by_congress(ctx: Context, congress: str) -> str:
     """
     Get amendments from a specific Congress.
     
@@ -146,7 +145,6 @@ async def get_amendments_by_congress(congress: str) -> str:
     specified Congress, sorted by update date in descending order.
     """
     logger.info(f"Accessing amendments for Congress {congress}")
-    ctx = mcp.get_context()
     try:
         data = await make_api_request(f"/amendment/{congress}", ctx, {"limit": 10, "sort": "updateDate+desc"})
         logger.info(f"API response received for Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
@@ -172,7 +170,7 @@ async def get_amendments_by_congress(congress: str) -> str:
         return f"Error retrieving amendments for the {congress}th Congress: {str(e)}"
 
 @mcp.resource("congress://amendments/{congress}/{amendment_type}")
-async def get_amendments_by_type(congress: str, amendment_type: str) -> str:
+async def get_amendments_by_type(ctx: Context,congress: str, amendment_type: str) -> str:
     """
     Get amendments from a specific Congress and amendment type.
     
@@ -184,7 +182,7 @@ async def get_amendments_by_type(congress: str, amendment_type: str) -> str:
     type from the specified Congress, sorted by update date in descending order.
     """
     logger.info(f"Accessing {amendment_type} amendments for Congress {congress}")
-    ctx = mcp.get_context()
+
     try:
         data = await make_api_request(f"/amendment/{congress}/{amendment_type}", ctx, {"limit": 10, "sort": "updateDate+desc"})
         logger.info(f"API response received for {amendment_type} amendments in Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
@@ -212,6 +210,7 @@ async def get_amendments_by_type(congress: str, amendment_type: str) -> str:
 # Tools
 @mcp.tool()
 async def get_bill_amendments(
+    ctx: Context,
     congress: int,
     bill_type: str,
     bill_number: int
@@ -224,7 +223,6 @@ async def get_bill_amendments(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/amendments"
     data = await make_api_request(endpoint, ctx)
     
@@ -243,6 +241,7 @@ async def get_bill_amendments(
 
 @mcp.tool()
 async def search_amendments(
+    ctx: Context,
     keywords: str, 
     congress: Optional[int] = None, 
     amendment_type: Optional[str] = None,
@@ -259,7 +258,6 @@ async def search_amendments(
         limit: Maximum number of results to return (default: 10)
         sort: Sort order (default: "updateDate+desc")
     """
-    ctx = mcp.get_context()
     params = {
         "query": keywords,
         "limit": limit,
@@ -290,6 +288,7 @@ async def search_amendments(
 
 @mcp.tool()
 async def get_amendment_details(
+    ctx: Context,
     congress: int,
     amendment_type: str,
     amendment_number: int
@@ -302,7 +301,6 @@ async def get_amendment_details(
         amendment_type: Amendment type (e.g., 'samdt' for Senate Amendment, 'hamdt' for House Amendment)
         amendment_number: Amendment number
     """
-    ctx = mcp.get_context()
     endpoint = f"/amendment/{congress}/{amendment_type}/{amendment_number}"
     data = await make_api_request(endpoint, ctx)
     
@@ -331,6 +329,7 @@ async def get_amendment_details(
 
 @mcp.tool()
 async def get_amendment_actions(
+    ctx: Context,
     congress: int,
     amendment_type: str,
     amendment_number: int,
@@ -345,7 +344,6 @@ async def get_amendment_actions(
         amendment_number: Amendment number
         limit: Maximum number of actions to return (default: 10)
     """
-    ctx = mcp.get_context()
     endpoint = f"/amendment/{congress}/{amendment_type}/{amendment_number}/actions"
     data = await make_api_request(endpoint, ctx, {"limit": limit})
     
@@ -364,6 +362,7 @@ async def get_amendment_actions(
 
 @mcp.tool()
 async def get_amendment_sponsors(
+    ctx: Context,
     congress: int,
     amendment_type: str,
     amendment_number: int
@@ -376,7 +375,6 @@ async def get_amendment_sponsors(
         amendment_type: Amendment type (e.g., 'samdt' for Senate Amendment, 'hamdt' for House Amendment)
         amendment_number: Amendment number
     """
-    ctx = mcp.get_context()
     endpoint = f"/amendment/{congress}/{amendment_type}/{amendment_number}/cosponsors"
     data = await make_api_request(endpoint, ctx)
     

@@ -1,7 +1,7 @@
 # congress_api/features/committee_prints.py
 import logging
 from typing import Dict, List, Any, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -12,7 +12,7 @@ logger.setLevel(logging.DEBUG)
 # --- Minimal Test Resource ---
 
 @mcp.resource("congress://committee-prints/test")
-async def test_committee_prints() -> str:
+async def test_committee_prints(ctx: Context) -> str:
     """
     A simple test resource for committee prints.
     This is a minimal implementation to test if the server can handle committee prints resources.
@@ -70,12 +70,11 @@ def format_committee_print_text_version(text_item: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://committee-prints/latest")
-async def get_latest_committee_prints() -> str:
+async def get_latest_committee_prints(ctx: Context) -> str:
     """
     Get a list of the most recent committee prints.
     Returns the 10 most recently updated prints by default.
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 10,
         "sort": "updateDate+desc",
@@ -103,14 +102,13 @@ async def get_latest_committee_prints() -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://committee-prints/{congress}")
-async def get_committee_prints_by_congress(congress: int) -> str:
+async def get_committee_prints_by_congress(ctx: Context, congress: int) -> str:
     """
     Get committee prints for a specific Congress.
     
     Args:
         congress: The Congress number (e.g., 117).
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 20,
         "sort": "updateDate+desc",
@@ -138,7 +136,7 @@ async def get_committee_prints_by_congress(congress: int) -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://committee-prints/{congress}/{chamber}")
-async def get_committee_prints_by_congress_and_chamber(congress: int, chamber: str) -> str:
+async def get_committee_prints_by_congress_and_chamber(ctx: Context, congress: int, chamber: str) -> str:
     """
     Get committee prints for a specific Congress and chamber.
     
@@ -146,7 +144,6 @@ async def get_committee_prints_by_congress_and_chamber(congress: int, chamber: s
         congress: The Congress number (e.g., 117).
         chamber: The chamber name (e.g., "house", "senate", "nochamber").
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 20,
         "sort": "updateDate+desc",
@@ -174,7 +171,7 @@ async def get_committee_prints_by_congress_and_chamber(congress: int, chamber: s
     return "\n".join(lines)
 
 @mcp.resource("congress://committee-prints/{congress}/{chamber}/{jacket_number}")
-async def get_committee_print_details(congress: int, chamber: str, jacket_number: int) -> str:
+async def get_committee_print_details(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
     Get detailed information for a specific committee print.
     
@@ -183,7 +180,6 @@ async def get_committee_print_details(congress: int, chamber: str, jacket_number
         chamber: The chamber name (e.g., "house", "senate", "nochamber").
         jacket_number: The jacket number for the print.
     """
-    ctx = mcp.get_context()
     
     logger.debug(f"Fetching details for committee print {congress}/{chamber}/{jacket_number}")
     data = await make_api_request(f"/committee-print/{congress}/{chamber}/{jacket_number}", ctx)
@@ -209,7 +205,7 @@ async def get_committee_print_details(congress: int, chamber: str, jacket_number
     return format_committee_print_detail(print_item)
 
 @mcp.resource("congress://committee-prints/{congress}/{chamber}/{jacket_number}/text")
-async def get_committee_print_text_versions(congress: int, chamber: str, jacket_number: int) -> str:
+async def get_committee_print_text_versions(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
     Get text versions for a specific committee print.
     
@@ -218,7 +214,6 @@ async def get_committee_print_text_versions(congress: int, chamber: str, jacket_
         chamber: The chamber name (e.g., "house", "senate", "nochamber").
         jacket_number: The jacket number for the print.
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -253,6 +248,7 @@ async def get_committee_print_text_versions(congress: int, chamber: str, jacket_
 
 @mcp.tool()
 async def search_committee_prints(
+    ctx: Context,
     offset: Optional[int] = None,
     limit: Optional[int] = None,
     from_date_time: Optional[str] = None,
@@ -267,7 +263,6 @@ async def search_committee_prints(
         from_date_time: Start date for filtering by update date (YYYY-MM-DDT00:00:00Z).
         to_date_time: End date for filtering by update date (YYYY-MM-DDT00:00:00Z).
     """
-    ctx = mcp.get_context()
     params = {}
     endpoint = "/committee-print"
     

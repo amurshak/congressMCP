@@ -1,6 +1,6 @@
 # committees.py
 from typing import Dict, List, Any, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -16,14 +16,13 @@ def format_committee_summary(committee: Dict[str, Any]) -> str:
 
 # Resources
 @mcp.resource("congress://committees")
-async def get_committees() -> str:
+async def get_committees(ctx: Context) -> str:
     """
     Get a list of congressional committees.
     
     Returns a comprehensive list of committees in the House and Senate,
     including their names, chambers, and system codes.
     """
-    ctx = mcp.get_context()
     data = await make_api_request("/committee", ctx)
     
     if "error" in data:
@@ -40,7 +39,7 @@ async def get_committees() -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://committees/{chamber}")
-async def get_committees_by_chamber(chamber: str) -> str:
+async def get_committees_by_chamber(ctx: Context, chamber: str) -> str:
     """
     Get committees for a specific chamber.
     
@@ -49,7 +48,6 @@ async def get_committees_by_chamber(chamber: str) -> str:
         
     Returns a list of committees in the specified chamber.
     """
-    ctx = mcp.get_context()
     
     # Validate chamber parameter
     if chamber.lower() not in ["house", "senate"]:
@@ -79,7 +77,7 @@ async def get_committees_by_chamber(chamber: str) -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://committees/{chamber}/{committee_code}")
-async def get_committee_details(chamber: str, committee_code: str) -> str:
+async def get_committee_details(ctx: Context, chamber: str, committee_code: str) -> str:
     """
     Get detailed information about a specific committee.
     
@@ -92,7 +90,6 @@ async def get_committee_details(chamber: str, committee_code: str) -> str:
     # Add temporary logging for debugging
     import logging
     logging.basicConfig(level=logging.INFO)
-    ctx = mcp.get_context()
     
     # Validate chamber parameter
     if chamber.lower() not in ["house", "senate"]:
@@ -175,7 +172,7 @@ async def get_committee_details(chamber: str, committee_code: str) -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://committees/{chamber}/{committee_code}/reports")
-async def get_committee_reports_resource(chamber: str, committee_code: str) -> str:
+async def get_committee_reports_resource(ctx: Context, chamber: str, committee_code: str) -> str:
     """
     Get reports for a specific committee.
     
@@ -185,7 +182,6 @@ async def get_committee_reports_resource(chamber: str, committee_code: str) -> s
         
     Returns a list of reports issued by the specified committee.
     """
-    ctx = mcp.get_context()
     
     # Validate chamber parameter
     if chamber.lower() not in ["house", "senate"]:
@@ -263,7 +259,7 @@ async def get_committee_reports_resource(chamber: str, committee_code: str) -> s
     return "\n".join(result)
 
 @mcp.resource("congress://committees/{chamber}/{committee_code}/nominations")
-async def get_committee_nominations_resource(chamber: str, committee_code: str) -> str:
+async def get_committee_nominations_resource(ctx: Context, chamber: str, committee_code: str) -> str:
     """
     Get nominations for a specific Senate committee.
     
@@ -273,7 +269,6 @@ async def get_committee_nominations_resource(chamber: str, committee_code: str) 
         
     Returns a list of nominations referred to the specified Senate committee.
     """
-    ctx = mcp.get_context()
     
     # Validate chamber parameter
     if chamber.lower() != "senate":
@@ -358,7 +353,7 @@ async def get_committee_nominations_resource(chamber: str, committee_code: str) 
     return "\n".join(result)
 
 @mcp.resource("congress://committees/{chamber}/{committee_code}/communications")
-async def get_committee_communications_resource(chamber: str, committee_code: str) -> str:
+async def get_committee_communications_resource(ctx: Context, chamber: str, committee_code: str) -> str:
     """
     Get communications for a specific committee.
     
@@ -368,7 +363,6 @@ async def get_committee_communications_resource(chamber: str, committee_code: st
         
     Returns a list of communications referred to the specified committee.
     """
-    ctx = mcp.get_context()
     
     # Validate chamber parameter
     if chamber.lower() not in ["house", "senate"]:
@@ -457,6 +451,7 @@ async def get_committee_communications_resource(chamber: str, committee_code: st
 # Tools
 @mcp.tool()
 async def get_committee_bills(
+    ctx: Context,
     chamber: str,
     committee_code: str,
     limit: int = 10
@@ -469,7 +464,6 @@ async def get_committee_bills(
         committee_code: The committee code (e.g., "hsag", "ssap")
         limit: Maximum number of bills to return (default: 10)
     """
-    ctx = mcp.get_context()
     
     # Validate chamber parameter
     if chamber.lower() not in ["house", "senate"]:
@@ -553,6 +547,7 @@ async def get_committee_bills(
 
 @mcp.tool()
 async def get_committee_reports(
+    ctx: Context,
     chamber: str,
     committee_code: str,
     limit: int = 10
@@ -565,7 +560,6 @@ async def get_committee_reports(
         committee_code: The committee code (e.g., "hspw00", "ssas00")
         limit: Maximum number of reports to return (default: 10)
     """
-    ctx = mcp.get_context()
     
     # Validate chamber parameter
     if chamber.lower() not in ["house", "senate"]:
@@ -647,6 +641,7 @@ async def get_committee_reports(
 
 @mcp.tool()
 async def get_committee_nominations(
+    ctx: Context,
     committee_code: str,
     limit: int = 10
 ) -> str:
@@ -657,7 +652,6 @@ async def get_committee_nominations(
         committee_code: The committee code (e.g., "ssas00")
         limit: Maximum number of nominations to return (default: 10)
     """
-    ctx = mcp.get_context()
     chamber = "senate"  # Nominations are only available for Senate committees
     
     # First get committee details to verify it exists and get the name
@@ -742,6 +736,7 @@ async def get_committee_nominations(
 
 @mcp.tool()
 async def get_committee_communications(
+    ctx: Context,
     chamber: str,
     committee_code: str,
     limit: int = 10
@@ -754,7 +749,6 @@ async def get_committee_communications(
         committee_code: The committee code (e.g., "hspw00", "ssas00")
         limit: Maximum number of communications to return (default: 10)
     """
-    ctx = mcp.get_context()
     
     # Validate chamber parameter
     if chamber.lower() not in ["house", "senate"]:
@@ -846,6 +840,7 @@ from typing import Optional
 
 @mcp.tool()
 async def search_committees(
+    ctx: Context,
     keywords: str,
     chamber: Optional[str] = None,
     congress: Optional[int] = None,
@@ -860,7 +855,6 @@ async def search_committees(
         congress: Optional Congress number (e.g., 117)
         limit: Maximum number of results to return (default: 10)
     """
-    ctx = mcp.get_context()
     
     # Determine initial fetch limit
     fetch_limit = limit

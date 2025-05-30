@@ -1,7 +1,7 @@
 # congress_api/features/hearings.py
 import logging
 from typing import Dict, List, Any, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -64,12 +64,11 @@ def format_hearing_detail(hearing_item: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://hearings/latest")
-async def get_latest_hearings() -> str:
+async def get_latest_hearings(ctx: Context) -> str:
     """
     Get a list of the most recent hearings.
     Returns the 10 most recently updated hearings by default.
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 10,
         "sort": "updateDate+desc",
@@ -97,14 +96,13 @@ async def get_latest_hearings() -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://hearings/{congress}")
-async def get_hearings_by_congress(congress: int) -> str:
+async def get_hearings_by_congress(ctx: Context, congress: int) -> str:
     """
     Get hearings for a specific Congress.
     
     Args:
         congress: The Congress number (e.g., 116).
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 20,
         "sort": "updateDate+desc",
@@ -132,7 +130,7 @@ async def get_hearings_by_congress(congress: int) -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://hearings/{congress}/{chamber}")
-async def get_hearings_by_congress_and_chamber(congress: int, chamber: str) -> str:
+async def get_hearings_by_congress_and_chamber(ctx: Context, congress: int, chamber: str) -> str:
     """
     Get hearings for a specific Congress and chamber.
     
@@ -140,7 +138,6 @@ async def get_hearings_by_congress_and_chamber(congress: int, chamber: str) -> s
         congress: The Congress number (e.g., 116).
         chamber: The chamber name (e.g., "house", "senate", "nochamber").
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 20,
         "sort": "updateDate+desc",
@@ -168,7 +165,7 @@ async def get_hearings_by_congress_and_chamber(congress: int, chamber: str) -> s
     return "\n".join(lines)
 
 @mcp.resource("congress://hearings/{congress}/{chamber}/{jacket_number}")
-async def get_hearing_details(congress: int, chamber: str, jacket_number: int) -> str:
+async def get_hearing_details(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
     Get detailed information for a specific hearing.
     
@@ -177,7 +174,6 @@ async def get_hearing_details(congress: int, chamber: str, jacket_number: int) -
         chamber: The chamber name (e.g., "house", "senate", "nochamber").
         jacket_number: The jacket number for the hearing.
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -205,6 +201,7 @@ async def get_hearing_details(congress: int, chamber: str, jacket_number: int) -
 
 @mcp.tool("search_hearings")
 async def search_hearings(
+    ctx: Context,
     keywords: Optional[str] = None,
     congress: Optional[int] = None,
     chamber: Optional[str] = None,
@@ -225,7 +222,6 @@ async def search_hearings(
         limit: Maximum number of results to return (default: 10).
         sort: Sort order (default: "updateDate+desc").
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json",
         "limit": limit,

@@ -1,7 +1,7 @@
 # members.py
 from typing import Dict, List, Any, Optional
 import json
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -73,14 +73,13 @@ def format_member_summary(member: Dict[str, Any]) -> str:
 
 # Resources
 @mcp.resource("congress://members/current")
-async def get_current_members() -> str:
+async def get_current_members(ctx: Context) -> str:
     """
     Get a list of current members of Congress.
     
     Returns a sample of 20 current members from both chambers of Congress,
     including their biographical information and contact details.
     """
-    ctx = mcp.get_context()
     data = await make_api_request("/member", ctx, {"limit": 20, "currentMember": "true"})
     
     if "error" in data:
@@ -97,14 +96,13 @@ async def get_current_members() -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://members/all")
-async def get_all_members() -> str:
+async def get_all_members(ctx: Context) -> str:
     """
     Get a list of congressional members.
     
     Returns a list of congressional members with basic information about each,
     including their biographical information and contact details.
     """
-    ctx = mcp.get_context()
     data = await make_api_request("/member", ctx, {"limit": 20})
     
     if "error" in data:
@@ -121,7 +119,7 @@ async def get_all_members() -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://members/{bioguide_id}")
-async def get_member_details(bioguide_id: str) -> str:
+async def get_member_details(ctx: Context, bioguide_id: str) -> str:
     """
     Get detailed information about a specific member of Congress.
     
@@ -131,7 +129,6 @@ async def get_member_details(bioguide_id: str) -> str:
     Returns comprehensive information about the specified member,
     including biographical data, terms of service, and committee assignments.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/member/{bioguide_id}", ctx)
     
     if "error" in data:
@@ -296,7 +293,7 @@ async def get_member_details(bioguide_id: str) -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://members/{bioguide_id}/sponsored")
-async def get_member_sponsored_legislation(bioguide_id: str) -> str:
+async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str) -> str:
     """
     Get legislation sponsored by a specific member of Congress.
     
@@ -305,7 +302,6 @@ async def get_member_sponsored_legislation(bioguide_id: str) -> str:
         
     Returns a list of legislation sponsored by the specified member.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/member/{bioguide_id}/sponsored-legislation", ctx, {"limit": 20})
     
     if "error" in data:
@@ -337,7 +333,7 @@ async def get_member_sponsored_legislation(bioguide_id: str) -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://members/{bioguide_id}/cosponsored")
-async def get_member_cosponsored_legislation(bioguide_id: str) -> str:
+async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str) -> str:
     """
     Get legislation cosponsored by a specific member of Congress.
     
@@ -346,7 +342,6 @@ async def get_member_cosponsored_legislation(bioguide_id: str) -> str:
         
     Returns a list of legislation cosponsored by the specified member.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/member/{bioguide_id}/cosponsored-legislation", ctx, {"limit": 20})
     
     if "error" in data:
@@ -378,7 +373,7 @@ async def get_member_cosponsored_legislation(bioguide_id: str) -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://members/congress/{congress}")
-async def get_members_by_congress(congress: str) -> str:
+async def get_members_by_congress(ctx: Context, congress: str) -> str:
     """
     Get members of a specific Congress.
     
@@ -387,7 +382,6 @@ async def get_members_by_congress(congress: str) -> str:
         
     Returns a list of members who served in the specified Congress.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/member/congress/{congress}", ctx, {"limit": 20})
     
     if "error" in data:
@@ -404,7 +398,7 @@ async def get_members_by_congress(congress: str) -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://members/state/{state_code}")
-async def get_members_by_state(state_code: str) -> str:
+async def get_members_by_state(ctx: Context, state_code: str) -> str:
     """
     Get members from a specific state.
     
@@ -413,7 +407,6 @@ async def get_members_by_state(state_code: str) -> str:
         
     Returns a list of members who represent the specified state.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/member/{state_code}", ctx, {"currentMember": "true"})
     
     if "error" in data:
@@ -430,7 +423,7 @@ async def get_members_by_state(state_code: str) -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://members/state/{state_code}/district/{district}")
-async def get_members_by_district(state_code: str, district: str) -> str:
+async def get_members_by_district(ctx: Context, state_code: str, district: str) -> str:
     """
     Get members from a specific congressional district.
     
@@ -440,7 +433,6 @@ async def get_members_by_district(state_code: str, district: str) -> str:
         
     Returns a list of members who represent the specified district.
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/member/{state_code}/{district}", ctx, {"currentMember": "true"})
     
     if "error" in data:
@@ -459,6 +451,7 @@ async def get_members_by_district(state_code: str, district: str) -> str:
 # Tools
 @mcp.tool()
 async def search_members(
+    ctx: Context,
     name: Optional[str] = None,
     state: Optional[str] = None,
     party: Optional[str] = None,
@@ -481,7 +474,6 @@ async def search_members(
         limit: Maximum number of results to return (default: 10)
         district: Optional district number for the district (e.g., 10)
     """
-    ctx = mcp.get_context()
     
     try:
         # Determine which API endpoint to use based on the provided parameters
@@ -923,14 +915,13 @@ async def search_members(
     except Exception as e:
         return f"Error searching members: {str(e)}"
         
-async def get_member_info(bioguide_id: str) -> str:
+async def get_member_info(ctx: Context, bioguide_id: str) -> str:
     """
     Get detailed information about a member of Congress.
     
     Args:
         bioguide_id: The Bioguide ID for the member
     """
-    ctx = mcp.get_context()
     data = await make_api_request(f"/member/{bioguide_id}", ctx)
     
     if "error" in data:
@@ -995,7 +986,6 @@ async def get_members_by_congress_state_district(
         district: Optional district number for the district (e.g., 10)
         current_member: Whether to only include current members (default: True)
     """
-    ctx = mcp.get_context()
     
     # Build the endpoint based on parameters
     if district is not None:

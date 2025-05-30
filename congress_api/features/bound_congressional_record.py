@@ -1,7 +1,7 @@
 # congress_api/features/bound_congressional_record.py
 import logging
 from typing import Dict, List, Any, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -75,12 +75,11 @@ def format_bound_record_detail(record_data: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://bound-congressional-record/latest")
-async def get_latest_bound_congressional_record() -> str:
+async def get_latest_bound_congressional_record(ctx: Context) -> str:
     """
     Get the most recent bound congressional record issues.
     Returns the 10 most recently published issues by default.
     """
-    ctx = mcp.get_context()
     params = {
         "limit": 10,
         "format": "json"
@@ -111,14 +110,13 @@ async def get_latest_bound_congressional_record() -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://bound-congressional-record/{year}")
-async def get_bound_congressional_record_by_year(year: str) -> str:
+async def get_bound_congressional_record_by_year(ctx: Context, year: str) -> str:
     """
     Get bound congressional record issues for a specific year.
     
     Args:
         year: The year (e.g., "1990").
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -148,7 +146,7 @@ async def get_bound_congressional_record_by_year(year: str) -> str:
     return "\n".join(lines)
 
 @mcp.resource("congress://bound-congressional-record/{year}/{month}")
-async def get_bound_congressional_record_by_year_month(year: str, month: str) -> str:
+async def get_bound_congressional_record_by_year_month(ctx: Context, year: str, month: str) -> str:
     """
     Get bound congressional record issues for a specific year and month.
     
@@ -156,7 +154,6 @@ async def get_bound_congressional_record_by_year_month(year: str, month: str) ->
         year: The year (e.g., "1990").
         month: The month (e.g., "5" for May).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -186,7 +183,7 @@ async def get_bound_congressional_record_by_year_month(year: str, month: str) ->
     return "\n".join(lines)
 
 @mcp.resource("congress://bound-congressional-record/{year}/{month}/{day}")
-async def get_bound_congressional_record_by_date(year: str, month: str, day: str) -> str:
+async def get_bound_congressional_record_by_date(ctx: Context, year: str, month: str, day: str) -> str:
     """
     Get bound congressional record issues for a specific date.
     
@@ -195,7 +192,6 @@ async def get_bound_congressional_record_by_date(year: str, month: str, day: str
         month: The month (e.g., "05" for May).
         day: The day (e.g., "19").
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json"
     }
@@ -231,6 +227,7 @@ async def get_bound_congressional_record_by_date(year: str, month: str, day: str
 
 @mcp.tool("search_bound_congressional_record")
 async def search_bound_congressional_record(
+    ctx: Context,
     year: Optional[str] = None,
     month: Optional[str] = None,
     day: Optional[str] = None,
@@ -245,7 +242,6 @@ async def search_bound_congressional_record(
         day: Optional day to filter by (e.g., "19").
         limit: Maximum number of results to return (default: 10).
     """
-    ctx = mcp.get_context()
     params = {
         "format": "json",
         "limit": limit

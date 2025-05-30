@@ -25,11 +25,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 # Import the MCP server from mcp_app
 from congress_api.mcp_app import mcp
 
-# Import all features to register them with the MCP server
-from congress_api.features import bills, members, committees, congress_info, amendments, summaries
-from congress_api.features import committee_reports, committee_prints, committee_meetings, hearings
-from congress_api.features import congressional_record, daily_congressional_record, bound_congressional_record
-from congress_api.features import house_communications, house_requirements, senate_communications, nominations, crs_reports, treaties
+# Features are imported in main.py - no need to duplicate here
 
 # Import prompts
 from congress_api import prompts_module

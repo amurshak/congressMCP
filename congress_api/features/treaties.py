@@ -1,7 +1,7 @@
 # congress_api/features/treaties.py
 import logging
 from typing import Dict, List, Any, Optional
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -195,12 +195,11 @@ def format_treaties_list(data: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://treaties/latest")
-async def get_latest_treaties() -> str:
+async def get_latest_treaties(ctx: Context) -> str:
     """
     Get the most recent treaties.
     Returns the 10 most recently published treaties by default.
     """
-    context = mcp.get_context()
     logger.debug("Getting latest treaties")
     
     # Set up parameters for the API request
@@ -213,7 +212,7 @@ async def get_latest_treaties() -> str:
     data = await make_api_request(
         endpoint="/treaty",
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response
@@ -224,14 +223,14 @@ async def get_latest_treaties() -> str:
     return format_treaties_list(data)
 
 @mcp.resource("congress://treaties/{congress}")
-async def get_treaties_by_congress(congress: int) -> str:
+async def get_treaties_by_congress(ctx: Context, congress: int) -> str:
     """
     Get treaties for a specific Congress.
     
     Args:
         congress: The Congress number (e.g., 117).
     """
-    context = mcp.get_context()
+
     logger.debug(f"Getting treaties for Congress: {congress}")
     
     # Set up parameters for the API request
@@ -244,7 +243,7 @@ async def get_treaties_by_congress(congress: int) -> str:
     data = await make_api_request(
         endpoint=f"/treaty/{congress}",
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response
@@ -255,7 +254,7 @@ async def get_treaties_by_congress(congress: int) -> str:
     return format_treaties_list(data)
 
 @mcp.resource("congress://treaties/{congress}/{treaty_number}")
-async def get_treaty_detail(congress: int, treaty_number: int) -> str:
+async def get_treaty_detail(ctx: Context, congress: int, treaty_number: int) -> str:
     """
     Get detailed information for a specific treaty.
     
@@ -263,7 +262,7 @@ async def get_treaty_detail(congress: int, treaty_number: int) -> str:
         congress: The Congress number (e.g., 117).
         treaty_number: The treaty number (e.g., 3).
     """
-    context = mcp.get_context()
+
     logger.debug(f"Getting treaty details for Congress: {congress}, Treaty Number: {treaty_number}")
     
     # Set up parameters for the API request
@@ -275,7 +274,7 @@ async def get_treaty_detail(congress: int, treaty_number: int) -> str:
     data = await make_api_request(
         endpoint=f"/treaty/{congress}/{treaty_number}",
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response
@@ -286,7 +285,7 @@ async def get_treaty_detail(congress: int, treaty_number: int) -> str:
     return format_treaty_detail(data)
 
 @mcp.resource("congress://treaties/{congress}/{treaty_number}/{treaty_suffix}")
-async def get_treaty_detail_with_suffix(congress: int, treaty_number: int, treaty_suffix: str) -> str:
+async def get_treaty_detail_with_suffix(ctx: Context, congress: int, treaty_number: int, treaty_suffix: str) -> str:
     """
     Get detailed information for a specific partitioned treaty.
     
@@ -295,7 +294,7 @@ async def get_treaty_detail_with_suffix(congress: int, treaty_number: int, treat
         treaty_number: The treaty number (e.g., 13).
         treaty_suffix: The treaty suffix (e.g., 'A').
     """
-    context = mcp.get_context()
+
     logger.debug(f"Getting treaty details for Congress: {congress}, Treaty Number: {treaty_number}, Suffix: {treaty_suffix}")
     
     # Set up parameters for the API request
@@ -307,7 +306,7 @@ async def get_treaty_detail_with_suffix(congress: int, treaty_number: int, treat
     data = await make_api_request(
         endpoint=f"/treaty/{congress}/{treaty_number}/{treaty_suffix}",
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response
@@ -321,6 +320,7 @@ async def get_treaty_detail_with_suffix(congress: int, treaty_number: int, treat
 
 @mcp.tool("get_treaty_actions")
 async def get_treaty_actions(
+    ctx: Context,
     congress: int,
     treaty_number: int,
     treaty_suffix: Optional[str] = None
@@ -333,7 +333,7 @@ async def get_treaty_actions(
         treaty_number: The treaty number (e.g., 3).
         treaty_suffix: Optional treaty suffix for partitioned treaties (e.g., 'A').
     """
-    context = mcp.get_context()
+
     logger.debug(f"Getting treaty actions for Congress: {congress}, Treaty Number: {treaty_number}, Suffix: {treaty_suffix}")
     
     # Set up parameters for the API request
@@ -352,7 +352,7 @@ async def get_treaty_actions(
     data = await make_api_request(
         endpoint=endpoint,
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response
@@ -364,6 +364,7 @@ async def get_treaty_actions(
 
 @mcp.tool("get_treaty_committees")
 async def get_treaty_committees(
+    ctx: Context,
     congress: int,
     treaty_number: int
 ) -> str:
@@ -374,7 +375,7 @@ async def get_treaty_committees(
         congress: The Congress number (e.g., 116).
         treaty_number: The treaty number (e.g., 3).
     """
-    context = mcp.get_context()
+
     logger.debug(f"Getting treaty committees for Congress: {congress}, Treaty Number: {treaty_number}")
     
     # Set up parameters for the API request
@@ -387,7 +388,7 @@ async def get_treaty_committees(
     data = await make_api_request(
         endpoint=f"/treaty/{congress}/{treaty_number}/committees",
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response
@@ -399,6 +400,7 @@ async def get_treaty_committees(
 
 @mcp.tool("search_treaties")
 async def search_treaties(
+    ctx: Context,
     congress: Optional[int] = None,
     topic: Optional[str] = None,
     from_date: Optional[str] = None,
@@ -415,7 +417,7 @@ async def search_treaties(
         to_date: Optional end date for filtering by update date (format: YYYY-MM-DDT00:00:00Z).
         limit: Maximum number of results to return (default: 10).
     """
-    context = mcp.get_context()
+
     logger.debug(f"Searching for treaties with congress: {congress}, topic: {topic}, from_date: {from_date}, to_date: {to_date}, limit: {limit}")
     
     # Set up parameters for the API request
@@ -440,7 +442,7 @@ async def search_treaties(
     data = await make_api_request(
         endpoint=endpoint,
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response

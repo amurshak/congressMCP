@@ -1,6 +1,7 @@
 # congress_api/features/crs_reports.py
 import logging
 from typing import Dict, List, Any, Optional
+from fastmcp import Context
 
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
@@ -120,7 +121,7 @@ def format_crs_reports_list(data: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://crs-reports/latest")
-async def get_latest_crs_reports() -> str:
+async def get_latest_crs_reports(ctx: Context) -> str:
     """
     Get the most recent CRS reports.
     Returns the 10 most recently published reports by default.
@@ -149,7 +150,7 @@ async def get_latest_crs_reports() -> str:
     return format_crs_reports_list(data)
 
 @mcp.resource("congress://crs-reports/{report_number}")
-async def get_crs_report_detail(report_number: str) -> str:
+async def get_crs_report_detail(ctx: Context, report_number: str) -> str:
     """
     Get detailed information for a specific CRS report.
     
@@ -182,6 +183,7 @@ async def get_crs_report_detail(report_number: str) -> str:
 
 @mcp.tool("search_crs_reports")
 async def search_crs_reports(
+    ctx: Context,
     keywords: Optional[str] = None,
     report_number: Optional[str] = None,
     limit: int = 10
@@ -205,7 +207,7 @@ async def search_crs_reports(
     
     # If a specific report number is provided, get that report directly
     if report_number:
-        return await get_crs_report_detail(report_number)
+        return await get_crs_report_detail(ctx, report_number)
     
     # Make the API request to get the latest reports (no specific search endpoint available)
     data = await make_api_request(

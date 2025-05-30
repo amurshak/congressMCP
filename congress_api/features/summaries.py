@@ -2,7 +2,7 @@
 from typing import Dict, Any, Optional, List
 import json
 import logging
-
+from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -82,7 +82,7 @@ def format_summaries_list(summaries: List[Dict[str, Any]], title: str) -> str:
 
 # Resources
 @mcp.resource("congress://summaries/latest")
-async def get_latest_summaries() -> str:
+async def get_latest_summaries(ctx: Context) -> str:
     """
     Get the most recent bill summaries.
     
@@ -90,7 +90,6 @@ async def get_latest_summaries() -> str:
     Congresses, sorted by update date in descending order.
     """
     logger.info("Accessing latest summaries resource")
-    ctx = mcp.get_context()
     try:
         data = await make_api_request("/summaries", ctx, {"limit": 10, "sort": "updateDate+desc"})
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")  
@@ -111,7 +110,7 @@ async def get_latest_summaries() -> str:
         return f"Error retrieving latest summaries: {str(e)}"
 
 @mcp.resource("congress://summaries/{congress}")
-async def get_summaries_by_congress(congress: str) -> str:
+async def get_summaries_by_congress(ctx: Context, congress: str) -> str:
     """
     Get summaries from a specific Congress.
     
@@ -122,7 +121,6 @@ async def get_summaries_by_congress(congress: str) -> str:
     specified Congress, sorted by update date in descending order.
     """
     logger.info(f"Accessing summaries for Congress {congress}")
-    ctx = mcp.get_context()
     try:
         data = await make_api_request(f"/summaries/{congress}", ctx, {"limit": 10, "sort": "updateDate+desc"})
         logger.info(f"API response received for Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
@@ -143,7 +141,7 @@ async def get_summaries_by_congress(congress: str) -> str:
         return f"Error retrieving summaries for the {congress}th Congress: {str(e)}"
 
 @mcp.resource("congress://summaries/{congress}/{bill_type}")
-async def get_summaries_by_type(congress: str, bill_type: str) -> str:
+async def get_summaries_by_type(ctx: Context, congress: str, bill_type: str) -> str:
     """
     Get summaries from a specific Congress and bill type.
     
@@ -155,7 +153,6 @@ async def get_summaries_by_type(congress: str, bill_type: str) -> str:
     bill type from the specified Congress, sorted by update date in descending order.
     """
     logger.info(f"Accessing {bill_type} summaries for Congress {congress}")
-    ctx = mcp.get_context()
     try:
         data = await make_api_request(f"/summaries/{congress}/{bill_type}", ctx, {"limit": 10, "sort": "updateDate+desc"})
         logger.info(f"API response received for {bill_type} summaries in Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
@@ -178,6 +175,7 @@ async def get_summaries_by_type(congress: str, bill_type: str) -> str:
 # Tools
 @mcp.tool()
 async def search_summaries(
+    ctx: Context,
     keywords: str, 
     congress: Optional[int] = None, 
     bill_type: Optional[str] = None,
@@ -198,7 +196,6 @@ async def search_summaries(
         from_date: Optional start date for filtering (format: YYYY-MM-DDT00:00:00Z)
         to_date: Optional end date for filtering (format: YYYY-MM-DDT00:00:00Z)
     """
-    ctx = mcp.get_context()
     logger.info(f"Searching for summaries with keywords: {keywords}")
     
     # Note: The Congress.gov Summaries API doesn't support keyword searching via query parameters
@@ -261,6 +258,7 @@ async def search_summaries(
 
 @mcp.tool()
 async def get_bill_summaries(
+    ctx: Context,
     congress: int,
     bill_type: str,
     bill_number: int
@@ -273,7 +271,6 @@ async def get_bill_summaries(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
-    ctx = mcp.get_context()
     
     # Use the existing bill summaries endpoint
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/summaries"
