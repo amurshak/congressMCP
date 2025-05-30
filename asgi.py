@@ -9,6 +9,7 @@ import asyncio
 import json
 import datetime
 import logging
+from contextlib import asynccontextmanager
 
 # Initialize logger
 logger = logging.getLogger(__name__)
@@ -17,8 +18,11 @@ logger = logging.getLogger(__name__)
 os.environ['WEB_CONCURRENCY'] = '1'
 os.environ['GUNICORN_CMD_ARGS'] = '--workers=1'
 
-from starlette.responses import JSONResponse
-from starlette.routing import Route
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse, Response, StreamingResponse
+from starlette.routing import Route, Mount
+from starlette.middleware import Middleware
+from starlette.middleware.cors import CORSMiddleware
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
@@ -29,7 +33,10 @@ from congress_api.main import server
 # Configure environment
 from congress_api.core.api_config import get_api_config, ENV
 
-# Define custom endpoint functions
+# Global reference to the FastMCP app
+fastmcp_app = None
+
+# Define endpoint functions
 async def health_check(request):
     """Health check endpoint for the ASGI server."""
     config = get_api_config()
@@ -64,6 +71,7 @@ async def mcp_debug(request):
             "resources_count": resources_count,
             "tools_sample": tools_list,
             "resources_sample": resources_list,
+            "fastmcp_app_available": fastmcp_app is not None,
         })
     except Exception as e:
         logger.error(f"MCP debug error: {e}")
@@ -72,66 +80,114 @@ async def mcp_debug(request):
             "error": str(e),
         }, status_code=500)
 
-# Create the FastMCP HTTP app directly
-try:
-    logger.info("Creating FastMCP HTTP app...")
-    app = server.http_app()
-    logger.info(f"Successfully created FastMCP HTTP app: {type(app)}")
+# Create the combined lifespan manager
+@asynccontextmanager
+async def lifespan(app):
+    """Combined lifespan manager that properly handles FastMCP initialization."""
+    global fastmcp_app
     
-    # Add custom routes to the FastMCP app
-    # The FastMCP app should be a Starlette app, so we can add routes
-    if hasattr(app, 'router') and hasattr(app.router, 'routes'):
-        # Add our custom routes to the beginning of the route list
-        custom_routes = [
-            Route("/", endpoint=health_check, methods=["GET"]),
-            Route("/health", endpoint=health_check, methods=["GET"]),
-            Route("/mcp-debug", endpoint=mcp_debug, methods=["GET"]),
-        ]
+    logger.info("Starting application lifespan...")
+    
+    try:
+        # Create the FastMCP HTTP app
+        logger.info("Creating FastMCP HTTP app...")
+        fastmcp_app = server.http_app()
+        logger.info(f"FastMCP HTTP app created: {type(fastmcp_app)}")
         
-        # Insert custom routes at the beginning
-        existing_routes = list(app.router.routes)
-        app.router.routes = custom_routes + existing_routes
+        # The key insight: we need to start the FastMCP app's lifespan context
+        # and keep it running during our app's lifetime
+        if hasattr(fastmcp_app, 'lifespan') and fastmcp_app.lifespan is not None:
+            logger.info("Starting FastMCP lifespan context...")
+            async with fastmcp_app.lifespan(fastmcp_app):
+                logger.info("FastMCP lifespan started successfully")
+                
+                # Mount the FastMCP app to our main app now that it's initialized
+                app.mount("/mcp", fastmcp_app)
+                logger.info("FastMCP app mounted at /mcp")
+                
+                # Yield control back to the application
+                yield
+                
+                logger.info("FastMCP lifespan ending...")
+        else:
+            logger.warning("FastMCP app has no lifespan - trying without lifespan management")
+            app.mount("/mcp", fastmcp_app)
+            yield
+            
+    except Exception as e:
+        logger.error(f"Error in lifespan management: {e}")
+        import traceback
+        traceback.print_exc()
         
-        logger.info("Added custom routes to FastMCP app")
-    else:
-        logger.warning("Could not add custom routes - FastMCP app structure unexpected")
+        # Create a fallback error handler for the MCP endpoint
+        async def mcp_error_handler(request):
+            return JSONResponse({
+                "error": "FastMCP initialization failed",
+                "details": str(e)
+            }, status_code=500)
+        
+        # Add error route
+        app.router.routes.append(
+            Route("/mcp", endpoint=mcp_error_handler, methods=["GET", "POST"])
+        )
+        app.router.routes.append(
+            Route("/mcp/", endpoint=mcp_error_handler, methods=["GET", "POST"])
+        )
+        
+        # Still yield to allow the rest of the app to work
+        yield
     
-    # Initialize the API config
-    config = get_api_config()
-    
-    # Log server info
-    tools_count = 0
-    resources_count = 0
-    if hasattr(server, '_tool_manager') and hasattr(server._tool_manager, '_tools'):
-        tools_count = len(server._tool_manager._tools)
-    if hasattr(server, '_resource_manager') and hasattr(server._resource_manager, '_resources'):
-        resources_count = len(server._resource_manager._resources)
-    
-    logger.info(f"Server ready with {tools_count} tools and {resources_count} resources")
-    logger.info("MCP endpoint available at /mcp/")
-    
-except Exception as e:
-    logger.error(f"Error creating FastMCP HTTP app: {e}")
-    import traceback
-    traceback.print_exc()
-    
-    # Fallback: create a simple Starlette app that explains the error
-    from starlette.applications import Starlette
-    
-    async def error_response(request):
-        return JSONResponse({
-            "error": "FastMCP server failed to initialize",
-            "details": str(e),
-            "traceback": traceback.format_exc()
-        }, status_code=500)
-    
-    app = Starlette(
-        routes=[
-            Route("/", endpoint=error_response, methods=["GET", "POST"]),
-            Route("/health", endpoint=error_response, methods=["GET", "POST"]),
-            Route("/mcp", endpoint=error_response, methods=["GET", "POST"]),
-            Route("/mcp/", endpoint=error_response, methods=["GET", "POST"]),
-        ]
+    logger.info("Application lifespan ended")
+
+# Exception handlers
+async def not_found(request, exc):
+    """Handle 404 errors."""
+    return JSONResponse(
+        {"error": "Not found", "path": request.url.path},
+        status_code=404
     )
-    
-    logger.error("Created fallback error app")
+
+async def server_error(request, exc):
+    """Handle 500 errors."""
+    logger.error(f"Server error: {exc}")
+    return JSONResponse(
+        {"error": "Internal server error", "details": str(exc)},
+        status_code=500
+    )
+
+# Create the main Starlette app with the combined lifespan
+app = Starlette(
+    debug=ENV != "production",
+    routes=[
+        Route("/", endpoint=health_check, methods=["GET"]),
+        Route("/health", endpoint=health_check, methods=["GET"]),
+        Route("/mcp-debug", endpoint=mcp_debug, methods=["GET"]),
+    ],
+    middleware=[
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    ],
+    exception_handlers={
+        404: not_found,
+        500: server_error,
+    },
+    lifespan=lifespan
+)
+
+# Initialize the API config
+config = get_api_config()
+
+# Log server info
+tools_count = 0
+resources_count = 0
+if hasattr(server, '_tool_manager') and hasattr(server._tool_manager, '_tools'):
+    tools_count = len(server._tool_manager._tools)
+if hasattr(server, '_resource_manager') and hasattr(server._resource_manager, '_resources'):
+    resources_count = len(server._resource_manager._resources)
+
+logger.info(f"Server configured with {tools_count} tools and {resources_count} resources")
+logger.info("Application ready - FastMCP will be initialized on startup")
