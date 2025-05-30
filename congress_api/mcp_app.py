@@ -1,5 +1,5 @@
 # mcp_app.py
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from .core.client_handler import app_lifespan
 
 # Create the MCP server with metadata
