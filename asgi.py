@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ASGI wrapper for the Congress.gov API MCP server.
-This follows the FastMCP ASGI integration documentation.
+This follows the FastMCP ASGI integration documentation correctly.
 """
 import os
 import sys
@@ -38,7 +38,7 @@ async def health_check(request):
         "environment": ENV,
         "api_key_configured": config["api_key_configured"],
         "caching_enabled": config["caching_enabled"],
-        "timestamp": "2025-05-30T14:43:00Z"
+        "timestamp": "2025-05-30T14:50:00Z"
     })
 
 async def mcp_debug(request):
@@ -85,18 +85,20 @@ try:
         )
     ]
     
-    # Create the MCP app with middleware and mount path
-    mcp_app = server.http_app(middleware=custom_middleware, path='/mcp')
+    # Create the MCP app with middleware
+    # The FastMCP app will have its internal /mcp endpoint
+    mcp_app = server.http_app(middleware=custom_middleware)
     logger.info(f"FastMCP HTTP app created: {type(mcp_app)}")
     
     # Step 2: Create main Starlette app and mount MCP app
-    # THE KEY: Pass the MCP app's lifespan to the parent app
+    # Mount at root "/" so that FastMCP's internal "/mcp" becomes "/mcp"
+    # OR mount at "/api" so FastMCP's "/mcp" becomes "/api/mcp"  
     app = Starlette(
         routes=[
             Route("/", endpoint=health_check, methods=["GET"]),
-            Route("/health", endpoint=health_check, methods=["GET"]),
+            Route("/health", endpoint=health_check, methods=["GET"]),  
             Route("/mcp-debug", endpoint=mcp_debug, methods=["GET"]),
-            Mount("/mcp", app=mcp_app),  # Mount MCP app at /mcp
+            Mount("/", app=mcp_app),  # Mount at root so /mcp works directly
         ],
         lifespan=mcp_app.lifespan,  # CRITICAL: Use MCP app's lifespan
     )
@@ -113,7 +115,7 @@ try:
         resources_count = len(server._resource_manager._resources)
     
     logger.info(f"Congress MCP server ready with {tools_count} tools and {resources_count} resources")
-    logger.info("MCP endpoint will be available at /mcp/")
+    logger.info("MCP endpoint available at /mcp/ (FastMCP's internal path)")
     
 except Exception as e:
     logger.error(f"Error creating FastMCP HTTP app: {e}")
