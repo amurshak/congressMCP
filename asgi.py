@@ -15,7 +15,7 @@ os.environ['GUNICORN_CMD_ARGS'] = '--workers=1'
 
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response, StreamingResponse
-from starlette.routing import Route
+from starlette.routing import Route, Mount
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 
@@ -37,47 +37,12 @@ from congress_api import prompts_module
 # This is the server object that will be used by the ASGI wrapper
 server = mcp
 
-# Force initialization and check tools registration
-try:
-    print(f"Server type: {type(server)}")
-    
-    # Check tool manager directly
-    if hasattr(server, '_tool_manager'):
-        tool_manager = server._tool_manager
-        print(f"Tool manager type: {type(tool_manager)}")
-        
-        # Check different possible attributes for tools (based on FastMCP docs)
-        tool_attrs = ['_tools', 'tools', 'registered_tools', '_registered_tools']
-        tools_found = False
-        tools_count = 0
-        
-        for attr in tool_attrs:
-            if hasattr(tool_manager, attr):
-                tools_dict = getattr(tool_manager, attr)
-                if tools_dict:
-                    tools_count = len(tools_dict)
-                    print(f"Found {tools_count} tools in {attr}: {list(tools_dict.keys())[:10]}")  # Show first 10
-                    tools_found = True
-                    break
-                else:
-                    print(f"Attribute {attr} exists but is empty")
-        
-        if not tools_found:
-            print(f"Tool manager attributes: {[attr for attr in dir(tool_manager) if 'tool' in attr.lower()]}")
-            print(f"All tool manager attributes: {[attr for attr in dir(tool_manager) if not attr.startswith('__')]}")
-    else:
-        print("Server has no '_tool_manager' attribute")
-    
-    # Also check if server itself has any tool-related attributes
-    server_tool_attrs = [attr for attr in dir(server) if 'tool' in attr.lower() and not attr.startswith('__')]
-    print(f"Server tool-related attributes: {server_tool_attrs}")
-    
-    print(f"Server initialized - found {tools_count} tools total")
-    
-except Exception as e:
-    print(f"Error during server initialization: {e}")
-    import traceback
-    traceback.print_exc()
+# Get the Starlette app from FastMCP for SSE transport
+# path="/" means FastMCP will handle requests directly at the mount point (e.g., /sse)
+fastmcp_asgi_app = server.http_app(transport="sse", path="/")
+
+
+
 
 # Initialize the API config
 from congress_api.core.api_config import get_api_config
@@ -217,177 +182,6 @@ async def mcp_info(request):
         "server_attrs": server_attrs
     })
 
-# SSE endpoint for MCP remote connections
-async def sse_endpoint(request):
-    """SSE endpoint for MCP remote connections."""
-    
-    # Handle both GET and POST requests
-    method = request.method
-    print(f"SSE endpoint called with method: {method}")
-    
-    if method == "POST":
-        # Handle MCP JSON-RPC messages over HTTP POST
-        try:
-            body = await request.body()
-            if body:
-                import json
-                message = json.loads(body.decode('utf-8'))
-                print(f"Received MCP message: {message}")
-                
-                # Handle different MCP message types
-                if message.get("method") == "initialize":
-                    # Return MCP initialization response
-                    response = {
-                        "jsonrpc": "2.0",
-                        "id": message.get("id"),
-                        "result": {
-                            "protocolVersion": "2024-11-05",
-                            "capabilities": {
-                                "tools": {},
-                                "resources": {}
-                            },
-                            "serverInfo": {
-                                "name": "Congress MCP",
-                                "version": "1.0.0"
-                            }
-                        }
-                    }
-                    return JSONResponse(response)
-                
-                elif message.get("method") == "notifications/initialized":
-                    # Handle initialized notification - just return success (notifications don't need responses)
-                    print("Received initialized notification")
-                    return JSONResponse({"status": "ok"})
-                
-                elif message.get("method") == "tools/list":
-                    # Return list of tools
-                    tools_list = []
-                    if hasattr(server, '_tool_manager') and hasattr(server._tool_manager, '_tools'):
-                        tools_dict = server._tool_manager._tools
-                        for tool_name, tool_obj in tools_dict.items():
-                            tool_info = {
-                                "name": tool_name,
-                                "description": getattr(tool_obj, 'description', 'No description available'),
-                                "inputSchema": {
-                                    "type": "object",
-                                    "properties": {},
-                                    "required": []
-                                }
-                            }
-                            tools_list.append(tool_info)
-                    
-                    response = {
-                        "jsonrpc": "2.0",
-                        "id": message.get("id"),
-                        "result": {
-                            "tools": tools_list
-                        }
-                    }
-                    return JSONResponse(response)
-                
-                elif message.get("method") == "resources/list":
-                    # Return list of resources
-                    resources_list = []
-                    if hasattr(server, '_resource_manager') and hasattr(server._resource_manager, '_resources'):
-                        resources_dict = server._resource_manager._resources
-                        for resource_uri, resource_obj in resources_dict.items():
-                            resource_info = {
-                                "uri": resource_uri,
-                                "name": getattr(resource_obj, 'name', resource_uri),
-                                "description": getattr(resource_obj, 'description', 'No description available')
-                            }
-                            resources_list.append(resource_info)
-                    
-                    response = {
-                        "jsonrpc": "2.0",
-                        "id": message.get("id"),
-                        "result": {
-                            "resources": resources_list
-                        }
-                    }
-                    return JSONResponse(response)
-                
-                else:
-                    # Unknown method
-                    response = {
-                        "jsonrpc": "2.0",
-                        "id": message.get("id"),
-                        "error": {
-                            "code": -32601,
-                            "message": f"Method not found: {message.get('method')}"
-                        }
-                    }
-                    return JSONResponse(response, status_code=400)
-            
-            # Empty POST body - return success
-            return JSONResponse({"status": "ok"})
-            
-        except Exception as e:
-            print(f"Error handling POST request: {e}")
-            return JSONResponse({"error": str(e)}, status_code=500)
-    
-    else:
-        # Handle GET request - return SSE stream
-        async def event_stream():
-            try:
-                # Send initial connection event
-                yield f"data: {json.dumps({'type': 'connected', 'message': 'MCP Server Connected', 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
-                
-                # Get server info for initial handshake
-                try:
-                    tools_info = []
-                    resources_info = []
-                    
-                    # For FastMCP servers, use the list methods
-                    if hasattr(server, 'list_tools'):
-                        try:
-                            tools_list = await server.list_tools()
-                            if hasattr(tools_list, 'tools'):
-                                tools_info = [{"name": tool.name, "description": tool.description} 
-                                             for tool in tools_list.tools]
-                        except Exception as e:
-                            tools_info = [{"error": f"Error listing tools: {str(e)}"}]
-                    
-                    if hasattr(server, 'list_resources'):
-                        try:
-                            resources_list = await server.list_resources()
-                            if hasattr(resources_list, 'resources'):
-                                resources_info = [{"uri": resource.uri, "name": resource.name} 
-                                                for resource in resources_list.resources]
-                        except Exception as e:
-                            resources_info = [{"error": f"Error listing resources: {str(e)}"}]
-                    
-                    # Send server capabilities
-                    yield f"data: {json.dumps({'type': 'capabilities', 'tools': tools_info, 'resources': resources_info, 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
-                    
-                except Exception as e:
-                    yield f"data: {json.dumps({'type': 'error', 'message': f'Error getting server info: {str(e)}', 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
-                
-                # Keep connection alive with periodic heartbeats
-                heartbeat_count = 0
-                while True:
-                    heartbeat_count += 1
-                    yield f"data: {json.dumps({'type': 'heartbeat', 'count': heartbeat_count, 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
-                    await asyncio.sleep(30)  # Send heartbeat every 30 seconds
-                    
-            except asyncio.CancelledError:
-                # Client disconnected
-                yield f"data: {json.dumps({'type': 'disconnected', 'message': 'Client disconnected', 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
-            except Exception as e:
-                yield f"data: {json.dumps({'type': 'error', 'message': str(e), 'timestamp': datetime.datetime.now().isoformat()})}\n\n"
-    
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Allow-Methods": "GET, OPTIONS",
-        }
-    )
-
 # Simple 404 handler
 async def not_found(request, exc):
     """Handle 404 errors."""
@@ -408,7 +202,7 @@ async def server_error(request, exc):
 routes = [
     Route("/health", health_check),
     Route("/mcp-info", mcp_info),
-    Route("/sse", sse_endpoint, methods=["GET", "POST"]),  # Add POST method support
+    Mount("/sse", app=fastmcp_asgi_app), # Mount FastMCP app for SSE
     Route("/", health_check),     # Add root endpoint that redirects to health
 ]
 
@@ -431,4 +225,5 @@ app = Starlette(
         404: not_found,
         500: server_error,
     },
+    lifespan=fastmcp_asgi_app.lifespan # Add lifespan from FastMCP app
 )
