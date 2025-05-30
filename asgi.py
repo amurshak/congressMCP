@@ -50,17 +50,38 @@ async def health_check(request):
 async def mcp_debug(request):
     """Debug endpoint to test server functionality."""
     try:
-        # Get server info
-        tools_count = len(server._tools) if hasattr(server, '_tools') else 0
-        resources_count = len(server._resources) if hasattr(server, '_resources') else 0
+        # Get server info using correct FastMCP API
+        tools_count = 0
+        resources_count = 0
+        tools_list = []
+        resources_list = []
+        
+        # Use the proper FastMCP API to get tools and resources
+        try:
+            tools_dict = await server.get_tools()
+            tools_count = len(tools_dict)
+            tools_list = list(tools_dict.keys())[:10]
+        except Exception as e:
+            tools_count = 0
+            tools_list = [f"Error getting tools: {e}"]
+        
+        try:
+            resources_dict = await server.get_resources()
+            resources_count = len(resources_dict)
+            resources_list = list(resources_dict.keys())[:10]
+        except Exception as e:
+            resources_count = 0
+            resources_list = [f"Error getting resources: {e}"]
         
         return JSONResponse({
             "status": "ok",
             "server_type": str(type(server)),
             "tools_count": tools_count,
             "resources_count": resources_count,
-            "has_tools_method": hasattr(server, '_tools'),
-            "has_resources_method": hasattr(server, '_resources'),
+            "tools_sample": tools_list,
+            "resources_sample": resources_list,
+            "has_tool_manager": hasattr(server, '_tool_manager'),
+            "has_resource_manager": hasattr(server, '_resource_manager'),
         })
     except Exception as e:
         return JSONResponse({
@@ -72,31 +93,27 @@ async def mcp_debug(request):
 async def mcp_info(request):
     """Information about the MCP server."""
     try:
-        from congress_api.main import server
+        # Get tools and resources using internal managers
+        tools_count = 0
+        resources_count = 0
+        tools_list = []
+        resources_list = []
         
-        # Try to get tools and resources information
-        tools_result = None
-        resources_result = None
+        if hasattr(server, '_tool_manager') and hasattr(server._tool_manager, '_tools'):
+            tools_count = len(server._tool_manager._tools)
+            tools_list = list(server._tool_manager._tools.keys())[:10]
         
-        try:
-            # List tools
-            tools_result = await server.list_tools()
-        except Exception as e:
-            logger.error(f"Error listing tools: {e}")
-        
-        try:
-            # List resources  
-            resources_result = await server.list_resources()
-        except Exception as e:
-            logger.error(f"Error listing resources: {e}")
+        if hasattr(server, '_resource_manager') and hasattr(server._resource_manager, '_resources'):
+            resources_count = len(server._resource_manager._resources)
+            resources_list = list(server._resource_manager._resources.keys())[:10]
         
         return JSONResponse({
             "status": "ok",
             "server_type": str(type(server)),
-            "tools_count": len(tools_result.tools) if hasattr(tools_result, 'tools') else 0,
-            "resources_count": len(resources_result.resources) if hasattr(resources_result, 'resources') else 0,
-            "tools_sample": [tool.name for tool in tools_result.tools[:5]] if hasattr(tools_result, 'tools') else [],
-            "resources_sample": [resource.uri for resource in resources_result.resources[:5]] if hasattr(resources_result, 'resources') else [],
+            "tools_count": tools_count,
+            "resources_count": resources_count,
+            "tools_sample": tools_list,
+            "resources_sample": resources_list,
         })
     except Exception as e:
         return JSONResponse({
@@ -119,7 +136,6 @@ async def server_error(request, exc):
     )
 
 # Get the FastMCP ASGI app using new FastMCP 2.3.2+ API
-# Use http_app() instead of deprecated streamable_http_app()
 try:
     # Use default path for FastMCP app - it handles /mcp internally
     fastmcp_asgi_app = server.http_app()
