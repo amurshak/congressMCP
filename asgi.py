@@ -17,8 +17,8 @@ os.environ['GUNICORN_CMD_ARGS'] = '--workers=1'
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Import the server and create_app function from the congress_api package
-from congress_api.main import server, create_app
+# Import server after path setup
+from congress_api.mcp_app import mcp as server
 
 # Configure environment
 from congress_api.core.api_config import get_api_config, ENV
@@ -26,10 +26,11 @@ from congress_api.core.api_config import get_api_config, ENV
 try:
     logger.info("Creating direct FastMCP HTTP app...")
     
-    # Create the FastAPI app with authentication middleware and routers
-    app = create_app(server)
+    # Use FastMCP directly as the main ASGI app
+    # No mounting, no wrapper, no complexity
+    app = server.http_app()
     
-    logger.info(f"FastMCP app created successfully with authentication middleware: {type(app)}")
+    logger.info(f"FastMCP app created successfully: {type(app)}")
     
     # Initialize config and log info
     config = get_api_config()
@@ -40,15 +41,15 @@ try:
         tools_count = len(server._tool_manager._tools)
     if hasattr(server, '_resource_manager') and hasattr(server._resource_manager, '_resources'):
         resources_count = len(server._resource_manager._resources)
-    
+
     logger.info(f"Congress MCP server ready with {tools_count} tools and {resources_count} resources")
     logger.info("MCP endpoint available at /mcp/ (FastMCP default path)")
-    
+
 except Exception as e:
     logger.error(f"Failed to create FastMCP app: {e}")
     import traceback
     traceback.print_exc()
-    
+
     # Fallback error app
     from starlette.applications import Starlette
     from starlette.responses import JSONResponse
@@ -59,10 +60,9 @@ except Exception as e:
             "error": "FastMCP failed to initialize",
             "details": str(e)
         }, status_code=500)
-    
+
     app = Starlette(routes=[
         Route("/", error_handler, methods=["GET", "POST"]),
         Route("/mcp", error_handler, methods=["GET", "POST"]),
         Route("/mcp/", error_handler, methods=["GET", "POST"]),
     ])
-    raise
