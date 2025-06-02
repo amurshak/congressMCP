@@ -51,26 +51,26 @@ async def create_test_user():
         test_email = "test@example.com"
         test_stripe_id = "cus_test_123456"
         
-        user = await user_service.create_user_with_api_key(
+        user, api_key = await user_service.create_user_with_api_key(
             email=test_email,
             stripe_customer_id=test_stripe_id,
             tier=SubscriptionTier.PRO
         )
         
-        if user:
+        if user and api_key:
             logger.info(f"✅ Test user created successfully:")
-            logger.info(f"   Email: {user['email']}")
-            logger.info(f"   User ID: {user['id']}")
-            logger.info(f"   Tier: {user['tier']}")
-            logger.info(f"   API Key: {user.get('api_key', 'Not generated')}")
-            return user
+            logger.info(f"   Email: {user.email}")
+            logger.info(f"   User ID: {user.id}")
+            logger.info(f"   Tier: {user.subscription_tier}")
+            logger.info(f"   API Key: {api_key}")
+            return user, api_key
         else:
             logger.error("❌ Failed to create test user")
-            return None
+            return None, None
             
     except Exception as e:
         logger.error(f"❌ Error creating test user: {str(e)}")
-        return None
+        return None, None
 
 async def test_api_key_validation():
     """Test API key validation."""
@@ -81,12 +81,10 @@ async def test_api_key_validation():
         user_service = UserService()
         
         # Try to find an existing test user or create one
-        test_user = await create_test_user()
-        if not test_user or 'api_key' not in test_user:
+        test_user, api_key = await create_test_user()
+        if not test_user or not api_key:
             logger.error("❌ No API key available for testing")
             return False
-        
-        api_key = test_user['api_key']
         
         # Test API key validation
         validation_result = await db_client.validate_api_key(api_key)
@@ -164,8 +162,8 @@ async def main():
         create_test = input("Do you want to create a test user? (y/N): ").lower().strip()
         
         if create_test in ['y', 'yes']:
-            test_user = await create_test_user()
-            if test_user:
+            test_user, api_key = await create_test_user()
+            if test_user and api_key:
                 # Test API key validation
                 await test_api_key_validation()
     except EOFError:
