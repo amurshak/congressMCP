@@ -41,5 +41,5 @@ websockets==15.0.1
 # Database dependencies for Supabase integration
 supabase==2.15.0
 asyncpg==0.30.0
-sqlalchemy==2.1.5
+sqlalchemy==2.0.35
 alembic==1.15.0
