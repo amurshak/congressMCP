@@ -26,6 +26,11 @@ from congress_api.core.api_config import get_api_config, ENV
 try:
     logger.info("Creating direct FastMCP HTTP app...")
     
+    # Initialize features BEFORE creating the HTTP app
+    from congress_api.mcp_app import initialize_features
+    logger.info("Initializing MCP features...")
+    initialize_features()
+    
     # Use FastMCP directly as the main ASGI app
     # No mounting, no wrapper, no complexity
     app = server.http_app()
