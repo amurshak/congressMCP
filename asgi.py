@@ -17,8 +17,8 @@ os.environ['GUNICORN_CMD_ARGS'] = '--workers=1'
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Import the server from the congress_api package
-from congress_api.main import server
+# Import the server and create_app function from the congress_api package
+from congress_api.main import server, create_app
 
 # Configure environment
 from congress_api.core.api_config import get_api_config, ENV
@@ -26,11 +26,10 @@ from congress_api.core.api_config import get_api_config, ENV
 try:
     logger.info("Creating direct FastMCP HTTP app...")
     
-    # Use FastMCP directly as the main ASGI app
-    # No mounting, no wrapper, no complexity
-    app = server.http_app()
+    # Create the FastAPI app with authentication middleware and routers
+    app = create_app(server)
     
-    logger.info(f"FastMCP app created successfully: {type(app)}")
+    logger.info(f"FastMCP app created successfully with authentication middleware: {type(app)}")
     
     # Initialize config and log info
     config = get_api_config()
