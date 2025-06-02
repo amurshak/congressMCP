@@ -30,7 +30,8 @@ user_service = UserService()
 STRIPE_PRICE_TO_TIER = {
     # These would be your actual Stripe price IDs
     "price_free": SubscriptionTier.FREE,
-    "price_pro": SubscriptionTier.PRO,
+    "price_pro_monthly": SubscriptionTier.PRO,
+    "price_pro_annual": SubscriptionTier.PRO,
     "price_enterprise": SubscriptionTier.ENTERPRISE
 }
 

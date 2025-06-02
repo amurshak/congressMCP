@@ -30,24 +30,28 @@ class SubscriptionTier(str, Enum):
 # Define rate limits and feature access for each tier
 TIER_CONFIG = {
     SubscriptionTier.FREE: {
-        "rate_limit": 100,  # requests per day
-        "features": ["bills", "members", "committees", "congress_info"]
+        "rate_limit": 200,  # 50 calls per week * 4 weeks = 200 per month
+        "features": ["bills", "members", "committees", "congress_info"]  # Basic tools only
     },
     SubscriptionTier.PRO: {
-        "rate_limit": 1000,  # requests per day
-        "features": ["bills", "members", "committees", "congress_info", 
-                    "amendments", "summaries", "committee_reports", 
-                    "committee_prints", "committee_meetings", "hearings"]
-    },
-    SubscriptionTier.ENTERPRISE: {
-        "rate_limit": 10000,  # requests per day
+        "rate_limit": 5000,  # 5,000 calls per month
         "features": ["bills", "members", "committees", "congress_info", 
                     "amendments", "summaries", "committee_reports", 
                     "committee_prints", "committee_meetings", "hearings",
                     "congressional_record", "daily_congressional_record", 
-                    "bound_congressional_record", "house_communications", 
+                    "bound_congressional_record", "house_communications",
+                    "house_requirements", "senate_communications",
+                    "nominations", "crs_reports", "treaties"]  # All 23 tool categories
+    },
+    SubscriptionTier.ENTERPRISE: {
+        "rate_limit": 100000,  # Very high limit (effectively unlimited)
+        "features": ["bills", "members", "committees", "congress_info", 
+                    "amendments", "summaries", "committee_reports", 
+                    "committee_prints", "committee_meetings", "hearings",
+                    "congressional_record", "daily_congressional_record", 
+                    "bound_congressional_record", "house_communications",
                     "house_requirements", "senate_communications", 
-                    "nominations", "crs_reports", "treaties"]
+                    "nominations", "crs_reports", "treaties"]  # All tools + future features
     }
 }
 

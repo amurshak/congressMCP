@@ -126,9 +126,9 @@ class UserService:
         # TODO: Update these with your actual Stripe price IDs
         price_tier_mapping = {
             "price_pro_monthly": SubscriptionTier.PRO,
-            "price_pro_yearly": SubscriptionTier.PRO,
+            "price_pro_annual": SubscriptionTier.PRO,
             "price_enterprise_monthly": SubscriptionTier.ENTERPRISE,
-            "price_enterprise_yearly": SubscriptionTier.ENTERPRISE,
+            "price_enterprise_annual": SubscriptionTier.ENTERPRISE,
         }
         
         tier = price_tier_mapping.get(price_id)
