@@ -10,16 +10,20 @@ import logging
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-# Force single worker for MCP compatibility - set multiple times to ensure it's not overridden
+# AGGRESSIVE CONCURRENCY ENFORCEMENT - Heroku buildpack overrides
+# Multiple environment variables to ensure single worker
 os.environ['WEB_CONCURRENCY'] = '1'
 os.environ['GUNICORN_CMD_ARGS'] = '--workers=1'
-
-# Also set via uvicorn args for extra safety
 os.environ['UVICORN_WORKERS'] = '1'
+os.environ['PYTHON_CONCURRENCY'] = '1'  # Heroku Python buildpack specific
+os.environ['PORT_CONCURRENCY'] = '1'    # Additional override
+os.environ['DYNO_WORKERS'] = '1'        # Heroku-specific override
+os.environ['WEB_CONCURRENCY_AGGRESSIVE'] = '1'
 
 # Log the current configuration
 logger.info(f"WEB_CONCURRENCY: {os.environ.get('WEB_CONCURRENCY', 'NOT SET')}")
 logger.info(f"UVICORN_WORKERS: {os.environ.get('UVICORN_WORKERS', 'NOT SET')}")
+logger.info(f"PYTHON_CONCURRENCY: {os.environ.get('PYTHON_CONCURRENCY', 'NOT SET')}")
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
