@@ -33,7 +33,11 @@ try:
     
     # Use FastMCP directly as the main ASGI app
     # No mounting, no wrapper, no complexity
-    app = server.http_app()
+    fastmcp_app = server.http_app()
+    
+    # Wrap with authentication middleware
+    from congress_api.core.auth_middleware import AuthenticationMiddleware
+    app = AuthenticationMiddleware(fastmcp_app)
     
     logger.info(f"FastMCP app created successfully: {type(app)}")
     

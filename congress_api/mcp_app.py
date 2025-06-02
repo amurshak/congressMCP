@@ -6,7 +6,7 @@ from .core.client_handler import app_lifespan
 mcp = FastMCP(
     "Congress MCP",
     description="Access legislative data from the Congress.gov API",
-    version="1.0.0",
+    version="1.1.0",
     dependencies=["httpx", "python-dotenv"],
     lifespan=app_lifespan,
     transport="streamable-http"  # Use streamable HTTP transport (note the hyphen)
