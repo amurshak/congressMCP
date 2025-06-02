@@ -2,6 +2,8 @@
 
 This project provides a Model Context Protocol (MCP) server for accessing the Congress.gov API, allowing AI systems to retrieve and interact with legislative data from the United States Congress.
 
+[![smithery badge](https://smithery.ai/badge/@amurshak/podbeanmcp)](https://smithery.ai/server/@amurshak/podbeanmcp)
+
 ## Features
 
 ### Legislative Information
@@ -125,12 +127,45 @@ This project includes production-ready deployment configurations.
 
 ### Environment Configuration
 
-1. Copy the template environment file:
+The server supports environment-specific configuration using separate `.env` files:
+
+#### For Local Development:
+1. Copy the template for development:
+   ```bash
+   cp .env.template .env.development
    ```
+
+2. Edit `.env.development` with your development settings:
+   - Use your Congress.gov API key
+   - For Stripe webhooks: Use the CLI secret from `stripe listen`
+
+#### For Production Deployment:
+1. Copy the template for production:
+   ```bash
    cp .env.template .env.production
    ```
 
-2. Edit `.env.production` with your production settings, including your API key.
+2. Edit `.env.production` with your production settings:
+   - For Stripe webhooks: Use the webhook endpoint secret from Stripe Dashboard
+
+#### Environment Detection:
+- **Development**: Automatically detected when no `PORT` environment variable is set
+- **Production**: Automatically detected when `PORT` is set (Heroku)
+- **Manual**: Set `CONGRESS_API_ENV=development|production|staging`
+
+#### Stripe Webhook Testing:
+For local webhook testing with Stripe CLI:
+```bash
+# Terminal 1: Start the server (loads .env.development automatically)
+uvicorn asgi:app --host=127.0.0.1 --port=8000
+
+# Terminal 2: Forward webhooks from Stripe CLI
+stripe listen --forward-to localhost:8000/stripe/webhook
+
+# Terminal 3: Trigger test events
+stripe trigger customer.created
+stripe trigger customer.subscription.created
+```
 
 ### Running with Production Server
 
