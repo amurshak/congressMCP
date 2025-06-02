@@ -1,5 +1,6 @@
 # user_service.py - High-level user management service
 import logging
+import os
 from typing import Optional, Tuple, Dict, Any
 from .database import db_client, User
 from .auth import SubscriptionTier
@@ -147,18 +148,18 @@ class UserService:
 
     def _get_tier_from_price_id(self, price_id: str) -> Optional[SubscriptionTier]:
         """Map Stripe price ID to subscription tier"""
-        # Actual Stripe price IDs from CLI setup
-        price_tier_mapping = {
-            "price_1RVWCJCrAoNgWc5EZbpHinj9": SubscriptionTier.PRO,  # Pro Monthly $29/month
-            "price_1RVWCQCrAoNgWc5EodIUwBDv": SubscriptionTier.PRO,  # Pro Annual $299/year
-        }
+        # Get price IDs from environment variables
+        stripe_pro_monthly_price = os.getenv("STRIPE_PRO_MONTHLY_PRICE_ID")
+        stripe_pro_annual_price = os.getenv("STRIPE_PRO_ANNUAL_PRICE_ID")
         
-        tier = price_tier_mapping.get(price_id)
-        if not tier:
+        # Map price IDs to tiers
+        if price_id == stripe_pro_monthly_price:
+            return SubscriptionTier.PRO
+        elif price_id == stripe_pro_annual_price:
+            return SubscriptionTier.PRO
+        else:
             logger.warning(f"Unknown price ID: {price_id}, defaulting to FREE")
             return SubscriptionTier.FREE
-            
-        return tier
 
     async def validate_api_key_with_features(self, api_key: str, 
                                            feature: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:
