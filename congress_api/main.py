@@ -18,84 +18,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 # Import the MCP app - using absolute imports instead of relative
 from congress_api.mcp_app import mcp
 
-# Import the features package to register all features with the MCP server
-# The features/__init__.py file already imports all the individual modules
-# Use a single import to prevent duplicate registrations
-import congress_api.features as features
+# Import all features to register them with the MCP server
+from congress_api.features import bills, members, committees, congress_info, amendments, summaries, committee_reports, committee_prints, committee_meetings, hearings, congressional_record, daily_congressional_record, bound_congressional_record, house_communications, house_requirements, senate_communications, nominations, crs_reports, treaties
 
 # Import prompts
 from congress_api import prompts_module
-
-# Import authentication middleware, Stripe webhook, and key management
-from congress_api.core.auth import auth_middleware
-from congress_api.core.stripe_webhook import router as stripe_router
-from congress_api.core.key_management import router as key_management_router
-from starlette.applications import Starlette
-from starlette.routing import Mount, Route
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware import Middleware
-from fastapi import FastAPI
-from starlette.responses import JSONResponse
-
-def convert_fastapi_router_to_asgi_app(router, prefix=""):
-    """
-    Convert a FastAPI router to a standalone FastAPI app that can be mounted.
-    
-    Args:
-        router: FastAPI APIRouter instance
-        prefix: Optional path prefix for the routes
-        
-    Returns:
-        FastAPI app that can be mounted in Starlette
-    """
-    app = FastAPI()
-    app.include_router(router, prefix=prefix)
-    return app
-
-async def stripe_webhook_handler(request):
-    """Wrapper to handle Stripe webhook requests directly in Starlette"""
-    from congress_api.core.stripe_webhook import stripe_webhook
-    # Convert Starlette request to FastAPI format and call the webhook handler
-    stripe_signature = request.headers.get("stripe-signature")
-    return await stripe_webhook(request, stripe_signature)
-
-async def stripe_test_handler(request):
-    """Test endpoint for Stripe webhooks"""
-    return JSONResponse({"status": "test_success", "message": "Stripe test endpoint working"})
-
-def create_app(mcp_server):
-    """
-    Create the main application with FastMCP and additional routes.
-    
-    Args:
-        mcp_server: The FastMCP server instance
-        
-    Returns:
-        The main Starlette application
-    """
-    # Get the FastMCP Starlette app using the correct FastMCP 2.3+ API
-    fastmcp_app = mcp_server.http_app()
-    
-    # Convert only the key management router to FastAPI app
-    keys_app = convert_fastapi_router_to_asgi_app(key_management_router)
-    
-    # Create main Starlette app with direct route handlers for Stripe to avoid FastAPI middleware issues
-    app = Starlette(
-        routes=[
-            Route("/stripe/webhook", stripe_webhook_handler, methods=["POST"]),
-            Route("/stripe/test", stripe_test_handler, methods=["GET"]),
-            Mount("/keys", keys_app),
-            Mount("/mcp", fastmcp_app),  # Mount FastMCP at /mcp
-        ],
-        # Temporarily comment out middleware for debugging
-        # middleware=[
-        #     Middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
-        # ],
-        # Important: Pass the lifespan from FastMCP app to handle session management
-        lifespan=fastmcp_app.lifespan,
-    )
-    
-    return app
 
 class SensitiveInfoFilter(logging.Filter):
     """Filter to redact sensitive information from logs."""
@@ -216,9 +143,10 @@ if __name__ == "__main__":
     parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to run the server on')
     args = parser.parse_args()
     
-    # Create the main application
-    main_app = create_app(server)
+    # Use the FastMCP server's http_app() method directly - keep it pure
+    app = server.http_app()
     
     # Run the server
-    print(f"Starting server on {args.host}:{args.port}")
-    uvicorn.run(main_app, host=args.host, port=args.port)
+    print(f"Starting FastMCP server on {args.host}:{args.port}")
+    print("Note: For webhook support, use the asgi.py deployment")
+    uvicorn.run(app, host=args.host, port=args.port)
