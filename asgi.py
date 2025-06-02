@@ -36,8 +36,11 @@ try:
     fastmcp_app = server.http_app()
     
     # Wrap with authentication middleware
-    from congress_api.core.auth_middleware import AuthenticationMiddleware
-    app = AuthenticationMiddleware(fastmcp_app)
+    # from congress_api.core.auth_middleware import AuthenticationMiddleware
+    # app = AuthenticationMiddleware(fastmcp_app)
+    
+    # TEMPORARY: Use app without authentication middleware to test timeout issue
+    app = fastmcp_app
     
     logger.info(f"FastMCP app created successfully: {type(app)}")
     
