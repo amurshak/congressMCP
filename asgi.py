@@ -32,12 +32,6 @@ try:
     
     logger.info(f"FastMCP app created successfully: {type(app)}")
     
-    # Initialize features after app creation to avoid circular imports
-    from congress_api.mcp_app import initialize_features
-    logger.info("Initializing features...")
-    initialize_features()
-    logger.info("Features initialized successfully")
-    
     # Initialize config and log info
     config = get_api_config()
     
