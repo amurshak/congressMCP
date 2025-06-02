@@ -35,13 +35,48 @@ async def stripe_webhook_handler(request: Request) -> JSONResponse:
         return await stripe_webhook(request, stripe_signature)
     except Exception as e:
         import logging
-        logging.getLogger(__name__).error(f"Stripe webhook error: {e}")
-        return JSONResponse({"error": "Webhook processing failed"}, status_code=500)
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Stripe webhook error: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return JSONResponse({"error": "Webhook processing failed", "details": str(e)}, status_code=500)
 
 @mcp.custom_route("/stripe/test", methods=["GET"])
 async def stripe_test_handler(request: Request) -> JSONResponse:
     """Test endpoint for Stripe webhooks"""
     return JSONResponse({"status": "test_success", "message": "Stripe test endpoint working"})
+
+@mcp.custom_route("/stripe/test/webhook", methods=["POST"])
+async def stripe_test_webhook_handler(request: Request) -> JSONResponse:
+    """Test webhook handler that bypasses signature verification"""
+    try:
+        import json
+        from .core import user_service
+        
+        # Parse the request body
+        payload = await request.body()
+        event = json.loads(payload)
+        
+        event_type = event.get("type")
+        event_data = event.get("data", {}).get("object", {})
+        
+        # Handle the webhook event
+        result = await user_service.handle_stripe_webhook(event_type, event_data)
+        
+        return JSONResponse({
+            "status": "success", 
+            "processed": result,
+            "event_type": event_type,
+            "message": "Test webhook processed (no signature verification)"
+        })
+        
+    except Exception as e:
+        import logging
+        import traceback
+        logger = logging.getLogger(__name__)
+        logger.error(f"Test webhook error: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return JSONResponse({"error": "Test webhook failed", "details": str(e)}, status_code=500)
 
 @mcp.custom_route("/api/register/free", methods=["OPTIONS"])
 async def handle_preflight(request: Request) -> JSONResponse:

@@ -112,12 +112,15 @@ async def stripe_webhook(
         
         # Use the user service to handle events
         if ENABLE_DATABASE:
-            result = await user_service.handle_stripe_webhook(event)
+            event_type = event.get("type")
+            event_data = event.get("data", {}).get("object", {})
+            
+            result = await user_service.handle_stripe_webhook(event_type, event_data)
             if result:
-                logger.info(f"Successfully processed {event.get('type')} event")
+                logger.info(f"Successfully processed {event_type} event")
                 return JSONResponse({"status": "success", "processed": True})
             else:
-                logger.warning(f"Event {event.get('type')} was not processed")
+                logger.warning(f"Event {event_type} was not processed")
                 return JSONResponse({"status": "success", "processed": False})
         else:
             # Fallback to simple event handling
