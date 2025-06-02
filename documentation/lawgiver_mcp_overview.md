@@ -1,7 +1,7 @@
 # Lawgiver MCP Server: Architecture, Strategy & Roadmap
 
-**Date**: June 1, 2025  
-**Version**: 1.0  
+**Date**: June 2, 2025  
+**Version**: 2.0  
 **Author**: Lawgiver Team
 
 ## Executive Summary
@@ -12,13 +12,14 @@ Lawgiver has successfully deployed a working Model Context Protocol (MCP) server
 
 ### Core Components
 
-**1. FastMCP Python Server**
-- **Framework**: FastMCP 2.3.2+ (Python-based MCP implementation)
-- **Purpose**: Handles MCP protocol communication and exposes Congress.gov API functionality
-- **Key Features**:
-  - Comprehensive legislative data endpoints covering bills, members, committees, amendments, congressional records, hearings, nominations, treaties, and more
-  - Structured prompts for AI context
-  - Direct Congress.gov API integration
+**1. FastMCP Python Server (`congress_api/`)**
+- **Purpose**: Core MCP protocol implementation with 43+ congressional data tools
+- **Authentication**: API key validation, rate limiting, and tier-based access control
+- **Features**: Real-time legislative data, bill tracking, member information, voting records
+- **Technology**: Python 3.x with FastMCP framework and Supabase integration
+- **Hosting**: Deployed on Heroku with environment-based configuration
+- **API**: Stripe webhooks + registration endpoints (`/api/register/free`)
+- **Data Source**: Direct Congress.gov API integration
 
 **2. Node.js Bridge (`index.js`)**
 - **Purpose**: Translates MCP stdio protocol to HTTP requests for broader MCP client compatibility
@@ -26,29 +27,54 @@ Lawgiver has successfully deployed a working Model Context Protocol (MCP) server
 - **Communication**: HTTPS bridge through Cloudflare to deployed FastMCP server
 - **Distribution**: npm package (`congressional-mcp`) with automated installation
 
-**3. ASGI Deployment Layer (`asgi.py`)**
+**3. Registration Frontend (Next.js)**
+- **Purpose**: User acquisition and API key distribution for commercial monetization
+- **Architecture**: Standalone React-based landing page with Stripe Payment Links integration
+- **Features**: Tiered pricing display, free tier signup, payment processing, setup instructions
+- **Hosting**: Deployed on Vercel with custom domain (`register.lawgiver.ai`)
+- **Integration**: Calls FastMCP server for user creation and leverages Stripe webhooks
+
+**4. ASGI Deployment Layer (`asgi.py`)**
 - **Framework**: Starlette with FastMCP integration
-- **Features**: Health checks, debug endpoints, CORS middleware
+- **Features**: Health checks, debug endpoints, CORS middleware, Stripe webhook handling
 - **Hosting**: Deployed on Heroku with Cloudflare CDN
 - **URL**: `https://congressmcp.lawgiver.ai`
 
+### System Architecture Diagram
+
+```
+┌─────────────────────┐    ┌──────────────────┐    ┌─────────────────────┐
+│ Registration        │    │ Node.js Bridge   │    │ FastMCP Server      │
+│ Frontend            │    │ (stdio→HTTP)     │    │ (Core MCP + Auth)   │
+│ Next.js/Vercel      │────│ npm package      │────│ Python/Heroku       │
+│ register.lawgiver.ai│    │ Session mgmt     │    │ congressmcp.lawgiver│
+└─────────────────────┘    └──────────────────┘    └─────────────────────┘
+         │                           │                         │
+         │                    ┌──────▼──────┐                 │
+         │                    │ Cloudflare  │                 │
+         │                    │ CDN/Routing │                 │
+         │                    └─────────────┘                 │
+         │                                                    │
+         └────────────── Shared Backend Services ─────────────┘
+                               │        │
+                    ┌──────────▼──┐  ┌──▼─────┐
+                    │ Supabase DB │  │ Stripe │
+                    │ Users/Keys  │  │ Billing│
+                    └─────────────┘  └────────┘
+```
+
 ### Technical Stack
 
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| **Backend** | Python 3.x + FastMCP | MCP server implementation |
-| **Bridge** | Node.js | Universal MCP client compatibility |
-| **CDN/Routing** | Cloudflare | Performance and reliability |
-| **API Client** | httpx | Congress.gov API integration |
-| **Deployment** | Heroku | Cloud hosting |
-| **Distribution** | npm | Package management |
-
-### Data Sources
-
-- **Primary**: Congress.gov official API
-- **Coverage**: Bills, members, committees, amendments, congressional records, nominations, treaties, hearings, committee reports, and more
-- **Access**: Direct API integration without intermediary caching
-- **Authentication**: API key-based access to Congress.gov
+| Component | Technology | Purpose | Status |
+|-----------|------------|---------|---------|
+| **Core Server** | Python 3.x + FastMCP | MCP server implementation | ✅ Production |
+| **Authentication** | Supabase + API Keys | User management & billing | ✅ Production |
+| **Bridge** | Node.js | Universal MCP client compatibility | ✅ Production |
+| **Registration** | Next.js + React | User acquisition & onboarding | 🚧 Planned |
+| **CDN/Routing** | Cloudflare | Performance and reliability | ✅ Production |
+| **Database** | Supabase PostgreSQL | User data, API keys, usage tracking | ✅ Production |
+| **Payments** | Stripe | Subscription management & billing | ✅ Production |
+| **Hosting** | Heroku + Vercel | Scalable cloud deployment | ✅ Production |
 
 ## Business Strategy
 
@@ -91,79 +117,84 @@ Lawgiver has successfully deployed a working Model Context Protocol (MCP) server
 
 ### ✅ Completed Features
 
-- **Core MCP Server**: Fully functional with comprehensive Congress.gov endpoint coverage
+- **Core MCP Server**: Fully functional with comprehensive Congress.gov endpoint coverage (43+ tools)
 - **Universal MCP Integration**: Working Node.js bridge with session management via Cloudflare
 - **Production Deployment**: Live server on Heroku with health monitoring
-- **npm Distribution**: Automated installation for MCP clients
+- **npm Distribution**: Automated installation for MCP clients (`congressional-mcp`)
+- **Authentication System**: API key-based authentication with Supabase database integration
+- **Subscription Management**: Complete Stripe integration with tiered pricing (FREE/PRO/ENTERPRISE)
+- **Rate Limiting**: Tier-based access control and usage tracking
+- **Webhook Integration**: Automated subscription lifecycle management
 - **Comprehensive API Coverage**: Bills, members, committees, congressional records, hearings, nominations, treaties, committee reports, and more
 - **Reliable Infrastructure**: Cloudflare routing with Heroku hosting
 
 ### 🔧 Architecture Highlights
 
-**🔧 Architecture Highlights**:
-- Modular feature registration system
-- Centralized API client for Congress.gov integration
-- Cloudflare routing for performance and reliability
-- Session-based HTTP bridge architecture
+- **Modular Authentication**: API key validation with tier-based feature access
+- **Secure Database**: Supabase PostgreSQL with encrypted API key storage
+- **Payment Processing**: Stripe webhooks for automatic user provisioning
+- **Centralized API Client**: Congress.gov integration with dual-key authentication
+- **Session Management**: HTTP bridge with stateful session handling
+- **Environment Configuration**: Dev/prod separation with comprehensive settings
 
-**🚧 Current Gaps**:
-- No user authentication or access control
-- No rate limiting or usage tracking
-- No caching layer for API efficiency
-- Limited environment configuration
+### 🚧 Current Development
+
+**Registration Frontend** (In Progress):
+- Next.js landing page with tiered pricing display
+- Stripe Payment Links integration for seamless checkout
+- Free tier email signup with instant API key generation
+- Email delivery system for user onboarding
+- Custom domain setup (`register.lawgiver.ai`)
 
 ## Next Steps & Roadmap
 
-### Immediate (Next 30 Days)
+### Current Development Priorities
 
-**1. User Authentication System**
-- Implement API key or JWT-based authentication
-- User registration and management system
-- Session validation for bridge requests
+**Phase 1: Core Infrastructure** ✅ COMPLETED
+- [x] FastMCP server with 43+ congressional tools
+- [x] Node.js bridge for universal client compatibility  
+- [x] Production deployment on Heroku + Cloudflare
+- [x] Comprehensive testing and documentation
 
-**2. Monetization Implementation**
-- Add Stripe integration for subscription management
-- Implement usage tracking and rate limiting by tier
-- Create pricing page and subscription flow
+**Phase 2: Authentication & Monetization** ✅ COMPLETED
+- [x] Supabase database integration for user management
+- [x] API key-based authentication with tier enforcement
+- [x] Stripe integration for subscription billing
+- [x] Rate limiting and usage tracking
+- [x] Webhook handlers for subscription lifecycle management
 
-**3. Infrastructure Improvements**
-- Add caching layer for Congress.gov API responses
-- Implement request rate limiting
-- Enhanced logging and monitoring
+**Phase 3: User Acquisition** 🚧 IN PROGRESS
+- [ ] **Registration frontend with tiered pricing** (Next.js + Vercel)
+- [ ] Stripe Payment Links integration for seamless checkout
+- [ ] Email delivery system for API key distribution
+- [ ] Comprehensive user onboarding documentation
+- [ ] MCP client setup instructions and guides
 
-### Short-term (30-90 Days)
+**Phase 4: Scale & Optimize** 📋 PLANNED
+- [ ] Advanced analytics and usage dashboards
+- [ ] Enhanced rate limiting and fair usage policies
+- [ ] API key rotation and security improvements
+- [ ] Enterprise features (custom rate limits, dedicated support)
+- [ ] Additional congressional data sources and tools
 
-**4. User Analytics & Optimization**
-- Log and analyze MCP query patterns
-- Track most-used endpoints and query types
-- Identify opportunities for premium features
+### Immediate Next Steps (Next 7 Days)
 
-**5. Enhanced Legislative Features**
-- Bill comparison and diff analysis
-- Custom alert system for tracked legislation
-- AI-powered bill summaries and impact analysis
+1. **Complete Registration Frontend** (4-5 hours)
+   - Build Next.js landing page with pricing tiers
+   - Add free tier registration endpoint to FastMCP server
+   - Deploy to Vercel with custom domain
+   - Implement email delivery for API keys
 
-**6. npm Package Optimization**
-- Publish to npm registry for broader distribution
-- Add automated updates and version management
-- Improve installation documentation
+2. **User Onboarding Documentation**
+   - MCP client setup guides (Claude Desktop, Continue, etc.)
+   - API key configuration instructions
+   - Troubleshooting and support documentation
 
-### Medium-term (3-6 Months)
-
-**7. Legislative Agent Development**
-- Proactive monitoring and alerts
-- Cross-bill analysis and trend identification
-- Industry-specific policy tracking (AI, healthcare, fintech)
-
-**8. Platform Expansion**
-- Slack bot integration
-- Web dashboard for non-Claude users
-- API access for enterprise customers
-
-**9. Data Enhancement**
-- State-level legislation integration
-- Regulatory tracking (FCC, FTC, etc.)
-- International policy monitoring
+3. **Testing & Launch**
+   - End-to-end user flow testing
+   - Payment processing verification
+   - Email delivery confirmation
+   - Public announcement and marketing
 
 ## Technical Debt & Considerations
 
@@ -216,6 +247,43 @@ Lawgiver has successfully deployed a working Model Context Protocol (MCP) server
 - Diversifying distribution channels beyond MCP
 - Strong user feedback loops for product-market fit
 - Maintaining infrastructure reliability through Cloudflare/Heroku stack
+
+## Complete User Journey
+
+```
+🌐 Discovery → 📝 Registration → 💳 Payment/Signup → 🔑 API Key → 🚀 MCP Usage → 📈 Upgrade
+
+1. User visits register.lawgiver.ai
+2. Single landing page shows three tiers (FREE/PRO/ENTERPRISE)
+
+3A. FREE PATH:
+   - Email form submission
+   - Instant Stripe customer creation (no payment)
+   - Immediate API key generation and delivery
+   - User starts using MCP with 50 requests/day
+
+3B. PAID PATH:
+   - Stripe Payment Link checkout
+   - Customer creation with subscription
+   - Webhook triggers API key generation
+   - User starts with higher tier limits
+
+4. MCP Client Setup:
+   - User receives email with LAW_API_KEY
+   - Configures MCP client (Claude Desktop, Continue, etc.)
+   - Uses congressional-mcp npm package for compatibility
+
+5. Usage & Monitoring:
+   - Requests flow: MCP Client → Node Bridge → Cloudflare → FastMCP
+   - Authentication enforced, usage tracked
+   - Rate limits based on subscription tier
+
+6. Upgrade Flow (Critical for MCP):
+   - User hits rate limits in MCP client
+   - Error messages include upgrade links with pre-filled email
+   - Stripe checkout uses EXISTING customer ID (no duplication)
+   - Tier upgrade immediate, same API key with higher limits
+```
 
 ## Conclusion
 

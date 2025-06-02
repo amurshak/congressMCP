@@ -9,6 +9,9 @@ from datetime import datetime, timedelta
 from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+# Import database functionality
+from .database import validate_api_key as db_validate_api_key, track_usage as db_track_usage
+
 # Configure logger
 logger = logging.getLogger(__name__)
 
@@ -16,6 +19,7 @@ logger = logging.getLogger(__name__)
 JWT_SECRET = os.getenv("LAWGIVER_JWT_SECRET", "")
 API_KEYS = os.getenv("LAWGIVER_API_KEYS", "").split(",")
 ENABLE_AUTH = os.getenv("ENABLE_AUTH", "false").lower() == "true"
+ENABLE_DATABASE = os.getenv("ENABLE_DATABASE", "true").lower() == "true"
 
 # Define subscription tiers
 class SubscriptionTier(str, Enum):
@@ -87,61 +91,83 @@ def decode_jwt_token(token: str) -> Dict[str, Any]:
         logger.error(f"JWT decode error: {str(e)}")
         raise HTTPException(status_code=401, detail="Invalid authentication token")
 
-def validate_api_key(api_key: str) -> Dict[str, Any]:
+async def validate_api_key(api_key: str) -> Dict[str, Any]:
     """Validate an API key and return the associated metadata."""
-    # In a production environment, this would query a database
-    # For now, we'll use a simple format: tier:user_id:key
-    if not api_key or ":" not in api_key:
-        raise HTTPException(status_code=401, detail="Invalid API key format")
-    
-    parts = api_key.split(":")
-    if len(parts) != 3:
-        raise HTTPException(status_code=401, detail="Invalid API key format")
-    
-    tier, user_id, key = parts
-    
-    # Check if the key is in our list of valid keys
-    if api_key not in API_KEYS and ENABLE_AUTH:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-    
-    # Validate the tier
-    if tier not in [t.value for t in SubscriptionTier]:
-        tier = SubscriptionTier.FREE.value
-    
-    return {
-        "user_id": user_id,
-        "tier": tier
-    }
+    if ENABLE_DATABASE:
+        # Use database validation
+        result = await db_validate_api_key(api_key)
+        if not result:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        return result
+    else:
+        # Fallback to simple validation for development
+        # Format: tier:user_id:key
+        if not api_key or ":" not in api_key:
+            raise HTTPException(status_code=401, detail="Invalid API key format")
+        
+        parts = api_key.split(":")
+        if len(parts) != 3:
+            raise HTTPException(status_code=401, detail="Invalid API key format")
+        
+        tier, user_id, key = parts
+        
+        # Check if the key is in our list of valid keys
+        if api_key not in API_KEYS and ENABLE_AUTH:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+        
+        # Validate the tier
+        if tier not in [t.value for t in SubscriptionTier]:
+            tier = SubscriptionTier.FREE.value
+        
+        return {
+            "user_id": user_id,
+            "tier": SubscriptionTier(tier),
+            "email": f"user_{user_id}@example.com",
+            "is_active": True
+        }
 
-def get_token_from_request(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
+async def get_token_from_request(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict[str, Any]:
     """Extract and validate the token from the request."""
     token = credentials.credentials
     
-    # Check if it's a JWT token or an API key
-    if token.startswith("Bearer "):
-        token = token[7:]  # Remove "Bearer " prefix
-        try:
-            return decode_jwt_token(token)
-        except:
-            # If JWT decode fails, try as API key
-            return validate_api_key(token)
-    else:
-        # Treat as API key
-        return validate_api_key(token)
+    # Try JWT first
+    if token.startswith("eyJ"):
+        user_info = decode_jwt_token(token)
+        if user_info:
+            return user_info
+    
+    # Try API key validation
+    return await validate_api_key(token)
 
-def check_rate_limit(user_id: str, tier: str) -> None:
+async def check_rate_limit(user_id: str, tier: str, feature: str = "general", endpoint: str = "") -> None:
     """Check if a user has exceeded their rate limit."""
-    rate_limit = TIER_CONFIG[tier]["rate_limit"]
-    count, reset_time = rate_limit_storage.get_user_requests(user_id)
-    
-    if count >= rate_limit:
-        reset_time_str = reset_time.strftime("%Y-%m-%d %H:%M:%S UTC")
-        raise HTTPException(
-            status_code=429, 
-            detail=f"Rate limit exceeded. Limit: {rate_limit} requests per day. Resets at {reset_time_str}"
-        )
-    
-    rate_limit_storage.increment_user_requests(user_id)
+    if ENABLE_DATABASE:
+        # Track usage in database
+        await db_track_usage(user_id, feature, endpoint)
+        
+        # Get daily usage from database
+        from .database import db_client
+        daily_usage = await db_client.get_daily_usage(user_id)
+        rate_limit = TIER_CONFIG.get(SubscriptionTier(tier), {}).get("rate_limit", 100)
+        
+        if daily_usage >= rate_limit:
+            raise HTTPException(
+                status_code=429, 
+                detail=f"Daily rate limit ({rate_limit}) exceeded. Usage: {daily_usage}"
+            )
+    else:
+        # Use in-memory rate limiting
+        rate_limit = TIER_CONFIG.get(SubscriptionTier(tier), {}).get("rate_limit", 100)
+        count, reset_time = rate_limit_storage.get_user_requests(user_id)
+        
+        if count >= rate_limit:
+            reset_time_str = reset_time.strftime("%Y-%m-%d %H:%M:%S UTC")
+            raise HTTPException(
+                status_code=429, 
+                detail=f"Rate limit exceeded. Limit: {rate_limit} requests per day. Resets at {reset_time_str}"
+            )
+        
+        rate_limit_storage.increment_user_requests(user_id)
 
 def check_feature_access(feature: str, tier: str) -> bool:
     """Check if a user's tier has access to a specific feature."""
@@ -172,13 +198,13 @@ async def auth_middleware(request: Request, call_next):
                 payload = decode_jwt_token(token)
             except:
                 # If JWT decode fails, try as API key
-                payload = validate_api_key(token)
+                payload = await validate_api_key(token)
         else:
             # Treat as API key
-            payload = validate_api_key(auth_header)
+            payload = await validate_api_key(auth_header)
         
         # Check rate limit
-        check_rate_limit(payload["user_id"], payload["tier"])
+        await check_rate_limit(payload["user_id"], payload["tier"])
         
         # Check feature access based on the path
         path_parts = request.url.path.strip("/").split("/")
@@ -202,10 +228,18 @@ async def auth_middleware(request: Request, call_next):
         logger.error(f"Authentication error: {str(e)}")
         raise HTTPException(status_code=401, detail="Authentication failed")
 
-def generate_api_key(user_id: str, tier: SubscriptionTier) -> str:
+async def generate_api_key(user_id: str, tier: SubscriptionTier) -> str:
     """Generate an API key for a user."""
-    key = f"{tier.value}:{user_id}:{int(time.time())}"
-    return key
+    if ENABLE_DATABASE:
+        from .database import db_client
+        api_key = await db_client.create_api_key(user_id, tier)
+        if not api_key:
+            raise HTTPException(status_code=500, detail="Failed to generate API key")
+        return api_key
+    else:
+        # Simple key generation for development
+        key = f"{tier.value}:{user_id}:{int(time.time())}"
+        return key
 
 def generate_jwt_token(user_id: str, tier: SubscriptionTier, expiry_days: int = 30) -> str:
     """Generate a JWT token for a user."""
