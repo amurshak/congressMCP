@@ -10,9 +10,16 @@ import logging
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-# Force single worker for MCP compatibility
+# Force single worker for MCP compatibility - set multiple times to ensure it's not overridden
 os.environ['WEB_CONCURRENCY'] = '1'
 os.environ['GUNICORN_CMD_ARGS'] = '--workers=1'
+
+# Also set via uvicorn args for extra safety
+os.environ['UVICORN_WORKERS'] = '1'
+
+# Log the current configuration
+logger.info(f"WEB_CONCURRENCY: {os.environ.get('WEB_CONCURRENCY', 'NOT SET')}")
+logger.info(f"UVICORN_WORKERS: {os.environ.get('UVICORN_WORKERS', 'NOT SET')}")
 
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
