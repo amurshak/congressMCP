@@ -1,7 +1,9 @@
 # user_service.py - High-level user management service
 import logging
-from typing import Dict, Any, Optional, Tuple
-from .database import db_client, User, SubscriptionTier
+from typing import Optional, Tuple, Dict, Any
+from .database import db_client, User
+from .auth import SubscriptionTier
+from .email_service import email_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,18 @@ class UserService:
                 return user, None
                 
             logger.info(f"Created user {email} with API key and tier {tier.value}")
+            
+            # Send welcome email with API key
+            email_sent = await email_service.send_welcome_email(
+                email=user.email,
+                api_key=api_key,
+                tier=tier
+            )
+            if email_sent:
+                logger.info(f"Welcome email sent successfully to {user.email}")
+            else:
+                logger.warning(f"Failed to send welcome email to {user.email}")
+            
             return user, api_key
             
         except Exception as e:
@@ -79,7 +93,17 @@ class UserService:
             new_api_key = await self.db.create_api_key(user.id, tier)
             if new_api_key:
                 logger.info(f"Generated new API key for upgraded user {user.email}")
-                # TODO: Email the new API key to the user
+                
+                # Send upgrade email with new API key
+                email_sent = await email_service.send_upgrade_email(
+                    email=user.email,
+                    new_api_key=new_api_key,
+                    new_tier=tier
+                )
+                if email_sent:
+                    logger.info(f"Upgrade email sent successfully to {user.email}")
+                else:
+                    logger.warning(f"Failed to send upgrade email to {user.email}")
                 
         return success
 
@@ -123,12 +147,10 @@ class UserService:
 
     def _get_tier_from_price_id(self, price_id: str) -> Optional[SubscriptionTier]:
         """Map Stripe price ID to subscription tier"""
-        # TODO: Update these with your actual Stripe price IDs
+        # Actual Stripe price IDs from CLI setup
         price_tier_mapping = {
-            "price_pro_monthly": SubscriptionTier.PRO,
-            "price_pro_annual": SubscriptionTier.PRO,
-            "price_enterprise_monthly": SubscriptionTier.ENTERPRISE,
-            "price_enterprise_annual": SubscriptionTier.ENTERPRISE,
+            "price_1RVWCJCrAoNgWc5EZbpHinj9": SubscriptionTier.PRO,  # Pro Monthly $29/month
+            "price_1RVWCQCrAoNgWc5EodIUwBDv": SubscriptionTier.PRO,  # Pro Annual $299/year
         }
         
         tier = price_tier_mapping.get(price_id)

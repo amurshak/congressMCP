@@ -43,3 +43,6 @@ supabase==2.15.0
 asyncpg==0.30.0
 sqlalchemy==2.0.35
 alembic==1.15.0
+
+# Email service dependencies
+resend==2.3.0

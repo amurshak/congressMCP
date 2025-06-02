@@ -27,12 +27,9 @@ router = APIRouter()
 user_service = UserService()
 
 # Map Stripe price IDs to subscription tiers
-STRIPE_PRICE_TO_TIER = {
-    # These would be your actual Stripe price IDs
-    "price_free": SubscriptionTier.FREE,
-    "price_pro_monthly": SubscriptionTier.PRO,
-    "price_pro_annual": SubscriptionTier.PRO,
-    "price_enterprise": SubscriptionTier.ENTERPRISE
+price_tier_mapping = {
+    "price_1RVWCJCrAoNgWc5EZbpHinj9": SubscriptionTier.PRO,  # Pro Monthly $29/month
+    "price_1RVWCQCrAoNgWc5EodIUwBDv": SubscriptionTier.PRO,  # Pro Annual $299/year
 }
 
 def verify_stripe_signature(payload: bytes, sig_header: str) -> bool:

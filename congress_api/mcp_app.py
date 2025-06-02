@@ -198,9 +198,7 @@ async def register_free_user(request: Request) -> JSONResponse:
         if user and api_key:
             logger.info(f"Successfully created free tier user: {email} (Stripe: {stripe_customer_id})")
             
-            # TODO: Send email with API key and setup instructions
-            # For now, we'll return it in the response (in production, only send via email)
-            
+            # Email sending is handled automatically by user_service.create_user_with_api_key
             return JSONResponse({
                 "success": True,
                 "message": "Registration successful! Check your email for your API key.",
