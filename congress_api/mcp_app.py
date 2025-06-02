@@ -12,11 +12,15 @@ mcp = FastMCP(
     transport="streamable-http"  # Use streamable HTTP transport (note the hyphen)
 )
 
-# Import all features to register them with the MCP server
-from .features import bills, members, committees, congress_info, amendments, summaries, committee_reports, committee_prints, committee_meetings, hearings, congressional_record, daily_congressional_record, bound_congressional_record, house_communications, house_requirements, senate_communications, nominations, crs_reports, treaties
-
-# Import prompts
-from . import prompts_module
+def initialize_features():
+    """Initialize all features - called after server setup to avoid circular imports"""
+    # Import all features to register them with the MCP server
+    from .features import bills, members, committees, congress_info, amendments, summaries, committee_reports, committee_prints, committee_meetings, hearings, congressional_record, daily_congressional_record, bound_congressional_record, house_communications, house_requirements, senate_communications, nominations, crs_reports, treaties
+    
+    # Import prompts
+    from . import prompts_module
+    
+    return True
 
 # Add webhook routes using FastMCP's custom route decorator
 from starlette.requests import Request
