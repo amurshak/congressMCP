@@ -3,7 +3,7 @@ import os
 import logging
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from enum import Enum
 from dataclasses import dataclass
@@ -264,7 +264,8 @@ class SupabaseClient:
             # Check if key is expired
             if key_record["expires_at"]:
                 expires_at = datetime.fromisoformat(key_record["expires_at"])
-                if datetime.utcnow() > expires_at:
+                now = datetime.now(expires_at.tzinfo) if expires_at.tzinfo else datetime.utcnow()
+                if now > expires_at:
                     logger.warning(f"API key expired for user {user_record['id']}")
                     return None
             
@@ -275,7 +276,8 @@ class SupabaseClient:
                 "user_id": user_record["id"],
                 "email": user_record["email"],
                 "tier": SubscriptionTier(key_record["tier"]),
-                "is_active": user_record["is_active"]
+                "is_active": user_record["is_active"],
+                "valid": True
             }
             
         except Exception as e:
@@ -285,8 +287,9 @@ class SupabaseClient:
     async def _update_key_last_used(self, key_id: str):
         """Update the last used timestamp for an API key"""
         try:
+            now = datetime.now(timezone.utc).isoformat()
             self.client.table("api_keys").update({
-                "last_used_at": datetime.utcnow().isoformat()
+                "last_used_at": now
             }).eq("id", key_id).execute()
         except Exception as e:
             logger.error(f"Failed to update key last used: {e}")
