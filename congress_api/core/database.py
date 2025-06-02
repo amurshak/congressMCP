@@ -3,6 +3,7 @@ import os
 import logging
 import hashlib
 import secrets
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from enum import Enum
@@ -104,7 +105,10 @@ class SupabaseClient:
                 "is_active": True
             }
             
-            result = self.client.table("users").insert(user_data).execute()
+            def _create_user_sync():
+                return self.client.table("users").insert(user_data).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(None, _create_user_sync)
             
             if result.data:
                 user_record = result.data[0]
@@ -130,7 +134,10 @@ class SupabaseClient:
             return None
             
         try:
-            result = self.client.table("users").select("*").eq("email", email).execute()
+            def _get_user_by_email_sync():
+                return self.client.table("users").select("*").eq("email", email).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(None, _get_user_by_email_sync)
             
             if result.data:
                 user_record = result.data[0]
@@ -155,7 +162,10 @@ class SupabaseClient:
             return None
             
         try:
-            result = self.client.table("users").select("*").eq("stripe_customer_id", stripe_customer_id).execute()
+            def _get_user_by_stripe_customer_id_sync():
+                return self.client.table("users").select("*").eq("stripe_customer_id", stripe_customer_id).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(None, _get_user_by_stripe_customer_id_sync)
             
             if result.data:
                 user_record = result.data[0]
@@ -180,10 +190,10 @@ class SupabaseClient:
             return False
             
         try:
-            result = self.client.table("users").update({
-                "subscription_tier": tier.value,
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("id", user_id).execute()
+            def _update_user_tier_sync():
+                return self.client.table("users").update({"subscription_tier": tier.value, "updated_at": datetime.utcnow().isoformat()}).eq("id", user_id).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(None, _update_user_tier_sync)
             
             success = len(result.data) > 0
             if success:
@@ -229,7 +239,10 @@ class SupabaseClient:
                 "is_active": True
             }
             
-            result = self.client.table("api_keys").insert(key_data).execute()
+            def _create_api_key_sync():
+                return self.client.table("api_keys").insert(key_data).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(None, _create_api_key_sync)
             
             if result.data:
                 logger.info(f"Created API key for user {user_id} with tier {tier.value}")
@@ -249,11 +262,10 @@ class SupabaseClient:
             key_hash = self._hash_key(api_key)
             
             # Join with users table to get user info
-            result = self.client.table("api_keys")\
-                .select("*, users(*)")\
-                .eq("key_hash", key_hash)\
-                .eq("is_active", True)\
-                .execute()
+            def _validate_api_key_sync():
+                return self.client.table("api_keys").select("*, users(*)").eq("key_hash", key_hash).eq("is_active", True).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(None, _validate_api_key_sync)
             
             if not result.data:
                 return None
@@ -288,9 +300,11 @@ class SupabaseClient:
         """Update the last used timestamp for an API key"""
         try:
             now = datetime.now(timezone.utc).isoformat()
-            self.client.table("api_keys").update({
-                "last_used_at": now
-            }).eq("id", key_id).execute()
+            
+            def _update_key_last_used_sync():
+                return self.client.table("api_keys").update({"last_used_at": now}).eq("id", key_id).execute()
+            
+            await asyncio.get_event_loop().run_in_executor(None, _update_key_last_used_sync)
         except Exception as e:
             logger.error(f"Failed to update key last used: {e}")
 
@@ -301,10 +315,11 @@ class SupabaseClient:
             
         try:
             key_hash = self._hash_key(api_key)
-            result = self.client.table("api_keys").update({
-                "is_active": False,
-                "updated_at": datetime.utcnow().isoformat()
-            }).eq("key_hash", key_hash).execute()
+            
+            def _revoke_api_key_sync():
+                return self.client.table("api_keys").update({"is_active": False, "updated_at": datetime.utcnow().isoformat()}).eq("key_hash", key_hash).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(None, _revoke_api_key_sync)
             
             success = len(result.data) > 0
             if success:
@@ -325,22 +340,20 @@ class SupabaseClient:
             today = datetime.utcnow().date()
             
             # Try to increment existing record for today
-            result = self.client.table("usage_tracking")\
-                .select("*")\
-                .eq("user_id", user_id)\
-                .eq("date", today.isoformat())\
-                .eq("feature", feature)\
-                .execute()
+            def _track_usage_sync():
+                return self.client.table("usage_tracking").select("*").eq("user_id", user_id).eq("date", today.isoformat()).eq("feature", feature).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(None, _track_usage_sync)
             
             if result.data:
                 # Update existing record
                 existing_record = result.data[0]
                 new_count = existing_record["request_count"] + 1
                 
-                self.client.table("usage_tracking").update({
-                    "request_count": new_count,
-                    "endpoint": endpoint  # Update to latest endpoint used
-                }).eq("id", existing_record["id"]).execute()
+                def _update_usage_sync():
+                    return self.client.table("usage_tracking").update({"request_count": new_count, "endpoint": endpoint}).eq("id", existing_record["id"]).execute()
+                
+                await asyncio.get_event_loop().run_in_executor(None, _update_usage_sync)
             else:
                 # Create new record
                 usage_data = {
@@ -350,7 +363,11 @@ class SupabaseClient:
                     "feature": feature,
                     "endpoint": endpoint
                 }
-                self.client.table("usage_tracking").insert(usage_data).execute()
+                
+                def _create_usage_sync():
+                    return self.client.table("usage_tracking").insert(usage_data).execute()
+                
+                await asyncio.get_event_loop().run_in_executor(None, _create_usage_sync)
             
             return True
             
@@ -369,11 +386,10 @@ class SupabaseClient:
             else:
                 date = date.date() if hasattr(date, 'date') else date
                 
-            result = self.client.table("usage_tracking")\
-                .select("request_count")\
-                .eq("user_id", user_id)\
-                .eq("date", date.isoformat())\
-                .execute()
+            def _get_daily_usage_sync():
+                return self.client.table("usage_tracking").select("request_count").eq("user_id", user_id).eq("date", date.isoformat()).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(None, _get_daily_usage_sync)
             
             total_requests = sum(record["request_count"] for record in result.data)
             return total_requests
