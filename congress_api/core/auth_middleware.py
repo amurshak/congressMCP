@@ -114,8 +114,14 @@ class AuthenticationMiddleware:
             # Add user info to scope for downstream processing
             scope["user"] = user_info
             
-            # Forward to FastMCP app
-            await self.app(scope, replay_receive, send)
+            # Create a streaming-aware send wrapper for FastMCP responses
+            async def streaming_send(message):
+                """Send wrapper that properly handles FastMCP streaming responses"""
+                # Pass through all FastMCP streaming messages directly
+                await send(message)
+            
+            # Forward to FastMCP app with streaming-aware send wrapper
+            await self.app(scope, replay_receive, streaming_send)
             
         except Exception as e:
             logger.error(f"Error in authentication middleware: {e}")

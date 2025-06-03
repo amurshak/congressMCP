@@ -42,12 +42,11 @@ try:
     logger.info("Initializing MCP features...")
     initialize_features()
     
-    # TEMPORARILY DISABLE AUTH MIDDLEWARE TO TEST FASTMCP STREAMING
     # Use FastMCP directly as the main ASGI app
     # No mounting, no wrapper, no complexity
-    # from congress_api.core.auth_middleware import AuthenticationMiddleware
-    # app = AuthenticationMiddleware(server.http_app())
-    app = server.http_app()  # Test FastMCP without middleware wrapper
+    # ASGI HTTP app with authentication middleware (streaming-aware)
+    from congress_api.core.auth_middleware import AuthenticationMiddleware
+    app = AuthenticationMiddleware(server.http_app())
     
     logger.info(f"FastMCP app created successfully: {type(app)}")
     
