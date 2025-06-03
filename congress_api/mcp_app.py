@@ -2,14 +2,14 @@
 from fastmcp import FastMCP
 from .core.client_handler import app_lifespan
 
-# Create the MCP server with metadata and streamable HTTP transport
+# Create the MCP server with metadata and regular HTTP transport
 mcp = FastMCP(
     "Congress MCP",
     description="Access legislative data from the Congress.gov API",
     version="1.1.0",
     dependencies=["httpx", "python-dotenv"],
     lifespan=app_lifespan,
-    transport="streamable-http"  # Use streamable HTTP transport (note the hyphen)
+    transport="streamable-http"  # Use streamable HTTP transport (correct per FastMCP docs)
 )
 
 def initialize_features():
