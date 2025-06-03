@@ -65,64 +65,26 @@ class AuthenticationMiddleware:
             )
             return
         
-        # Check feature access for tool calls by examining request body
+        # SIMPLIFIED: Skip body buffering entirely to fix FastMCP streaming
+        # TODO: Re-implement selective tool validation after fixing streaming issue
         try:
-            # Collect request body
-            body_parts = []
-            while True:
-                message = await receive()
-                if message["type"] == "http.request":
-                    body_parts.append(message.get("body", b""))
-                    if not message.get("more_body", False):
-                        break
-            
-            request_body = b"".join(body_parts)
-            
-            # Parse MCP request
-            if request_body:
-                try:
-                    mcp_request = json.loads(request_body.decode('utf-8'))
-                    
-                    # Check tool access for tool calls
-                    if mcp_request.get('method') == 'tools/call':
-                        tool_name = mcp_request.get('params', {}).get('name', '')
-                        if tool_name and not await self._check_tool_access(tool_name, user_tier, user_info):
-                            await self._send_feature_access_error(send, user_info['tier'], tool_name)
-                            return
-                    
-                    # Check rate limiting
-                    from .auth import check_rate_limit
-                    await check_rate_limit(user_info["user_id"], user_info["tier"])
-                    
-                except json.JSONDecodeError:
-                    # If we can't parse JSON, let FastMCP handle it
-                    logger.debug("Could not parse MCP request JSON, proceeding without feature check")
-                except Exception as rate_error:
-                    if "rate limit" in str(rate_error).lower():
-                        await self._send_rate_limit_error(send, str(rate_error))
-                        return
-                    logger.error(f"Rate limit check error: {rate_error}")
-            
-            # Create new receive callable that replays the body
-            async def replay_receive():
-                return {
-                    "type": "http.request", 
-                    "body": request_body,
-                    "more_body": False
-                }
+            # Check rate limiting (always do this)
+            from .auth import check_rate_limit
+            try:
+                await check_rate_limit(user_info["user_id"], user_info["tier"])
+            except Exception as rate_error:
+                if "rate limit" in str(rate_error).lower():
+                    await self._send_rate_limit_error(send, str(rate_error))
+                    return
+                logger.error(f"Rate limit check error: {rate_error}")
             
             # Add user info to scope for downstream processing
             scope["user"] = user_info
             
-            # Create a streaming-aware send wrapper for FastMCP responses
-            async def streaming_send(message):
-                """Send wrapper that properly handles FastMCP streaming responses"""
-                # Pass through all FastMCP streaming messages directly
-                await send(message)
-            
-            # Forward to FastMCP app with streaming-aware send wrapper
-            await self.app(scope, replay_receive, streaming_send)
-            
+            # Forward to FastMCP app directly without any request buffering
+            # This maintains streaming compatibility at the cost of tool validation
+            await self.app(scope, receive, send)
+        
         except Exception as e:
             logger.error(f"Error in authentication middleware: {e}")
             await self._send_auth_error(
@@ -132,68 +94,6 @@ class AuthenticationMiddleware:
                 details="Please try again or contact support",
                 status_code=500
             )
-    
-    async def _check_tool_access(self, tool_name: str, user_tier: "SubscriptionTier", user_info: Dict[str, Any]) -> bool:
-        """Check if user's tier has access to the requested tool"""
-        
-        # Extract feature category from tool name
-        feature_category = self._extract_feature_category(tool_name)
-        
-        # Import here to avoid circular imports
-        from .auth import check_feature_access
-        return check_feature_access(feature_category, user_info['tier'])  # Pass tier as string
-    
-    def _extract_feature_category(self, tool_name: str) -> str:
-        """Extract feature category from tool name for access control"""
-        
-        # Handle MCP tool names like "mcp0_search_bills" -> "bills"
-        if tool_name.startswith("mcp0_"):
-            parts = tool_name.split("_")
-            if len(parts) >= 2:
-                # Extract the main feature (e.g., "search_bills" -> "bills", "get_bill_details" -> "bills")
-                action_part = "_".join(parts[1:])
-                if "bill" in action_part:
-                    return "bills"
-                elif "member" in action_part:
-                    return "members"
-                elif "committee" in action_part:
-                    return "committees"
-                elif "amendment" in action_part:
-                    return "amendments"
-                elif "congress" in action_part:
-                    return "congress_info"
-                elif "nomination" in action_part:
-                    return "nominations"
-                elif "treaty" in action_part:
-                    return "treaties"
-                elif "hearing" in action_part:
-                    return "hearings"
-                elif "record" in action_part:
-                    return "congressional_record"
-                elif "crs" in action_part:
-                    return "crs_reports"
-                elif "summary" in action_part:
-                    return "summaries"
-                else:
-                    # Default to the first meaningful part
-                    return parts[1] if len(parts) > 1 else "bills"
-        
-        # Handle direct tool names
-        if "_" in tool_name:
-            base = tool_name.split("_")[0]
-            if base in ["get", "search"]:
-                return tool_name.split("_")[1] if len(tool_name.split("_")) > 1 else "bills"
-            return base
-        
-        # Default mapping for common tools
-        tool_mappings = {
-            "bills": "bills",
-            "members": "members", 
-            "committees": "committees",
-            "congress": "congress_info"
-        }
-        
-        return tool_mappings.get(tool_name, "bills")  # Default to bills for unknown tools
     
     async def _send_auth_error(self, send: Send, code: int, message: str, details: str, status_code: int = 401):
         """Send JSON-RPC error response for authentication failures"""
@@ -218,45 +118,6 @@ class AuthenticationMiddleware:
         })
         await send({
             "type": "http.response.body", 
-            "body": response_body
-        })
-    
-    async def _send_feature_access_error(self, send: Send, user_tier: str, tool_name: str):
-        """Send error response for tier-based feature access denial"""
-        
-        available_features = {
-            "FREE": "bills, members, committees, congress_info",
-            "PRO": "All 23 tool categories", 
-            "ENTERPRISE": "All tools + priority support"
-        }
-        
-        error_response = {
-            "jsonrpc": "2.0",
-            "error": {
-                "code": -32003,
-                "message": f"Tool '{tool_name}' not available in {user_tier} tier",
-                "data": {
-                    "current_tier": user_tier,
-                    "available_features": available_features.get(user_tier, "Unknown"),
-                    "upgrade_url": "https://congressmcp.lawgiver.ai",
-                    "pricing_info": {
-                        "PRO_MONTHLY": "$29/month - 5,000 calls/month, all tools",
-                        "PRO_ANNUAL": "$299/year - 5,000 calls/month, all tools (save 14%)",
-                        "ENTERPRISE": "Custom pricing - 100K calls/month, priority support"
-                    }
-                }
-            }
-        }
-        
-        response_body = json.dumps(error_response).encode("utf-8")
-        
-        await send({
-            "type": "http.response.start",
-            "status": 403,
-            "headers": [[b"content-type", b"application/json"]]
-        })
-        await send({
-            "type": "http.response.body",
             "body": response_body
         })
     
