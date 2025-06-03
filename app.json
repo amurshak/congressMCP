@@ -1,7 +1,7 @@
 {
-  "name": "Congressional MCP Server",
+  "name": "Congress MCP Server",
   "description": "MCP server for accessing Congress.gov API data",
-  "repository": "https://github.com/yourusername/CongressionalMCP",
+  "repository": "https://github.com/yourusername/CongressMCP",
   "keywords": ["python", "mcp", "congress", "api"],
   "env": {
     "CONGRESS_API_KEY": {
