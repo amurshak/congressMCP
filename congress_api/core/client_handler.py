@@ -82,8 +82,9 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
             limits=limits,
             follow_redirects=True
         ) as client:
-            # Test connection if API key is available
-            if API_KEY:
+            # Test connection if API key is available - TEMPORARILY DISABLED FOR PRODUCTION
+            # The external API call during startup can cause hangs in production
+            if False:  # Disabled: API_KEY:
                 try:
                     logger.info("Testing API connection")
                     response = await client.get("/congress", params={"api_key": API_KEY})
@@ -98,7 +99,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
                     logger.error("Network error when connecting to API")
                     logger.warning("The server will start, but API requests may fail")
             else:
-                logger.error("No API key provided. The server will start, but API requests will fail")
+                if API_KEY:
+                    logger.info("API key configured - skipping startup connection test")
+                else:
+                    logger.error("No API key provided. The server will start, but API requests will fail")
             
             # Initialize and yield context to server
             context = AppContext(api_key=API_KEY or "MISSING_API_KEY", client=client)
