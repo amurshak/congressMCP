@@ -1,8 +1,42 @@
 # Congress.gov API MCP Server
 
+**🎉 Production Ready - Complete Legislative Data Access for Claude Desktop**
+
 This project provides a Model Context Protocol (MCP) server for accessing the Congress.gov API, allowing AI systems to retrieve and interact with legislative data from the United States Congress.
 
 [![smithery badge](https://smithery.ai/badge/@amurshak/podbeanmcp)](https://smithery.ai/server/@amurshak/podbeanmcp)
+
+## 🚀 Quick Start
+
+### 1. Get Your API Key
+Visit [congressmcp.lawgiver.ai](https://congressmcp.lawgiver.ai) to register and get your API key.
+
+### 2. Install via NPM (Recommended)
+```bash
+npm install -g congressmcp
+```
+
+### 3. Configure Claude Desktop
+Add this to your Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "congressional-mcp": {
+      "command": "npx",
+      "args": ["-y", "congressmcp"],
+      "env": {
+        "CONGRESSMCP_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+### 4. Restart Claude Desktop
+You'll now have access to 42+ Congressional tools!
+
+---
 
 ## Features
 
@@ -269,6 +303,47 @@ The server includes several production-ready features:
 ## API Documentation
 
 For detailed information about the Congress.gov API endpoints, see the documentation in `documentation/CongressAPI_documentation.md`.
+
+## 🧪 Testing & Development
+
+### Postman Testing
+Test the production server directly:
+
+**URL:** `https://congressmcp.lawgiver.ai/mcp/`  
+**Method:** `POST`  
+**Headers:**
+```
+Content-Type: application/json
+Accept: application/json, text/event-stream
+Authorization: Bearer your-api-key-here
+X-Session-ID: test-session-123
+```
+
+**Sample Request (Initialize):**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {},
+    "clientInfo": {
+      "name": "postman-test",
+      "version": "1.0.0"
+    }
+  }
+}
+```
+
+**Expected Response:**
+```
+event: message
+data: {"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05",...}}
+```
+
+### Local Development
+For server development, see the deployment documentation in the `/deployment` folder.
 
 ## License
 

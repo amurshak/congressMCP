@@ -42,8 +42,9 @@ try:
     logger.info("Initializing MCP features...")
     initialize_features()
     
-    # Use simplified AuthenticationMiddleware (no request buffering)
-    # This maintains FastMCP streaming compatibility while preserving auth
+    # Use FastMCP directly as the main ASGI app
+    # No mounting, no wrapper, no complexity
+    # ASGI HTTP app with authentication middleware (streaming-aware)
     from congress_api.core.auth_middleware import AuthenticationMiddleware
     app = AuthenticationMiddleware(server.http_app())
     
