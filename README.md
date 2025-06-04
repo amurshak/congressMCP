@@ -201,9 +201,9 @@ stripe trigger customer.created
 stripe trigger customer.subscription.created
 ```
 
-### Running with Production Server
+### Running with Production Server (Alternative Deployment)
 
-The project includes a production-ready server script using Uvicorn:
+**Note**: Heroku production deployment uses `uvicorn asgi:app` via the Procfile. This alternative server script is for other deployment scenarios:
 
 ```
 python production_server.py --env production --workers 2

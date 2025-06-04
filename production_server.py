@@ -2,6 +2,12 @@
 """
 Production server script for the Congress.gov API MCP server.
 This script provides a production-ready ASGI server using uvicorn.
+
+⚠️  NOTE: This file is NOT used for Heroku production deployment.
+    The Procfile uses 'uvicorn asgi:app' directly for better performance.
+    This file is kept for alternative deployment scenarios only.
+    
+    Current production deployment: uvicorn asgi:app --host=0.0.0.0 --port=$PORT --workers=1
 """
 import os
 import sys
