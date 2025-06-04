@@ -122,23 +122,26 @@ async def search_bills(
         from_date: Optional start date for filtering (format: YYYY-MM-DDT00:00:00Z)
         to_date: Optional end date for filtering (format: YYYY-MM-DDT00:00:00Z)
     """
+    # Build endpoint based on parameters
+    if congress and bill_type:
+        endpoint = f"/bill/{congress}/{bill_type}"
+    elif congress:
+        endpoint = f"/bill/{congress}"
+    else:
+        endpoint = "/bill"
+    
     # Build parameters
     params = {
-        "query": keywords,
-        "limit": limit,
+        "limit": min(limit * 3, 250),  # Get more results to filter
         "sort": sort
     }
     
-    if congress:
-        params["congress"] = congress
-    if bill_type:
-        params["billType"] = bill_type
     if from_date:
         params["fromDateTime"] = from_date
     if to_date:
         params["toDateTime"] = to_date
     
-    data = await make_api_request("/bill/search", ctx, params)
+    data = await make_api_request(endpoint, ctx, params)
     
     if "error" in data:
         return f"Error searching bills: {data['error']}"
@@ -147,8 +150,22 @@ async def search_bills(
     if not bills:
         return f"No bills found matching '{keywords}'."
     
-    result = [f"Found {len(bills)} bills matching '{keywords}':"]
+    # Filter bills by keywords in title (client-side filtering)
+    keywords_lower = keywords.lower()
+    filtered_bills = []
+    
     for bill in bills:
+        title = bill.get("title", "").lower()
+        if any(keyword.strip().lower() in title for keyword in keywords_lower.split()):
+            filtered_bills.append(bill)
+            if len(filtered_bills) >= limit:
+                break
+    
+    if not filtered_bills:
+        return f"No bills found with '{keywords}' in the title. Try broader search terms."
+    
+    result = [f"Found {len(filtered_bills)} bills matching '{keywords}':"]
+    for bill in filtered_bills:
         result.append("\n" + format_bill_summary(bill))
     
     return "\n".join(result)

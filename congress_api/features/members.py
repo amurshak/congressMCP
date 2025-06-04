@@ -972,6 +972,7 @@ async def get_member_info(ctx: Context, bioguide_id: str) -> str:
     return "\n".join(result)
 @mcp.tool()
 async def get_members_by_congress_state_district(
+    ctx: Context,
     congress: int,
     state_code: str,
     district: Optional[int] = None,
