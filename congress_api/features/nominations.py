@@ -209,8 +209,7 @@ async def get_latest_nominations(ctx: Context) -> str:
     logger.info("Getting latest nominations")
     
     # Make API request
-    context = mcp.get_context()
-    data = await make_api_request(BASE_ENDPOINT, context)
+    data = await make_api_request(BASE_ENDPOINT, ctx)
     
     if "error" in data:
         logger.error(f"Error getting latest nominations: {data['error']}")
@@ -247,8 +246,7 @@ async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
     
     # Make API request
     endpoint = f"{BASE_ENDPOINT}/{congress}"
-    context = mcp.get_context()
-    data = await make_api_request(endpoint, context)
+    data = await make_api_request(endpoint, ctx)
     
     if "error" in data:
         logger.error(f"Error getting nominations for Congress {congress}: {data['error']}")
@@ -286,8 +284,7 @@ async def get_nomination(ctx: Context, congress: int, nomination_number: int) ->
     
     # Make API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}"
-    context = mcp.get_context()
-    data = await make_api_request(endpoint, context)
+    data = await make_api_request(endpoint, ctx)
     
     if "error" in data:
         logger.error(f"Error getting nomination {nomination_number} for Congress {congress}: {data['error']}")
@@ -317,8 +314,7 @@ async def get_nomination_nominees(ctx: Context, congress: int, nomination_number
     
     # Make API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/{ordinal}"
-    context = mcp.get_context()
-    data = await make_api_request(endpoint, context)
+    data = await make_api_request(endpoint, ctx)
     
     if "error" in data:
         logger.error(f"Error getting nominees for nomination {nomination_number}, position {ordinal}, Congress {congress}: {data['error']}")
@@ -351,8 +347,7 @@ async def get_nomination_actions(ctx: Context, congress: int, nomination_number:
     
     # Make API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/actions"
-    context = mcp.get_context()
-    data = await make_api_request(endpoint, context)
+    data = await make_api_request(endpoint, ctx)
     
     if "error" in data:
         logger.error(f"Error getting actions for nomination {nomination_number}, Congress {congress}: {data['error']}")
@@ -385,8 +380,7 @@ async def get_nomination_committees(ctx: Context, congress: int, nomination_numb
     
     # Make API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/committees"
-    context = mcp.get_context()
-    data = await make_api_request(endpoint, context)
+    data = await make_api_request(endpoint, ctx)
     
     if "error" in data:
         logger.error(f"Error getting committees for nomination {nomination_number}, Congress {congress}: {data['error']}")
@@ -404,7 +398,7 @@ async def get_nomination_committees(ctx: Context, congress: int, nomination_numb
     logger.info(f"Found {len(committees)} committees for nomination {nomination_number}, Congress {congress}")
     
     # Format the results
-    return format_nomination_committees(committees)
+    return format_nomination_committees(ctx, committees)
 
 @mcp.tool("get_nomination_hearings")
 async def get_nomination_hearings(ctx: Context, congress: int, nomination_number: int) -> str:
@@ -419,8 +413,7 @@ async def get_nomination_hearings(ctx: Context, congress: int, nomination_number
     
     # Make API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/hearings"
-    context = mcp.get_context()
-    data = await make_api_request(endpoint, context)
+    data = await make_api_request(endpoint, ctx)
     
     if "error" in data:
         logger.error(f"Error getting hearings for nomination {nomination_number}, Congress {congress}: {data['error']}")

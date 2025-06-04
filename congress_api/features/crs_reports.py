@@ -126,7 +126,6 @@ async def get_latest_crs_reports(ctx: Context) -> str:
     Get the most recent CRS reports.
     Returns the 10 most recently published reports by default.
     """
-    context = mcp.get_context()
     logger.debug("Getting latest CRS reports")
     
     # Set up parameters for the API request
@@ -139,7 +138,7 @@ async def get_latest_crs_reports(ctx: Context) -> str:
     data = await make_api_request(
         endpoint="/crsreport",
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response
@@ -152,12 +151,11 @@ async def get_latest_crs_reports(ctx: Context) -> str:
 @mcp.resource("congress://crs-reports/{report_number}")
 async def get_crs_report_detail(ctx: Context, report_number: str) -> str:
     """
-    Get detailed information for a specific CRS report.
+    Get detailed information about a specific CRS report.
     
     Args:
         report_number: The report number or ID (e.g., "R47175").
     """
-    context = mcp.get_context()
     logger.debug(f"Getting CRS report details for report number: {report_number}")
     
     # Set up parameters for the API request
@@ -169,7 +167,7 @@ async def get_crs_report_detail(ctx: Context, report_number: str) -> str:
     data = await make_api_request(
         endpoint=f"/crsreport/{report_number}",
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response
@@ -196,32 +194,36 @@ async def search_crs_reports(
         report_number: Optional specific report number to search for.
         limit: Maximum number of results to return (default: 10).
     """
-    context = mcp.get_context()
     logger.debug(f"Searching for CRS reports with keywords: {keywords}, report_number: {report_number}, limit: {limit}")
     
-    # Set up parameters for the API request
-    params = {
-        'format': 'json',
-        'limit': limit
-    }
-    
-    # If a specific report number is provided, get that report directly
+    # Option A: Report Number Search Priority
     if report_number:
         return await get_crs_report_detail(ctx, report_number)
     
-    # Make the API request to get the latest reports (no specific search endpoint available)
+    # If no keywords provided, guide user
+    if not keywords:
+        return "Please provide either 'keywords' for searching recent reports or 'report_number' for a specific report (e.g., 'R47175'). For best results with specific reports, use the report number."
+    
+    # Option B: Pagination with Warnings - search larger batch of recent reports
+    search_limit = min(250, max(limit * 5, 50))  # Search more than requested to improve filtering
+    params = {
+        'format': 'json',
+        'limit': search_limit
+    }
+    
+    # Make the API request to get recent reports
     data = await make_api_request(
         endpoint="/crsreport",
         params=params,
-        ctx=context
+        ctx=ctx
     )
     
     # Check if there was an error in the response
     if isinstance(data, dict) and 'error' in data:
         return f"Error searching for CRS reports: {data['error']}"
     
-    # If keywords are provided, filter the results client-side
-    if keywords and 'CRSReports' in data and data['CRSReports']:
+    # Filter the results client-side by keywords
+    if 'CRSReports' in data and data['CRSReports']:
         filtered_reports = []
         keywords_lower = keywords.lower()
         
@@ -230,13 +232,17 @@ async def search_crs_reports(
             title = report.get('title', '').lower()
             if keywords_lower in title:
                 filtered_reports.append(report)
-                continue
+                if len(filtered_reports) >= limit:
+                    break
         
         # Replace the original reports with the filtered ones
         if filtered_reports:
             data['CRSReports'] = filtered_reports
+            result = format_crs_reports_list(data)
+            # Add warning about search limitations
+            warning = f"⚠️ Keyword search limited to {search_limit} most recent reports. For specific reports, use report number (e.g., 'R47175').\n\n"
+            return warning + result
         else:
-            return f"No CRS reports found matching keywords: {keywords}"
-    
-    # Format the response
-    return format_crs_reports_list(data)
+            return f"No CRS reports found matching keywords: '{keywords}' in recent {search_limit} reports. Try:\n• Different keywords\n• Specific report number if known (e.g., 'R47175')\n• Broader search terms"
+    else:
+        return "No CRS reports data available from the API."
