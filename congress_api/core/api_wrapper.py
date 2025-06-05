@@ -84,6 +84,11 @@ class DefensiveAPIWrapper:
             retry_count=2,
             retry_delay=1.0
         ),
+        'house-votes': APIEndpointConfig(
+            timeout=8.0,
+            retry_count=2,
+            retry_delay=1.0
+        ),
         'default': APIEndpointConfig()
     }
     
@@ -159,6 +164,8 @@ class DefensiveAPIWrapper:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['crs-reports']
         elif 'daily-congressional-record' in endpoint:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['daily-congressional-record']
+        elif 'house-votes' in endpoint:
+            return DefensiveAPIWrapper.ENDPOINT_CONFIGS['house-votes']
         else:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['default']
     
@@ -395,4 +402,10 @@ async def safe_crs_reports_request(endpoint: str, ctx: Context, params: Dict[str
         params = {}
     return await DefensiveAPIWrapper.safe_api_request(
         endpoint, ctx, params, endpoint_type='crs-reports'
+    )
+
+async def safe_house_votes_request(endpoint: str, ctx: Context, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Make a safe request to house votes endpoints."""
+    return await DefensiveAPIWrapper.safe_api_request(
+        endpoint, ctx, params, endpoint_type='house-votes'
     )
