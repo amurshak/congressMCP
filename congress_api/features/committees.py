@@ -29,7 +29,11 @@ def format_committee_summary(committee: Dict[str, Any]) -> str:
     result.append(f"URL: {committee.get('url', 'No URL available')}")
     return "\n".join(result)
 
-# Resources
+# Resources (Static/Reference Data)
+# - get_committees: List all committees
+# - get_committees_by_chamber: List committees by chamber  
+# - get_committee_details: Specific committee details
+
 @mcp.resource("congress://committees")
 async def get_committees(ctx: Context) -> str:
     """
@@ -102,10 +106,6 @@ async def get_committee_details(ctx: Context, chamber: str, committee_code: str)
         
     Returns detailed information about the specified committee.
     """
-    # Add temporary logging for debugging
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    
     # Validate chamber parameter
     if chamber.lower() not in ["house", "senate"]:
         return f"Invalid chamber: {chamber}. Must be 'house' or 'senate'."
@@ -119,10 +119,6 @@ async def get_committee_details(ctx: Context, chamber: str, committee_code: str)
     committee = committee_data.get("committee", {})
     if not committee:
         return f"No committee found with code {committee_code} in the {chamber.capitalize()}."
-    
-    # Log the raw committee data for debugging
-    import logging
-    logging.info(f"Raw committee data: {committee}")
     
     result = []
     
@@ -186,284 +182,13 @@ async def get_committee_details(ctx: Context, chamber: str, committee_code: str)
     
     return "\n".join(result)
 
-@mcp.resource("congress://committees/{chamber}/{committee_code}/reports")
-async def get_committee_reports_resource(ctx: Context, chamber: str, committee_code: str) -> str:
-    """
-    Get reports for a specific committee.
-    
-    Args:
-        chamber: The chamber of Congress ("house" or "senate")
-        committee_code: The committee code (e.g., "hspw00", "ssas00")
-        
-    Returns a list of reports issued by the specified committee.
-    """
-    
-    # Validate chamber parameter
-    if chamber.lower() not in ["house", "senate"]:
-        return f"Invalid chamber: {chamber}. Must be 'house' or 'senate'."
-    
-    # First get committee details to verify it exists and get the name
-    committee_data = await make_api_request(f"/committee/{chamber.lower()}/{committee_code}", ctx)
-    
-    if "error" in committee_data:
-        return f"Error retrieving committee: {committee_data['error']}"
-    
-    committee = committee_data.get("committee", {})
-    if not committee:
-        return f"No committee found with code {committee_code} in the {chamber.capitalize()}."
-    
-    # Extract committee name using multiple possible locations in the response
-    committee_name = "Unknown Committee"
-    
-    # Option 1: Direct name field
-    if "name" in committee:
-        committee_name = committee["name"]
-    
-    # Option 2: History array with libraryOfCongressName or officialName
-    elif "history" in committee and committee["history"] and len(committee["history"]) > 0:
-        history_item = committee["history"][0]
-        if "libraryOfCongressName" in history_item and history_item["libraryOfCongressName"]:
-            committee_name = history_item["libraryOfCongressName"]
-        elif "officialName" in history_item and history_item["officialName"]:
-            committee_name = history_item["officialName"]
-    
-    # Option 3: For subcommittees, the name might be in the parent committee's subcommittees array
-    elif "parent" in committee and committee["parent"] and "subcommittees" in committee["parent"]:
-        for subcommittee in committee["parent"]["subcommittees"]:
-            if subcommittee.get("systemCode") == committee_code:
-                committee_name = subcommittee.get("name", "Unknown Committee")
-                break
-    
-    # Option 4: Check for a 'title' field that some committee responses might have
-    elif "title" in committee:
-        committee_name = committee["title"]
-        
-    # Option 5: Check for 'fullName' field
-    elif "fullName" in committee:
-        committee_name = committee["fullName"]
-    
-    # Now get reports for this committee
-    reports_data = await make_api_request(f"/committee/{chamber.lower()}/{committee_code}/reports", ctx)
-    
-    if "error" in reports_data:
-        return f"Error retrieving committee reports: {reports_data['error']}"
-    
-    reports = reports_data.get("reports", [])
-    if not reports:
-        return f"No reports found for the {committee_name} committee."
-    
-    result = [f"Reports from the {committee_name} committee:"]
-    
-    for report in reports:
-        citation = report.get("citation", "Unknown citation")
-        congress = report.get("congress", "Unknown")
-        number = report.get("number", "Unknown")
-        report_type = report.get("type", "Unknown").upper()
-        
-        result.append(f"\n### {citation}")
-        result.append(f"Congress: {congress}")
-        result.append(f"Report Number: {number}")
-        result.append(f"Type: {report_type}")
-        
-        if "updateDate" in report:
-            result.append(f"Update Date: {report['updateDate']}")
-        
-        if "url" in report:
-            result.append(f"URL: {report['url']}")
-    
-    return "\n".join(result)
+# Tools (Interactive/Parameterized Functions)
+# - get_committee_bills: Bills with limit parameter
+# - get_committee_reports: Reports with limit parameter
+# - get_committee_nominations: Nominations with limit parameter  
+# - get_committee_communications: Communications with limit parameter
+# - search_committees: Search functionality
 
-@mcp.resource("congress://committees/{chamber}/{committee_code}/nominations")
-async def get_committee_nominations_resource(ctx: Context, chamber: str, committee_code: str) -> str:
-    """
-    Get nominations for a specific Senate committee.
-    
-    Args:
-        chamber: The chamber of Congress (must be "senate")
-        committee_code: The committee code (e.g., "ssas00")
-        
-    Returns a list of nominations referred to the specified Senate committee.
-    """
-    
-    # Validate chamber parameter
-    if chamber.lower() != "senate":
-        return f"Invalid chamber: {chamber}. Nominations are only available for Senate committees."
-    
-    # First get committee details to verify it exists and get the name
-    committee_data = await make_api_request(f"/committee/{chamber.lower()}/{committee_code}", ctx)
-    
-    if "error" in committee_data:
-        return f"Error retrieving committee: {committee_data['error']}"
-    
-    committee = committee_data.get("committee", {})
-    if not committee:
-        return f"No committee found with code {committee_code} in the Senate."
-    
-    # Extract committee name using multiple possible locations in the response
-    committee_name = "Unknown Committee"
-    
-    # Option 1: Direct name field
-    if "name" in committee:
-        committee_name = committee["name"]
-    
-    # Option 2: History array with libraryOfCongressName or officialName
-    elif "history" in committee and committee["history"] and len(committee["history"]) > 0:
-        history_item = committee["history"][0]
-        if "libraryOfCongressName" in history_item and history_item["libraryOfCongressName"]:
-            committee_name = history_item["libraryOfCongressName"]
-        elif "officialName" in history_item and history_item["officialName"]:
-            committee_name = history_item["officialName"]
-    
-    # Option 3: For subcommittees, the name might be in the parent committee's subcommittees array
-    elif "parent" in committee and committee["parent"] and "subcommittees" in committee["parent"]:
-        for subcommittee in committee["parent"]["subcommittees"]:
-            if subcommittee.get("systemCode") == committee_code:
-                committee_name = subcommittee.get("name", "Unknown Committee")
-                break
-    
-    # Option 4: Check for a 'title' field that some committee responses might have
-    elif "title" in committee:
-        committee_name = committee["title"]
-        
-    # Option 5: Check for 'fullName' field
-    elif "fullName" in committee:
-        committee_name = committee["fullName"]
-    
-    # Now get nominations for this committee
-    nominations_data = await make_api_request(f"/committee/{chamber.lower()}/{committee_code}/nominations", ctx)
-    
-    if "error" in nominations_data:
-        return f"Error retrieving committee nominations: {nominations_data['error']}"
-    
-    nominations = nominations_data.get("nominations", [])
-    if not nominations:
-        return f"No nominations found for the {committee_name} committee."
-    
-    result = [f"Nominations referred to the {committee_name} committee:"]
-    
-    for nomination in nominations:
-        citation = nomination.get("citation", "Unknown citation")
-        congress = nomination.get("congress", "Unknown")
-        number = nomination.get("number", "Unknown")
-        
-        result.append(f"\n### {citation}")
-        result.append(f"Congress: {congress}")
-        result.append(f"Nomination Number: {number}")
-        
-        if "description" in nomination and nomination["description"].strip():
-            result.append(f"Description: {nomination['description']}")
-        
-        if "latestAction" in nomination:
-            action = nomination["latestAction"]
-            action_text = action.get("text", "Unknown action")
-            action_date = action.get("actionDate", "Unknown date")
-            result.append(f"Latest Action: {action_text} ({action_date})")
-        
-        if "receivedDate" in nomination:
-            result.append(f"Received Date: {nomination['receivedDate']}")
-        
-        if "url" in nomination:
-            result.append(f"URL: {nomination['url']}")
-    
-    return "\n".join(result)
-
-@mcp.resource("congress://committees/{chamber}/{committee_code}/communications")
-async def get_committee_communications_resource(ctx: Context, chamber: str, committee_code: str) -> str:
-    """
-    Get communications for a specific committee.
-    
-    Args:
-        chamber: The chamber of Congress ("house" or "senate")
-        committee_code: The committee code (e.g., "hspw00", "ssas00")
-        
-    Returns a list of communications referred to the specified committee.
-    """
-    
-    # Validate chamber parameter
-    if chamber.lower() not in ["house", "senate"]:
-        return f"Invalid chamber: {chamber}. Must be 'house' or 'senate'."
-    
-    # First get committee details to verify it exists and get the name
-    committee_data = await make_api_request(f"/committee/{chamber.lower()}/{committee_code}", ctx)
-    
-    if "error" in committee_data:
-        return f"Error retrieving committee: {committee_data['error']}"
-    
-    committee = committee_data.get("committee", {})
-    if not committee:
-        return f"No committee found with code {committee_code} in the {chamber.capitalize()}."
-    
-    # Extract committee name using multiple possible locations in the response
-    committee_name = "Unknown Committee"
-    
-    # Option 1: Direct name field
-    if "name" in committee:
-        committee_name = committee["name"]
-    
-    # Option 2: History array with libraryOfCongressName or officialName
-    elif "history" in committee and committee["history"] and len(committee["history"]) > 0:
-        history_item = committee["history"][0]
-        if "libraryOfCongressName" in history_item and history_item["libraryOfCongressName"]:
-            committee_name = history_item["libraryOfCongressName"]
-        elif "officialName" in history_item and history_item["officialName"]:
-            committee_name = history_item["officialName"]
-    
-    # Option 3: For subcommittees, the name might be in the parent committee's subcommittees array
-    elif "parent" in committee and committee["parent"] and "subcommittees" in committee["parent"]:
-        for subcommittee in committee["parent"]["subcommittees"]:
-            if subcommittee.get("systemCode") == committee_code:
-                committee_name = subcommittee.get("name", "Unknown Committee")
-                break
-    
-    # Option 4: Check for a 'title' field that some committee responses might have
-    elif "title" in committee:
-        committee_name = committee["title"]
-        
-    # Option 5: Check for 'fullName' field
-    elif "fullName" in committee:
-        committee_name = committee["fullName"]
-    
-    # Determine the communications endpoint based on the chamber
-    if chamber.lower() == "house":
-        comm_endpoint = f"/committee/{chamber.lower()}/{committee_code}/house-communication"
-        comm_key = "houseCommunications"
-    else:
-        comm_endpoint = f"/committee/{chamber.lower()}/{committee_code}/senate-communication"
-        comm_key = "senateCommunications"
-    
-    # Now get communications for this committee
-    communications_data = await make_api_request(comm_endpoint, ctx)
-    
-    if "error" in communications_data:
-        return f"Error retrieving committee communications: {communications_data['error']}"
-    
-    communications = communications_data.get(comm_key, [])
-    if not communications:
-        return f"No communications found for the {committee_name} committee."
-    
-    result = [f"Communications referred to the {committee_name} committee:"]
-    
-    for comm in communications:
-        congress = comm.get("congress", "Unknown")
-        number = comm.get("number", "Unknown")
-        comm_type = ""
-        if "communicationType" in comm:
-            comm_type = comm["communicationType"].get("name", "Unknown")
-        
-        result.append(f"\n### {comm_type} {number} ({congress}th Congress)")
-        
-        if "referralDate" in comm:
-            result.append(f"Referral Date: {comm['referralDate']}")
-        
-        if "updateDate" in comm:
-            result.append(f"Update Date: {comm['updateDate']}")
-        
-        if "url" in comm:
-            result.append(f"URL: {comm['url']}")
-    
-    return "\n".join(result)
-
-# Tools
 @mcp.tool()
 async def get_committee_bills(
     ctx: Context,
@@ -479,111 +204,63 @@ async def get_committee_bills(
         committee_code: The committee code (e.g., "hsag", "ssap")
         limit: Maximum number of bills to return (default: 10)
     """
-    
     try:
-        # Parameter validation
+        # Validate parameters
         chamber_validation = ParameterValidator.validate_chamber(chamber)
         if not chamber_validation.is_valid:
-            return format_error_response(CommonErrors.invalid_parameter(
-                "chamber", chamber, chamber_validation.message
-            ))
-        
-        limit_validation = ParameterValidator.validate_limit_range(limit)
+            logger.warning(f"Invalid chamber: {chamber}")
+            return chamber_validation.error_message
+            
+        limit_validation = ParameterValidator.validate_limit(limit)
         if not limit_validation.is_valid:
-            return format_error_response(CommonErrors.invalid_parameter(
-                "limit", limit, limit_validation.message
-            ))
+            logger.warning(f"Invalid limit: {limit}")
+            return limit_validation.error_message
         
-        logger.debug(f"Getting bills for committee {committee_code} in {chamber}")
+        # Build endpoint
+        endpoint = f"/committee/{chamber.lower()}/{committee_code}/bills"
         
-        # First get committee details to verify it exists and get the name
-        committee_data = await safe_committees_request(f"/committee/{chamber.lower()}/{committee_code}", ctx, {})
+        # Make API request
+        response = await safe_committees_request(endpoint, ctx, {"limit": limit})
         
-        if "error" in committee_data:
-            error_response = CommonErrors.api_server_error("committee verification")
-            error_response.details = {"api_error": committee_data["error"]}
-            return format_error_response(error_response)
+        if "error" in response:
+            logger.warning(f"API error for committee bills: {response['error']}")
+            return response["error"]
         
-        committee = committee_data.get("committee", {})
-        if not committee:
-            return format_error_response(CommonErrors.invalid_parameter(
-                "committee_code", committee_code, 
-                f"No committee found with code {committee_code} in the {chamber.capitalize()}."
-            ))
-        
-        # Extract committee name using multiple possible locations in the response
-        committee_name = "Unknown Committee"
-        
-        # Option 1: Direct name field
-        if "name" in committee:
-            committee_name = committee["name"]
-        # Option 2: History array with libraryOfCongressName or officialName
-        elif "history" in committee and committee["history"] and len(committee["history"]) > 0:
-            history_item = committee["history"][0]
-            if "libraryOfCongressName" in history_item and history_item["libraryOfCongressName"]:
-                committee_name = history_item["libraryOfCongressName"]
-            elif "officialName" in history_item and history_item["officialName"]:
-                committee_name = history_item["officialName"]
-        # Option 3: For subcommittees, the name might be in the parent committee's subcommittees array
-        elif "parent" in committee and committee["parent"] and "subcommittees" in committee["parent"]:
-            for subcommittee in committee["parent"]["subcommittees"]:
-                if subcommittee.get("systemCode") == committee_code:
-                    committee_name = subcommittee.get("name", "Unknown Committee")
-                    break
-        # Option 4: Check for a 'title' field that some committee responses might have
-        elif "title" in committee:
-            committee_name = committee["title"]
-        # Option 5: Check for 'fullName' field
-        elif "fullName" in committee:
-            committee_name = committee["fullName"]
-        
-        # Now get bills for this committee using defensive wrapper
-        bills_data = await safe_committees_request("/bill", ctx, {
-            "committee": committee_code,
-            "limit": limit,
-            "sort": "updateDate+desc"
-        })
-        
-        if "error" in bills_data:
-            error_response = CommonErrors.api_server_error("committee bills retrieval")
-            error_response.details = {"api_error": bills_data["error"]}
-            return format_error_response(error_response)
-        
-        bills = bills_data.get("bills", [])
+        bills = response.get("bills", [])
         if not bills:
-            return f"No bills found for the {committee_name} committee.\n\n**Note:** This may be because:\n- The committee has no recent bills\n- The committee code is incorrect\n- Bills may be assigned to subcommittees instead"
+            return f"No bills found for committee {committee_code} in the {chamber.capitalize()}."
         
         # Deduplicate bills
         bills = ResponseProcessor.deduplicate_results(
             bills, 
-            key_func=lambda b: f"{b.get('congress', '')}-{b.get('type', '')}-{b.get('number', '')}"
+            key_fields=["congress", "number", "type"]
         )
         
-        result = [f"Recent bills referred to the {committee_name} committee:"]
-        
-        for bill in bills:
-            bill_num = bill.get("number", "Unknown")
-            bill_type = bill.get("type", "Unknown").upper()
-            title = bill.get("title", "No title")
+        # Format results
+        result = [f"Bills referred to {chamber.capitalize()} Committee {committee_code}:"]
+        for bill in bills[:limit]:
+            title = bill.get("title", "No title available")
+            bill_type = bill.get("type", "Unknown")
+            number = bill.get("number", "Unknown")
             congress = bill.get("congress", "Unknown")
+            url = bill.get("url", "No URL available")
             
-            result.append(f"\n### {bill_type} {bill_num} ({congress}th Congress)")
+            # Get latest action
+            latest_action = bill.get("latestAction", {})
+            action_date = latest_action.get("actionDate", "Unknown")
+            action_text = latest_action.get("text", "No action text")
+            
+            result.append(f"\n**{bill_type.upper()} {number}** (Congress {congress})")
             result.append(f"Title: {title}")
-            
-            if "latestAction" in bill:
-                action = bill["latestAction"]
-                action_text = action.get("text", "Unknown action")
-                action_date = action.get("actionDate", "Unknown date")
-                result.append(f"Latest Action: {action_text} ({action_date})")
-            
-            if "url" in bill:
-                result.append(f"URL: {bill['url']}")
+            result.append(f"Latest Action ({action_date}): {action_text}")
+            result.append(f"URL: {url}")
         
+        logger.info(f"Successfully retrieved {len(bills)} bills for committee {committee_code}")
         return "\n".join(result)
         
     except Exception as e:
         logger.error(f"Error in get_committee_bills: {str(e)}")
-        error_response = CommonErrors.api_server_error("committee bills retrieval")
+        error_response = CommonErrors.api_server_error("committee bills")
         error_response.details = {"error": str(e)}
         return format_error_response(error_response)
 
@@ -602,84 +279,61 @@ async def get_committee_reports(
         committee_code: The committee code (e.g., "hspw00", "ssas00")
         limit: Maximum number of reports to return (default: 10)
     """
-    
-    # Validate chamber parameter
-    if chamber.lower() not in ["house", "senate"]:
-        return f"Invalid chamber: {chamber}. Must be 'house' or 'senate'."
-    
-    # First get committee details to verify it exists and get the name
-    committee_data = await make_api_request(f"/committee/{chamber.lower()}/{committee_code}", ctx)
-    
-    if "error" in committee_data:
-        return f"Error retrieving committee: {committee_data['error']}"
-    
-    committee = committee_data.get("committee", {})
-    if not committee:
-        return f"No committee found with code {committee_code} in the {chamber.capitalize()}."
-    
-    # Extract committee name using multiple possible locations in the response
-    committee_name = "Unknown Committee"
-    
-    # Option 1: Direct name field
-    if "name" in committee:
-        committee_name = committee["name"]
-    
-    # Option 2: History array with libraryOfCongressName or officialName
-    elif "history" in committee and committee["history"] and len(committee["history"]) > 0:
-        history_item = committee["history"][0]
-        if "libraryOfCongressName" in history_item and history_item["libraryOfCongressName"]:
-            committee_name = history_item["libraryOfCongressName"]
-        elif "officialName" in history_item and history_item["officialName"]:
-            committee_name = history_item["officialName"]
-    
-    # Option 3: For subcommittees, the name might be in the parent committee's subcommittees array
-    elif "parent" in committee and committee["parent"] and "subcommittees" in committee["parent"]:
-        for subcommittee in committee["parent"]["subcommittees"]:
-            if subcommittee.get("systemCode") == committee_code:
-                committee_name = subcommittee.get("name", "Unknown Committee")
-                break
-    
-    # Option 4: Check for a 'title' field that some committee responses might have
-    elif "title" in committee:
-        committee_name = committee["title"]
+    try:
+        # Validate parameters
+        chamber_validation = ParameterValidator.validate_chamber(chamber)
+        if not chamber_validation.is_valid:
+            logger.warning(f"Invalid chamber: {chamber}")
+            return chamber_validation.error_message
+            
+        limit_validation = ParameterValidator.validate_limit(limit)
+        if not limit_validation.is_valid:
+            logger.warning(f"Invalid limit: {limit}")
+            return limit_validation.error_message
         
-    # Option 5: Check for 'fullName' field
-    elif "fullName" in committee:
-        committee_name = committee["fullName"]
-    
-    # Now get reports for this committee
-    reports_data = await make_api_request(f"/committee/{chamber.lower()}/{committee_code}/reports", ctx, {
-        "limit": limit,
-        "sort": "updateDate+desc"
-    })
-    
-    if "error" in reports_data:
-        return f"Error retrieving committee reports: {reports_data['error']}"
-    
-    reports = reports_data.get("reports", [])
-    if not reports:
-        return f"No reports found for the {committee_name} committee."
-    
-    result = [f"Reports from the {committee_name} committee:"]
-    
-    for report in reports:
-        citation = report.get("citation", "Unknown citation")
-        congress = report.get("congress", "Unknown")
-        number = report.get("number", "Unknown")
-        report_type = report.get("type", "Unknown").upper()
+        # Build endpoint
+        endpoint = f"/committee/{chamber.lower()}/{committee_code}/reports"
         
-        result.append(f"\n### {citation}")
-        result.append(f"Congress: {congress}")
-        result.append(f"Report Number: {number}")
-        result.append(f"Type: {report_type}")
+        # Make API request
+        response = await safe_committees_request(endpoint, ctx, {"limit": limit})
         
-        if "updateDate" in report:
-            result.append(f"Update Date: {report['updateDate']}")
+        if "error" in response:
+            logger.warning(f"API error for committee reports: {response['error']}")
+            return response["error"]
         
-        if "url" in report:
-            result.append(f"URL: {report['url']}")
-    
-    return "\n".join(result)
+        reports = response.get("reports", [])
+        if not reports:
+            return f"No reports found for committee {committee_code} in the {chamber.capitalize()}."
+        
+        # Deduplicate reports
+        reports = ResponseProcessor.deduplicate_results(
+            reports, 
+            key_fields=["congress", "number", "type"]
+        )
+        
+        # Format results
+        result = [f"Reports from {chamber.capitalize()} Committee {committee_code}:"]
+        for report in reports[:limit]:
+            title = report.get("title", "No title available")
+            report_type = report.get("type", "Unknown")
+            number = report.get("number", "Unknown")
+            congress = report.get("congress", "Unknown")
+            url = report.get("url", "No URL available")
+            update_date = report.get("updateDate", "Unknown")
+            
+            result.append(f"\n**{report_type.upper()} {number}** (Congress {congress})")
+            result.append(f"Title: {title}")
+            result.append(f"Updated: {update_date}")
+            result.append(f"URL: {url}")
+        
+        logger.info(f"Successfully retrieved {len(reports)} reports for committee {committee_code}")
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in get_committee_reports: {str(e)}")
+        error_response = CommonErrors.api_server_error("committee reports")
+        error_response.details = {"error": str(e)}
+        return format_error_response(error_response)
 
 @mcp.tool()
 async def get_committee_nominations(
@@ -694,87 +348,66 @@ async def get_committee_nominations(
         committee_code: The committee code (e.g., "ssas00")
         limit: Maximum number of nominations to return (default: 10)
     """
-    chamber = "senate"  # Nominations are only available for Senate committees
-    
-    # First get committee details to verify it exists and get the name
-    committee_data = await make_api_request(f"/committee/{chamber}/{committee_code}", ctx)
-    
-    if "error" in committee_data:
-        return f"Error retrieving committee: {committee_data['error']}"
-    
-    committee = committee_data.get("committee", {})
-    if not committee:
-        return f"No committee found with code {committee_code} in the Senate."
-    
-    # Extract committee name using multiple possible locations in the response
-    committee_name = "Unknown Committee"
-    
-    # Option 1: Direct name field
-    if "name" in committee:
-        committee_name = committee["name"]
-    
-    # Option 2: History array with libraryOfCongressName or officialName
-    elif "history" in committee and committee["history"] and len(committee["history"]) > 0:
-        history_item = committee["history"][0]
-        if "libraryOfCongressName" in history_item and history_item["libraryOfCongressName"]:
-            committee_name = history_item["libraryOfCongressName"]
-        elif "officialName" in history_item and history_item["officialName"]:
-            committee_name = history_item["officialName"]
-    
-    # Option 3: For subcommittees, the name might be in the parent committee's subcommittees array
-    elif "parent" in committee and committee["parent"] and "subcommittees" in committee["parent"]:
-        for subcommittee in committee["parent"]["subcommittees"]:
-            if subcommittee.get("systemCode") == committee_code:
-                committee_name = subcommittee.get("name", "Unknown Committee")
-                break
-    
-    # Option 4: Check for a 'title' field that some committee responses might have
-    elif "title" in committee:
-        committee_name = committee["title"]
+    try:
+        # Validate parameters
+        limit_validation = ParameterValidator.validate_limit(limit)
+        if not limit_validation.is_valid:
+            logger.warning(f"Invalid limit: {limit}")
+            return limit_validation.error_message
         
-    # Option 5: Check for 'fullName' field
-    elif "fullName" in committee:
-        committee_name = committee["fullName"]
-    
-    # Now get nominations for this committee
-    nominations_data = await make_api_request(f"/committee/{chamber}/{committee_code}/nominations", ctx, {
-        "limit": limit
-    })
-    
-    if "error" in nominations_data:
-        return f"Error retrieving committee nominations: {nominations_data['error']}"
-    
-    nominations = nominations_data.get("nominations", [])
-    if not nominations:
-        return f"No nominations found for the {committee_name} committee."
-    
-    result = [f"Nominations referred to the {committee_name} committee:"]
-    
-    for nomination in nominations:
-        citation = nomination.get("citation", "Unknown citation")
-        congress = nomination.get("congress", "Unknown")
-        number = nomination.get("number", "Unknown")
+        # Build endpoint (nominations are Senate-only)
+        endpoint = f"/committee/senate/{committee_code}/nominations"
         
-        result.append(f"\n### {citation}")
-        result.append(f"Congress: {congress}")
-        result.append(f"Nomination Number: {number}")
+        # Make API request
+        response = await safe_committees_request(endpoint, ctx, {"limit": limit})
         
-        if "description" in nomination and nomination["description"].strip():
-            result.append(f"Description: {nomination['description']}")
+        if "error" in response:
+            logger.warning(f"API error for committee nominations: {response['error']}")
+            return response["error"]
         
-        if "latestAction" in nomination:
-            action = nomination["latestAction"]
-            action_text = action.get("text", "Unknown action")
-            action_date = action.get("actionDate", "Unknown date")
-            result.append(f"Latest Action: {action_text} ({action_date})")
+        nominations = response.get("nominations", [])
+        if not nominations:
+            return f"No nominations found for Senate committee {committee_code}."
         
-        if "receivedDate" in nomination:
-            result.append(f"Received Date: {nomination['receivedDate']}")
+        # Deduplicate nominations
+        nominations = ResponseProcessor.deduplicate_results(
+            nominations, 
+            key_fields=["congress", "number"]
+        )
         
-        if "url" in nomination:
-            result.append(f"URL: {nomination['url']}")
-    
-    return "\n".join(result)
+        # Format results
+        result = [f"Nominations for Senate Committee {committee_code}:"]
+        for nomination in nominations[:limit]:
+            number = nomination.get("number", "Unknown")
+            congress = nomination.get("congress", "Unknown")
+            url = nomination.get("url", "No URL available")
+            update_date = nomination.get("updateDate", "Unknown")
+            
+            # Get nominees
+            nominees = nomination.get("nominees", [])
+            nominee_names = []
+            for nominee in nominees:
+                first_name = nominee.get("firstName", "")
+                last_name = nominee.get("lastName", "")
+                full_name = f"{first_name} {last_name}".strip()
+                if full_name:
+                    nominee_names.append(full_name)
+            
+            nominee_text = ", ".join(nominee_names) if nominee_names else "Unknown nominees"
+            
+            result.append(f"\n**Nomination {number}** (Congress {congress})")
+            result.append(f"Nominees: {nominee_text}")
+            result.append(f"Updated: {update_date}")
+            result.append(f"URL: {url}")
+        
+        logger.info(f"Successfully retrieved {len(nominations)} nominations for committee {committee_code}")
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in get_committee_nominations: {str(e)}")
+        error_response = CommonErrors.api_server_error("committee nominations")
+        error_response.details = {"error": str(e)}
+        return format_error_response(error_response)
 
 @mcp.tool()
 async def get_committee_communications(
@@ -791,94 +424,67 @@ async def get_committee_communications(
         committee_code: The committee code (e.g., "hspw00", "ssas00")
         limit: Maximum number of communications to return (default: 10)
     """
-    
-    # Validate chamber parameter
-    if chamber.lower() not in ["house", "senate"]:
-        return f"Invalid chamber: {chamber}. Must be 'house' or 'senate'."
-    
-    # First get committee details to verify it exists and get the name
-    committee_data = await make_api_request(f"/committee/{chamber.lower()}/{committee_code}", ctx)
-    
-    if "error" in committee_data:
-        return f"Error retrieving committee: {committee_data['error']}"
-    
-    committee = committee_data.get("committee", {})
-    if not committee:
-        return f"No committee found with code {committee_code} in the {chamber.capitalize()}."
-    
-    # Extract committee name using multiple possible locations in the response
-    committee_name = "Unknown Committee"
-    
-    # Option 1: Direct name field
-    if "name" in committee:
-        committee_name = committee["name"]
-    
-    # Option 2: History array with libraryOfCongressName or officialName
-    elif "history" in committee and committee["history"] and len(committee["history"]) > 0:
-        history_item = committee["history"][0]
-        if "libraryOfCongressName" in history_item and history_item["libraryOfCongressName"]:
-            committee_name = history_item["libraryOfCongressName"]
-        elif "officialName" in history_item and history_item["officialName"]:
-            committee_name = history_item["officialName"]
-    
-    # Option 3: For subcommittees, the name might be in the parent committee's subcommittees array
-    elif "parent" in committee and committee["parent"] and "subcommittees" in committee["parent"]:
-        for subcommittee in committee["parent"]["subcommittees"]:
-            if subcommittee.get("systemCode") == committee_code:
-                committee_name = subcommittee.get("name", "Unknown Committee")
-                break
-    
-    # Option 4: Check for a 'title' field that some committee responses might have
-    elif "title" in committee:
-        committee_name = committee["title"]
+    try:
+        # Validate parameters
+        chamber_validation = ParameterValidator.validate_chamber(chamber)
+        if not chamber_validation.is_valid:
+            logger.warning(f"Invalid chamber: {chamber}")
+            return chamber_validation.error_message
+            
+        limit_validation = ParameterValidator.validate_limit(limit)
+        if not limit_validation.is_valid:
+            logger.warning(f"Invalid limit: {limit}")
+            return limit_validation.error_message
         
-    # Option 5: Check for 'fullName' field
-    elif "fullName" in committee:
-        committee_name = committee["fullName"]
-    
-    # Determine the communications endpoint based on the chamber
-    if chamber.lower() == "house":
-        comm_endpoint = f"/committee/{chamber.lower()}/{committee_code}/house-communication"
-        comm_key = "houseCommunications"
-    else:
-        comm_endpoint = f"/committee/{chamber.lower()}/{committee_code}/senate-communication"
-        comm_key = "senateCommunications"
-    
-    # Now get communications for this committee
-    communications_data = await make_api_request(comm_endpoint, ctx, {
-        "limit": limit
-    })
-    
-    if "error" in communications_data:
-        return f"Error retrieving committee communications: {communications_data['error']}"
-    
-    communications = communications_data.get(comm_key, [])
-    if not communications:
-        return f"No communications found for the {committee_name} committee."
-    
-    result = [f"Communications referred to the {committee_name} committee:"]
-    
-    for comm in communications:
-        congress = comm.get("congress", "Unknown")
-        number = comm.get("number", "Unknown")
-        comm_type = ""
-        if "communicationType" in comm:
-            comm_type = comm["communicationType"].get("name", "Unknown")
+        # Build endpoint
+        endpoint = f"/committee/{chamber.lower()}/{committee_code}/communications"
         
-        result.append(f"\n### {comm_type} {number} ({congress}th Congress)")
+        # Make API request
+        response = await safe_committees_request(endpoint, ctx, {"limit": limit})
         
-        if "referralDate" in comm:
-            result.append(f"Referral Date: {comm['referralDate']}")
+        if "error" in response:
+            logger.warning(f"API error for committee communications: {response['error']}")
+            return response["error"]
         
-        if "updateDate" in comm:
-            result.append(f"Update Date: {comm['updateDate']}")
+        communications = response.get("communications", [])
+        if not communications:
+            return f"No communications found for committee {committee_code} in the {chamber.capitalize()}."
         
-        if "url" in comm:
-            result.append(f"URL: {comm['url']}")
-    
-    return "\n".join(result)
-
-from typing import Optional
+        # Deduplicate communications
+        communications = ResponseProcessor.deduplicate_results(
+            communications, 
+            key_fields=["congress", "number"]
+        )
+        
+        # Format results
+        result = [f"Communications for {chamber.capitalize()} Committee {committee_code}:"]
+        for comm in communications[:limit]:
+            number = comm.get("number", "Unknown")
+            congress = comm.get("congress", "Unknown")
+            url = comm.get("url", "No URL available")
+            
+            # Get communication type
+            comm_type = comm.get("communicationType", {})
+            type_name = comm_type.get("name", "Unknown")
+            
+            # Get committee referral info
+            committees = comm.get("committees", [])
+            referral_date = "Unknown"
+            if committees:
+                referral_date = committees[0].get("referralDate", "Unknown")
+            
+            result.append(f"\n**{type_name} {number}** (Congress {congress})")
+            result.append(f"Referral Date: {referral_date}")
+            result.append(f"URL: {url}")
+        
+        logger.info(f"Successfully retrieved {len(communications)} communications for committee {committee_code}")
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in get_committee_communications: {str(e)}")
+        error_response = CommonErrors.api_server_error("committee communications")
+        error_response.details = {"error": str(e)}
+        return format_error_response(error_response)
 
 @mcp.tool()
 async def search_committees(
@@ -897,101 +503,47 @@ async def search_committees(
         congress: Optional Congress number (e.g., 117)
         limit: Maximum number of results to return (default: 10)
     """
-    
     try:
-        # Parameter validation
-        if chamber is not None:
-            chamber_validation = ParameterValidator.validate_chamber(chamber)
-            if not chamber_validation.is_valid:
-                return format_error_response(CommonErrors.invalid_parameter(
-                    "chamber", chamber, chamber_validation.message
-                ))
-        
-        if congress is not None:
-            congress_validation = ParameterValidator.validate_congress(congress)
+        # Validate parameters
+        if chamber and chamber.lower() not in ["house", "senate", "joint"]:
+            logger.warning(f"Invalid chamber: {chamber}")
+            return f"Invalid chamber '{chamber}'. Must be 'house', 'senate', or 'joint'."
+            
+        if congress:
+            congress_validation = ParameterValidator.validate_congress_number(congress)
             if not congress_validation.is_valid:
-                return format_error_response(CommonErrors.invalid_parameter(
-                    "congress", congress, congress_validation.message
-                ))
-        
+                logger.warning(f"Invalid congress number: {congress}")
+                return congress_validation.error_message
+                
         limit_validation = ParameterValidator.validate_limit(limit)
         if not limit_validation.is_valid:
-            return format_error_response(CommonErrors.invalid_parameter(
-                "limit", limit, limit_validation.message
-            ))
+            logger.warning(f"Invalid limit: {limit}")
+            return limit_validation.error_message
         
-        # Determine initial fetch limit for better search results
-        fetch_limit = min(limit * 5, 200) if keywords else limit
-        
-        # Build query parameters
-        params = {
-            "limit": fetch_limit,
-            "sort": "updateDate+desc"
-        }
-        
-        # Add chamber parameter if provided
+        # Build search parameters
+        params = {"q": keywords, "limit": limit}
         if chamber:
             params["chamber"] = chamber.lower()
+        if congress:
+            params["congress"] = congress
         
-        # Determine the endpoint based on provided parameters
-        if congress and chamber:
-            endpoint = f"/committee/{congress}/{chamber.lower()}"
-        elif congress:
-            endpoint = f"/committee/{congress}"
-        else:
-            endpoint = "/committee"
+        # Make API request
+        response = await safe_committees_request("/committee", ctx, params)
         
-        logger.debug(f"Searching committees with endpoint: {endpoint}, params: {params}")
+        if "error" in response:
+            logger.warning(f"API error for committee search: {response['error']}")
+            return response["error"]
         
-        # Make the API request using defensive wrapper
-        committees_data = await safe_committees_request(endpoint, ctx, params)
-        
-        if "error" in committees_data:
-            error_response = CommonErrors.api_server_error("committee search")
-            error_response.details = {"api_error": committees_data["error"]}
-            return format_error_response(error_response)
-        
-        raw_committees = committees_data.get("committees", [])
-        logger.debug(f"API returned {len(raw_committees)} committees before filtering")
-        
-        # Filter by keywords if provided
-        if keywords:
-            filtered_committees = []
-            keywords_lower = keywords.lower()
-            
-            for committee in raw_committees:
-                name = committee.get("name", "").lower()
-                # Consider adding other descriptive fields if 'name' alone is insufficient
-                # For now, focusing on 'name' as the primary search field for keywords.
-                if keywords_lower in name:
-                    filtered_committees.append(committee)
-            
-            committees = filtered_committees
-        else:
-            committees = raw_committees
-        
-        logger.debug(f"Found {len(committees)} committees after keyword filtering")
-        
+        committees = response.get("committees", [])
         if not committees:
-            return "No committees found matching your search criteria.\n\n**Suggestions:**\n- Try broader keywords\n- Check spelling\n- Try searching without chamber/congress filters"
+            return f"No committees found matching '{keywords}'."
         
-        # Deduplicate results
-        committees = ResponseProcessor.deduplicate_results(
-            committees, 
-            key_func=lambda c: c.get('systemCode', c.get('name', ''))
-        )
-        
-        # Limit the number of results after filtering and deduplication
-        committees = committees[:limit]
-        
-        result = [f"Found {len(committees)} committees matching your search:"]
-        
-        for committee in committees:
+        # Format results
+        result = [f"Committees matching '{keywords}':"]
+        for committee in committees[:limit]:
             result.append("\n" + format_committee_summary(committee))
         
-        if len(raw_committees) > len(committees):
-            result.append(f"\n**Note:** Showing top {len(committees)} results. Use more specific keywords to narrow results.")
-        
+        logger.info(f"Successfully found {len(committees)} committees for search '{keywords}'")
         return "\n".join(result)
         
     except Exception as e:
@@ -999,3 +551,195 @@ async def search_committees(
         error_response = CommonErrors.api_server_error("committee search")
         error_response.details = {"error": str(e)}
         return format_error_response(error_response)
+
+@mcp.tool()
+async def get_committee_communication_details(
+    ctx: Context,
+    congress: int,
+    chamber: str,
+    communication_type: str,
+    communication_number: int
+) -> str:
+    """
+    Get detailed information about a specific committee communication.
+    
+    Args:
+        congress: Congress number (e.g., 117 for 117th Congress)
+        chamber: Chamber of Congress ("house" or "senate")
+        communication_type: Communication type (e.g., "ec", "pm", "pom")
+        communication_number: Communication number
+        
+    Returns:
+        Detailed information about the specified communication
+    """
+    try:
+        # Validate parameters
+        congress_validation = ParameterValidator.validate_congress_number(congress)
+        if not congress_validation.is_valid:
+            logger.warning(f"Invalid congress number: {congress}")
+            return congress_validation.error_message
+            
+        chamber_validation = ParameterValidator.validate_chamber(chamber)
+        if not chamber_validation.is_valid:
+            logger.warning(f"Invalid chamber: {chamber}")
+            return chamber_validation.error_message
+            
+        # Validate communication type
+        valid_comm_types = ["ec", "pm", "pom", "ml", "pt"]
+        if communication_type.lower() not in valid_comm_types:
+            logger.warning(f"Invalid communication type: {communication_type}")
+            return f"Invalid communication type '{communication_type}'. Valid types: {', '.join(valid_comm_types)}"
+            
+        # Validate communication number
+        if communication_number <= 0:
+            logger.warning(f"Invalid communication number: {communication_number}")
+            return "Communication number must be a positive integer"
+            
+        # Build endpoint based on chamber
+        if chamber.lower() == "house":
+            endpoint = f"/house-communication/{congress}/{communication_type.lower()}/{communication_number}"
+        elif chamber.lower() == "senate":
+            endpoint = f"/senate-communication/{congress}/{communication_type.lower()}/{communication_number}"
+        else:
+            return f"Invalid chamber '{chamber}'. Must be 'house' or 'senate'"
+            
+        logger.info(f"Fetching communication details: {endpoint}")
+        
+        # Make API request directly (like house_communications.py)
+        response = await make_api_request(endpoint, ctx, {})
+        
+        # Log the entire response structure for debugging
+        logger.debug(f"API response structure: {list(response.keys()) if isinstance(response, dict) else 'Not a dictionary'}")
+        
+        if "error" in response:
+            logger.warning(f"API error for communication details: {response['error']}")
+            return response["error"]
+            
+        # Debug: Log the response structure
+        logger.debug(f"Response keys: {list(response.keys())}")
+        logger.debug(f"Full response: {response}")
+            
+        # Extract communication data based on chamber - check for different possible response formats
+        if chamber.lower() == "house":
+            if 'house-communication' in response:
+                communication_data = response['house-communication']
+            elif 'houseCommunication' in response:
+                communication_data = response['houseCommunication']
+            else:
+                logger.warning(f"Unexpected House response format. Keys: {list(response.keys()) if isinstance(response, dict) else 'Not a dictionary'}")
+                return f"Retrieved house communication but in unexpected format. Keys: {list(response.keys())}"
+        else:
+            if 'senateCommunication' in response:
+                communication_data = response['senateCommunication']
+            elif 'senate-communication' in response:
+                communication_data = response['senate-communication']
+            else:
+                logger.warning(f"Unexpected Senate response format. Keys: {list(response.keys()) if isinstance(response, dict) else 'Not a dictionary'}")
+                return f"Retrieved senate communication but in unexpected format. Keys: {list(response.keys())}"
+        
+        # Format detailed communication information
+        result = format_communication_details(communication_data, chamber)
+        
+        logger.info(f"Successfully retrieved communication details for {chamber} {communication_type} {communication_number}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in get_committee_communication_details: {str(e)}")
+        error_response = CommonErrors.api_server_error("communication details")
+        error_response.details = {"error": str(e)}
+        return format_error_response(error_response)
+
+
+def format_communication_details(communication: Dict[str, Any], chamber: str) -> str:
+    """Format detailed communication information for display."""
+    lines = [
+        f"# {chamber.title()} Communication Details",
+        f"",
+        f"**Number**: {communication.get('number', 'N/A')}",
+        f"**Congress**: {communication.get('congress', communication.get('congressNumber', 'N/A'))}",
+        f"**Chamber**: {communication.get('chamber', chamber.title())}",
+        f"**Session**: {communication.get('sessionNumber', 'N/A')}",
+        f"**Congressional Record Date**: {communication.get('congressionalRecordDate', 'N/A')}",
+        f"**Update Date**: {communication.get('updateDate', 'N/A')}",
+        f""
+    ]
+    
+    # Communication type
+    comm_type = communication.get('communicationType', {})
+    if comm_type:
+        lines.extend([
+            f"**Communication Type**: {comm_type.get('name', 'N/A')} ({comm_type.get('code', 'N/A')})",
+            f""
+        ])
+    
+    # Abstract/Description
+    abstract = communication.get('abstract', '')
+    if abstract:
+        lines.extend([
+            f"**Abstract**:",
+            f"{abstract}",
+            f""
+        ])
+    
+    # Submitting information (House communications)
+    if chamber.lower() == "house":
+        submitting_agency = communication.get('submittingAgency', '')
+        submitting_official = communication.get('submittingOfficial', '')
+        if submitting_agency or submitting_official:
+            lines.extend([
+                f"**Submitting Information**:",
+                f"  - Agency: {submitting_agency or 'N/A'}",
+                f"  - Official: {submitting_official or 'N/A'}",
+                f""
+            ])
+        
+        # Report nature
+        report_nature = communication.get('reportNature', '')
+        if report_nature:
+            lines.extend([
+                f"**Report Nature**: {report_nature}",
+                f""
+            ])
+        
+        # Legal authority
+        legal_authority = communication.get('legalAuthority', '')
+        if legal_authority:
+            lines.extend([
+                f"**Legal Authority**: {legal_authority}",
+                f""
+            ])
+        
+        # Rulemaking
+        is_rulemaking = communication.get('isRulemaking', '')
+        if is_rulemaking:
+            lines.extend([
+                f"**Is Rulemaking**: {is_rulemaking}",
+                f""
+            ])
+    
+    # Committee referrals
+    committees = communication.get('committees', [])
+    if committees:
+        lines.extend([
+            f"**Committee Referrals**:"
+        ])
+        for committee in committees:
+            lines.extend([
+                f"  - **{committee.get('name', 'N/A')}** ({committee.get('systemCode', 'N/A')})",
+                f"    - Referral Date: {committee.get('referralDate', 'N/A')}",
+                f"    - URL: {committee.get('url', 'N/A')}"
+            ])
+        lines.append("")
+    
+    # Matching requirements (House communications)
+    if chamber.lower() == "house":
+        requirements = communication.get('matchingRequirements', [])
+        if requirements:
+            lines.extend([
+                f"**Matching Requirements**:"
+            ])
+            for req in requirements:
+                lines.append(f"  - {req.get('name', 'N/A')}")
+            lines.append("")
+    
+    return "\n".join(lines)
