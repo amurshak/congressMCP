@@ -359,6 +359,74 @@ class ParameterValidator:
             sanitized_value=content_type_lower
         )
 
+    @staticmethod
+    def validate_jacket_number(jacket_number: Optional[int]) -> ValidationResult:
+        """
+        Validate jacket number parameters for committee prints.
+        
+        Args:
+            jacket_number: Jacket number to validate
+            
+        Returns:
+            ValidationResult with validation status and error details
+        """
+        if jacket_number is None:
+            return ValidationResult(
+                is_valid=False,
+                error_message="Jacket number is required",
+                suggestions=["Provide a valid jacket number (positive integer)"]
+            )
+        
+        if not isinstance(jacket_number, int) or jacket_number <= 0:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Invalid jacket number: {jacket_number}. Must be a positive integer.",
+                suggestions=["Use a positive integer for the jacket number (e.g., 48144)"]
+            )
+        
+        # Jacket numbers are typically 5-6 digits based on API examples
+        if jacket_number > 999999:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Jacket number {jacket_number} seems unusually large",
+                suggestions=["Verify the jacket number is correct (typically 5-6 digits)"]
+            )
+        
+        return ValidationResult(is_valid=True, sanitized_value=jacket_number)
+    
+    @staticmethod
+    def validate_chamber(chamber: str, allow_nochamber: bool = True) -> ValidationResult:
+        """
+        Validate chamber parameter for Congressional APIs.
+        
+        Args:
+            chamber: Chamber name to validate
+            allow_nochamber: Whether to allow 'nochamber' as valid option
+            
+        Returns:
+            ValidationResult with validation status and sanitized value
+        """
+        if not isinstance(chamber, str):
+            return ValidationResult(
+                is_valid=False,
+                error_message="Chamber must be a string",
+                suggestions=["Provide chamber as 'house', 'senate'" + (", or 'nochamber'" if allow_nochamber else "")]
+            )
+        
+        chamber_lower = chamber.lower().strip()
+        valid_chambers = ["house", "senate"]
+        if allow_nochamber:
+            valid_chambers.append("nochamber")
+        
+        if chamber_lower not in valid_chambers:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Invalid chamber: {chamber}",
+                suggestions=[f"Must be one of: {', '.join(valid_chambers)}"]
+            )
+        
+        return ValidationResult(is_valid=True, sanitized_value=chamber_lower)
+    
 # Convenience functions for specific APIs
 class BoundCongressionalRecordValidator:
     """Specialized validator for Bound Congressional Record API."""

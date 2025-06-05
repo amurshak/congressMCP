@@ -305,11 +305,11 @@ class AmendmentsProcessor:
         )
 
 class MembersProcessor:
-    """Specialized processor for Members responses."""
+    """Specialized processor for Members API responses."""
     
     @staticmethod
     def deduplicate_members(members: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Deduplicate members."""
+        """Remove duplicate members based on bioguideId."""
         return ResponseProcessor.deduplicate_results(
             members,
             key_fields=['bioguideId'],
@@ -317,13 +317,52 @@ class MembersProcessor:
         )
     
     @staticmethod
-    def sort_by_name(members: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def sort_members_by_name(members: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Sort members by last name."""
         return ResponseProcessor.sort_results(
             members,
             sort_field='name',
             reverse=False,
             default_value='ZZZ'
+        )
+
+class CommitteePrintsProcessor:
+    """Specialized processor for Committee Prints API responses."""
+    
+    @staticmethod
+    def deduplicate_committee_prints(prints: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Remove duplicate committee prints based on congress, chamber, and jacketNumber."""
+        return ResponseProcessor.deduplicate_results(
+            prints,
+            key_fields=['congress', 'chamber', 'jacketNumber'],
+            preserve_order=True
+        )
+    
+    @staticmethod
+    def sort_prints_by_update_date(prints: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Sort committee prints by update date (most recent first)."""
+        return ResponseProcessor.sort_results(
+            prints,
+            sort_field='updateDate',
+            reverse=True,
+            default_value='1900-01-01T00:00:00+00:00'
+        )
+    
+    @staticmethod
+    def filter_prints_by_congress(prints: List[Dict[str, Any]], congress: int) -> List[Dict[str, Any]]:
+        """Filter committee prints by congress number."""
+        return ResponseProcessor.filter_results(
+            prints,
+            lambda print_item: print_item.get('congress') == congress
+        )
+    
+    @staticmethod
+    def filter_prints_by_chamber(prints: List[Dict[str, Any]], chamber: str) -> List[Dict[str, Any]]:
+        """Filter committee prints by chamber."""
+        chamber_lower = chamber.lower().strip()
+        return ResponseProcessor.filter_results(
+            prints,
+            lambda print_item: print_item.get('chamber', '').lower().strip() == chamber_lower
         )
 
 # Utility functions for common response processing patterns
@@ -406,6 +445,17 @@ def clean_amendments_response(data: Dict[str, Any], limit: int = 10) -> List[Dic
         data=data,
         data_key='amendments',
         deduplication_keys=['congress', 'type', 'number'],
+        sort_field='updateDate',
+        sort_reverse=True,
+        limit=limit
+    )
+
+def clean_committee_prints_response(data: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+    """Clean and process committee prints response."""
+    return process_api_response(
+        data=data,
+        data_key='committeePrints',
+        deduplication_keys=['congress', 'chamber', 'jacketNumber'],
         sort_field='updateDate',
         sort_reverse=True,
         limit=limit

@@ -64,6 +64,11 @@ class DefensiveAPIWrapper:
             retry_count=2,
             retry_delay=1.0
         ),
+        'committee-prints': APIEndpointConfig(
+            timeout=8.0,
+            retry_count=2,
+            retry_delay=1.0
+        ),
         'default': APIEndpointConfig()
     }
     
@@ -131,6 +136,8 @@ class DefensiveAPIWrapper:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['committees']
         elif 'committee-meetings' in endpoint:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['committee-meetings']
+        elif 'committee-prints' in endpoint:
+            return DefensiveAPIWrapper.ENDPOINT_CONFIGS['committee-prints']
         else:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['default']
     
@@ -330,4 +337,12 @@ async def safe_committee_meetings_request(endpoint: str, ctx: Context, params: D
     """Make a safe request to committee meetings endpoints."""
     return await DefensiveAPIWrapper.safe_api_request(
         endpoint, ctx, params, endpoint_type='committee-meetings'
+    )
+
+async def safe_committee_prints_request(endpoint: str, ctx: Context, params: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Make a safe request to committee prints endpoints."""
+    if params is None:
+        params = {}
+    return await DefensiveAPIWrapper.safe_api_request(
+        endpoint, ctx, params, endpoint_type='committee-prints'
     )

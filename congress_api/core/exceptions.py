@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 class ErrorType(Enum):
     """Standard error types for Congressional MCP APIs."""
     VALIDATION = "validation"
-    API_FAILURE = "api_failure"
     NOT_FOUND = "not_found"
     TIMEOUT = "timeout"
     SERVER_ERROR = "server_error"
@@ -185,27 +184,35 @@ class CommonErrors:
         )
     
     @staticmethod
-    def data_not_found(resource_type: str, search_criteria: Dict[str, Any]) -> APIErrorResponse:
-        """Error for when requested data is not found."""
+    def invalid_parameter(parameter_name: str, value: Any, message: str = None) -> APIErrorResponse:
+        """Error for invalid parameter values."""
+        error_message = f"Invalid {parameter_name}: {value}"
+        if message:
+            error_message += f". {message}"
+        
         return APIErrorResponse(
-            error_type=ErrorType.NOT_FOUND,
-            message=f"No {resource_type} found matching your search criteria",
+            error_type=ErrorType.VALIDATION,
+            message=error_message,
             suggestions=[
-                "Check that your parameters are correct",
-                "Try broadening your search criteria",
-                "Verify the data exists for the time period you're searching",
-                "Some historical data may not be available"
+                f"Check the {parameter_name} value and try again",
+                "Refer to the API documentation for valid parameter values"
             ],
-            error_code="DATA_NOT_FOUND",
-            details={"resource_type": resource_type, "search_criteria": search_criteria}
+            error_code="INVALID_PARAMETER",
+            details={"parameter": parameter_name, "provided_value": str(value)}
         )
-    
+
     @staticmethod
-    def api_server_error(endpoint: str, status_code: int = None) -> APIErrorResponse:
-        """Error for API server issues."""
+    def api_server_error(endpoint: str, status_code: int = None, message: str = None) -> APIErrorResponse:
+        """Error for API server issues and failures."""
+        default_message = "The Congressional API is experiencing issues"
+        if message:
+            default_message = message
+        elif status_code:
+            default_message = f"API request to {endpoint} failed with status {status_code}"
+        
         return APIErrorResponse(
             error_type=ErrorType.SERVER_ERROR,
-            message="The Congressional API is experiencing internal issues",
+            message=default_message,
             suggestions=[
                 "Try again in a few minutes",
                 "The issue is on the API server side, not your request",
@@ -215,7 +222,7 @@ class CommonErrors:
             error_code="SERVER_ERROR",
             details={"endpoint": endpoint, "status_code": status_code}
         )
-    
+
     @staticmethod
     def rate_limit_exceeded(endpoint: str, retry_after: Optional[int] = None) -> APIErrorResponse:
         """Error for rate limiting."""
@@ -237,18 +244,48 @@ class CommonErrors:
         )
 
     @staticmethod
-    def invalid_parameter(parameter_name: str, value: Any, message: str) -> APIErrorResponse:
-        """Error for invalid parameter values."""
+    def data_not_found(resource_type: str, search_criteria: Dict[str, Any] = None, identifier: str = None) -> APIErrorResponse:
+        """Error for when requested data is not found."""
+        if identifier:
+            message = f"{resource_type} not found: {identifier}"
+            suggestions = [
+                f"Verify the {resource_type.lower()} identifier is correct",
+                "Check if the resource exists in the specified congress",
+                "Try searching for similar resources"
+            ]
+            details = {"resource_type": resource_type, "identifier": identifier}
+        else:
+            message = f"No {resource_type} found matching your search criteria"
+            suggestions = [
+                "Check that your parameters are correct",
+                "Try broadening your search criteria",
+                "Verify the data exists for the time period you're searching",
+                "Some historical data may not be available"
+            ]
+            details = {"resource_type": resource_type}
+            if search_criteria:
+                details["search_criteria"] = search_criteria
+        
         return APIErrorResponse(
-            error_type=ErrorType.VALIDATION,
-            message=f"Invalid {parameter_name}: {message}",
-            suggestions=[
-                f"Check the {parameter_name} parameter format and value",
-                "Refer to the API documentation for valid parameter ranges",
-                "Try using a different value or format"
+            error_type=ErrorType.NOT_FOUND,
+            message=message,
+            suggestions=suggestions,
+            error_code="DATA_NOT_FOUND",
+            details=details
+        )
+
+    @staticmethod
+    def general_error(message: str, suggestions: List[str] = None, error_code: str = "GENERAL_ERROR") -> APIErrorResponse:
+        """Generic error for unexpected situations."""
+        return APIErrorResponse(
+            error_type=ErrorType.GENERAL,
+            message=message,
+            suggestions=suggestions or [
+                "Try again in a few moments",
+                "Contact support if the issue persists"
             ],
-            error_code=f"INVALID_{parameter_name.upper()}",
-            details={"parameter": parameter_name, "provided_value": str(value)}
+            error_code=error_code,
+            details={}
         )
 
 # Utility functions for error handling
