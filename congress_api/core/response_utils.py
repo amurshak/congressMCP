@@ -365,6 +365,52 @@ class CommitteePrintsProcessor:
             lambda print_item: print_item.get('chamber', '').lower().strip() == chamber_lower
         )
 
+class CommitteeReportsProcessor:
+    """Specialized processor for Committee Reports responses."""
+    
+    @staticmethod
+    def deduplicate_reports(reports: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Deduplicate committee reports."""
+        return ResponseProcessor.deduplicate_results(
+            reports,
+            key_fields=['congress', 'type', 'number'],
+            preserve_order=True
+        )
+    
+    @staticmethod
+    def filter_by_congress(reports: List[Dict[str, Any]], congress: int) -> List[Dict[str, Any]]:
+        """Filter reports by congress number."""
+        return ResponseProcessor.filter_results(
+            reports,
+            lambda report: report.get('congress') == congress
+        )
+    
+    @staticmethod
+    def filter_by_type(reports: List[Dict[str, Any]], report_type: str) -> List[Dict[str, Any]]:
+        """Filter reports by type."""
+        return ResponseProcessor.filter_results(
+            reports,
+            lambda report: report.get('type', '').lower() == report_type.lower()
+        )
+    
+    @staticmethod
+    def filter_conference_reports(reports: List[Dict[str, Any]], conference_only: bool = True) -> List[Dict[str, Any]]:
+        """Filter for conference reports only."""
+        return ResponseProcessor.filter_results(
+            reports,
+            lambda report: report.get('isConferenceReport', False) == conference_only
+        )
+    
+    @staticmethod
+    def sort_by_date(reports: List[Dict[str, Any]], newest_first: bool = True) -> List[Dict[str, Any]]:
+        """Sort reports by update date."""
+        return ResponseProcessor.sort_results(
+            reports,
+            sort_field='updateDate',
+            reverse=newest_first,
+            default_value='1900-01-01'
+        )
+
 # Utility functions for common response processing patterns
 def process_api_response(
     data: Dict[str, Any],
@@ -456,6 +502,17 @@ def clean_committee_prints_response(data: Dict[str, Any], limit: int = 10) -> Li
         data=data,
         data_key='committeePrints',
         deduplication_keys=['congress', 'chamber', 'jacketNumber'],
+        sort_field='updateDate',
+        sort_reverse=True,
+        limit=limit
+    )
+
+def clean_committee_reports_response(data: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+    """Clean and process committee reports response."""
+    return process_api_response(
+        data=data,
+        data_key='committeeReports',
+        deduplication_keys=['congress', 'type', 'number'],
         sort_field='updateDate',
         sort_reverse=True,
         limit=limit
