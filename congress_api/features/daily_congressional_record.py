@@ -4,10 +4,38 @@ from typing import Dict, List, Any, Optional
 from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
+from ..core.validators import ParameterValidator
+from ..core.api_wrapper import DefensiveAPIWrapper
+from ..core.exceptions import CommonErrors, format_error_response
+from ..core.response_utils import ResponseProcessor
 
 # Set up logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+# --- Defensive API Wrapper ---
+
+async def safe_daily_congressional_record_request(endpoint: str, params: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+    """
+    Safe API request wrapper for Daily Congressional Record with timeout and retry logic.
+    
+    Args:
+        endpoint: API endpoint to call
+        params: Parameters for the API request
+        ctx: FastMCP context
+        
+    Returns:
+        API response data
+        
+    Raises:
+        Exception: If API request fails after retries
+    """
+    return await DefensiveAPIWrapper.safe_api_request(
+        endpoint=endpoint,
+        ctx=ctx,
+        params=params or {},
+        endpoint_type="daily-congressional-record"
+    )
 
 # --- Formatting Helpers ---
 
@@ -50,85 +78,53 @@ def format_daily_record_detail(record_data: Dict[str, Any]) -> str:
     if 'issue' in record_data and record_data['issue']:
         issue = record_data['issue'][0]  # Get the first issue
         
-        # Add congress information if available in the issue
-        if 'congress' in issue:
-            lines[1] = f"Congress: {issue.get('congress', 'N/A')}"
+        # Add issue-specific details
+        lines.extend([
+            f"Full Issue Date: {issue.get('fullIssueDate', 'N/A')}",
+            f"PDF URL: {issue.get('pdfUrl', 'N/A')}",
+            f"ZIP URL: {issue.get('zipUrl', 'N/A')}"
+        ])
         
-        # Add full issue date if available
-        if 'fullIssue' in issue:
-            lines.append(f"Full Issue Date: {issue.get('fullIssue', 'N/A')}")
-        
-        # Add entire issue links
-        if 'entireIssue' in issue:
-            lines.append("\nEntire Issue:")
-            for item in issue['entireIssue']:
-                part = item.get('part', '')
-                part_text = f" (Part {part})" if part else ""
-                lines.append(f"  - {item.get('type', 'N/A')}{part_text}: {item.get('url', 'N/A')}")
-        
-        # Add sections
-        if 'sections' in issue:
-            lines.append("\nSections:")
-            for section in issue['sections']:
-                lines.append(f"  - {section.get('name', 'N/A')}")
-                lines.append(f"    Pages: {section.get('startPage', 'N/A')} - {section.get('endPage', 'N/A')}")
-                
-                if 'text' in section:
-                    lines.append("    Available formats:")
-                    for text_item in section['text']:
-                        part = text_item.get('part', '')
-                        part_text = f" (Part {part})" if part else ""
-                        lines.append(f"      - {text_item.get('type', 'N/A')}{part_text}: {text_item.get('url', 'N/A')}")
-        
-        # Add articles info
-        if 'articles' in issue:
-            articles = issue['articles']
-            lines.append(f"\nArticles: {articles.get('count', 'N/A')}")
-            lines.append(f"Articles URL: {articles.get('url', 'N/A')}")
-    else:
-        # Handle case where the response doesn't have an 'issue' key
-        # This might be the case for older API versions or different response formats
-        lines.append("\nNo detailed issue information available.")
-        
-        # Try to extract any available information from the response
-        if 'request' in record_data:
-            lines.append(f"\nAPI Request: {record_data.get('request', {}).get('url', 'N/A')}")
+        # Add links if available
+        if 'links' in issue and issue['links']:
+            lines.append("\nAvailable Links:")
+            for link in issue['links']:
+                name = link.get('name', 'Unknown')
+                url = link.get('url', 'N/A')
+                lines.append(f"  - {name}: {url}")
     
-    return "\n".join(lines)
+    # Add articles count if available
+    if 'articles' in record_data and record_data['articles']:
+        article_count = len(record_data['articles'])
+        lines.append(f"\nArticles Available: {article_count}")
     
     return "\n".join(lines)
 
 def format_daily_record_articles(articles_data: Dict[str, Any]) -> str:
     """Formats articles from a daily congressional record issue."""
     if not articles_data or 'articles' not in articles_data:
-        return "No articles available."
+        return "No articles available for this daily congressional record issue."
     
     articles = articles_data['articles']
     if not articles:
-        return "No articles found."
+        return "No articles found for this daily congressional record issue."
     
-    lines = ["Daily Congressional Record Articles:"]
+    lines = [f"Daily Congressional Record Articles ({len(articles)} found):\n"]
     
-    for section in articles:
-        section_name = section.get('name', 'Unnamed Section')
-        lines.append(f"\n## {section_name}")
-        
-        section_articles = section.get('sectionArticles', [])
-        for article in section_articles:
-            title = article.get('title', 'Untitled')
-            lines.append(f"\n- {title}")
-            lines.append(f"  Pages: {article.get('startPage', 'N/A')} - {article.get('endPage', 'N/A')}")
-            
-            if 'text' in article:
-                lines.append("  Available formats:")
-                for text_item in article['text']:
-                    part = text_item.get('part', '')
-                    part_text = f" (Part {part})" if part else ""
-                    lines.append(f"    - {text_item.get('type', 'N/A')}{part_text}: {text_item.get('url', 'N/A')}")
+    for i, article in enumerate(articles, 1):
+        lines.extend([
+            f"{i}. {article.get('title', 'Untitled Article')}",
+            f"   Type: {article.get('articleType', 'N/A')}",
+            f"   Chamber: {article.get('chamber', 'N/A')}",
+            f"   URL: {article.get('url', 'N/A')}",
+            ""
+        ])
     
     return "\n".join(lines)
 
-# --- MCP Resources ---
+# =============================================================================
+# MCP RESOURCES (Static/Reference Data Only - No User Parameters)
+# =============================================================================
 
 @mcp.resource("congress://daily-congressional-record/latest")
 async def get_latest_daily_congressional_record(ctx: Context) -> str:
@@ -136,124 +132,72 @@ async def get_latest_daily_congressional_record(ctx: Context) -> str:
     Get the most recent daily congressional record issues.
     Returns the 10 most recently published issues by default.
     """
-    params = {
-        "limit": 10,
-        "format": "json"
-    }
-    
-    logger.debug("Fetching latest daily congressional record issues")
-    data = await make_api_request("/daily-congressional-record", ctx, params=params)
-    
-    if "error" in data:
-        logger.error(f"Error retrieving latest daily congressional record issues: {data['error']}")
-        return f"Error retrieving latest daily congressional record issues: {data['error']}"
-    
-    if 'dailyCongressionalRecord' not in data:
-        logger.warning("No dailyCongressionalRecord field in response")
-        return "No daily congressional record issues found."
-    
-    issues = data['dailyCongressionalRecord']
-    if not issues:
-        logger.info("No daily congressional record issues found")
-        return "No daily congressional record issues found."
-    
-    logger.info(f"Found {len(issues)} daily congressional record issues")
-    lines = ["Latest Daily Congressional Record Issues:"]
-    for issue in issues:
-        lines.append("")
-        lines.append(format_daily_record_item(issue))
-    
-    return "\n".join(lines)
+    try:
+        logger.debug("Retrieving latest daily congressional record issues")
+        
+        # Make API request with defensive wrapper
+        data = await safe_daily_congressional_record_request(
+            endpoint="/daily-congressional-record",
+            params={"limit": 10},
+            ctx=ctx
+        )
+        
+        # Check for error response from API
+        if isinstance(data, dict) and 'error' in data:
+            error_msg = data.get('error', 'Unknown API error')
+            status_code = data.get('status_code', 'Unknown')
+            logger.warning(f"API returned error for /daily-congressional-record: {error_msg} (status: {status_code})")
+            
+            # Handle specific error cases
+            if status_code == 404 or 'not found' in error_msg.lower():
+                error_response = CommonErrors.data_not_found(
+                    "Daily Congressional Record Issues",
+                    search_criteria={"search_type": "latest"}
+                )
+                return format_error_response(error_response)
+            else:
+                # General API error
+                error_response = CommonErrors.general_error(f"API error: {error_msg}")
+                return format_error_response(error_response)
+        
+        # Process and deduplicate results
+        if 'dailyCongressionalRecord' in data and data['dailyCongressionalRecord']:
+            deduplicated_records = ResponseProcessor.deduplicate_results(
+                data['dailyCongressionalRecord'],
+                key_fields=['volumeNumber', 'issueNumber']
+            )
+            data['dailyCongressionalRecord'] = deduplicated_records
+            logger.debug(f"Retrieved {len(deduplicated_records)} latest daily congressional record issues")
+            
+            # Format the results
+            formatted_items = []
+            for item in deduplicated_records:
+                formatted_items.append(format_daily_record_item(item))
+            
+            return "\n\n".join(formatted_items)
+        else:
+            logger.warning("No daily congressional record issues found in API response")
+            error_response = CommonErrors.data_not_found(
+                "Daily Congressional Record Issues",
+                search_criteria={"search_type": "latest"}
+            )
+            return format_error_response(error_response)
+            
+    except Exception as e:
+        logger.error(f"Error retrieving latest daily congressional record issues: {e}")
+        logger.error(f"Exception type: {type(e)}")
+        logger.error(f"Exception repr: {repr(e)}")
+        logger.error(f"Exception args: {e.args}")
+        logger.error(f"Exception str: '{str(e)}'")
+        logger.error(f"Exception bool: {bool(e)}")
+        error_response = CommonErrors.general_error(
+            f"Error retrieving latest daily congressional record issues: {str(e) if str(e) else 'Unknown error occurred'}"
+        )
+        return format_error_response(error_response)
 
-@mcp.resource("congress://daily-congressional-record/{volume_number}")
-async def get_daily_congressional_record_by_volume(ctx: Context, volume_number: str) -> str:
-    """
-    Get daily congressional record issues for a specific volume.
-    
-    Args:
-        volume_number: The volume number (e.g., "166").
-    """
-    params = {
-        "format": "json"
-    }
-    
-    logger.debug(f"Fetching daily congressional record issues for volume {volume_number}")
-    data = await make_api_request(f"/daily-congressional-record/{volume_number}", ctx, params=params)
-    
-    if "error" in data:
-        logger.error(f"Error retrieving daily congressional record issues for volume {volume_number}: {data['error']}")
-        return f"Error retrieving daily congressional record issues for volume {volume_number}: {data['error']}"
-    
-    if 'dailyCongressionalRecord' not in data:
-        logger.warning(f"No dailyCongressionalRecord field in response for volume {volume_number}")
-        return f"No daily congressional record issues found for volume {volume_number}."
-    
-    issues = data['dailyCongressionalRecord']
-    if not issues:
-        logger.info(f"No daily congressional record issues found for volume {volume_number}")
-        return f"No daily congressional record issues found for volume {volume_number}."
-    
-    logger.info(f"Found {len(issues)} daily congressional record issues for volume {volume_number}")
-    lines = [f"Daily Congressional Record Issues for Volume {volume_number}:"]
-    for issue in issues:
-        lines.append("")
-        lines.append(format_daily_record_item(issue))
-    
-    return "\n".join(lines)
-
-@mcp.resource("congress://daily-congressional-record/{volume_number}/{issue_number}")
-async def get_daily_congressional_record_issue(ctx: Context, volume_number: str, issue_number: str) -> str:
-    """
-    Get detailed information for a specific daily congressional record issue.
-    
-    Args:
-        volume_number: The volume number (e.g., "168").
-        issue_number: The issue number (e.g., "153").
-    """
-    params = {
-        "format": "json"
-    }
-    
-    logger.debug(f"Fetching daily congressional record issue for volume {volume_number}, issue {issue_number}")
-    api_endpoint = f"/daily-congressional-record/{volume_number}/{issue_number}"
-    logger.info(f"API Endpoint: {api_endpoint}")
-    
-    data = await make_api_request(api_endpoint, ctx, params=params)
-    
-    # Log the raw response for debugging
-    logger.info(f"Raw API Response: {data}")
-    
-    if "error" in data:
-        logger.error(f"Error retrieving daily congressional record issue for volume {volume_number}, issue {issue_number}: {data['error']}")
-        return f"Error retrieving daily congressional record issue for volume {volume_number}, issue {issue_number}: {data['error']}"
-    
-    logger.info(f"Retrieved daily congressional record issue for volume {volume_number}, issue {issue_number}")
-    return format_daily_record_detail(data)
-
-@mcp.resource("congress://daily-congressional-record/{volume_number}/{issue_number}/articles")
-async def get_daily_congressional_record_articles(ctx: Context, volume_number: str, issue_number: str) -> str:
-    """
-    Get articles from a specific daily congressional record issue.
-    
-    Args:
-        volume_number: The volume number (e.g., "167").
-        issue_number: The issue number (e.g., "21").
-    """
-    params = {
-        "format": "json"
-    }
-    
-    logger.debug(f"Fetching articles for daily congressional record volume {volume_number}, issue {issue_number}")
-    data = await make_api_request(f"/daily-congressional-record/{volume_number}/{issue_number}/articles", ctx, params=params)
-    
-    if "error" in data:
-        logger.error(f"Error retrieving articles for daily congressional record volume {volume_number}, issue {issue_number}: {data['error']}")
-        return f"Error retrieving articles for daily congressional record volume {volume_number}, issue {issue_number}: {data['error']}"
-    
-    logger.info(f"Retrieved articles for daily congressional record volume {volume_number}, issue {issue_number}")
-    return format_daily_record_articles(data)
-
-# --- MCP Tools ---
+# =============================================================================
+# MCP TOOLS (Interactive/Parameterized Functions)
+# =============================================================================
 
 @mcp.tool()
 async def search_daily_congressional_record(
@@ -264,69 +208,176 @@ async def search_daily_congressional_record(
 ) -> str:
     """
     Search for daily congressional record issues based on various criteria.
+    Can also retrieve specific issues, volumes, or articles with detailed information.
     
     Args:
         volume_number: Optional volume number to filter by (e.g., "169").
-        issue_number: Optional issue number to filter by (e.g., "118").
-        limit: Maximum number of results to return (default: 10).
+        issue_number: Optional issue number to filter by (e.g., "118"). Requires volume_number.
+        limit: Maximum number of results to return (default: 10, max: 250).
     """
-    params = {
-        "format": "json",
-        "limit": limit
-    }
-    
-    endpoint = "/daily-congressional-record"
-    
-    # Build the endpoint based on provided parameters
-    if volume_number:
-        endpoint = f"{endpoint}/{volume_number}"
-        if issue_number:
-            endpoint = f"{endpoint}/{issue_number}"
-    
-    logger.debug(f"Searching daily congressional record with endpoint: {endpoint}")
-    data = await make_api_request(endpoint, ctx, params=params)
-    
-    if "error" in data:
-        logger.error(f"Error searching daily congressional record: {data['error']}")
-        return f"Error searching daily congressional record: {data['error']}"
-    
-    # Handle different response formats based on the endpoint
-    if issue_number and volume_number:
-        # Detailed issue view
-        logger.info(f"Retrieved daily congressional record volume {volume_number}, issue {issue_number}")
-        return format_daily_record_detail(data)
-    elif volume_number:
-        # Volume view
-        if 'dailyCongressionalRecord' not in data:
-            logger.warning(f"No dailyCongressionalRecord field in response for volume {volume_number}")
-            return f"No daily congressional record issues found for volume {volume_number}."
+    try:
+        logger.debug(f"Searching daily congressional record with volume={volume_number}, issue={issue_number}, limit={limit}")
         
-        issues = data['dailyCongressionalRecord']
-        if not issues:
-            logger.info(f"No daily congressional record issues found for volume {volume_number}")
-            return f"No daily congressional record issues found for volume {volume_number}."
+        # Parameter validation
+        validation_errors = []
         
-        logger.info(f"Found {len(issues)} daily congressional record issues for volume {volume_number}")
-        lines = [f"Daily Congressional Record Issues for Volume {volume_number}:"]
-    else:
-        # Latest issues view
-        if 'dailyCongressionalRecord' not in data:
-            logger.warning("No dailyCongressionalRecord field in response")
-            return "No daily congressional record issues found."
+        # Validate limit
+        limit_result = ParameterValidator.validate_limit_range(limit, max_limit=250)
+        if not limit_result.is_valid:
+            validation_errors.append(limit_result.error_message)
+        else:
+            if limit_result.sanitized_value != limit:
+                logger.debug(f"Auto-corrected limit from {limit} to {limit_result.sanitized_value}")
+            limit = limit_result.sanitized_value
         
-        issues = data['dailyCongressionalRecord']
-        if not issues:
-            logger.info("No daily congressional record issues found")
-            return "No daily congressional record issues found."
+        # Validate volume number format if provided
+        if volume_number is not None:
+            if not isinstance(volume_number, str) or not volume_number.strip():
+                validation_errors.append("volume_number must be a non-empty string")
+            else:
+                volume_number = volume_number.strip()
         
-        logger.info(f"Found {len(issues)} daily congressional record issues")
-        lines = ["Search Results - Daily Congressional Record Issues:"]
-    
-    # Format the list of issues
-    if 'dailyCongressionalRecord' in data:
-        issues = data['dailyCongressionalRecord']
-        for issue in issues:
-            lines.append("")
-            lines.append(format_daily_record_item(issue))
-    
-    return "\n".join(lines)
+        # Validate issue number format if provided
+        if issue_number is not None:
+            if volume_number is None:
+                validation_errors.append("issue_number requires volume_number to be specified")
+            elif not isinstance(issue_number, str) or not issue_number.strip():
+                validation_errors.append("issue_number must be a non-empty string")
+            else:
+                issue_number = issue_number.strip()
+        
+        # Return validation errors if any
+        if validation_errors:
+            error_msg = "; ".join(validation_errors)
+            logger.warning(f"Parameter validation failed: {error_msg}")
+            error_response = CommonErrors.invalid_parameter(
+                "search_parameters", 
+                {"volume_number": volume_number, "issue_number": issue_number, "limit": limit},
+                error_msg
+            )
+            return format_error_response(error_response)
+        
+        # Build endpoint and parameters based on search criteria
+        if volume_number and issue_number:
+            # Specific issue detail request
+            endpoint = f"/daily-congressional-record/{volume_number}/{issue_number}"
+            params = {}
+            search_type = "issue_detail"
+        elif volume_number:
+            # Volume-specific search - use the correct API endpoint
+            endpoint = f"/daily-congressional-record/{volume_number}"
+            params = {"limit": limit}
+            search_type = "volume_search"
+        else:
+            # General search
+            endpoint = "/daily-congressional-record"
+            params = {"limit": limit}
+            search_type = "general_search"
+        
+        # Make API request with defensive wrapper
+        data = await safe_daily_congressional_record_request(
+            endpoint=endpoint,
+            params=params,
+            ctx=ctx
+        )
+        
+        # Check for error response from API
+        if isinstance(data, dict) and 'error' in data:
+            error_msg = data.get('error', 'Unknown API error')
+            status_code = data.get('status_code', 'Unknown')
+            logger.warning(f"API returned error for {endpoint}: {error_msg} (status: {status_code})")
+            
+            # Handle specific error cases
+            if status_code == 404 or 'not found' in error_msg.lower():
+                if search_type == "issue_detail":
+                    error_response = CommonErrors.data_not_found(
+                        "Daily Congressional Record Issue",
+                        identifier=f"volume {volume_number}, issue {issue_number}"
+                    )
+                else:
+                    search_desc = f"volume {volume_number}" if volume_number else "your search criteria"
+                    error_response = CommonErrors.data_not_found(
+                        "Daily Congressional Record Issues",
+                        search_criteria={"volume_number": volume_number} if volume_number else {}
+                    )
+                return format_error_response(error_response)
+            else:
+                # General API error
+                error_response = CommonErrors.general_error(f"API error: {error_msg}")
+                return format_error_response(error_response)
+        
+        # Add debug logging for issue detail requests
+        if search_type == "issue_detail":
+            logger.debug(f"API Response for {endpoint}: {data}")
+            logger.debug(f"Response type: {type(data)}")
+            if isinstance(data, dict):
+                logger.debug(f"Response keys: {list(data.keys())}")
+                logger.debug(f"Full response content: {data}")
+            else:
+                logger.debug(f"Response content: {data}")
+        
+        # Process results based on search type
+        if search_type == "issue_detail":
+            # Return detailed issue information
+            # Check for valid response structure instead of just truthiness
+            if data and isinstance(data, dict) and ('issue' in data or 'issueDate' in data):
+                logger.debug(f"Retrieved detailed information for volume {volume_number}, issue {issue_number}")
+                return format_daily_record_detail(data)
+            else:
+                logger.warning(f"No data found for volume {volume_number}, issue {issue_number}")
+                error_response = CommonErrors.data_not_found(
+                    "Daily Congressional Record Issue",
+                    identifier=f"volume {volume_number}, issue {issue_number}"
+                )
+                return format_error_response(error_response)
+        
+        elif search_type in ["volume_search", "general_search"]:
+            # Process list results
+            if 'dailyCongressionalRecord' in data and data['dailyCongressionalRecord']:
+                records = data['dailyCongressionalRecord']
+                
+                # Apply response deduplication
+                deduplicated_records = ResponseProcessor.deduplicate_results(
+                    records,
+                    key_fields=['volumeNumber', 'issueNumber']
+                )
+                
+                if deduplicated_records:
+                    logger.debug(f"Found {len(deduplicated_records)} matching daily congressional record issues")
+                    
+                    # Format results
+                    formatted_items = []
+                    for item in deduplicated_records:
+                        formatted_items.append(format_daily_record_item(item))
+                    
+                    search_desc = f"volume {volume_number}" if volume_number else "your search criteria"
+                    result_header = f"Daily Congressional Record Issues matching {search_desc}:\n\n"
+                    return result_header + "\n\n".join(formatted_items)
+                else:
+                    search_desc = f"volume {volume_number}" if volume_number else "your search criteria"
+                    logger.warning(f"No daily congressional record issues found matching {search_desc}")
+                    search_criteria = {"volume_number": volume_number} if volume_number else {}
+                    error_response = CommonErrors.data_not_found(
+                        "Daily Congressional Record Issues",
+                        search_criteria=search_criteria
+                    )
+                    return format_error_response(error_response)
+            else:
+                logger.warning("No daily congressional record issues found in API response")
+                error_response = CommonErrors.data_not_found(
+                    "Daily Congressional Record Issues",
+                    search_criteria={"search_type": search_type}
+                )
+                return format_error_response(error_response)
+        
+    except Exception as e:
+        logger.error(f"Error searching daily congressional record: {e}")
+        logger.error(f"Exception type: {type(e)}")
+        logger.error(f"Exception repr: {repr(e)}")
+        logger.error(f"Exception args: {e.args}")
+        logger.error(f"Exception str: '{str(e)}'")
+        logger.error(f"Exception bool: {bool(e)}")
+        error_response = CommonErrors.general_error(
+            f"Error searching daily congressional record: {str(e) if str(e) else 'Unknown error occurred'}"
+        )
+        return format_error_response(error_response)

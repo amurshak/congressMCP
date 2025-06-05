@@ -79,6 +79,11 @@ class DefensiveAPIWrapper:
             retry_count=3,
             retry_delay=1.0
         ),
+        'daily-congressional-record': APIEndpointConfig(
+            timeout=8.0,
+            retry_count=2,
+            retry_delay=1.0
+        ),
         'default': APIEndpointConfig()
     }
     
@@ -152,6 +157,8 @@ class DefensiveAPIWrapper:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['committee-reports']
         elif 'crsreport' in endpoint:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['crs-reports']
+        elif 'daily-congressional-record' in endpoint:
+            return DefensiveAPIWrapper.ENDPOINT_CONFIGS['daily-congressional-record']
         else:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['default']
     
@@ -215,6 +222,19 @@ class DefensiveAPIWrapper:
                 # Make the actual API request
                 response = await make_api_request(endpoint, ctx, sanitized_params)
                 
+                # Check if make_api_request returned an error response
+                if isinstance(response, dict) and 'error' in response:
+                    error_msg = response.get('error', 'Unknown API error')
+                    status_code = response.get('status_code', 'Unknown')
+                    
+                    # Create an exception with the error details
+                    if status_code == 404:
+                        raise Exception(f"404 Not Found: {error_msg}")
+                    elif status_code == 400:
+                        raise Exception(f"400 Bad Request: {error_msg}")
+                    else:
+                        raise Exception(f"API Error ({status_code}): {error_msg}")
+                
                 logger.info(f"API request to {endpoint} succeeded on attempt {attempt + 1}")
                 return response
                 
@@ -239,7 +259,7 @@ class DefensiveAPIWrapper:
         error_response = DefensiveAPIWrapper._format_api_error(endpoint, last_error, config.retry_count)
         logger.error(f"API request to {endpoint} failed after {config.retry_count + 1} attempts: {error_response.message}")
         
-        raise Exception(format_error_response(error_response))
+        raise Exception(error_response.message)
     
     @staticmethod
     def _format_api_error(endpoint: str, error: Exception, retry_count: int) -> APIErrorResponse:
