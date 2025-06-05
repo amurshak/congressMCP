@@ -764,3 +764,53 @@ def clean_summaries_response(data: Dict[str, Any], limit: int = 10) -> List[Dict
         sort_reverse=True,
         limit=limit
     )
+
+class TreatiesProcessor:
+    """Specialized processor for Treaties API responses."""
+    
+    @staticmethod
+    def deduplicate_treaties(treaties: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Remove duplicate treaties based on congress, number, and suffix."""
+        return ResponseProcessor.deduplicate_results(
+            treaties,
+            key_fields=['congressReceived', 'number', 'suffix'],
+            preserve_order=True
+        )
+    
+    @staticmethod
+    def sort_by_update_date(treaties: List[Dict[str, Any]], newest_first: bool = True) -> List[Dict[str, Any]]:
+        """Sort treaties by update date."""
+        return ResponseProcessor.sort_results(
+            treaties,
+            sort_field='updateDate',
+            reverse=newest_first,
+            default_value='1900-01-01'
+        )
+    
+    @staticmethod
+    def filter_by_congress(treaties: List[Dict[str, Any]], congress: int) -> List[Dict[str, Any]]:
+        """Filter treaties by congress number."""
+        return ResponseProcessor.filter_results(
+            treaties,
+            lambda treaty: treaty.get('congressReceived') == congress or treaty.get('congressConsidered') == congress
+        )
+    
+    @staticmethod
+    def filter_by_topic(treaties: List[Dict[str, Any]], topic: str) -> List[Dict[str, Any]]:
+        """Filter treaties by topic (case-insensitive)."""
+        topic_lower = topic.lower()
+        return ResponseProcessor.filter_results(
+            treaties,
+            lambda treaty: topic_lower in treaty.get('topic', '').lower()
+        )
+
+def clean_treaties_response(data: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+    """Clean and process treaties response."""
+    return process_api_response(
+        data=data,
+        data_key='treaties',
+        deduplication_keys=['congressReceived', 'number', 'suffix'],
+        sort_field='updateDate',
+        sort_reverse=True,
+        limit=limit
+    )

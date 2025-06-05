@@ -748,22 +748,78 @@ class ParameterValidator:
         if communication_number is None:
             return ValidationResult(is_valid=True)
         
-        if not isinstance(communication_number, int):
+        if not isinstance(communication_number, int) or communication_number <= 0:
             return ValidationResult(
                 is_valid=False,
-                error_message="Communication number must be an integer",
-                suggestions=["Provide a positive integer communication number"]
-            )
-        
-        if communication_number <= 0:
-            return ValidationResult(
-                is_valid=False,
-                error_message=f"Communication number must be positive, got: {communication_number}",
-                suggestions=["Provide a positive integer communication number (e.g., 1, 100, 2561)"]
+                error_message=f"Communication number must be a positive integer, got: {communication_number}",
+                suggestions=["Use a positive integer for communication number (e.g., 1, 2, 3, ...)"]
             )
         
         return ValidationResult(is_valid=True, sanitized_value=communication_number)
-    
+
+    @staticmethod
+    def validate_treaty_number(treaty_number: Optional[int]) -> ValidationResult:
+        """
+        Validate treaty number.
+        
+        Args:
+            treaty_number: Treaty number to validate
+            
+        Returns:
+            ValidationResult with validation status and error details
+        """
+        if treaty_number is None:
+            return ValidationResult(is_valid=True)
+        
+        if not isinstance(treaty_number, int) or treaty_number <= 0:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Treaty number must be a positive integer, got: {treaty_number}",
+                suggestions=["Use a positive integer for treaty number (e.g., 1, 2, 3, ...)"]
+            )
+        
+        return ValidationResult(is_valid=True, sanitized_value=treaty_number)
+
+    @staticmethod
+    def validate_treaty_suffix(treaty_suffix: Optional[str]) -> ValidationResult:
+        """
+        Validate treaty suffix for partitioned treaties.
+        
+        Args:
+            treaty_suffix: Treaty suffix to validate (e.g., 'A', 'B', 'C')
+            
+        Returns:
+            ValidationResult with validation status and sanitized value
+        """
+        if treaty_suffix is None:
+            return ValidationResult(is_valid=True)
+        
+        if not isinstance(treaty_suffix, str):
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Treaty suffix must be a string, got: {type(treaty_suffix).__name__}",
+                suggestions=["Use a string for treaty suffix (e.g., 'A', 'B', 'C')"]
+            )
+        
+        # Clean and validate suffix
+        clean_suffix = treaty_suffix.strip().upper()
+        if not clean_suffix:
+            return ValidationResult(
+                is_valid=False,
+                error_message="Treaty suffix cannot be empty",
+                suggestions=["Use a non-empty string for treaty suffix (e.g., 'A', 'B', 'C')"]
+            )
+        
+        # Validate that it's a reasonable suffix (single letter or short string)
+        if len(clean_suffix) > 3:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Treaty suffix '{clean_suffix}' is too long (max 3 characters)",
+                suggestions=["Use a short suffix like 'A', 'B', 'C', or 'AB'"]
+            )
+        
+        return ValidationResult(is_valid=True, sanitized_value=clean_suffix)
+
     @staticmethod
     def validate_chamber(chamber: str, allow_nochamber: bool = True) -> ValidationResult:
         """

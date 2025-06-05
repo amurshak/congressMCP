@@ -104,6 +104,11 @@ class DefensiveAPIWrapper:
             retry_count=2,
             retry_delay=1.0
         ),
+        'treaties': APIEndpointConfig(
+            timeout=8.0,
+            retry_count=2,
+            retry_delay=1.0
+        ),
         'default': APIEndpointConfig()
     }
     
@@ -187,6 +192,8 @@ class DefensiveAPIWrapper:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['senate_communications']
         elif 'summaries' in endpoint:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['summaries']
+        elif 'treaties' in endpoint:
+            return DefensiveAPIWrapper.ENDPOINT_CONFIGS['treaties']
         else:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['default']
     
@@ -447,4 +454,10 @@ async def safe_summaries_request(endpoint: str, ctx: Context, params: Dict[str, 
     """Make a safe request to summaries endpoints."""
     return await DefensiveAPIWrapper.safe_api_request(
         endpoint, ctx, params, endpoint_type='summaries'
+    )
+
+async def safe_treaties_request(endpoint: str, ctx: Context, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Make a safe request to treaties endpoints."""
+    return await DefensiveAPIWrapper.safe_api_request(
+        endpoint, ctx, params, endpoint_type='treaties'
     )
