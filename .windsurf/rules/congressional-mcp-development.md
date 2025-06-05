@@ -38,3 +38,14 @@ trigger: always_on
 2. **All features import from congress_api.mcp_app** - Use `from congress_api.mcp_app import mcp`
 3. **Features auto-register** - Import in `congress_api/main.py` to register with MCP server
 4. **Use proper type hints** - Optional[int], Optional[str] for optional parameters
+
+## Testing Organization Rules
+1. **All test files must be placed in `/tests/` directory** - Never create test files in root or other directories
+2. **Use naming convention**: `test_[feature_name].py` for test files, `run_[category]_tests.py` for test runners
+3. **Test files must use relative imports**: `sys.path.append(os.path.join(os.path.dirname(__file__), '..'))`
+4. **Create mock data files** as `mock_[api_endpoint].json` in `tests/fixtures/` subdirectory
+5. **All new backend features must include corresponding tests** with mock data based on actual API responses
+6. **Test runners must provide clear pass/fail summaries** and be runnable from tests directory
+7. **Test categories**: API functionality, database operations, email services, authentication, integration tests
+8. **Tests must be executable without external API dependencies** using mock data
+9. **Use comprehensive test coverage** - formatting functions, error handling, edge cases, search logic

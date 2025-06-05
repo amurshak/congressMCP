@@ -1,9 +1,20 @@
-# congress_api/features/bound_congressional_record.py
+"""
+Bound Congressional Record API features for Congressional MCP.
+
+This module provides access to bound congressional record data including
+search functionality and individual record retrieval.
+"""
+
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Optional, Dict, Any
 from fastmcp import Context
-from ..mcp_app import mcp
+
 from ..core.client_handler import make_api_request
+from ..core.validators import BoundCongressionalRecordValidator, ParameterValidator
+from ..core.api_wrapper import safe_bound_record_request
+from ..core.exceptions import handle_validation_error, format_error_response, CommonErrors
+from ..core.response_utils import clean_bound_congressional_record_response
+from ..mcp_app import mcp
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -225,7 +236,7 @@ async def get_bound_congressional_record_by_date(ctx: Context, year: str, month:
 
 # --- MCP Tools ---
 
-@mcp.tool("search_bound_congressional_record")
+@mcp.tool()
 async def search_bound_congressional_record(
     ctx: Context,
     year: Optional[str] = None,
@@ -242,56 +253,93 @@ async def search_bound_congressional_record(
         day: Optional day to filter by (e.g., "19").
         limit: Maximum number of results to return (default: 10).
     """
-    params = {
-        "format": "json",
-        "limit": limit
-    }
+    logger.info(f"Searching bound congressional record with year={year}, month={month}, day={day}, limit={limit}")
     
-    # Construct the endpoint based on provided parameters
-    endpoint = "/bound-congressional-record"
-    if year:
-        endpoint += f"/{year}"
+    try:
+        # Use the new validation framework
+        validation_result = BoundCongressionalRecordValidator.validate_parameters(year, month, day, limit)
+        handle_validation_error(validation_result)
+        
+        # Validate and sanitize limit
+        limit_result = ParameterValidator.validate_limit_range(limit)
+        if limit_result.sanitized_value is not None:
+            limit = limit_result.sanitized_value
+            if limit_result.error_message:
+                logger.info(limit_result.error_message)
+        
+        # Prepare API parameters
+        params = {
+            "format": "json",
+            "limit": limit
+        }
+        
+        # Construct the endpoint based on provided parameters
+        endpoint = "/bound-congressional-record"
+        if year:
+            endpoint += f"/{year}"
+            if month:
+                endpoint += f"/{month}"
+                if day:
+                    endpoint += f"/{day}"
+        
+        # Log the search parameters for debugging
+        search_params = []
+        if year:
+            search_params.append(f"year={year}")
         if month:
-            endpoint += f"/{month}"
-            if day:
-                endpoint += f"/{day}"
-    
-    # Log the search parameters
-    search_params = []
-    if year:
-        search_params.append(f"year={year}")
-    if month:
-        search_params.append(f"month={month}")
-    if day:
-        search_params.append(f"day={day}")
-    if limit != 10:
-        search_params.append(f"limit={limit}")
-    
-    search_str = ", ".join(search_params) if search_params else "default parameters"
-    logger.debug(f"Searching bound congressional record with {search_str}")
-    
-    # Make the API request
-    data = await make_api_request(endpoint, ctx, params=params)
-    
-    if "error" in data:
-        logger.error(f"Error searching bound congressional record: {data['error']}")
-        return f"Error searching bound congressional record: {data['error']}"
-    
-    if 'boundCongressionalRecord' not in data:
-        logger.warning("No boundCongressionalRecord field in response")
-        return "No bound congressional record issues found matching the search criteria."
-    
-    issues = data['boundCongressionalRecord']
-    if not issues:
-        logger.info("No bound congressional record issues found matching the search criteria")
-        return "No bound congressional record issues found matching the search criteria."
-    
-    logger.info(f"Found {len(issues)} bound congressional record issues matching the search criteria")
-    
-    # Format the results
-    lines = ["Bound Congressional Record Search Results:"]
-    for issue in issues:
-        lines.append("")
-        lines.append(format_bound_record_item(issue))
-    
-    return "\n".join(lines)
+            search_params.append(f"month={month}")
+        if day:
+            search_params.append(f"day={day}")
+        if limit != 10:
+            search_params.append(f"limit={limit}")
+        
+        search_str = ", ".join(search_params) if search_params else "default parameters"
+        logger.info(f"Searching bound congressional record with {search_str}")
+        
+        # Use the defensive API wrapper
+        data = await safe_bound_record_request(endpoint, ctx, params)
+        
+        if "error" in data:
+            logger.error(f"API returned error: {data['error']}")
+            return format_error_response(CommonErrors.api_server_error(endpoint))
+        
+        if 'boundCongressionalRecord' not in data:
+            logger.warning("No boundCongressionalRecord field in response")
+            search_criteria = {"year": year, "month": month, "day": day}
+            return format_error_response(CommonErrors.data_not_found("bound congressional record issues", search_criteria))
+        
+        issues = data['boundCongressionalRecord']
+        if not issues:
+            logger.info("No bound congressional record issues found")
+            search_criteria = {"year": year, "month": month, "day": day}
+            return format_error_response(CommonErrors.data_not_found("bound congressional record issues", search_criteria))
+        
+        logger.info(f"Found {len(issues)} bound congressional record issues")
+        
+        # Deduplicate and clean the response
+        deduplicated_issues = clean_bound_congressional_record_response(data, limit)
+        
+        # Format the results
+        formatted_results = []
+        for issue in deduplicated_issues:
+            formatted_issue = format_bound_record_item(issue)
+            formatted_results.append(formatted_issue)
+        
+        result = f"# Bound Congressional Record Issues\n\n"
+        result += f"Found **{len(deduplicated_issues)}** issues matching your search criteria"
+        if len(deduplicated_issues) != len(issues):
+            result += f" ({len(issues) - len(deduplicated_issues)} duplicates removed)"
+        result += ".\n\n"
+        result += "\n".join(formatted_results)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in search_bound_congressional_record: {str(e)}")
+        # If it's already a formatted error, return it directly
+        if "❌ **Error**:" in str(e):
+            return str(e)
+        
+        # Otherwise, create a general error response
+        error_response = CommonErrors.api_server_error("bound-congressional-record")
+        return format_error_response(error_response)

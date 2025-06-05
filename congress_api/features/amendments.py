@@ -5,6 +5,10 @@ import logging
 from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
+from ..core.validators import ParameterValidator, ValidationResult
+from ..core.api_wrapper import DefensiveAPIWrapper
+from ..core.exceptions import format_error_response, APIErrorResponse
+from ..core.response_utils import ResponseProcessor
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -110,7 +114,7 @@ async def get_latest_amendments(ctx: Context) -> str:
     """
     logger.info("Accessing latest amendments resource")
     try:
-        data = await make_api_request("/amendment", ctx, {"limit": 10, "sort": "updateDate+desc"})
+        data = await DefensiveAPIWrapper.safe_api_request("/amendment", ctx, {"limit": 10, "sort": "updateDate+desc"}, timeout_override=10.0)
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")  
         
         if "error" in data:
@@ -146,7 +150,7 @@ async def get_amendments_by_congress(ctx: Context, congress: str) -> str:
     """
     logger.info(f"Accessing amendments for Congress {congress}")
     try:
-        data = await make_api_request(f"/amendment/{congress}", ctx, {"limit": 10, "sort": "updateDate+desc"})
+        data = await DefensiveAPIWrapper.safe_api_request(f"/amendment/{congress}", ctx, {"limit": 10, "sort": "updateDate+desc"}, timeout_override=10.0)
         logger.info(f"API response received for Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
         
         if "error" in data:
@@ -184,7 +188,7 @@ async def get_amendments_by_type(ctx: Context,congress: str, amendment_type: str
     logger.info(f"Accessing {amendment_type} amendments for Congress {congress}")
 
     try:
-        data = await make_api_request(f"/amendment/{congress}/{amendment_type}", ctx, {"limit": 10, "sort": "updateDate+desc"})
+        data = await DefensiveAPIWrapper.safe_api_request(f"/amendment/{congress}/{amendment_type}", ctx, {"limit": 10, "sort": "updateDate+desc"}, timeout_override=10.0)
         logger.info(f"API response received for {amendment_type} amendments in Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
         
         if "error" in data:
@@ -203,6 +207,7 @@ async def get_amendments_by_type(ctx: Context,congress: str, amendment_type: str
             result.append(format_amendment_summary(amendment))
         
         return "\n\n".join(result)
+        
     except Exception as e:
         logger.error(f"Exception in get_amendments_by_type for {amendment_type} amendments in Congress {congress}: {str(e)}")
         return f"Error retrieving {amendment_type.upper()} amendments for the {congress}th Congress: {str(e)}"
@@ -223,21 +228,70 @@ async def get_bill_amendments(
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
     """
+    # Parameter validation using reliability framework
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid congress number: {congress_validation.error_message}",
+            suggestions=congress_validation.suggestions,
+            error_code="INVALID_CONGRESS_NUMBER"
+        ))
+    
+    bill_type_validation = ParameterValidator.validate_bill_type(bill_type)
+    if not bill_type_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid bill type: {bill_type_validation.error_message}",
+            suggestions=bill_type_validation.suggestions,
+            error_code="INVALID_BILL_TYPE"
+        ))
+    
+    if bill_number <= 0:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message="Bill number must be a positive integer",
+            suggestions=["Use a positive number like 1, 2, 3, etc."],
+            error_code="INVALID_BILL_NUMBER"
+        ))
+    
     endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/amendments"
-    data = await make_api_request(endpoint, ctx)
     
-    if "error" in data:
-        return f"Error retrieving amendments: {data['error']}"
-    
-    amendments = data.get("amendments", [])
-    if not amendments:
-        return f"No amendments found for {bill_type.upper()} {bill_number} in the {congress}th Congress."
-    
-    result = [f"Found {len(amendments)} amendments for {bill_type.upper()} {bill_number} in the {congress}th Congress:"]
-    for amendment in amendments:
-        result.append("\n" + format_amendment_summary(amendment))
-    
-    return "\n".join(result)
+    # Use defensive API wrapper
+    try:
+        data = await DefensiveAPIWrapper.safe_api_request(endpoint, ctx, {}, timeout_override=10.0)
+        
+        amendments = data.get("amendments", [])
+        if not amendments:
+            return f"No amendments found for {bill_type.upper()} {bill_number} in the {congress}th Congress."
+        
+        # Apply deduplication
+        original_count = len(amendments)
+        amendments = ResponseProcessor.deduplicate_results(amendments, ["number", "type", "congress"])
+        duplicates_removed = original_count - len(amendments)
+        
+        result = [f"Found {len(amendments)} amendments for {bill_type.upper()} {bill_number} in the {congress}th Congress"]
+        if duplicates_removed > 0:
+            result[0] += f" ({duplicates_removed} duplicates removed)"
+        result[0] += ":"
+        
+        for amendment in amendments:
+            result.append("\n" + format_amendment_summary(amendment))
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in get_bill_amendments: {str(e)}")
+        return format_error_response(APIErrorResponse(
+            error_type="api_failure",
+            message="Failed to retrieve bill amendments due to an unexpected error",
+            suggestions=[
+                "Verify the bill exists",
+                "Check bill type and number are correct",
+                "Try again in a few moments"
+            ],
+            error_code="BILL_AMENDMENTS_RETRIEVAL_FAILED"
+        ))
 
 @mcp.tool()
 async def search_amendments(
@@ -258,6 +312,37 @@ async def search_amendments(
         limit: Maximum number of results to return (default: 10)
         sort: Sort order (default: "updateDate+desc")
     """
+    # Parameter validation using reliability framework
+    if congress is not None:
+        congress_validation = ParameterValidator.validate_congress_number(congress)
+        if not congress_validation.is_valid:
+            return format_error_response(APIErrorResponse(
+                error_type="validation",
+                message=f"Invalid congress number: {congress_validation.error_message}",
+                suggestions=congress_validation.suggestions,
+                error_code="INVALID_CONGRESS_NUMBER"
+            ))
+    
+    if amendment_type is not None:
+        amendment_validation = ParameterValidator.validate_amendment_type(amendment_type)
+        if not amendment_validation.is_valid:
+            return format_error_response(APIErrorResponse(
+                error_type="validation", 
+                message=f"Invalid amendment type: {amendment_validation.error_message}",
+                suggestions=amendment_validation.suggestions,
+                error_code="INVALID_AMENDMENT_TYPE"
+            ))
+    
+    limit_validation = ParameterValidator.validate_limit_range(limit, max_limit=250)
+    if not limit_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid limit: {limit_validation.error_message}",
+            suggestions=limit_validation.suggestions,
+            error_code="INVALID_LIMIT"
+        ))
+    
+    # Build endpoint and parameters
     params = {
         "query": keywords,
         "limit": limit,
@@ -270,21 +355,41 @@ async def search_amendments(
         if amendment_type is not None:
             endpoint = f"/amendment/{congress}/{amendment_type}"
     
-    data = await make_api_request(endpoint, ctx, params)
-    
-    if "error" in data:
-        return f"Error searching amendments: {data['error']}"
-    
-    amendments = data.get("amendments", [])
-    if not amendments:
-        return f"No amendments found matching '{keywords}'."
-    
-    result = [f"# Amendments Matching '{keywords}'\n"]
-    for amendment in amendments:
-        result.append("---\n")
-        result.append(format_amendment_summary(amendment))
-    
-    return "\n\n".join(result)
+    # Use defensive API wrapper
+    try:
+        data = await DefensiveAPIWrapper.safe_api_request(endpoint, ctx, params, timeout_override=15.0)
+        
+        amendments = data.get("amendments", [])
+        if not amendments:
+            return f"No amendments found matching '{keywords}'."
+        
+        # Apply deduplication
+        original_count = len(amendments)
+        amendments = ResponseProcessor.deduplicate_results(amendments, ["number", "type", "congress"])
+        duplicates_removed = original_count - len(amendments)
+        
+        # Apply pagination
+        amendments = ResponseProcessor.paginate_results(amendments, limit)
+        
+        # Format results
+        result = [f"# Amendments Matching '{keywords}'\n"]
+        if duplicates_removed > 0:
+            result.append(f"*Found {original_count} results ({duplicates_removed} duplicates removed)*\n")
+        
+        for amendment in amendments:
+            result.append("---\n")
+            result.append(format_amendment_summary(amendment))
+        
+        return "\n\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in search_amendments: {str(e)}")
+        return format_error_response(APIErrorResponse(
+            error_type="api_failure",
+            message="Failed to search amendments due to an unexpected error",
+            suggestions=["Try simplifying your search terms", "Check your internet connection", "Try again in a few moments"],
+            error_code="SEARCH_FAILED"
+        ))
 
 @mcp.tool()
 async def get_amendment_details(
@@ -301,31 +406,77 @@ async def get_amendment_details(
         amendment_type: Amendment type (e.g., 'samdt' for Senate Amendment, 'hamdt' for House Amendment)
         amendment_number: Amendment number
     """
+    # Parameter validation using reliability framework
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid congress number: {congress_validation.error_message}",
+            suggestions=congress_validation.suggestions,
+            error_code="INVALID_CONGRESS_NUMBER"
+        ))
+    
+    amendment_validation = ParameterValidator.validate_amendment_type(amendment_type)
+    if not amendment_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid amendment type: {amendment_validation.error_message}",
+            suggestions=amendment_validation.suggestions,
+            error_code="INVALID_AMENDMENT_TYPE"
+        ))
+    
+    if amendment_number <= 0:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message="Amendment number must be a positive integer",
+            suggestions=["Use a positive number like 1, 2, 3, etc."],
+            error_code="INVALID_AMENDMENT_NUMBER"
+        ))
+    
     endpoint = f"/amendment/{congress}/{amendment_type}/{amendment_number}"
-    data = await make_api_request(endpoint, ctx)
     
-    if "error" in data:
-        return f"Error retrieving amendment details: {data['error']}"
-    
-    # Log the data structure to help debug
-    logger.debug(f"Amendment details data structure: {data.keys() if isinstance(data, dict) else type(data)}")
-    
-    # Handle different data structures for amendment
-    amendment_data = data.get("amendment", {})
-    
-    # If amendment_data is empty, try to use the data directly
-    if not amendment_data and isinstance(data, dict):
-        # Some API responses don't have an 'amendment' wrapper
-        if 'number' in data or 'type' in data or 'congress' in data:
-            amendment_data = data
-    
-    if not amendment_data:
-        return f"No details found for {amendment_type.upper()} {amendment_number} in the {congress}th Congress."
-    
-    # Log the amendment structure to help debug
-    logger.debug(f"Amendment structure: {amendment_data.keys() if isinstance(amendment_data, dict) else type(amendment_data)}")
-    
-    return format_amendment_details(amendment_data)
+    # Use defensive API wrapper
+    try:
+        data = await DefensiveAPIWrapper.safe_api_request(endpoint, ctx, {}, timeout_override=10.0)
+        
+        # Log the data structure to help debug
+        logger.debug(f"Amendment details data structure: {data.keys() if isinstance(data, dict) else type(data)}")
+        
+        # Handle different data structures for amendment
+        amendment_data = data.get("amendment", {})
+        
+        # If amendment_data is empty, try to use the data directly
+        if not amendment_data and isinstance(data, dict):
+            # Some API responses don't have an 'amendment' wrapper
+            if 'number' in data or 'type' in data or 'congress' in data:
+                amendment_data = data
+        
+        if not amendment_data:
+            return format_error_response(APIErrorResponse(
+                error_type="not_found",
+                message=f"Amendment {amendment_type.upper()} {amendment_number} not found in Congress {congress}",
+                suggestions=[
+                    "Verify the amendment number is correct",
+                    "Check if the amendment type (samdt/hamdt) is correct",
+                    "Try searching for amendments to find the correct number"
+                ],
+                error_code="AMENDMENT_NOT_FOUND"
+            ))
+        
+        return format_amendment_details(amendment_data)
+        
+    except Exception as e:
+        logger.error(f"Error in get_amendment_details: {str(e)}")
+        return format_error_response(APIErrorResponse(
+            error_type="api_failure",
+            message="Failed to retrieve amendment details due to an unexpected error",
+            suggestions=[
+                "Verify the amendment exists",
+                "Check your internet connection", 
+                "Try again in a few moments"
+            ],
+            error_code="DETAILS_RETRIEVAL_FAILED"
+        ))
 
 @mcp.tool()
 async def get_amendment_actions(
@@ -344,21 +495,79 @@ async def get_amendment_actions(
         amendment_number: Amendment number
         limit: Maximum number of actions to return (default: 10)
     """
+    # Parameter validation using reliability framework
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid congress number: {congress_validation.error_message}",
+            suggestions=congress_validation.suggestions,
+            error_code="INVALID_CONGRESS_NUMBER"
+        ))
+    
+    amendment_validation = ParameterValidator.validate_amendment_type(amendment_type)
+    if not amendment_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid amendment type: {amendment_validation.error_message}",
+            suggestions=amendment_validation.suggestions,
+            error_code="INVALID_AMENDMENT_TYPE"
+        ))
+    
+    if amendment_number <= 0:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message="Amendment number must be a positive integer",
+            suggestions=["Use a positive number like 1, 2, 3, etc."],
+            error_code="INVALID_AMENDMENT_NUMBER"
+        ))
+    
+    limit_validation = ParameterValidator.validate_limit_range(limit, max_limit=100)
+    if not limit_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid limit: {limit_validation.error_message}",
+            suggestions=limit_validation.suggestions,
+            error_code="INVALID_LIMIT"
+        ))
+    
     endpoint = f"/amendment/{congress}/{amendment_type}/{amendment_number}/actions"
-    data = await make_api_request(endpoint, ctx, {"limit": limit})
     
-    if "error" in data:
-        return f"Error retrieving amendment actions: {data['error']}"
-    
-    actions = data.get("actions", [])
-    if not actions:
-        return f"No actions found for {amendment_type.upper()} {amendment_number} in the {congress}th Congress."
-    
-    result = [f"# Actions for {amendment_type.upper()} {amendment_number} - {congress}th Congress"]
-    for action in actions:
-        result.append(format_amendment_action(action))
-    
-    return "\n".join(result)
+    # Use defensive API wrapper
+    try:
+        data = await DefensiveAPIWrapper.safe_api_request(endpoint, ctx, {"limit": limit}, timeout_override=10.0)
+        
+        actions = data.get("actions", [])
+        if not actions:
+            return f"No actions found for {amendment_type.upper()} {amendment_number} in the {congress}th Congress."
+        
+        # Apply deduplication and pagination
+        original_count = len(actions)
+        actions = ResponseProcessor.deduplicate_results(actions, ["actionDate", "text"])
+        actions = ResponseProcessor.paginate_results(actions, limit)
+        duplicates_removed = original_count - len(actions)
+        
+        result = [f"# Actions for {amendment_type.upper()} {amendment_number} - {congress}th Congress"]
+        if duplicates_removed > 0:
+            result.append(f"*({duplicates_removed} duplicate actions removed)*")
+        
+        for action in actions:
+            result.append(format_amendment_action(action))
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in get_amendment_actions: {str(e)}")
+        return format_error_response(APIErrorResponse(
+            error_type="api_failure",
+            message="Failed to retrieve amendment actions due to an unexpected error",
+            suggestions=[
+                "Verify the amendment exists",
+                "Check amendment type and number are correct",
+                "Try again in a few moments"
+            ],
+            error_code="AMENDMENT_ACTIONS_RETRIEVAL_FAILED"
+        ))
 
 @mcp.tool()
 async def get_amendment_sponsors(
@@ -375,44 +584,100 @@ async def get_amendment_sponsors(
         amendment_type: Amendment type (e.g., 'samdt' for Senate Amendment, 'hamdt' for House Amendment)
         amendment_number: Amendment number
     """
+    # Parameter validation using reliability framework
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid congress number: {congress_validation.error_message}",
+            suggestions=congress_validation.suggestions,
+            error_code="INVALID_CONGRESS_NUMBER"
+        ))
+    
+    amendment_validation = ParameterValidator.validate_amendment_type(amendment_type)
+    if not amendment_validation.is_valid:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message=f"Invalid amendment type: {amendment_validation.error_message}",
+            suggestions=amendment_validation.suggestions,
+            error_code="INVALID_AMENDMENT_TYPE"
+        ))
+    
+    if amendment_number <= 0:
+        return format_error_response(APIErrorResponse(
+            error_type="validation",
+            message="Amendment number must be a positive integer",
+            suggestions=["Use a positive number like 1, 2, 3, etc."],
+            error_code="INVALID_AMENDMENT_NUMBER"
+        ))
+    
     endpoint = f"/amendment/{congress}/{amendment_type}/{amendment_number}/cosponsors"
-    data = await make_api_request(endpoint, ctx)
     
-    if "error" in data:
-        return f"Error retrieving amendment cosponsors: {data['error']}"
-    
-    # Handle different data structures for cosponsors
-    cosponsors_data = data.get("cosponsors", {})
-    
-    # Extract cosponsor items based on the data structure
-    if isinstance(cosponsors_data, list):
-        cosponsors = cosponsors_data
-    elif isinstance(cosponsors_data, dict) and "item" in cosponsors_data:
-        items = cosponsors_data["item"]
-        if isinstance(items, list):
-            cosponsors = items
+    # Use defensive API wrapper
+    try:
+        data = await DefensiveAPIWrapper.safe_api_request(endpoint, ctx, {}, timeout_override=10.0)
+        
+        # Handle different data structures for cosponsors
+        cosponsors_data = data.get("cosponsors", {})
+        
+        # Extract cosponsor items based on the data structure
+        if isinstance(cosponsors_data, list):
+            cosponsors = cosponsors_data
+        elif isinstance(cosponsors_data, dict) and "item" in cosponsors_data:
+            items = cosponsors_data["item"]
+            if isinstance(items, list):
+                cosponsors = items
+            else:
+                cosponsors = [items] if items else []
         else:
-            # If there's only one item, wrap it in a list
-            cosponsors = [items]
-    else:
-        # If we can't determine the structure, just use an empty list
-        logger.warning(f"Unexpected cosponsors structure: {type(cosponsors_data)}")
-        cosponsors = []
-    
-    if not cosponsors:
-        return f"No cosponsors found for {amendment_type.upper()} {amendment_number} in the {congress}th Congress."
-    
-    result = [f"# Cosponsors for {amendment_type.upper()} {amendment_number} - {congress}th Congress"]
-    result.append(f"Total Cosponsors: {len(cosponsors)}")
-    
-    for cosponsor in cosponsors:
-        full_name = cosponsor.get("fullName", "Unknown")
-        party = cosponsor.get("party", "")
-        state = cosponsor.get("state", "")
-        bioguide_id = cosponsor.get("bioguideId", "")
-        is_original = cosponsor.get("isOriginalCosponsor", False)
-        sponsorship_date = cosponsor.get("sponsorshipDate", "Unknown date")
-        original_status = "Original Cosponsor" if is_original else "Cosponsor"
-        result.append(f"- {full_name} ({party}-{state}), {original_status}, Added: {sponsorship_date}, Bioguide ID: {bioguide_id}")
-    
-    return "\n".join(result)
+            cosponsors = []
+        
+        if not cosponsors:
+            return f"No cosponsors found for {amendment_type.upper()} {amendment_number} in the {congress}th Congress."
+        
+        # Apply deduplication
+        original_count = len(cosponsors)
+        cosponsors = ResponseProcessor.deduplicate_results(cosponsors, ["bioguideId", "name"])
+        duplicates_removed = original_count - len(cosponsors)
+        
+        result = [f"# Cosponsors for {amendment_type.upper()} {amendment_number} - {congress}th Congress"]
+        if duplicates_removed > 0:
+            result.append(f"*({duplicates_removed} duplicate cosponsors removed)*")
+        result.append(f"Total: {len(cosponsors)} cosponsors\n")
+        
+        for cosponsor in cosponsors:
+            name = cosponsor.get("name", "Unknown")
+            party = cosponsor.get("party", "")
+            state = cosponsor.get("state", "")
+            district = cosponsor.get("district", "")
+            
+            sponsor_info = f"- **{name}**"
+            if party:
+                sponsor_info += f" ({party}"
+                if state:
+                    sponsor_info += f"-{state}"
+                    if district:
+                        sponsor_info += f"-{district}"
+                sponsor_info += ")"
+            elif state:
+                sponsor_info += f" ({state})"
+            
+            if "sponsorshipDate" in cosponsor:
+                sponsor_info += f" - Sponsored: {cosponsor['sponsorshipDate']}"
+            
+            result.append(sponsor_info)
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in get_amendment_sponsors: {str(e)}")
+        return format_error_response(APIErrorResponse(
+            error_type="api_failure",
+            message="Failed to retrieve amendment sponsors due to an unexpected error",
+            suggestions=[
+                "Verify the amendment exists",
+                "Check amendment type and number are correct",
+                "Try again in a few moments"
+            ],
+            error_code="AMENDMENT_SPONSORS_RETRIEVAL_FAILED"
+        ))
