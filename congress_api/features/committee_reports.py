@@ -1,6 +1,8 @@
 # congress_api/features/committee_reports.py
 import logging
+import re
 from typing import Dict, List, Any, Optional
+import httpx
 from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
@@ -531,5 +533,244 @@ async def search_committee_reports(
         logger.error(f"Error searching committee reports: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(
             "Failed to search committee reports",
+            message=str(e)
+        ))
+
+@mcp.tool("get_committee_report_content")
+async def get_committee_report_content(
+    ctx: Context,
+    congress: int, 
+    report_type: str, 
+    report_number: int,
+    chunk_number: int = 1,
+    chunk_size: int = 8000
+) -> str:
+    """
+    Get the actual text content of a specific committee report, with chunking support for large reports.
+    
+    Args:
+        congress: Congress number (e.g., 117 for 117th Congress)
+        report_type: Report type (e.g., 'hrpt' for House Report, 'srpt' for Senate Report)
+        report_number: Report number
+        chunk_number: Chunk number to retrieve (1-based, default: 1)
+        chunk_size: Size of each chunk in characters (default: 8000)
+    """
+    logger.debug(f"Fetching content for committee report {congress}/{report_type}/{report_number}")
+    
+    # Validate congress parameter
+    validation = ParameterValidator.validate_congress_number(congress)
+    if not validation.is_valid:
+        logger.warning(f"Invalid congress number: {congress}")
+        return format_error_response(CommonErrors.invalid_congress_number(congress))
+    
+    # Validate report type
+    report_type_validation = ParameterValidator.validate_report_type(report_type)
+    if not report_type_validation.is_valid:
+        logger.warning(f"Invalid report type: {report_type}")
+        return format_error_response(CommonErrors.invalid_parameter(
+            "report_type", 
+            report_type, 
+            report_type_validation.error_message
+        ))
+    report_type = report_type_validation.sanitized_value
+    
+    # Validate report number
+    report_number_validation = ParameterValidator.validate_report_number(report_number)
+    if not report_number_validation.is_valid:
+        logger.warning(f"Invalid report number: {report_number}")
+        return format_error_response(CommonErrors.invalid_parameter(
+            "report_number", 
+            report_number, 
+            report_number_validation.error_message
+        ))
+    
+    # Validate chunk_number parameter
+    if not isinstance(chunk_number, int) or chunk_number < 1:
+        error_response = CommonErrors.invalid_parameter(
+            "chunk_number", 
+            chunk_number, 
+            "Chunk number must be a positive integer (1-based)"
+        )
+        return format_error_response(error_response)
+    
+    # Validate chunk_size parameter
+    if not isinstance(chunk_size, int) or chunk_size < 1000 or chunk_size > 50000:
+        error_response = CommonErrors.invalid_parameter(
+            "chunk_size", 
+            chunk_size, 
+            "Chunk size must be between 1000 and 50000 characters"
+        )
+        return format_error_response(error_response)
+    
+    try:
+        # First, get the text versions to find the content URL
+        endpoint = f"/committee-report/{congress}/{report_type}/{report_number}/text"
+        data = await safe_committee_reports_request(endpoint, ctx, {})
+        
+        if not data or 'text' not in data:
+            logger.warning(f"No text versions data received for committee report {congress}/{report_type}/{report_number}")
+            return format_error_response(CommonErrors.data_not_found(
+                "committee report text versions", 
+                {"congress": congress, "report_type": report_type, "report_number": report_number}
+            ))
+        
+        text_versions = data['text']
+        if not text_versions:
+            logger.info(f"No text versions found for committee report {congress}/{report_type}/{report_number}")
+            return format_error_response(CommonErrors.data_not_found(
+                "committee report text versions", 
+                {"congress": congress, "report_type": report_type, "report_number": report_number}
+            ))
+        
+        # Get the formatted text URL (prefer HTML format)
+        text_url = None
+        selected_format = None
+        
+        # Look through all text versions for a formatted text URL
+        for text_version in text_versions:
+            formats = text_version.get("formats", [])
+            for fmt in formats:
+                if fmt.get("type") == "Formatted Text":
+                    text_url = fmt.get("url")
+                    selected_format = fmt
+                    break
+            if text_url:
+                break
+        
+        if not text_url:
+            # If no formatted text, try to get any available format
+            for text_version in text_versions:
+                formats = text_version.get("formats", [])
+                if formats:
+                    text_url = formats[0].get("url")
+                    selected_format = formats[0]
+                    break
+        
+        if not text_url:
+            available_formats = []
+            for text_version in text_versions:
+                for fmt in text_version.get("formats", []):
+                    available_formats.append(fmt.get("type", "Unknown"))
+            
+            error_response = CommonErrors.data_not_found("committee report content", {
+                "congress": congress,
+                "report_type": report_type,
+                "report_number": report_number,
+                "available_formats": available_formats
+            })
+            return format_error_response(error_response)
+        
+        # Fetch the actual committee report text content
+        try:
+            # Configure HTTP client with proper headers and timeout
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            timeout = httpx.Timeout(30.0)  # 30 second timeout
+            
+            async with httpx.AsyncClient(headers=headers, timeout=timeout) as client:
+                logger.debug(f"Fetching content from URL: {text_url}")
+                response = await client.get(text_url)
+                
+                logger.debug(f"HTTP response status: {response.status_code}")
+                if response.status_code != 200:
+                    error_response = CommonErrors.api_server_error("committee report content retrieval")
+                    error_response.details = {
+                        "http_status": response.status_code,
+                        "url": text_url,
+                        "response_text": response.text[:500] if response.text else "No response text"
+                    }
+                    return format_error_response(error_response)
+                
+                html_content = response.text
+                
+                # Extract text from HTML and clean it up
+                # Remove script and style elements
+                html_content = re.sub(r'<script[^>]*>.*?</script>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+                html_content = re.sub(r'<style[^>]*>.*?</style>', '', html_content, flags=re.DOTALL | re.IGNORECASE)
+                
+                # Remove HTML tags but preserve some structure
+                clean_text = re.sub(r'<[^>]+>', '', html_content)
+                
+                # Clean up whitespace and formatting
+                clean_text = re.sub(r'\n\s*\n\s*\n', '\n\n', clean_text)  # Multiple newlines to double
+                clean_text = re.sub(r'[ \t]+', ' ', clean_text)  # Multiple spaces to single
+                clean_text = clean_text.strip()
+                
+                # Calculate chunking
+                total_chars = len(clean_text)
+                total_chunks = (total_chars + chunk_size - 1) // chunk_size  # Ceiling division
+                
+                if chunk_number < 1 or chunk_number > total_chunks:
+                    error_response = CommonErrors.invalid_parameter(
+                        "chunk_number", 
+                        chunk_number, 
+                        f"Invalid chunk number. Report has {total_chunks} chunks of {chunk_size} characters each"
+                    )
+                    return format_error_response(error_response)
+                
+                # Extract the requested chunk
+                start_pos = (chunk_number - 1) * chunk_size
+                end_pos = min(start_pos + chunk_size, total_chars)
+                chunk_text = clean_text[start_pos:end_pos]
+                
+                # Add some overlap context if not the first chunk
+                if chunk_number > 1 and start_pos > 200:
+                    overlap_start = max(0, start_pos - 200)
+                    overlap_text = clean_text[overlap_start:start_pos]
+                    chunk_text = f"[...previous context: {overlap_text[-200:]}]\n\n{chunk_text}"
+                
+                result = [
+                    f"# Committee Report {report_type.upper()} {report_number} - {congress}th Congress",
+                    f"**Format:** {selected_format.get('type', 'Unknown')}",
+                    f"**Chunk:** {chunk_number} of {total_chunks} (characters {start_pos+1:,}-{end_pos:,} of {total_chars:,})",
+                    f"**Source:** {text_url}",
+                    "",
+                    "## Report Content",
+                    "",
+                    chunk_text
+                ]
+                
+                if chunk_number < total_chunks:
+                    result.extend([
+                        "",
+                        f"📄 **Note**: This is chunk {chunk_number} of {total_chunks}. Use `chunk_number={chunk_number + 1}` to get the next chunk."
+                    ])
+                
+                return "\n".join(result)
+                
+        except httpx.TimeoutException:
+            logger.error(f"Timeout while fetching committee report content from: {text_url}")
+            error_response = CommonErrors.api_server_error("committee report content retrieval")
+            error_response.details = {
+                "error": "Request timeout",
+                "url": text_url,
+                "suggestion": "The content server may be temporarily slow. Please try again."
+            }
+            return format_error_response(error_response)
+            
+        except httpx.RequestError as e:
+            logger.error(f"Request error while fetching committee report content: {e}")
+            error_response = CommonErrors.api_server_error("committee report content retrieval")
+            error_response.details = {
+                "error": f"Network error: {str(e)}",
+                "url": text_url,
+                "suggestion": "Please check your internet connection and try again."
+            }
+            return format_error_response(error_response)
+            
+        except Exception as e:
+            logger.error(f"Unexpected error while fetching committee report content: {e}")
+            error_response = CommonErrors.api_server_error("committee report content retrieval")
+            error_response.details = {
+                "error": f"Unexpected error: {str(e)}",
+                "url": text_url
+            }
+            return format_error_response(error_response)
+        
+    except Exception as e:
+        logger.error(f"Error fetching committee report content: {str(e)}")
+        return format_error_response(CommonErrors.api_server_error(
+            "Failed to fetch committee report content",
             message=str(e)
         ))
