@@ -5,18 +5,39 @@ from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
+# Import reliability framework components
+from ..core.validators import ParameterValidator
+from ..core.api_wrapper import DefensiveAPIWrapper
+from ..core.exceptions import CommonErrors, format_error_response
+from ..core.response_utils import HouseCommunicationsProcessor
+
 # Set up logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+# Initialize defensive API wrapper for house communications
+defensive_wrapper = DefensiveAPIWrapper()
+
+async def safe_house_communications_request(endpoint: str, params: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+    """Make a safe API request for house communications with defensive wrapper."""
+    return await defensive_wrapper.safe_api_request(
+        endpoint=endpoint,
+        params=params,
+        ctx=ctx
+    )
 
 # --- Formatting Helpers ---
 
 def format_house_communication_item(item: Dict[str, Any]) -> str:
     """Formats a single house communication item for display in a list."""
+    # Handle both field name formats (list vs detail endpoints)
+    congress_number = item.get('congressNumber') or item.get('congress', 'N/A')
+    comm_number = item.get('communicationNumber') or item.get('number', 'N/A')
+    
     lines = [
-        f"Congress: {item.get('congressNumber', 'N/A')}",
+        f"Congress: {congress_number}",
         f"Chamber: {item.get('chamber', 'N/A')}",
-        f"Communication Number: {item.get('communicationNumber', item.get('number', 'N/A'))}"
+        f"Communication Number: {comm_number}"
     ]
     
     # Add communication type if available
@@ -49,20 +70,16 @@ def format_house_communication_detail(comm_data: Dict[str, Any]) -> str:
     if not comm_data:
         return "No house communication data available."
     
-    # Check if the expected key is present
-    if 'house-communication' not in comm_data:
-        # Try to determine if this is a valid response in a different format
-        if isinstance(comm_data, dict) and len(comm_data) > 0:
-            # Log what keys we did receive
-            logging.debug(f"Received keys in response: {list(comm_data.keys())}")
-            return f"Received house communication data, but in an unexpected format. Keys: {list(comm_data.keys())}"
-        return "No house communication data available."
+    # comm_data is now the communication object directly
+    comm = comm_data
     
-    comm = comm_data['house-communication']
+    # Handle both field name formats (list vs detail endpoints)
+    comm_number = comm.get('number') or comm.get('communicationNumber', 'N/A')
+    congress_number = comm.get('congressNumber') or comm.get('congress', 'N/A')
     
     lines = [
-        f"House Communication - {comm.get('congressNumber', 'N/A')}/{comm.get('communicationType', {}).get('code', 'N/A')}/{comm.get('number', 'N/A')}",
-        f"Congress: {comm.get('congressNumber', 'N/A')}",
+        f"House Communication - {congress_number}/{comm.get('communicationType', {}).get('code', 'N/A')}/{comm_number}",
+        f"Congress: {congress_number}",
         f"Chamber: {comm.get('chamber', 'N/A')}",
         f"Session: {comm.get('sessionNumber', 'N/A')}"
     ]
@@ -123,163 +140,137 @@ def format_house_communication_detail(comm_data: Dict[str, Any]) -> str:
     
     return "\n".join(lines)
 
+# --- Helper Functions ---
+
+async def get_latest_house_communications(ctx: Context, limit: int = 10) -> List[Dict[str, Any]]:
+    """Helper function to get latest house communications."""
+    try:
+        params = {
+            "format": "json",
+            "limit": limit
+        }
+        
+        logger.debug("Fetching latest house communications")
+        data = await safe_house_communications_request("/house-communication", params, ctx)
+        
+        if "error" in data:
+            logger.error(f"Error retrieving latest house communications: {data['error']}")
+            return []
+        
+        if 'houseCommunications' not in data:
+            logger.warning("No houseCommunications field in response")
+            return []
+        
+        communications = data['houseCommunications']
+        if not communications:
+            logger.info("No house communications found")
+            return []
+        
+        # Apply response processing
+        processed_communications = HouseCommunicationsProcessor.deduplicate_communications(communications)
+        processed_communications = HouseCommunicationsProcessor.sort_by_update_date(processed_communications)
+        
+        logger.info(f"Retrieved {len(processed_communications)} latest house communications")
+        return processed_communications[:limit]
+        
+    except Exception as e:
+        logger.error(f"Unexpected error getting latest house communications: {str(e)}")
+        return []
+
 # --- MCP Resources ---
 
 @mcp.resource("congress://house-communications/latest")
-async def get_latest_house_communications(ctx: Context) -> str:
-    """
-    Get the most recent house communications.
-    Returns the 10 most recently published communications by default.
-    """
-    params = {
-        "limit": 10,
-        "format": "json"
-    }
-    
-    logger.debug("Fetching latest house communications")
-    data = await make_api_request("/house-communication", ctx, params=params)
-    
-    if "error" in data:
-        logger.error(f"Error retrieving latest house communications: {data['error']}")
-        return f"Error retrieving latest house communications: {data['error']}"
-    
-    if 'houseCommunications' not in data:
-        logger.warning("No houseCommunications field in response")
-        return "No house communications found."
-    
-    comms = data['houseCommunications']
-    if not comms:
-        logger.info("No house communications found")
-        return "No house communications found."
-    
-    logger.info(f"Found {len(comms)} house communications")
-    lines = ["Latest House Communications:"]
-    for comm in comms:
-        lines.append("")
-        lines.append(format_house_communication_item(comm))
-    
-    return "\n".join(lines)
-
-@mcp.resource("congress://house-communications/{congress}")
-async def get_house_communications_by_congress(ctx: Context, congress: int) -> str:
-    """
-    Get house communications for a specific Congress.
-    
-    Args:
-        congress: The Congress number (e.g., 117).
-    """
-    params = {
-        "format": "json"
-    }
-    
-    logger.debug(f"Fetching house communications for Congress {congress}")
-    data = await make_api_request(f"/house-communication/{congress}", ctx, params=params)
-    
-    if "error" in data:
-        logger.error(f"Error retrieving house communications for Congress {congress}: {data['error']}")
-        return f"Error retrieving house communications for Congress {congress}: {data['error']}"
-    
-    if 'houseCommunications' not in data:
-        logger.warning(f"No houseCommunications field in response for Congress {congress}")
-        return f"No house communications found for Congress {congress}."
-    
-    comms = data['houseCommunications']
-    if not comms:
-        logger.info(f"No house communications found for Congress {congress}")
-        return f"No house communications found for Congress {congress}."
-    
-    logger.info(f"Found {len(comms)} house communications for Congress {congress}")
-    lines = [f"House Communications for Congress {congress}:"]
-    for comm in comms:
-        lines.append("")
-        lines.append(format_house_communication_item(comm))
-    
-    return "\n".join(lines)
-
-@mcp.resource("congress://house-communications/{congress}/{communication_type}")
-async def get_house_communications_by_congress_and_type(ctx: Context, congress: int, communication_type: str) -> str:
-    """
-    Get house communications for a specific Congress and communication type.
-    
-    Args:
-        congress: The Congress number (e.g., 117).
-        communication_type: The type of communication (e.g., "ec", "ml", "pm", "pt").
-    """
-    params = {
-        "format": "json"
-    }
-    
-    logger.debug(f"Fetching house communications for Congress {congress}, type {communication_type}")
-    data = await make_api_request(f"/house-communication/{congress}/{communication_type}", ctx, params=params)
-    
-    if "error" in data:
-        logger.error(f"Error retrieving house communications for Congress {congress}, type {communication_type}: {data['error']}")
-        return f"Error retrieving house communications for Congress {congress}, type {communication_type}: {data['error']}"
-    
-    if 'houseCommunications' not in data:
-        logger.warning(f"No houseCommunications field in response for Congress {congress}, type {communication_type}")
-        return f"No house communications found for Congress {congress}, type {communication_type}."
-    
-    comms = data['houseCommunications']
-    if not comms:
-        logger.info(f"No house communications found for Congress {congress}, type {communication_type}")
-        return f"No house communications found for Congress {congress}, type {communication_type}."
-    
-    logger.info(f"Found {len(comms)} house communications for Congress {congress}, type {communication_type}")
-    
-    # Get the full name of the communication type from the first item if available
-    type_name = communication_type.upper()
-    if comms and 'communicationType' in comms[0] and 'name' in comms[0]['communicationType']:
-        type_name = comms[0]['communicationType']['name']
-    
-    lines = [f"House Communications for Congress {congress}, Type: {type_name}:"]
-    for comm in comms:
-        lines.append("")
-        lines.append(format_house_communication_item(comm))
-    
-    return "\n".join(lines)
-
-@mcp.resource("congress://house-communications/{congress}/{communication_type}/{communication_number}")
-async def get_house_communication_detail(ctx: Context, congress: int, communication_type: str, communication_number: int) -> str:
-    """
-    Get detailed information for a specific house communication.
-    
-    Args:
-        congress: The Congress number (e.g., 117).
-        communication_type: The type of communication (e.g., "ec", "ml", "pm", "pt").
-        communication_number: The communication number (e.g., 3324).
-    """
-    params = {
-        "format": "json"
-    }
-    
-    logger.debug(f"Fetching house communication {congress}/{communication_type}/{communication_number}")
-    data = await make_api_request(f"/house-communication/{congress}/{communication_type}/{communication_number}", ctx, params=params)
-    
-    # Log the entire response structure for debugging
-    logger.debug(f"API response structure: {list(data.keys()) if isinstance(data, dict) else 'Not a dictionary'}")
-    
-    if "error" in data:
-        logger.error(f"Error retrieving house communication {congress}/{communication_type}/{communication_number}: {data['error']}")
-        return f"Error retrieving house communication {congress}/{communication_type}/{communication_number}: {data['error']}"
-    
-    # Check for different possible response formats
-    if 'house-communication' in data:
-        logger.info(f"Retrieved house communication using 'house-communication' key")
-        return format_house_communication_detail(data)
-    elif 'houseCommunication' in data:
-        logger.info(f"Retrieved house communication using 'houseCommunication' key")
-        # Create a compatible structure for our formatter
-        compatible_data = {'house-communication': data['houseCommunication']}
-        return format_house_communication_detail(compatible_data)
-    else:
-        # If neither expected key is found, log the keys and return a formatted version of whatever we got
-        logger.warning(f"Unexpected response format. Keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dictionary'}")
-        return f"Retrieved house communication {congress}/{communication_type}/{communication_number}, but in an unexpected format:\n\n{str(data)[:500]}..."
+async def latest_house_communications_resource(ctx: Context) -> str:
+    """Static resource providing the 10 most recent house communications."""
+    try:
+        communications = await get_latest_house_communications(ctx, limit=10)
+        
+        if not communications:
+            return "No recent house communications available."
+        
+        lines = ["# Latest House Communications", ""]
+        for comm in communications:
+            lines.append(format_house_communication_item(comm))
+            lines.append("")
+        
+        return "\n".join(lines)
+        
+    except Exception as e:
+        logger.error(f"Error in latest house communications resource: {str(e)}")
+        return format_error_response(CommonErrors.api_server_error("/house-communication", message=str(e)))
 
 # --- MCP Tools ---
 
-@mcp.tool("search_house_communications")
+@mcp.tool()
+async def get_house_communication_details(
+    ctx: Context,
+    congress: int,
+    communication_type: str,
+    communication_number: int
+) -> str:
+    """
+    Get detailed information about a specific house communication.
+    
+    Args:
+        congress: Congress number (e.g., 117 for 117th Congress)
+        communication_type: Communication type (e.g., "ec", "ml", "pm", "pt")
+        communication_number: Communication number
+    """
+    # Parameter validation
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        logger.warning(f"Invalid congress parameter: {congress}")
+        return format_error_response(CommonErrors.invalid_congress_number(congress))
+    
+    # Validate communication type
+    valid_types = ["ec", "ml", "pm", "pt"]
+    if communication_type.lower() not in valid_types:
+        logger.warning(f"Invalid communication_type parameter: {communication_type}")
+        return format_error_response(CommonErrors.invalid_communication_type(communication_type))
+    
+    # Validate communication number
+    if not isinstance(communication_number, int) or communication_number < 1:
+        logger.warning(f"Invalid communication_number parameter: {communication_number}")
+        return format_error_response(CommonErrors.invalid_parameter(
+            "communication_number", 
+            communication_number, 
+            "Communication number must be a positive integer"
+        ))
+    
+    try:
+        params = {
+            "format": "json"
+        }
+        
+        logger.debug(f"Fetching house communication {congress}/{communication_type}/{communication_number}")
+        data = await safe_house_communications_request(f"/house-communication/{congress}/{communication_type}/{communication_number}", params, ctx)
+        
+        # Log the entire response structure for debugging
+        logger.debug(f"API response structure: {list(data.keys()) if isinstance(data, dict) else 'Not a dictionary'}")
+        
+        if "error" in data:
+            logger.error(f"Error retrieving house communication {congress}/{communication_type}/{communication_number}: {data['error']}")
+            return format_error_response(CommonErrors.api_server_error(f"/house-communication/{congress}/{communication_type}/{communication_number}", message=data['error']))
+        
+        # Check for house communication data
+        if 'house-communication' in data:
+            comm_data = data['house-communication']
+        elif 'houseCommunication' in data:
+            comm_data = data['houseCommunication']
+        elif 'houseCommunications' in data and data['houseCommunications']:
+            comm_data = data['houseCommunications'][0]
+        else:
+            logger.warning(f"No house communication data found for {congress}/{communication_type}/{communication_number}")
+            return f"House communication {congress}/{communication_type}/{communication_number} not found."
+        
+        logger.info(f"Retrieved details for house communication {congress}/{communication_type}/{communication_number}")
+        return format_house_communication_detail(comm_data)
+        
+    except Exception as e:
+        logger.error(f"Unexpected error getting house communication details {congress}/{communication_type}/{communication_number}: {str(e)}")
+        return format_error_response(CommonErrors.api_server_error(f"/house-communication/{congress}/{communication_type}/{communication_number}", message=str(e)))
+
+@mcp.tool()
 async def search_house_communications(
     ctx: Context,
     congress: Optional[int] = None,
@@ -290,56 +281,93 @@ async def search_house_communications(
     Search for house communications based on various criteria.
     
     Args:
-        congress: Optional Congress number (e.g., 117).
-        communication_type: Optional communication type (e.g., "ec", "ml", "pm", "pt").
-        limit: Maximum number of results to return (default: 10).
+        congress: Optional Congress number (e.g., 117)
+        communication_type: Optional communication type (e.g., "ec", "ml", "pm", "pt")
+        limit: Maximum number of results to return (default: 10)
     """
-    params = {
-        "format": "json",
-        "limit": limit
-    }
+    # Parameter validation
+    if congress is not None:
+        congress_validation = ParameterValidator.validate_congress_number(congress)
+        if not congress_validation.is_valid:
+            logger.warning(f"Invalid congress parameter: {congress}")
+            return format_error_response(CommonErrors.invalid_congress_number(congress))
     
-    # Construct the endpoint based on provided parameters
-    endpoint = "/house-communication"
-    if congress:
-        endpoint += f"/{congress}"
+    if communication_type is not None:
+        valid_types = ["ec", "ml", "pm", "pt"]
+        if communication_type.lower() not in valid_types:
+            logger.warning(f"Invalid communication_type parameter: {communication_type}")
+            return format_error_response(CommonErrors.invalid_communication_type(communication_type))
+    
+    limit_validation = ParameterValidator.validate_limit_range(limit, max_limit=250)
+    if not limit_validation.is_valid:
+        logger.warning(f"Invalid limit parameter: {limit}")
+        return format_error_response(CommonErrors.invalid_parameter(
+            "limit",
+            limit,
+            limit_validation.error_message
+        ))
+    
+    try:
+        params = {
+            "format": "json",
+            "limit": limit
+        }
+        
+        # Construct the endpoint based on provided parameters
+        endpoint = "/house-communication"
+        if congress:
+            endpoint += f"/{congress}"
+            if communication_type:
+                endpoint += f"/{communication_type}"
+        
+        # Log the search parameters
+        search_params = []
+        if congress:
+            search_params.append(f"congress={congress}")
         if communication_type:
-            endpoint += f"/{communication_type}"
-    
-    # Log the search parameters
-    search_params = []
-    if congress:
-        search_params.append(f"congress={congress}")
-    if communication_type:
-        search_params.append(f"communication_type={communication_type}")
-    if limit != 10:
-        search_params.append(f"limit={limit}")
-    
-    search_str = ", ".join(search_params) if search_params else "default parameters"
-    logger.debug(f"Searching house communications with {search_str}")
-    
-    # Make the API request
-    data = await make_api_request(endpoint, ctx, params=params)
-    
-    if "error" in data:
-        logger.error(f"Error searching house communications: {data['error']}")
-        return f"Error searching house communications: {data['error']}"
-    
-    if 'houseCommunications' not in data:
-        logger.warning("No houseCommunications field in response")
-        return "No house communications found matching the search criteria."
-    
-    comms = data['houseCommunications']
-    if not comms:
-        logger.info("No house communications found matching the search criteria")
-        return "No house communications found matching the search criteria."
-    
-    logger.info(f"Found {len(comms)} house communications matching the search criteria")
-    
-    # Format the results
-    lines = ["House Communications Search Results:"]
-    for comm in comms:
-        lines.append("")
-        lines.append(format_house_communication_item(comm))
-    
-    return "\n".join(lines)
+            search_params.append(f"communication_type={communication_type}")
+        if limit != 10:
+            search_params.append(f"limit={limit}")
+        
+        search_str = ", ".join(search_params) if search_params else "default parameters"
+        logger.debug(f"Searching house communications with {search_str}")
+        
+        # Make the API request
+        data = await safe_house_communications_request(endpoint, params, ctx)
+        
+        if "error" in data:
+            logger.error(f"Error searching house communications: {data['error']}")
+            return format_error_response(CommonErrors.api_server_error(endpoint, message=data['error']))
+        
+        if 'houseCommunications' not in data:
+            logger.warning("No houseCommunications field in response")
+            return "No house communications found matching the search criteria."
+        
+        communications = data['houseCommunications']
+        if not communications:
+            logger.info("No house communications found matching the search criteria")
+            return "No house communications found matching the search criteria."
+        
+        # Apply response processing
+        processed_communications = HouseCommunicationsProcessor.deduplicate_communications(communications)
+        processed_communications = HouseCommunicationsProcessor.sort_by_update_date(processed_communications)
+        
+        # Debug logging to see what fields are present
+        if processed_communications:
+            sample_comm = processed_communications[0]
+            logger.debug(f"Sample communication fields: {list(sample_comm.keys())}")
+            logger.debug(f"Sample communication data: {sample_comm}")
+        
+        logger.info(f"Found {len(processed_communications)} house communications matching the search criteria")
+        
+        # Format the results
+        lines = ["# House Communications Search Results", ""]
+        for comm in processed_communications[:limit]:
+            lines.append(format_house_communication_item(comm))
+            lines.append("")
+        
+        return "\n".join(lines)
+        
+    except Exception as e:
+        logger.error(f"Unexpected error searching house communications: {str(e)}")
+        return format_error_response(CommonErrors.api_server_error(endpoint, message=str(e)))

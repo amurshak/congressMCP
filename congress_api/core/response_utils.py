@@ -517,3 +517,77 @@ def clean_committee_reports_response(data: Dict[str, Any], limit: int = 10) -> L
         sort_reverse=True,
         limit=limit
     )
+
+class HouseCommunicationsProcessor:
+    """Specialized processor for House Communications API responses."""
+    
+    @staticmethod
+    def deduplicate_communications(communications: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Remove duplicate house communications based on congress, type, and number."""
+        if not communications:
+            return communications
+        
+        seen_keys: Set[tuple] = set()
+        deduplicated = []
+        
+        for comm in communications:
+            # Extract key values for deduplication
+            congress_num = comm.get('congressNumber')
+            comm_number = comm.get('communicationNumber')
+            
+            # Handle complex communicationType object
+            comm_type = comm.get('communicationType', {})
+            if isinstance(comm_type, dict):
+                comm_type_code = comm_type.get('code', '')
+            else:
+                comm_type_code = str(comm_type) if comm_type else ''
+            
+            # Create deduplication key
+            key_tuple = (congress_num, comm_type_code, comm_number)
+            
+            if key_tuple not in seen_keys:
+                seen_keys.add(key_tuple)
+                deduplicated.append(comm)
+            else:
+                logger.debug(f"Removing duplicate house communication with key: {key_tuple}")
+        
+        original_count = len(communications)
+        final_count = len(deduplicated)
+        
+        if original_count != final_count:
+            logger.info(f"Deduplicated house communications: {original_count} -> {final_count} ({original_count - final_count} duplicates removed)")
+        
+        return deduplicated
+    
+    @staticmethod
+    def sort_by_update_date(communications: List[Dict[str, Any]], newest_first: bool = True) -> List[Dict[str, Any]]:
+        """Sort communications by update date."""
+        return ResponseProcessor.sort_results(
+            communications,
+            sort_field='updateDate',
+            reverse=newest_first,
+            default_value='1900-01-01'
+        )
+    
+    @staticmethod
+    def filter_by_type(communications: List[Dict[str, Any]], communication_type: str) -> List[Dict[str, Any]]:
+        """Filter communications by communication type."""
+        return ResponseProcessor.filter_results(
+            communications,
+            lambda comm: comm.get('communicationType', {}).get('code', '').lower() == communication_type.lower()
+        )
+
+def clean_house_communications_response(data: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+    """Clean and process house communications response."""
+    if 'houseCommunications' not in data:
+        return []
+    
+    communications = data['houseCommunications']
+    if not communications:
+        return []
+    
+    # Apply custom house communications processing
+    processed = HouseCommunicationsProcessor.deduplicate_communications(communications)
+    processed = HouseCommunicationsProcessor.sort_by_update_date(processed)
+    
+    return processed[:limit]

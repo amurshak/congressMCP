@@ -168,6 +168,24 @@ class CommonErrors:
         )
     
     @staticmethod
+    def invalid_communication_type(communication_type: Any) -> APIErrorResponse:
+        """Error for invalid house communication types."""
+        valid_types = ['ec', 'ml', 'pm', 'pt']
+        return APIErrorResponse(
+            error_type=ErrorType.VALIDATION,
+            message=f"Invalid communication type: {communication_type}",
+            suggestions=[
+                f"Valid communication types: {', '.join(valid_types)}",
+                "ec = Executive Communication",
+                "ml = Memorial Letter",
+                "pm = Petition or Memorial",
+                "pt = Petition"
+            ],
+            error_code="INVALID_COMMUNICATION_TYPE",
+            details={"provided_value": str(communication_type), "valid_types": valid_types}
+        )
+    
+    @staticmethod
     def api_timeout(endpoint: str, timeout_seconds: float) -> APIErrorResponse:
         """Error for API timeouts."""
         return APIErrorResponse(
