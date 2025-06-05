@@ -193,142 +193,144 @@ def format_house_vote_xml_content(xml_content: str, source_url: str) -> str:
         
         root = ET.fromstring(xml_content)
         
-        # Debug: Log the root element and its immediate children
-        logger.info(f"XML Root tag: {root.tag}")
-        logger.info(f"XML Root children: {[child.tag for child in root]}")
+        # Extract vote metadata
+        metadata = root.find('vote-metadata')
+        if metadata is None:
+            return f"Could not parse XML structure from {source_url}"
         
-        # Try multiple possible XML structures
-        # Structure 1: Standard expected structure
-        vote_metadata = root.find('.//vote-metadata')
-        if vote_metadata is None:
-            # Structure 2: Try direct children
-            vote_metadata = root.find('vote-metadata')
+        # Basic vote information
+        congress = metadata.find('congress')
+        congress_text = congress.text if congress is not None else 'N/A'
         
-        # Extract metadata with fallbacks
-        congress = 'N/A'
-        session = 'N/A'
-        roll_call = 'N/A'
+        session = metadata.find('session')
+        session_text = session.text if session is not None else 'N/A'
         
-        if vote_metadata is not None:
-            congress_elem = vote_metadata.find('congress')
-            session_elem = vote_metadata.find('session')
-            roll_call_elem = vote_metadata.find('rollcall-num')
-            
-            congress = congress_elem.text if congress_elem is not None else 'N/A'
-            session = session_elem.text if session_elem is not None else 'N/A'
-            roll_call = roll_call_elem.text if roll_call_elem is not None else 'N/A'
-        else:
-            # Try alternative paths
-            for elem in root.iter():
-                if 'congress' in elem.tag.lower():
-                    congress = elem.text or 'N/A'
-                elif 'session' in elem.tag.lower():
-                    session = elem.text or 'N/A'
-                elif 'roll' in elem.tag.lower():
-                    roll_call = elem.text or 'N/A'
+        rollcall_num = metadata.find('rollcall-num')
+        rollcall_text = rollcall_num.text if rollcall_num is not None else 'N/A'
         
-        # Extract vote data with multiple fallback strategies
-        vote_data = root.find('.//vote-data') or root.find('vote-data')
-        recorded_vote = None
+        legis_num = metadata.find('legis-num')
+        legis_text = legis_num.text if legis_num is not None else 'N/A'
         
-        if vote_data is not None:
-            recorded_vote = vote_data.find('recorded-vote')
+        vote_question = metadata.find('vote-question')
+        question_text = vote_question.text if vote_question is not None else 'N/A'
         
-        if recorded_vote is None:
-            # Try finding recorded-vote directly
-            recorded_vote = root.find('.//recorded-vote') or root.find('recorded-vote')
+        vote_type = metadata.find('vote-type')
+        type_text = vote_type.text if vote_type is not None else 'N/A'
         
-        # Extract basic info with fallbacks
-        date_time = 'N/A'
-        location = 'N/A'
-        result = 'N/A'
-        vote_question = 'N/A'
-        vote_desc = 'N/A'
-        legis_num = 'N/A'
+        vote_result = metadata.find('vote-result')
+        result_text = vote_result.text if vote_result is not None else 'N/A'
         
-        if recorded_vote is not None:
-            # Try to extract fields with multiple possible tag names
-            for elem in recorded_vote:
-                tag_lower = elem.tag.lower()
-                if 'date' in tag_lower and date_time == 'N/A':
-                    date_time = elem.text or 'N/A'
-                elif 'time' in tag_lower and location == 'N/A':
-                    location = elem.text or 'N/A'
-                elif 'result' in tag_lower and result == 'N/A':
-                    result = elem.text or 'N/A'
-                elif 'question' in tag_lower and vote_question == 'N/A':
-                    vote_question = elem.text or 'N/A'
-                elif 'desc' in tag_lower and vote_desc == 'N/A':
-                    vote_desc = elem.text or 'N/A'
-                elif 'legis' in tag_lower and legis_num == 'N/A':
-                    legis_num = elem.text or 'N/A'
+        action_date = metadata.find('action-date')
+        date_text = action_date.text if action_date is not None else 'N/A'
         
-        # Extract vote totals with fallbacks
-        vote_totals = {}
+        action_time = metadata.find('action-time')
+        time_text = action_time.text if action_time is not None else 'N/A'
         
-        # Try to find vote totals in various locations
-        totals_elem = root.find('.//vote-totals') or root.find('vote-totals')
-        if totals_elem is not None:
-            for total in totals_elem:
-                vote_type = total.tag.replace('-', ' ').title()
-                count = total.text or '0'
-                vote_totals[vote_type] = count
+        vote_desc = metadata.find('vote-desc')
+        desc_text = vote_desc.text if vote_desc is not None else 'N/A'
         
-        # If no totals found, try counting individual votes
-        if not vote_totals:
-            yea_count = len(root.findall('.//member[@vote="Yea"]') or root.findall('.//member[@vote="Yes"]'))
-            nay_count = len(root.findall('.//member[@vote="Nay"]') or root.findall('.//member[@vote="No"]'))
-            present_count = len(root.findall('.//member[@vote="Present"]'))
-            not_voting_count = len(root.findall('.//member[@vote="Not Voting"]'))
-            
-            if yea_count > 0 or nay_count > 0:
-                vote_totals = {
-                    'Yea': str(yea_count),
-                    'Nay': str(nay_count),
-                    'Present': str(present_count),
-                    'Not Voting': str(not_voting_count)
-                }
-        
-        # Extract member votes (limit to first 10 per category for readability)
-        member_votes = {}
-        for vote_type in ['Yea', 'Yes', 'Nay', 'No', 'Present', 'Not Voting']:
-            members = root.findall(f'.//member[@vote="{vote_type}"]')[:10]
-            if members:
-                member_votes[vote_type] = [
-                    f"{member.get('name', 'Unknown')} ({member.get('party', 'Unknown')}-{member.get('state', 'Unknown')})"
-                    for member in members
-                ]
-        
-        # Build the formatted output
         lines = [
-            f"# House Vote {congress}-{session}-{roll_call} - Member Votes (XML Data)",
+            f"# House Vote {congress_text}-{session_text}-{rollcall_text} - Member Votes (XML Data)",
             "",
             f"**Source**: {source_url}",
-            f"**Date/Time**: {date_time}",
-            f"**Location**: {location}",
-            f"**Result**: {result}",
-            f"**Legislation**: {legis_num}",
-            "",
-            f"**Question**: {vote_question}",
-            f"**Description**: {vote_desc}",
-            "",
-            "## Vote Totals"
+            f"**Legislation**: {legis_text}",
+            f"**Question**: {question_text}",
+            f"**Vote Type**: {type_text}",
+            f"**Result**: {result_text}",
+            f"**Date**: {date_text}",
+            f"**Time**: {time_text}",
+            f"**Description**: {desc_text}",
+            ""
         ]
         
-        if vote_totals:
-            for vote_type, count in vote_totals.items():
-                lines.append(f"- **{vote_type}**: {count}")
-        else:
-            lines.append("- No vote totals found in XML")
+        # Extract vote totals
+        vote_totals = metadata.find('vote-totals')
+        if vote_totals is not None:
+            lines.append("## Vote Totals")
+            
+            # Party breakdown
+            party_totals = vote_totals.findall('totals-by-party')
+            if party_totals:
+                lines.append("### By Party")
+                for party_total in party_totals:
+                    party = party_total.find('party')
+                    party_name = party.text if party is not None else 'Unknown'
+                    
+                    yea = party_total.find('yea-total')
+                    yea_count = yea.text if yea is not None else '0'
+                    
+                    nay = party_total.find('nay-total')
+                    nay_count = nay.text if nay is not None else '0'
+                    
+                    present = party_total.find('present-total')
+                    present_count = present.text if present is not None else '0'
+                    
+                    not_voting = party_total.find('not-voting-total')
+                    not_voting_count = not_voting.text if not_voting is not None else '0'
+                    
+                    lines.append(f"**{party_name}**: Yes: {yea_count}, No: {nay_count}, Present: {present_count}, Not Voting: {not_voting_count}")
+            
+            # Overall totals
+            overall_totals = vote_totals.find('totals-by-vote')
+            if overall_totals is not None:
+                lines.append("")
+                lines.append("### Overall Totals")
+                
+                yea = overall_totals.find('yea-total')
+                yea_count = yea.text if yea is not None else '0'
+                
+                nay = overall_totals.find('nay-total')
+                nay_count = nay.text if nay is not None else '0'
+                
+                present = overall_totals.find('present-total')
+                present_count = present.text if present is not None else '0'
+                
+                not_voting = overall_totals.find('not-voting-total')
+                not_voting_count = not_voting.text if not_voting is not None else '0'
+                
+                lines.extend([
+                    f"- **Yes**: {yea_count}",
+                    f"- **No**: {nay_count}",
+                    f"- **Present**: {present_count}",
+                    f"- **Not Voting**: {not_voting_count}"
+                ])
         
-        # Add member vote samples
-        if member_votes:
-            lines.extend(["", "## Sample Member Votes (First 10 per category)"])
-            for vote_type, members in member_votes.items():
-                if members:
-                    lines.append(f"### {vote_type} ({len(members)} shown)")
-                    for member in members:
-                        lines.append(f"- {member}")
+        # Extract member votes (limited sample)
+        vote_data = root.find('vote-data')
+        if vote_data is not None:
+            recorded_votes = vote_data.findall('recorded-vote')
+            if recorded_votes:
+                lines.extend([
+                    "",
+                    "## Sample Member Votes (First 20)"
+                ])
+                
+                # Group votes by vote type for better organization
+                vote_groups = {'Yea': [], 'Nay': [], 'Present': [], 'Not Voting': []}
+                
+                for recorded_vote in recorded_votes[:50]:  # Process first 50 to get good samples
+                    legislator = recorded_vote.find('legislator')
+                    vote = recorded_vote.find('vote')
+                    
+                    if legislator is not None and vote is not None:
+                        name = legislator.text or 'Unknown'
+                        party = legislator.get('party', 'Unknown')
+                        state = legislator.get('state', 'Unknown')
+                        vote_choice = vote.text or 'Unknown'
+                        
+                        if vote_choice in vote_groups:
+                            vote_groups[vote_choice].append(f"{name} ({party}-{state})")
+                
+                # Display sample votes by type
+                for vote_type, members in vote_groups.items():
+                    if members:
+                        lines.append(f"### {vote_type} Votes (Sample)")
+                        # Show first 10 of each type
+                        for member in members[:10]:
+                            lines.append(f"- {member}")
+                        if len(members) > 10:
+                            lines.append(f"- ... and {len(members) - 10} more")
+                        lines.append("")
         
         lines.extend([
             "",
@@ -340,10 +342,10 @@ def format_house_vote_xml_content(xml_content: str, source_url: str) -> str:
         
     except ET.ParseError as e:
         logger.error(f"XML parsing error: {e}")
-        return f"Error parsing XML content: {e}\n\nSource: {source_url}"
+        return f"Error parsing XML from {source_url}: {str(e)}"
     except Exception as e:
         logger.error(f"Error formatting XML content: {e}")
-        return f"Error formatting XML content: {e}\n\nSource: {source_url}"
+        return f"Error processing XML data from {source_url}: {str(e)}"
 
 @mcp.resource("congress://house-votes/latest")
 async def get_latest_house_votes(ctx: Context) -> str:
