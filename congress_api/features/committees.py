@@ -1,8 +1,23 @@
 # committees.py
 from typing import Dict, List, Any, Optional
+import logging
 from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
+from ..core.validators import ParameterValidator, ValidationResult
+from ..core.api_wrapper import DefensiveAPIWrapper
+from ..core.exceptions import CommonErrors, format_error_response
+from ..core.response_utils import ResponseProcessor
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+# Initialize defensive API wrapper
+defensive_api = DefensiveAPIWrapper()
+
+async def safe_committees_request(endpoint: str, ctx: Context, params: Dict[str, Any] = {}) -> Dict[str, Any]:
+    """Safe API request wrapper for committees endpoints."""
+    return await DefensiveAPIWrapper.safe_api_request(endpoint, ctx, params, endpoint_type="committees")
 
 # Formatting helpers
 def format_committee_summary(committee: Dict[str, Any]) -> str:
@@ -465,85 +480,112 @@ async def get_committee_bills(
         limit: Maximum number of bills to return (default: 10)
     """
     
-    # Validate chamber parameter
-    if chamber.lower() not in ["house", "senate"]:
-        return f"Invalid chamber: {chamber}. Must be 'house' or 'senate'."
-    
-    # First get committee details to verify it exists and get the name
-    committee_data = await make_api_request(f"/committee/{chamber.lower()}/{committee_code}", ctx)
-    
-    if "error" in committee_data:
-        return f"Error retrieving committee: {committee_data['error']}"
-    
-    committee = committee_data.get("committee", {})
-    if not committee:
-        return f"No committee found with code {committee_code} in the {chamber.capitalize()}."
-    
-    # Extract committee name using multiple possible locations in the response
-    committee_name = "Unknown Committee"
-    
-    # Option 1: Direct name field
-    if "name" in committee:
-        committee_name = committee["name"]
-    
-    # Option 2: History array with libraryOfCongressName or officialName
-    elif "history" in committee and committee["history"] and len(committee["history"]) > 0:
-        history_item = committee["history"][0]
-        if "libraryOfCongressName" in history_item and history_item["libraryOfCongressName"]:
-            committee_name = history_item["libraryOfCongressName"]
-        elif "officialName" in history_item and history_item["officialName"]:
-            committee_name = history_item["officialName"]
-    
-    # Option 3: For subcommittees, the name might be in the parent committee's subcommittees array
-    elif "parent" in committee and committee["parent"] and "subcommittees" in committee["parent"]:
-        for subcommittee in committee["parent"]["subcommittees"]:
-            if subcommittee.get("systemCode") == committee_code:
-                committee_name = subcommittee.get("name", "Unknown Committee")
-                break
-    
-    # Option 4: Check for a 'title' field that some committee responses might have
-    elif "title" in committee:
-        committee_name = committee["title"]
+    try:
+        # Parameter validation
+        chamber_validation = ParameterValidator.validate_chamber(chamber)
+        if not chamber_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "chamber", chamber, chamber_validation.message
+            ))
         
-    # Option 5: Check for 'fullName' field
-    elif "fullName" in committee:
-        committee_name = committee["fullName"]
-    
-    # Now get bills for this committee
-    bills_data = await make_api_request(f"/bill", ctx, {
-        "committee": committee_code,
-        "limit": limit,
-        "sort": "updateDate+desc"
-    })
-    
-    if "error" in bills_data:
-        return f"Error retrieving committee bills: {bills_data['error']}"
-    
-    bills = bills_data.get("bills", [])
-    if not bills:
-        return f"No bills found for the {committee_name} committee."
-    
-    result = [f"Recent bills referred to the {committee_name} committee:"]
-    
-    for bill in bills:
-        bill_num = bill.get("number", "Unknown")
-        bill_type = bill.get("type", "Unknown").upper()
-        title = bill.get("title", "No title")
-        congress = bill.get("congress", "Unknown")
+        limit_validation = ParameterValidator.validate_limit_range(limit)
+        if not limit_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "limit", limit, limit_validation.message
+            ))
         
-        result.append(f"\n### {bill_type} {bill_num} ({congress}th Congress)")
-        result.append(f"Title: {title}")
+        logger.debug(f"Getting bills for committee {committee_code} in {chamber}")
         
-        if "latestAction" in bill:
-            action = bill["latestAction"]
-            action_text = action.get("text", "Unknown action")
-            action_date = action.get("actionDate", "Unknown date")
-            result.append(f"Latest Action: {action_text} ({action_date})")
+        # First get committee details to verify it exists and get the name
+        committee_data = await safe_committees_request(f"/committee/{chamber.lower()}/{committee_code}", ctx, {})
         
-        if "url" in bill:
-            result.append(f"URL: {bill['url']}")
-    
-    return "\n".join(result)
+        if "error" in committee_data:
+            error_response = CommonErrors.api_server_error("committee verification")
+            error_response.details = {"api_error": committee_data["error"]}
+            return format_error_response(error_response)
+        
+        committee = committee_data.get("committee", {})
+        if not committee:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "committee_code", committee_code, 
+                f"No committee found with code {committee_code} in the {chamber.capitalize()}."
+            ))
+        
+        # Extract committee name using multiple possible locations in the response
+        committee_name = "Unknown Committee"
+        
+        # Option 1: Direct name field
+        if "name" in committee:
+            committee_name = committee["name"]
+        # Option 2: History array with libraryOfCongressName or officialName
+        elif "history" in committee and committee["history"] and len(committee["history"]) > 0:
+            history_item = committee["history"][0]
+            if "libraryOfCongressName" in history_item and history_item["libraryOfCongressName"]:
+                committee_name = history_item["libraryOfCongressName"]
+            elif "officialName" in history_item and history_item["officialName"]:
+                committee_name = history_item["officialName"]
+        # Option 3: For subcommittees, the name might be in the parent committee's subcommittees array
+        elif "parent" in committee and committee["parent"] and "subcommittees" in committee["parent"]:
+            for subcommittee in committee["parent"]["subcommittees"]:
+                if subcommittee.get("systemCode") == committee_code:
+                    committee_name = subcommittee.get("name", "Unknown Committee")
+                    break
+        # Option 4: Check for a 'title' field that some committee responses might have
+        elif "title" in committee:
+            committee_name = committee["title"]
+        # Option 5: Check for 'fullName' field
+        elif "fullName" in committee:
+            committee_name = committee["fullName"]
+        
+        # Now get bills for this committee using defensive wrapper
+        bills_data = await safe_committees_request("/bill", ctx, {
+            "committee": committee_code,
+            "limit": limit,
+            "sort": "updateDate+desc"
+        })
+        
+        if "error" in bills_data:
+            error_response = CommonErrors.api_server_error("committee bills retrieval")
+            error_response.details = {"api_error": bills_data["error"]}
+            return format_error_response(error_response)
+        
+        bills = bills_data.get("bills", [])
+        if not bills:
+            return f"No bills found for the {committee_name} committee.\n\n**Note:** This may be because:\n- The committee has no recent bills\n- The committee code is incorrect\n- Bills may be assigned to subcommittees instead"
+        
+        # Deduplicate bills
+        bills = ResponseProcessor.deduplicate_results(
+            bills, 
+            key_func=lambda b: f"{b.get('congress', '')}-{b.get('type', '')}-{b.get('number', '')}"
+        )
+        
+        result = [f"Recent bills referred to the {committee_name} committee:"]
+        
+        for bill in bills:
+            bill_num = bill.get("number", "Unknown")
+            bill_type = bill.get("type", "Unknown").upper()
+            title = bill.get("title", "No title")
+            congress = bill.get("congress", "Unknown")
+            
+            result.append(f"\n### {bill_type} {bill_num} ({congress}th Congress)")
+            result.append(f"Title: {title}")
+            
+            if "latestAction" in bill:
+                action = bill["latestAction"]
+                action_text = action.get("text", "Unknown action")
+                action_date = action.get("actionDate", "Unknown date")
+                result.append(f"Latest Action: {action_text} ({action_date})")
+            
+            if "url" in bill:
+                result.append(f"URL: {bill['url']}")
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in get_committee_bills: {str(e)}")
+        error_response = CommonErrors.api_server_error("committee bills retrieval")
+        error_response.details = {"error": str(e)}
+        return format_error_response(error_response)
 
 @mcp.tool()
 async def get_committee_reports(
@@ -856,78 +898,104 @@ async def search_committees(
         limit: Maximum number of results to return (default: 10)
     """
     
-    # Determine initial fetch limit
-    fetch_limit = limit
-    if not chamber and not congress:
-        # If searching all committees for keywords, fetch a larger initial set
-        fetch_limit = 200 # Or API max, e.g., 250
-
-    # Build query parameters
-    params = {
-        "limit": fetch_limit, # Use the potentially larger fetch_limit here
-        "sort": "updateDate+desc"
-    }
-    
-    # Add optional parameters if provided
-    if chamber:
-        if chamber.lower() not in ["house", "senate", "joint"]:
-            return f"Invalid chamber: {chamber}. Must be 'house', 'senate', or 'joint'."
-        params["chamber"] = chamber.lower()
-    
-    # Determine the endpoint based on provided parameters
-    if congress and chamber:
-        endpoint = f"/committee/{congress}/{chamber.lower()}"
-    elif congress:
-        endpoint = f"/committee/{congress}"
-    elif chamber:
-        endpoint = f"/committee" # Chamber is already in params
-    else:
-        endpoint = f"/committee"
-    
-    import sys # Required for print to stderr
-    print(f"DEBUG search_committees: Requesting endpoint='{endpoint}', params={params}", file=sys.stderr)
-    
-    # Make the API request
-    committees_data = await make_api_request(endpoint, ctx, params)
-    
-    if "error" in committees_data:
-        return f"Error searching committees: {committees_data['error']}"
-    
-    raw_committees = committees_data.get("committees", [])
-    print(f"DEBUG search_committees: API returned {len(raw_committees)} committees before filtering.", file=sys.stderr)
-    if raw_committees:
-        sample_names = [c.get('name', 'N/A') for c in raw_committees[:5]] # Show 5 samples
-        print(f"DEBUG search_committees: Sample names from API: {sample_names}", file=sys.stderr)
-
-    committees_to_filter = raw_committees
-    
-    # Filter by keywords
-    if keywords:
-        filtered_committees = []
-        keywords_lower = keywords.lower()
+    try:
+        # Parameter validation
+        if chamber is not None:
+            chamber_validation = ParameterValidator.validate_chamber(chamber)
+            if not chamber_validation.is_valid:
+                return format_error_response(CommonErrors.invalid_parameter(
+                    "chamber", chamber, chamber_validation.message
+                ))
         
-        for committee in committees_to_filter:
-            name = committee.get("name", "").lower()
-            # Consider adding other descriptive fields if 'name' alone is insufficient
-            # For now, focusing on 'name' as the primary search field for keywords.
-            if keywords_lower in name:
-                filtered_committees.append(committee)
+        if congress is not None:
+            congress_validation = ParameterValidator.validate_congress(congress)
+            if not congress_validation.is_valid:
+                return format_error_response(CommonErrors.invalid_parameter(
+                    "congress", congress, congress_validation.message
+                ))
         
-        committees = filtered_committees
-    else: # If no keywords, use all committees returned (respecting fetch_limit)
-        committees = committees_to_filter
-
-    print(f"DEBUG search_committees: {len(committees)} committees after filtering by keywords '{keywords}'.", file=sys.stderr)
-
-    if not committees:
-        return f"No committees found matching your search criteria."
-    
-    # Limit the number of results *after* filtering
-    committees = committees[:limit]
-    
-    result = [f"Found {len(committees)} committees matching your search:"]
-    
-    for committee in committees:
-        result.append("\n" + format_committee_summary(committee))
-    
-    return "\n".join(result)
+        limit_validation = ParameterValidator.validate_limit(limit)
+        if not limit_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "limit", limit, limit_validation.message
+            ))
+        
+        # Determine initial fetch limit for better search results
+        fetch_limit = min(limit * 5, 200) if keywords else limit
+        
+        # Build query parameters
+        params = {
+            "limit": fetch_limit,
+            "sort": "updateDate+desc"
+        }
+        
+        # Add chamber parameter if provided
+        if chamber:
+            params["chamber"] = chamber.lower()
+        
+        # Determine the endpoint based on provided parameters
+        if congress and chamber:
+            endpoint = f"/committee/{congress}/{chamber.lower()}"
+        elif congress:
+            endpoint = f"/committee/{congress}"
+        else:
+            endpoint = "/committee"
+        
+        logger.debug(f"Searching committees with endpoint: {endpoint}, params: {params}")
+        
+        # Make the API request using defensive wrapper
+        committees_data = await safe_committees_request(endpoint, ctx, params)
+        
+        if "error" in committees_data:
+            error_response = CommonErrors.api_server_error("committee search")
+            error_response.details = {"api_error": committees_data["error"]}
+            return format_error_response(error_response)
+        
+        raw_committees = committees_data.get("committees", [])
+        logger.debug(f"API returned {len(raw_committees)} committees before filtering")
+        
+        # Filter by keywords if provided
+        if keywords:
+            filtered_committees = []
+            keywords_lower = keywords.lower()
+            
+            for committee in raw_committees:
+                name = committee.get("name", "").lower()
+                # Consider adding other descriptive fields if 'name' alone is insufficient
+                # For now, focusing on 'name' as the primary search field for keywords.
+                if keywords_lower in name:
+                    filtered_committees.append(committee)
+            
+            committees = filtered_committees
+        else:
+            committees = raw_committees
+        
+        logger.debug(f"Found {len(committees)} committees after keyword filtering")
+        
+        if not committees:
+            return "No committees found matching your search criteria.\n\n**Suggestions:**\n- Try broader keywords\n- Check spelling\n- Try searching without chamber/congress filters"
+        
+        # Deduplicate results
+        committees = ResponseProcessor.deduplicate_results(
+            committees, 
+            key_func=lambda c: c.get('systemCode', c.get('name', ''))
+        )
+        
+        # Limit the number of results after filtering and deduplication
+        committees = committees[:limit]
+        
+        result = [f"Found {len(committees)} committees matching your search:"]
+        
+        for committee in committees:
+            result.append("\n" + format_committee_summary(committee))
+        
+        if len(raw_committees) > len(committees):
+            result.append(f"\n**Note:** Showing top {len(committees)} results. Use more specific keywords to narrow results.")
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in search_committees: {str(e)}")
+        error_response = CommonErrors.api_server_error("committee search")
+        error_response.details = {"error": str(e)}
+        return format_error_response(error_response)
