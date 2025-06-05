@@ -326,6 +326,39 @@ class ParameterValidator:
         
         return ValidationResult(is_valid=True, sanitized_value=amendment_type_lower)
 
+    @staticmethod
+    def validate_content_type(content_type: str) -> ValidationResult:
+        """
+        Validate content type parameters.
+        
+        Args:
+            content_type: Content type to validate (e.g., "text", "summary")
+            
+        Returns:
+            ValidationResult with validation status
+        """
+        if not content_type:
+            return ValidationResult(
+                is_valid=False,
+                error_message="Content type cannot be empty",
+                suggestions=["Use 'text' for bill text or 'summary' for bill summaries"]
+            )
+        
+        valid_types = ["text", "summary"]
+        content_type_lower = content_type.lower().strip()
+        
+        if content_type_lower not in valid_types:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Invalid content type: {content_type}",
+                suggestions=[f"Valid content types are: {', '.join(valid_types)}"]
+            )
+        
+        return ValidationResult(
+            is_valid=True,
+            sanitized_value=content_type_lower
+        )
+
 # Convenience functions for specific APIs
 class BoundCongressionalRecordValidator:
     """Specialized validator for Bound Congressional Record API."""

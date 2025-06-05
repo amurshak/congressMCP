@@ -227,6 +227,60 @@ class BillsProcessor:
             bills,
             lambda bill: bill.get('congress') == congress
         )
+    
+    @staticmethod
+    def deduplicate_cosponsors(cosponsors: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Deduplicate bill cosponsors."""
+        return ResponseProcessor.deduplicate_results(
+            cosponsors,
+            key_fields=['bioguideId'],
+            preserve_order=True
+        )
+    
+    @staticmethod
+    def deduplicate_text_versions(text_versions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Deduplicate bill text versions."""
+        return ResponseProcessor.deduplicate_results(
+            text_versions,
+            key_fields=['type', 'date'],
+            preserve_order=True
+        )
+    
+    @staticmethod
+    def deduplicate_titles(titles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Deduplicate bill titles."""
+        return ResponseProcessor.deduplicate_results(
+            titles,
+            key_fields=['titleType', 'title'],
+            preserve_order=True
+        )
+    
+    @staticmethod
+    def deduplicate_related_bills(related_bills: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Deduplicate related bills."""
+        return ResponseProcessor.deduplicate_results(
+            related_bills,
+            key_fields=['congress', 'type', 'number'],
+            preserve_order=True
+        )
+    
+    @staticmethod
+    def deduplicate_summaries(summaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Deduplicate bill summaries."""
+        return ResponseProcessor.deduplicate_results(
+            summaries,
+            key_fields=['actionDesc', 'actionDate'],
+            preserve_order=True
+        )
+    
+    @staticmethod
+    def deduplicate_committees(committees: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Deduplicate bill committees."""
+        return ResponseProcessor.deduplicate_results(
+            committees,
+            key_fields=['name', 'chamber'],
+            preserve_order=True
+        )
 
 class AmendmentsProcessor:
     """Specialized processor for Amendments responses."""
