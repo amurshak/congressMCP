@@ -13,13 +13,94 @@ mcp = FastMCP(
 )
 
 def initialize_features():
-    """Initialize all features - called after server setup to avoid circular imports"""
-    # Import all features to register them with the MCP server
-    from .features import bills, members, committees, congress_info, amendments, summaries, committee_reports, committee_prints, committee_meetings, hearings, congressional_record, daily_congressional_record, bound_congressional_record, house_communications, house_requirements, senate_communications, nominations, crs_reports, treaties
+    """Initialize features based on configuration - called after server setup to avoid circular imports"""
+    from .core.feature_config import get_enabled_features, get_feature_stats
+    
+    # Get enabled features from configuration
+    enabled_features = get_enabled_features()
+    stats = get_feature_stats()
+    
+    # Log configuration info
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Congressional MCP Server - Feature Mode: {stats['mode']}")
+    logger.info(f"Loading {stats['enabled_count']}/{stats['total_available']} features ({stats['coverage_percentage']}% coverage)")
+    
+    # Dynamic import of enabled features only
+    feature_modules = {}
+    
+    for feature_name in enabled_features:
+        try:
+            if feature_name == "bills":
+                from .features import bills
+                feature_modules["bills"] = bills
+            elif feature_name == "members":
+                from .features import members
+                feature_modules["members"] = members
+            elif feature_name == "committees":
+                from .features import committees
+                feature_modules["committees"] = committees
+            elif feature_name == "congress_info":
+                from .features import congress_info
+                feature_modules["congress_info"] = congress_info
+            elif feature_name == "amendments":
+                from .features import amendments
+                feature_modules["amendments"] = amendments
+            elif feature_name == "summaries":
+                from .features import summaries
+                feature_modules["summaries"] = summaries
+            elif feature_name == "house_votes":
+                from .features import house_votes
+                feature_modules["house_votes"] = house_votes
+            elif feature_name == "committee_reports":
+                from .features import committee_reports
+                feature_modules["committee_reports"] = committee_reports
+            elif feature_name == "committee_prints":
+                from .features import committee_prints
+                feature_modules["committee_prints"] = committee_prints
+            elif feature_name == "committee_meetings":
+                from .features import committee_meetings
+                feature_modules["committee_meetings"] = committee_meetings
+            elif feature_name == "hearings":
+                from .features import hearings
+                feature_modules["hearings"] = hearings
+            elif feature_name == "congressional_record":
+                from .features import congressional_record
+                feature_modules["congressional_record"] = congressional_record
+            elif feature_name == "daily_congressional_record":
+                from .features import daily_congressional_record
+                feature_modules["daily_congressional_record"] = daily_congressional_record
+            elif feature_name == "bound_congressional_record":
+                from .features import bound_congressional_record
+                feature_modules["bound_congressional_record"] = bound_congressional_record
+            elif feature_name == "house_communications":
+                from .features import house_communications
+                feature_modules["house_communications"] = house_communications
+            elif feature_name == "house_requirements":
+                from .features import house_requirements
+                feature_modules["house_requirements"] = house_requirements
+            elif feature_name == "senate_communications":
+                from .features import senate_communications
+                feature_modules["senate_communications"] = senate_communications
+            elif feature_name == "nominations":
+                from .features import nominations
+                feature_modules["nominations"] = nominations
+            elif feature_name == "crs_reports":
+                from .features import crs_reports
+                feature_modules["crs_reports"] = crs_reports
+            elif feature_name == "treaties":
+                from .features import treaties
+                feature_modules["treaties"] = treaties
+            
+            logger.info(f"✅ Loaded feature: {feature_name}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to load feature {feature_name}: {e}")
     
     # Import prompts
     from . import prompts_module
     
+    logger.info(f"Congressional MCP Server initialized with {len(feature_modules)} features")
     return True
 
 # Add webhook routes using FastMCP's custom route decorator
