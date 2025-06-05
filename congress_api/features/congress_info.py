@@ -6,9 +6,29 @@ from datetime import datetime
 from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
+from ..core.validators import ParameterValidator
+from ..core.api_wrapper import DefensiveAPIWrapper
+from ..core.exceptions import CommonErrors, format_error_response
+from ..core.response_utils import ResponseProcessor
 
 # Configure logging
 logger = logging.getLogger(__name__)
+
+# Defensive API wrapper for Congress Info requests
+async def safe_congress_request(endpoint: str, ctx: Context, params: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Defensive wrapper for Congress Info API requests with:
+    - Parameter sanitization
+    - Timeout handling
+    - Retry logic
+    - Standardized error responses
+    """
+    return await DefensiveAPIWrapper.safe_api_request(
+        endpoint=endpoint,
+        ctx=ctx,
+        params=params or {},
+        endpoint_type="congress"
+    )
 
 # Helper functions
 def format_date(date_str: str) -> str:
@@ -154,10 +174,10 @@ def handle_api_error(data: Dict[str, Any], error_message: str) -> str:
         error_message: Custom error message prefix
     """
     if "error" in data:
-        error_code = data.get("error", {}).get("code", "unknown")
-        error_msg = data.get("error", {}).get("message", str(data["error"]))
-        return f"{error_message}: [{error_code}] {error_msg}"
-    return f"{error_message}: Unknown error"
+        error = CommonErrors.api_server_error(f"{error_message}: {data.get('error', 'Unknown API error')}")
+        return format_error_response(error)
+    error = CommonErrors.general_error(f"{error_message}: Unknown error")
+    return format_error_response(error)
 
 # Resources
 @mcp.resource("congress://all")
@@ -170,7 +190,7 @@ async def get_all_congresses(ctx: Context) -> str:
     """
     logger.info("Accessing all congresses resource")
     try:
-        data = await make_api_request("/congress", ctx, {"limit": 20})
+        data = await safe_congress_request("/congress", ctx, {"limit": 20})
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")
         
         if "error" in data:
@@ -182,14 +202,21 @@ async def get_all_congresses(ctx: Context) -> str:
         logger.info(f"Found {len(congresses)} congresses")
         
         if not congresses:
-            return "No congresses found."
+            error = CommonErrors.data_not_found("congresses", "list")
+            return format_error_response(error)
+        
+        # Deduplicate results
+        deduplicated_congresses = ResponseProcessor.deduplicate_results(
+            congresses, 
+            key_fields=["number", "name"]
+        )
         
         # Use default format type
-        return format_congresses_list(congresses, "markdown")
+        return format_congresses_list(deduplicated_congresses, "markdown")
     except Exception as e:
-        error_msg = f"Error retrieving congresses: {str(e)}"
+        error = CommonErrors.general_error(f"Error retrieving congresses: {str(e)}")
         logger.error(f"Exception in get_all_congresses: {str(e)}")
-        return error_msg
+        return format_error_response(error)
 
 @mcp.resource("congress://congress/{congress}")
 async def get_congress_by_number(ctx: Context, congress: str) -> str:
@@ -204,10 +231,22 @@ async def get_congress_by_number(ctx: Context, congress: str) -> str:
     """
     logger.info(f"Accessing information for Congress {congress}")
     try:
+        # Parameter validation - convert string to int for validation
+        try:
+            congress_num = int(congress)
+        except ValueError:
+            error = CommonErrors.invalid_parameter("congress", congress, "Congress number must be a valid integer")
+            return format_error_response(error)
+        
+        congress_result = ParameterValidator.validate_congress_number(congress_num)
+        if not congress_result.is_valid:
+            error = CommonErrors.invalid_parameter("congress", congress, congress_result.error_message)
+            return format_error_response(error)
+        
         # Use default detailed parameter
         detailed = False
         
-        data = await make_api_request(f"/congress/{congress}", ctx)
+        data = await safe_congress_request(f"/congress/{congress}", ctx)
         logger.info(f"API response received for Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
         
         if "error" in data:
@@ -219,13 +258,14 @@ async def get_congress_by_number(ctx: Context, congress: str) -> str:
         logger.info(f"Found data for Congress {congress}")
         
         if not congress_data:
-            return f"No information found for the {congress}th Congress."
+            error = CommonErrors.data_not_found("Congress", congress)
+            return format_error_response(error)
         
         return format_congress(congress_data, detailed)
     except Exception as e:
-        error_msg = f"Error retrieving information for the {congress}th Congress: {str(e)}"
+        error = CommonErrors.general_error(f"Error retrieving information for the {congress}th Congress: {str(e)}")
         logger.error(f"Exception in get_congress_by_number for Congress {congress}: {str(e)}")
-        return error_msg
+        return format_error_response(error)
 
 @mcp.resource("congress://info/current")
 async def get_current_congress(ctx: Context) -> str:
@@ -240,7 +280,7 @@ async def get_current_congress(ctx: Context) -> str:
         # Use default detailed parameter
         detailed = False
         
-        data = await make_api_request("/congress/current", ctx)
+        data = await safe_congress_request("/congress/current", ctx)
         logger.info(f"API response received for current Congress: {data.keys() if isinstance(data, dict) else 'not a dict'}")
         
         if "error" in data:
@@ -252,13 +292,14 @@ async def get_current_congress(ctx: Context) -> str:
         logger.info(f"Found data for current Congress")
         
         if not congress:
-            return "No information found about the current Congress."
+            error = CommonErrors.data_not_found("current Congress", "current")
+            return format_error_response(error)
         
         return format_congress(congress, detailed)
     except Exception as e:
-        error_msg = f"Error retrieving current Congress information: {str(e)}"
+        error = CommonErrors.general_error(f"Error retrieving current Congress information: {str(e)}")
         logger.error(f"Exception in get_current_congress: {str(e)}")
-        return error_msg
+        return format_error_response(error)
 
 # Tools
 @mcp.tool()
@@ -282,41 +323,70 @@ async def get_congress_info(
     """
     
     try:
+        # Parameter validation
+        if congress is not None:
+            congress_result = ParameterValidator.validate_congress_number(congress)
+            if not congress_result.is_valid:
+                error = CommonErrors.invalid_parameter("congress", congress, congress_result.error_message)
+                return format_error_response(error)
+        
+        if limit is not None:
+            limit_result = ParameterValidator.validate_limit_range(limit, max_limit=250)
+            if not limit_result.is_valid:
+                error = CommonErrors.invalid_parameter("limit", limit, limit_result.error_message)
+                return format_error_response(error)
+        
+        if format_type not in ["markdown", "table"]:
+            error = CommonErrors.invalid_parameter("format_type", format_type, "Must be 'markdown' or 'table'")
+            return format_error_response(error)
+        
+        logger.info(f"Getting congress info - congress: {congress}, current: {current}, limit: {limit}, detailed: {detailed}, format: {format_type}")
+        
         if current:
             # Get current Congress
-            data = await make_api_request("/congress/current", ctx)
+            data = await safe_congress_request("/congress/current", ctx)
             if "error" in data:
                 return handle_api_error(data, "Error retrieving current Congress information")
             
             congress_data = data.get("congress", {})
             if not congress_data:
-                return "No information found about the current Congress."
+                error = CommonErrors.data_not_found("current Congress", "current")
+                return format_error_response(error)
             
             return format_congress(congress_data, detailed)
         elif congress is not None:
             # Get specific Congress
-            data = await make_api_request(f"/congress/{congress}", ctx)
+            data = await safe_congress_request(f"/congress/{congress}", ctx)
             if "error" in data:
                 return handle_api_error(data, f"Error retrieving Congress {congress} information")
             
             congress_data = data.get("congress", {})
             if not congress_data:
-                return f"No information found for the {congress}th Congress."
+                error = CommonErrors.data_not_found("Congress", str(congress))
+                return format_error_response(error)
             
             return format_congress(congress_data, detailed)
         else:
             # Get list of congresses
-            data = await make_api_request("/congress", ctx, {"limit": limit})
+            data = await safe_congress_request("/congress", ctx, {"limit": limit})
             if "error" in data:
                 return handle_api_error(data, "Error retrieving congresses")
             
             congresses = data.get("congresses", [])
             if not congresses:
-                return "No congresses found."
+                error = CommonErrors.data_not_found("congresses", "list")
+                return format_error_response(error)
             
-            return format_congresses_list(congresses, format_type)
+            # Deduplicate results
+            deduplicated_congresses = ResponseProcessor.deduplicate_results(
+                congresses, 
+                key_fields=["number", "name"]
+            )
+            
+            return format_congresses_list(deduplicated_congresses, format_type)
     except Exception as e:
-        return f"Error retrieving Congress information: {str(e)}"
+        error = CommonErrors.general_error(f"Error retrieving Congress information: {str(e)}")
+        return format_error_response(error)
 
 @mcp.tool()
 async def search_congresses(
@@ -339,15 +409,47 @@ async def search_congresses(
     """
     
     try:
+        # Parameter validation
+        if not keywords or not keywords.strip():
+            error = CommonErrors.invalid_parameter("keywords", keywords, "Keywords cannot be empty")
+            return format_error_response(error)
+        
+        if start_year is not None:
+            if start_year < 1789 or start_year > 2100:
+                error = CommonErrors.invalid_parameter("start_year", start_year, "Start year must be between 1789 and 2100")
+                return format_error_response(error)
+        
+        if end_year is not None:
+            if end_year < 1789 or end_year > 2100:
+                error = CommonErrors.invalid_parameter("end_year", end_year, "End year must be between 1789 and 2100")
+                return format_error_response(error)
+        
+        if start_year is not None and end_year is not None and start_year > end_year:
+            error = CommonErrors.invalid_parameter("date_range", f"{start_year}-{end_year}", "Start year cannot be greater than end year")
+            return format_error_response(error)
+        
+        if limit is not None:
+            limit_result = ParameterValidator.validate_limit_range(limit, max_limit=250)
+            if not limit_result.is_valid:
+                error = CommonErrors.invalid_parameter("limit", limit, limit_result.error_message)
+                return format_error_response(error)
+        
+        if format_type not in ["markdown", "table"]:
+            error = CommonErrors.invalid_parameter("format_type", format_type, "Must be 'markdown' or 'table'")
+            return format_error_response(error)
+        
+        logger.info(f"Searching congresses - keywords: '{keywords}', start_year: {start_year}, end_year: {end_year}, limit: {limit}, format: {format_type}")
+        
         # Get all congresses first
-        data = await make_api_request("/congress", ctx, {"limit": 50})
+        data = await safe_congress_request("/congress", ctx, {"limit": 50})
         
         if "error" in data:
             return handle_api_error(data, "Error retrieving congresses for search")
         
         all_congresses = data.get("congresses", [])
         if not all_congresses:
-            return "No congresses found to search."
+            error = CommonErrors.data_not_found("congresses", "search")
+            return format_error_response(error)
         
         # Filter by keywords and date range
         filtered_congresses = []
@@ -369,11 +471,18 @@ async def search_congresses(
                 if start_year_match and end_year_match:
                     filtered_congresses.append(congress)
         
-        # Limit results
-        filtered_congresses = filtered_congresses[:limit]
+        # Deduplicate results
+        deduplicated_congresses = ResponseProcessor.deduplicate_results(
+            filtered_congresses, 
+            key_fields=["number", "name"]
+        )
         
-        if not filtered_congresses:
-            return f"No congresses found matching '{keywords}'."
+        # Limit results
+        limited_congresses = deduplicated_congresses[:limit]
+        
+        if not limited_congresses:
+            error = CommonErrors.data_not_found("congresses", f"search term '{keywords}'")
+            return format_error_response(error)
         
         # Format results
         result_header = f"# Search Results for '{keywords}'"
@@ -388,7 +497,7 @@ async def search_congresses(
         if format_type == "table":
             result = [result_header, "", "| Congress | Years | Sessions |", "|---------|-------|---------|"]
             
-            for congress in filtered_congresses:
+            for congress in limited_congresses:
                 name = congress.get("name", "Unknown Congress")
                 start_year = congress.get("startYear", "Unknown")
                 end_year = congress.get("endYear", "Unknown")
@@ -411,8 +520,9 @@ async def search_congresses(
             return "\n".join(result)
         else:
             # Use the existing format_congresses_list function
-            formatted_list = format_congresses_list(filtered_congresses)
+            formatted_list = format_congresses_list(limited_congresses)
             # Replace the default header with our search header
             return result_header + formatted_list[formatted_list.find("\n"):]
     except Exception as e:
-        return f"Error searching congresses: {str(e)}"
+        error = CommonErrors.general_error(f"Error searching congresses: {str(e)}")
+        return format_error_response(error)
