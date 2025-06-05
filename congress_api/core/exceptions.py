@@ -236,6 +236,21 @@ class CommonErrors:
             details={"endpoint": endpoint, "retry_after": retry_after}
         )
 
+    @staticmethod
+    def invalid_parameter(parameter_name: str, value: Any, message: str) -> APIErrorResponse:
+        """Error for invalid parameter values."""
+        return APIErrorResponse(
+            error_type=ErrorType.VALIDATION,
+            message=f"Invalid {parameter_name}: {message}",
+            suggestions=[
+                f"Check the {parameter_name} parameter format and value",
+                "Refer to the API documentation for valid parameter ranges",
+                "Try using a different value or format"
+            ],
+            error_code=f"INVALID_{parameter_name.upper()}",
+            details={"parameter": parameter_name, "provided_value": str(value)}
+        )
+
 # Utility functions for error handling
 def handle_validation_error(validation_result) -> None:
     """
