@@ -2,7 +2,7 @@
 from typing import Dict, Any, List, Optional, Union
 import json
 import logging
-from datetime import datetime
+import datetime
 from fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
@@ -40,7 +40,7 @@ def format_date(date_str: str) -> str:
     
     try:
         # Parse ISO format date
-        dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        dt = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
         return dt.strftime("%B %d, %Y")
     except ValueError:
         # If parsing fails, return the original string
@@ -179,7 +179,7 @@ def handle_api_error(data: Dict[str, Any], error_message: str) -> str:
     error = CommonErrors.general_error(f"{error_message}: Unknown error")
     return format_error_response(error)
 
-# Resources
+# Resources (Static/Reference Data Only)
 @mcp.resource("congress://all")
 async def get_all_congresses(ctx: Context) -> str:
     """
@@ -218,90 +218,7 @@ async def get_all_congresses(ctx: Context) -> str:
         logger.error(f"Exception in get_all_congresses: {str(e)}")
         return format_error_response(error)
 
-@mcp.resource("congress://congress/{congress}")
-async def get_congress_by_number(ctx: Context, congress: str) -> str:
-    """
-    Get information about a specific Congress.
-    
-    Args:
-        congress: The number of the Congress (e.g., "117")
-        
-    Returns detailed information about the specified Congress,
-    including session dates, chamber information, and other details.
-    """
-    logger.info(f"Accessing information for Congress {congress}")
-    try:
-        # Parameter validation - convert string to int for validation
-        try:
-            congress_num = int(congress)
-        except ValueError:
-            error = CommonErrors.invalid_parameter("congress", congress, "Congress number must be a valid integer")
-            return format_error_response(error)
-        
-        congress_result = ParameterValidator.validate_congress_number(congress_num)
-        if not congress_result.is_valid:
-            error = CommonErrors.invalid_parameter("congress", congress, congress_result.error_message)
-            return format_error_response(error)
-        
-        # Use default detailed parameter
-        detailed = False
-        
-        data = await safe_congress_request(f"/congress/{congress}", ctx)
-        logger.info(f"API response received for Congress {congress}: {data.keys() if isinstance(data, dict) else 'not a dict'}")
-        
-        if "error" in data:
-            error_msg = handle_api_error(data, f"Error retrieving information for the {congress}th Congress")
-            logger.error(error_msg)
-            return error_msg
-        
-        congress_data = data.get("congress", {})
-        logger.info(f"Found data for Congress {congress}")
-        
-        if not congress_data:
-            error = CommonErrors.data_not_found("Congress", congress)
-            return format_error_response(error)
-        
-        return format_congress(congress_data, detailed)
-    except Exception as e:
-        error = CommonErrors.general_error(f"Error retrieving information for the {congress}th Congress: {str(e)}")
-        logger.error(f"Exception in get_congress_by_number for Congress {congress}: {str(e)}")
-        return format_error_response(error)
-
-@mcp.resource("congress://info/current")
-async def get_current_congress(ctx: Context) -> str:
-    """
-    Get information about the current Congress.
-    
-    Returns detailed information about the currently active Congress,
-    including session dates, chamber information, and leadership.
-    """
-    logger.info("Accessing current Congress information")
-    try:
-        # Use default detailed parameter
-        detailed = False
-        
-        data = await safe_congress_request("/congress/current", ctx)
-        logger.info(f"API response received for current Congress: {data.keys() if isinstance(data, dict) else 'not a dict'}")
-        
-        if "error" in data:
-            error_msg = handle_api_error(data, "Error retrieving current Congress information")
-            logger.error(error_msg)
-            return error_msg
-        
-        congress = data.get("congress", {})
-        logger.info(f"Found data for current Congress")
-        
-        if not congress:
-            error = CommonErrors.data_not_found("current Congress", "current")
-            return format_error_response(error)
-        
-        return format_congress(congress, detailed)
-    except Exception as e:
-        error = CommonErrors.general_error(f"Error retrieving current Congress information: {str(e)}")
-        logger.error(f"Exception in get_current_congress: {str(e)}")
-        return format_error_response(error)
-
-# Tools
+# Tools (Interactive/Parameterized Functions)
 @mcp.tool()
 async def get_congress_info(
     ctx: Context,
