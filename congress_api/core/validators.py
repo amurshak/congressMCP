@@ -607,6 +607,54 @@ class ParameterValidator:
         
         return ValidationResult(is_valid=True, sanitized_value=state_code_clean)
 
+    @staticmethod
+    def validate_date_format(date_string: Optional[str]) -> ValidationResult:
+        """
+        Validate ISO date format (YYYY-MM-DDTHH:MM:SSZ) for API parameters.
+        
+        Args:
+            date_string: Date string to validate in ISO format
+            
+        Returns:
+            ValidationResult with validation status and error details
+        """
+        if date_string is None:
+            return ValidationResult(is_valid=True)
+        
+        if not isinstance(date_string, str):
+            return ValidationResult(
+                is_valid=False,
+                error_message="Date must be a string",
+                suggestions=["Provide date in ISO format: YYYY-MM-DDTHH:MM:SSZ"]
+            )
+        
+        # Check ISO format pattern: YYYY-MM-DDTHH:MM:SSZ
+        iso_pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+        
+        if not re.match(iso_pattern, date_string.strip()):
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Invalid date format: {date_string}. Date must be in format YYYY-MM-DDTHH:MM:SSZ",
+                suggestions=[
+                    "Use ISO format: YYYY-MM-DDTHH:MM:SSZ",
+                    "Example: 2023-01-01T00:00:00Z"
+                ]
+            )
+        
+        # Additional validation: try to parse the date to ensure it's valid
+        try:
+            datetime.strptime(date_string.strip(), '%Y-%m-%dT%H:%M:%SZ')
+            return ValidationResult(is_valid=True, sanitized_value=date_string.strip())
+        except ValueError as e:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Invalid date: {date_string}. {str(e)}",
+                suggestions=[
+                    "Check that the date values are valid (e.g., month 1-12, day 1-31)",
+                    "Use format: YYYY-MM-DDTHH:MM:SSZ"
+                ]
+            )
+
 # Convenience functions for specific APIs
 class BoundCongressionalRecordValidator:
     """Specialized validator for Bound Congressional Record API."""

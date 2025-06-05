@@ -89,6 +89,11 @@ class DefensiveAPIWrapper:
             retry_count=2,
             retry_delay=1.0
         ),
+        'nominations': APIEndpointConfig(
+            timeout=8.0,
+            retry_count=2,
+            retry_delay=1.0
+        ),
         'default': APIEndpointConfig()
     }
     
@@ -166,6 +171,8 @@ class DefensiveAPIWrapper:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['daily-congressional-record']
         elif 'house-votes' in endpoint:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['house-votes']
+        elif 'nominations' in endpoint:
+            return DefensiveAPIWrapper.ENDPOINT_CONFIGS['nominations']
         else:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['default']
     
@@ -408,4 +415,10 @@ async def safe_house_votes_request(endpoint: str, ctx: Context, params: Dict[str
     """Make a safe request to house votes endpoints."""
     return await DefensiveAPIWrapper.safe_api_request(
         endpoint, ctx, params, endpoint_type='house-votes'
+    )
+
+async def safe_nominations_request(endpoint: str, ctx: Context, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Make a safe request to nominations endpoints."""
+    return await DefensiveAPIWrapper.safe_api_request(
+        endpoint, ctx, params, endpoint_type='nominations'
     )

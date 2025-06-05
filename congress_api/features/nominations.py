@@ -8,11 +8,17 @@ import logging
 from typing import Dict, Any, List, Optional
 from fastmcp import Context
 from ..mcp_app import mcp
-from ..core.client_handler import make_api_request
+from ..core.api_wrapper import safe_nominations_request
+from ..core.validators import ParameterValidator
+from ..core.exceptions import CommonErrors, format_error_response
+from ..core.response_utils import ResponseProcessor
 
 # Set up logger
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+# Initialize validator
+validator = ParameterValidator()
 
 # Base endpoint for the nominations API
 BASE_ENDPOINT = "nomination"
@@ -199,8 +205,8 @@ def format_nomination_hearings(hearings: List[Dict[str, Any]]) -> str:
     
     return "\n".join(lines)
 
-# MCP Resources
-@mcp.resource("congress://nominations/latest")
+# MCP Tools
+@mcp.tool("get_latest_nominations")
 async def get_latest_nominations(ctx: Context) -> str:
     """
     Get the most recent nominations.
@@ -208,12 +214,13 @@ async def get_latest_nominations(ctx: Context) -> str:
     """
     logger.info("Getting latest nominations")
     
-    # Make API request
-    data = await make_api_request(BASE_ENDPOINT, ctx)
+    # Make safe API request
+    endpoint = BASE_ENDPOINT
+    data = await safe_nominations_request(endpoint, ctx, {"sort": "updateDate+desc", "limit": 10})
     
     if "error" in data:
         logger.error(f"Error getting latest nominations: {data['error']}")
-        return f"Error: {data['error'].get('message', 'Unknown error')}"
+        return format_error_response(CommonErrors.api_server_error(f"latest nominations: {endpoint}", message=data['error']))
     
     if 'nominations' not in data:
         logger.warning("No nominations field in response")
@@ -224,17 +231,19 @@ async def get_latest_nominations(ctx: Context) -> str:
         logger.info("No nominations found")
         return "No nominations found."
     
-    logger.info(f"Found {len(nominations)} nominations")
+    # Deduplicate results
+    nominations = ResponseProcessor.deduplicate_results(nominations, ['number', 'congress'])
     
-    # Format the results
-    lines = ["Latest Nominations:"]
-    for nomination in nominations:
-        lines.append("")
-        lines.append(format_nomination_item(nomination))
+    logger.info(f"Found {len(nominations)} latest nominations")
+    
+    # Format results
+    lines = ["# Latest Nominations\n"]
+    for idx, nomination in enumerate(nominations, 1):
+        lines.append(f"## {idx}. {format_nomination_item(nomination)}\n")
     
     return "\n".join(lines)
 
-@mcp.resource("congress://nominations/{congress}")
+@mcp.tool("get_nominations_by_congress")
 async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
     """
     Get nominations for a specific Congress.
@@ -244,13 +253,19 @@ async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
     """
     logger.info(f"Getting nominations for Congress {congress}")
     
-    # Make API request
+    # Validate parameters
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        logger.warning(f"Invalid congress number: {congress}")
+        return format_error_response(CommonErrors.invalid_congress_number(congress))
+    
+    # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}"
-    data = await make_api_request(endpoint, ctx)
+    data = await safe_nominations_request(endpoint, ctx, {})
     
     if "error" in data:
         logger.error(f"Error getting nominations for Congress {congress}: {data['error']}")
-        return f"Error: {data['error'].get('message', 'Unknown error')}"
+        return format_error_response(CommonErrors.api_server_error(f"nominations by congress: {endpoint}", message=data['error']))
     
     if 'nominations' not in data:
         logger.warning(f"No nominations field in response for Congress {congress}")
@@ -261,46 +276,59 @@ async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
         logger.info(f"No nominations found for Congress {congress}")
         return f"No nominations found for Congress {congress}."
     
+    # Deduplicate results
+    nominations = ResponseProcessor.deduplicate_results(nominations, ['number', 'congress'])
+    
     logger.info(f"Found {len(nominations)} nominations for Congress {congress}")
     
-    # Format the results
-    lines = [f"Nominations for Congress {congress}:"]
-    for nomination in nominations:
-        lines.append("")
-        lines.append(format_nomination_item(nomination))
+    # Format results
+    lines = [f"# Nominations for Congress {congress}\n"]
+    for idx, nomination in enumerate(nominations, 1):
+        lines.append(f"## {idx}. {format_nomination_item(nomination)}\n")
     
     return "\n".join(lines)
 
-@mcp.resource("congress://nominations/{congress}/{nomination_number}")
-async def get_nomination(ctx: Context, congress: int, nomination_number: int) -> str:
+@mcp.tool("get_nomination_details")
+async def get_nomination_details(ctx: Context, congress: int, nomination_number: int) -> str:
     """
-    Get detailed information for a specific nomination.
-    
+    Get detailed information about a specific nomination.
+
     Args:
-        congress: The Congress number (e.g., 117 for the 117th Congress)
+        congress: Congress number (e.g., 117 for 117th Congress)
         nomination_number: The nomination number
     """
-    logger.info(f"Getting nomination {nomination_number} for Congress {congress}")
+    logger.info(f"Getting nomination details for {nomination_number}, Congress {congress}")
     
-    # Make API request
+    # Validate parameters
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        logger.warning(f"Invalid congress number: {congress}")
+        return format_error_response(CommonErrors.invalid_congress_number(congress))
+    
+    if nomination_number <= 0:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "nomination_number", nomination_number, "Nomination number must be a positive integer"
+        ))
+    
+    # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}"
-    data = await make_api_request(endpoint, ctx)
+    data = await safe_nominations_request(endpoint, ctx, {})
     
     if "error" in data:
-        logger.error(f"Error getting nomination {nomination_number} for Congress {congress}: {data['error']}")
-        return f"Error: {data['error'].get('message', 'Unknown error')}"
+        logger.error(f"Error getting nomination details for {nomination_number}, Congress {congress}: {data['error']}")
+        return format_error_response(CommonErrors.api_server_error(f"nomination details: {endpoint}", message=data['error']))
     
     if 'nomination' not in data:
         logger.warning(f"No nomination field in response for {congress}/{nomination_number}")
-        return f"No nomination found for {congress}/{nomination_number}."
+        return f"No nomination found for nomination {nomination_number}, Congress {congress}."
     
     nomination = data['nomination']
-    logger.info(f"Found nomination {nomination_number} for Congress {congress}")
+    logger.info(f"Found nomination details for {nomination_number}, Congress {congress}")
     
-    # Format the result
+    # Format and return the result
     return format_nomination_detail(nomination)
 
-@mcp.resource("congress://nominations/{congress}/{nomination_number}/{ordinal}")
+@mcp.tool("get_nomination_nominees")
 async def get_nomination_nominees(ctx: Context, congress: int, nomination_number: int, ordinal: int) -> str:
     """
     Get nominees for a specific position within a nomination.
@@ -310,26 +338,45 @@ async def get_nomination_nominees(ctx: Context, congress: int, nomination_number
         nomination_number: The nomination number
         ordinal: The ordinal number for the position
     """
-    logger.info(f"Getting nominees for nomination {nomination_number}, position {ordinal}, Congress {congress}")
+    logger.info(f"Getting nominees for nomination {nomination_number}, Congress {congress}, ordinal {ordinal}")
     
-    # Make API request
+    # Validate parameters
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        logger.warning(f"Invalid congress number: {congress}")
+        return format_error_response(CommonErrors.invalid_congress_number(congress))
+    
+    if nomination_number <= 0:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "nomination_number", nomination_number, "Nomination number must be a positive integer"
+        ))
+    
+    if ordinal <= 0:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "ordinal", ordinal, "Ordinal must be a positive integer"
+        ))
+    
+    # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/{ordinal}"
-    data = await make_api_request(endpoint, ctx)
+    data = await safe_nominations_request(endpoint, ctx, {})
     
     if "error" in data:
-        logger.error(f"Error getting nominees for nomination {nomination_number}, position {ordinal}, Congress {congress}: {data['error']}")
-        return f"Error: {data['error'].get('message', 'Unknown error')}"
+        logger.error(f"Error getting nominees for nomination {nomination_number}, Congress {congress}, ordinal {ordinal}: {data['error']}")
+        return format_error_response(CommonErrors.api_server_error(f"nomination nominees: {endpoint}", message=data['error']))
     
     if 'nominees' not in data:
         logger.warning(f"No nominees field in response for {congress}/{nomination_number}/{ordinal}")
-        return f"No nominees found for {congress}/{nomination_number}/{ordinal}."
+        return f"No nominees found for nomination {nomination_number}, Congress {congress}, ordinal {ordinal}."
     
     nominees = data['nominees']
     if not nominees:
-        logger.info(f"No nominees found for {congress}/{nomination_number}/{ordinal}")
-        return f"No nominees found for {congress}/{nomination_number}/{ordinal}."
+        logger.info(f"No nominees found for nomination {nomination_number}, Congress {congress}, ordinal {ordinal}")
+        return f"No nominees found for nomination {nomination_number}, Congress {congress}, ordinal {ordinal}."
     
-    logger.info(f"Found {len(nominees)} nominees for {congress}/{nomination_number}/{ordinal}")
+    # Deduplicate results
+    nominees = ResponseProcessor.deduplicate_results(nominees, ['name', 'position'])
+    
+    logger.info(f"Found {len(nominees)} nominees for nomination {nomination_number}, Congress {congress}, ordinal {ordinal}")
     
     # Format the results
     return format_nominees_list(nominees)
@@ -345,13 +392,25 @@ async def get_nomination_actions(ctx: Context, congress: int, nomination_number:
     """
     logger.info(f"Getting actions for nomination {nomination_number}, Congress {congress}")
     
-    # Make API request
+    # Validate parameters
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "congress", congress, congress_validation.error_message
+        ))
+    
+    if nomination_number <= 0:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "nomination_number", nomination_number, "Nomination number must be a positive integer"
+        ))
+    
+    # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/actions"
-    data = await make_api_request(endpoint, ctx)
+    data = await safe_nominations_request(endpoint, ctx, {})
     
     if "error" in data:
         logger.error(f"Error getting actions for nomination {nomination_number}, Congress {congress}: {data['error']}")
-        return f"Error: {data['error'].get('message', 'Unknown error')}"
+        return format_error_response(CommonErrors.api_server_error(f"nomination actions: {endpoint}", message=data['error']))
     
     if 'actions' not in data:
         logger.warning(f"No actions field in response for {congress}/{nomination_number}/actions")
@@ -362,10 +421,16 @@ async def get_nomination_actions(ctx: Context, congress: int, nomination_number:
         logger.info(f"No actions found for nomination {nomination_number}, Congress {congress}")
         return f"No actions found for nomination {nomination_number}, Congress {congress}."
     
-    logger.info(f"Found {len(actions)} actions for nomination {nomination_number}, Congress {congress}")
+    # Deduplicate actions
+    deduplicated_actions = ResponseProcessor.deduplicate_results(
+        actions,
+        key_fields=['actionDate', 'text']
+    )
+    
+    logger.info(f"Found {len(deduplicated_actions)} unique actions for nomination {nomination_number}, Congress {congress}")
     
     # Format the results
-    return format_nomination_actions(actions)
+    return format_nomination_actions(deduplicated_actions)
 
 @mcp.tool("get_nomination_committees")
 async def get_nomination_committees(ctx: Context, congress: int, nomination_number: int) -> str:
@@ -378,13 +443,25 @@ async def get_nomination_committees(ctx: Context, congress: int, nomination_numb
     """
     logger.info(f"Getting committees for nomination {nomination_number}, Congress {congress}")
     
-    # Make API request
+    # Validate parameters
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "congress", congress, congress_validation.error_message
+        ))
+    
+    if nomination_number <= 0:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "nomination_number", nomination_number, "Nomination number must be a positive integer"
+        ))
+    
+    # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/committees"
-    data = await make_api_request(endpoint, ctx)
+    data = await safe_nominations_request(endpoint, ctx, {})
     
     if "error" in data:
         logger.error(f"Error getting committees for nomination {nomination_number}, Congress {congress}: {data['error']}")
-        return f"Error: {data['error'].get('message', 'Unknown error')}"
+        return format_error_response(CommonErrors.api_server_error(f"nomination committees: {endpoint}", message=data['error']))
     
     if 'committees' not in data:
         logger.warning(f"No committees field in response for {congress}/{nomination_number}/committees")
@@ -395,10 +472,16 @@ async def get_nomination_committees(ctx: Context, congress: int, nomination_numb
         logger.info(f"No committees found for nomination {nomination_number}, Congress {congress}")
         return f"No committees found for nomination {nomination_number}, Congress {congress}."
     
-    logger.info(f"Found {len(committees)} committees for nomination {nomination_number}, Congress {congress}")
+    # Deduplicate committees
+    deduplicated_committees = ResponseProcessor.deduplicate_results(
+        committees,
+        key_fields=['systemCode', 'name']
+    )
+    
+    logger.info(f"Found {len(deduplicated_committees)} unique committees for nomination {nomination_number}, Congress {congress}")
     
     # Format the results
-    return format_nomination_committees(ctx, committees)
+    return format_nomination_committees(ctx, deduplicated_committees)
 
 @mcp.tool("get_nomination_hearings")
 async def get_nomination_hearings(ctx: Context, congress: int, nomination_number: int) -> str:
@@ -411,13 +494,25 @@ async def get_nomination_hearings(ctx: Context, congress: int, nomination_number
     """
     logger.info(f"Getting hearings for nomination {nomination_number}, Congress {congress}")
     
-    # Make API request
+    # Validate parameters
+    congress_validation = ParameterValidator.validate_congress_number(congress)
+    if not congress_validation.is_valid:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "congress", congress, congress_validation.error_message
+        ))
+    
+    if nomination_number <= 0:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "nomination_number", nomination_number, "Nomination number must be a positive integer"
+        ))
+    
+    # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/hearings"
-    data = await make_api_request(endpoint, ctx)
+    data = await safe_nominations_request(endpoint, ctx, {})
     
     if "error" in data:
         logger.error(f"Error getting hearings for nomination {nomination_number}, Congress {congress}: {data['error']}")
-        return f"Error: {data['error'].get('message', 'Unknown error')}"
+        return format_error_response(CommonErrors.api_server_error(f"nomination hearings: {endpoint}", message=data['error']))
     
     if 'hearings' not in data:
         logger.warning(f"No hearings field in response for {congress}/{nomination_number}/hearings")
@@ -428,10 +523,16 @@ async def get_nomination_hearings(ctx: Context, congress: int, nomination_number
         logger.info(f"No hearings found for nomination {nomination_number}, Congress {congress}")
         return f"No hearings found for nomination {nomination_number}, Congress {congress}."
     
-    logger.info(f"Found {len(hearings)} hearings for nomination {nomination_number}, Congress {congress}")
+    # Deduplicate hearings
+    deduplicated_hearings = ResponseProcessor.deduplicate_results(
+        hearings,
+        key_fields=['jacketNumber', 'date']
+    )
+    
+    logger.info(f"Found {len(deduplicated_hearings)} unique hearings for nomination {nomination_number}, Congress {congress}")
     
     # Format the results
-    return format_nomination_hearings(hearings)
+    return format_nomination_hearings(deduplicated_hearings)
 
 # MCP Tool
 @mcp.tool("search_nominations")
@@ -457,6 +558,34 @@ async def search_nominations(
     """
     logger.info(f"Searching for nominations with keywords: {keywords}, congress: {congress}")
     
+    # Validate parameters
+    if congress is not None:
+        congress_validation = ParameterValidator.validate_congress_number(congress)
+        if not congress_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "congress", congress, congress_validation.error_message
+            ))
+    
+    limit_validation = ParameterValidator.validate_limit_range(limit, 250)
+    if not limit_validation.is_valid:
+        return format_error_response(CommonErrors.invalid_parameter(
+            "limit", limit, limit_validation.error_message
+        ))
+    
+    if from_date:
+        date_validation = ParameterValidator.validate_date_format(from_date)
+        if not date_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "from_date", from_date, date_validation.error_message
+            ))
+    
+    if to_date:
+        date_validation = ParameterValidator.validate_date_format(to_date)
+        if not date_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "to_date", to_date, date_validation.error_message
+            ))
+    
     params = {
         "format": "json",
         "limit": limit
@@ -476,12 +605,12 @@ async def search_nominations(
     if congress:
         endpoint = f"{BASE_ENDPOINT}/{congress}"
     
-    # Make API request
-    data = await make_api_request(endpoint, ctx, params)
+    # Make safe API request
+    data = await safe_nominations_request(endpoint, ctx, params)
     
     if "error" in data:
         logger.error(f"Error searching for nominations: {data['error']}")
-        return f"Error: {data['error'].get('message', 'Unknown error')}"
+        return format_error_response(CommonErrors.api_server_error(f"nominations search: {endpoint}", message=data['error']))
     
     if 'nominations' not in data:
         logger.warning("No nominations field in response")
@@ -492,12 +621,19 @@ async def search_nominations(
         logger.info("No nominations found matching the search criteria")
         return "No nominations found matching the search criteria."
     
-    logger.info(f"Found {len(nominations)} nominations matching the search criteria")
+    # Deduplicate results
+    deduplicated_nominations = ResponseProcessor.deduplicate_results(
+        nominations, 
+        key_fields=['number', 'congress']
+    )
+    
+    logger.info(f"Found {len(deduplicated_nominations)} unique nominations matching the search criteria")
     
     # Format the results
-    lines = ["Nominations Search Results:"]
-    for nomination in nominations:
+    lines = ["# Nominations Search Results"]
+    lines.append("")
+    for i, nomination in enumerate(deduplicated_nominations, 1):
+        lines.append(f"## {i}. {format_nomination_item(nomination)}")
         lines.append("")
-        lines.append(format_nomination_item(nomination))
     
     return "\n".join(lines)
