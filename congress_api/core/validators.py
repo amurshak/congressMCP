@@ -557,6 +557,56 @@ class ParameterValidator:
         
         return ValidationResult(is_valid=True)
     
+    @staticmethod
+    def validate_state_code(state_code: str) -> ValidationResult:
+        """
+        Validate US state codes for Congressional member queries.
+        
+        Args:
+            state_code: Two-letter state code to validate
+            
+        Returns:
+            ValidationResult with validation status and sanitized value
+        """
+        if not state_code:
+            return ValidationResult(
+                is_valid=False,
+                error_message="State code cannot be empty",
+                suggestions=["Provide a two-letter state code like 'CA', 'TX', 'NY'"]
+            )
+        
+        # Sanitize input
+        state_code_clean = str(state_code).strip().upper()
+        
+        # Valid US state and territory codes
+        valid_states = {
+            'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+            'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+            'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+            'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+            'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY',
+            'DC', 'AS', 'GU', 'MP', 'PR', 'VI'  # Territories with Congressional representation
+        }
+        
+        if len(state_code_clean) != 2:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"State code must be exactly 2 characters: '{state_code}'",
+                suggestions=["Use two-letter state codes like 'CA' for California, 'TX' for Texas"]
+            )
+        
+        if state_code_clean not in valid_states:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Invalid state code: '{state_code_clean}'",
+                suggestions=[
+                    "Use valid US state codes like 'CA', 'TX', 'NY', 'FL'",
+                    "Territories: 'DC', 'PR', 'VI', 'GU', 'AS', 'MP'"
+                ]
+            )
+        
+        return ValidationResult(is_valid=True, sanitized_value=state_code_clean)
+
 # Convenience functions for specific APIs
 class BoundCongressionalRecordValidator:
     """Specialized validator for Bound Congressional Record API."""
