@@ -665,3 +665,102 @@ def clean_senate_communications_response(data: Dict[str, Any], limit: int = 10) 
     processed = SenateCommunicationsProcessor.sort_by_update_date(processed)
     
     return processed[:limit]
+
+class SummariesProcessor(ResponseProcessor):
+    """Specialized processor for Summaries API responses."""
+    
+    @staticmethod
+    def deduplicate_summaries(summaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Remove duplicate summaries based on bill and action date.
+        
+        Args:
+            summaries: List of summary dictionaries
+            
+        Returns:
+            Deduplicated list of summaries
+        """
+        if not summaries:
+            return summaries
+        
+        seen_keys: Set[tuple] = set()
+        deduplicated = []
+        
+        for summary in summaries:
+            # Create unique key from bill info and action date
+            bill = summary.get("bill", {})
+            congress = bill.get("congress")
+            bill_type = bill.get("type", "").lower()
+            bill_number = bill.get("number")
+            action_date = summary.get("actionDate")
+            
+            key = (congress, bill_type, bill_number, action_date)
+            
+            if key not in seen_keys:
+                seen_keys.add(key)
+                deduplicated.append(summary)
+            else:
+                logger.debug(f"Removing duplicate summary for {bill_type.upper()} {bill_number} ({congress}th Congress) on {action_date}")
+        
+        return deduplicated
+    
+    @staticmethod
+    def sort_by_update_date(summaries: List[Dict[str, Any]], newest_first: bool = True) -> List[Dict[str, Any]]:
+        """
+        Sort summaries by update date.
+        
+        Args:
+            summaries: List of summary dictionaries
+            newest_first: Whether to sort newest first (default: True)
+            
+        Returns:
+            Sorted list of summaries
+        """
+        def get_sort_key(summary: Dict[str, Any]) -> str:
+            return summary.get("updateDate", "1900-01-01T00:00:00Z")
+        
+        return sorted(summaries, key=get_sort_key, reverse=newest_first)
+    
+    @staticmethod
+    def filter_by_keywords(summaries: List[Dict[str, Any]], keywords: str) -> List[Dict[str, Any]]:
+        """
+        Filter summaries by keywords in title, text, or action description.
+        
+        Args:
+            summaries: List of summary dictionaries
+            keywords: Keywords to search for (case-insensitive)
+            
+        Returns:
+            Filtered list of summaries
+        """
+        if not keywords:
+            return summaries
+        
+        keywords_lower = keywords.lower()
+        filtered = []
+        
+        for summary in summaries:
+            # Check if keywords appear in the title, text, or action description
+            bill = summary.get("bill", {})
+            title = bill.get("title", "").lower()
+            text = summary.get("text", "").lower()
+            action_desc = summary.get("actionDesc", "").lower()
+            
+            # If keywords appear in any of these fields, include the summary
+            if (keywords_lower in title or 
+                keywords_lower in text or 
+                keywords_lower in action_desc):
+                filtered.append(summary)
+        
+        return filtered
+
+def clean_summaries_response(data: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+    """Clean and process summaries response."""
+    return process_api_response(
+        data=data,
+        data_key="summaries",
+        deduplication_keys=["bill.congress", "bill.type", "bill.number", "actionDate"],
+        sort_field="updateDate",
+        sort_reverse=True,
+        limit=limit
+    )

@@ -395,6 +395,41 @@ class ParameterValidator:
         return ValidationResult(is_valid=True, sanitized_value=jacket_number)
     
     @staticmethod
+    def validate_bill_number(bill_number: int) -> ValidationResult:
+        """
+        Validate bill number parameters.
+        
+        Args:
+            bill_number: Bill number to validate
+            
+        Returns:
+            ValidationResult with validation status and error details
+        """
+        if bill_number is None:
+            return ValidationResult(
+                is_valid=False,
+                error_message="Bill number is required",
+                suggestions=["Provide a valid bill number (positive integer)"]
+            )
+        
+        if not isinstance(bill_number, int) or bill_number <= 0:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Invalid bill number: {bill_number}. Must be a positive integer.",
+                suggestions=["Use a positive integer for the bill number (e.g., 1, 100, 5376)"]
+            )
+        
+        # Bill numbers are typically 1-5 digits based on API examples
+        if bill_number > 99999:
+            return ValidationResult(
+                is_valid=False,
+                error_message=f"Bill number {bill_number} seems unusually large",
+                suggestions=["Verify the bill number is correct (typically 1-5 digits)"]
+            )
+        
+        return ValidationResult(is_valid=True, sanitized_value=bill_number)
+    
+    @staticmethod
     def validate_chamber(chamber: str, allow_nochamber: bool = True) -> ValidationResult:
         """
         Validate chamber parameter for Congressional APIs.
