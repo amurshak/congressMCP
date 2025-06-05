@@ -74,6 +74,11 @@ class DefensiveAPIWrapper:
             retry_count=2,
             retry_delay=1.0
         ),
+        'crs-reports': APIEndpointConfig(
+            timeout=10.0,
+            retry_count=3,
+            retry_delay=1.0
+        ),
         'default': APIEndpointConfig()
     }
     
@@ -145,6 +150,8 @@ class DefensiveAPIWrapper:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['committee-prints']
         elif 'committee-reports' in endpoint:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['committee-reports']
+        elif 'crsreport' in endpoint:
+            return DefensiveAPIWrapper.ENDPOINT_CONFIGS['crs-reports']
         else:
             return DefensiveAPIWrapper.ENDPOINT_CONFIGS['default']
     
@@ -360,4 +367,12 @@ async def safe_committee_reports_request(endpoint: str, ctx: Context, params: Di
         params = {}
     return await DefensiveAPIWrapper.safe_api_request(
         endpoint, ctx, params, endpoint_type='committee-reports'
+    )
+
+async def safe_crs_reports_request(endpoint: str, ctx: Context, params: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Make a safe request to CRS reports endpoints."""
+    if params is None:
+        params = {}
+    return await DefensiveAPIWrapper.safe_api_request(
+        endpoint, ctx, params, endpoint_type='crs-reports'
     )
