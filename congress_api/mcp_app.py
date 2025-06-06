@@ -22,6 +22,16 @@ def initialize_features():
         senate_communications, nominations, treaties, summaries,
         house_votes, crs_reports
     )
+    
+    # Initialize bucket tools
+    from .features.buckets import (
+        legislation_hub, 
+        members_and_committees, 
+        voting_and_nominations, 
+        records_and_hearings,
+        committee_intelligence,
+        research_and_professional
+    )
 
 # Add webhook routes using FastMCP's custom route decorator
 from starlette.requests import Request
