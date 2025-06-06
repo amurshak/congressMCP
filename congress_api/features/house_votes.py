@@ -348,7 +348,7 @@ def format_house_vote_xml_content(xml_content: str, source_url: str) -> str:
         logger.error(f"Error formatting XML content: {e}")
         return f"Error processing XML data from {source_url}: {str(e)}"
 
-@require_paid_access
+# @require_paid_access
 @mcp.resource("congress://house-votes/latest")
 async def get_latest_house_votes(ctx: Context) -> str:
     """Get the latest House of Representatives roll call votes."""
@@ -386,8 +386,7 @@ async def get_latest_house_votes(ctx: Context) -> str:
         logger.error(f"Exception str: {str(e)}")
         return format_error_response(CommonErrors.general_error(f"Error in get_latest_house_votes: {str(e)}", ["Try again in a few moments", "Check if the Congressional API is available"]))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_house_votes_by_congress(ctx: Context, congress: int, limit: int = 20) -> str:
     """Get House of Representatives roll call votes for a specific Congress.
     
@@ -440,8 +439,7 @@ async def get_house_votes_by_congress(ctx: Context, congress: int, limit: int = 
         logger.error(f"Exception str: {str(e)}")
         return format_error_response(CommonErrors.general_error(f"Error in get_house_votes_by_congress: {str(e)}", ["Try again in a few moments", "Check your congress parameter"]))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_house_votes_by_session(ctx: Context, congress: int, session: int, limit: int = 20) -> str:
     """Get House of Representatives roll call votes for a specific Congress and session.
     
@@ -500,8 +498,7 @@ async def get_house_votes_by_session(ctx: Context, congress: int, session: int, 
         logger.error(f"Exception str: {str(e)}")
         return format_error_response(CommonErrors.general_error(f"Error in get_house_votes_by_session: {str(e)}", ["Try again in a few moments", "Check your congress and session parameters"]))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_house_vote_details(ctx: Context, congress: int, session: int, vote_number: int) -> str:
     """Get detailed information for a specific House roll call vote.
     
@@ -551,8 +548,7 @@ async def get_house_vote_details(ctx: Context, congress: int, session: int, vote
         logger.error(f"Exception str: {str(e)}")
         return format_error_response(CommonErrors.general_error(f"Error in get_house_vote_details: {str(e)}", ["Try again in a few moments", "Check your vote parameters"]))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_house_vote_details_enhanced(ctx: Context, congress: int, session: int, vote_number: int) -> str:
     """
     Get enhanced detailed information about a specific House roll call vote with additional metadata.
@@ -614,8 +610,7 @@ async def get_house_vote_details_enhanced(ctx: Context, congress: int, session: 
         logger.error(f"Enhanced function error: {type(e).__name__}: {e}")
         return format_error_response(CommonErrors.general_error(f"Error getting enhanced vote details: {str(e)}", ["Try again in a few moments", "Check your vote parameters"]))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_house_vote_member_votes(ctx: Context, congress: int, session: int, vote_number: int) -> str:
     """Get information about how individual members voted on a specific House roll call vote.
     
@@ -680,8 +675,7 @@ async def get_house_vote_member_votes(ctx: Context, congress: int, session: int,
         logger.error(f"Exception str: {str(e)}")
         return format_error_response(CommonErrors.general_error(f"Error in get_house_vote_member_votes: {str(e)}", ["Try again in a few moments", "Check your vote parameters"]))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_house_vote_member_votes_xml(ctx: Context, congress: int, session: int, vote_number: int) -> str:
     """Get the actual XML member vote data from the House Clerk's website for a specific roll call vote.
     

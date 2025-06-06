@@ -113,8 +113,7 @@ def format_committee_meeting_detail(meeting_item: Dict[str, Any]) -> str:
 
 # --- MCP Tools ---
 
-@require_paid_access
-@mcp.tool("get_latest_committee_meetings")
+# @require_paid_access
 async def get_latest_committee_meetings(ctx: Context) -> str:
     """
     Get a list of the most recent committee meetings.
@@ -154,8 +153,7 @@ async def get_latest_committee_meetings(ctx: Context) -> str:
         logger.error(f"Unexpected error in get_latest_committee_meetings: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meetings"))
 
-@require_paid_access
-@mcp.tool("get_committee_meetings_by_congress")
+# @require_paid_access
 async def get_committee_meetings_by_congress(ctx: Context, congress: int) -> str:
     """
     Get committee meetings for a specific Congress.
@@ -203,8 +201,7 @@ async def get_committee_meetings_by_congress(ctx: Context, congress: int) -> str
         logger.error(f"Unexpected error in get_committee_meetings_by_congress: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meetings"))
 
-@require_paid_access
-@mcp.tool("get_committee_meetings_by_congress_and_chamber")
+# @require_paid_access
 async def get_committee_meetings_by_congress_and_chamber(ctx: Context, congress: int, chamber: str) -> str:
     """
     Get committee meetings for a specific Congress and chamber.
@@ -257,8 +254,7 @@ async def get_committee_meetings_by_congress_and_chamber(ctx: Context, congress:
         logger.error(f"Unexpected error in get_committee_meetings_by_congress_and_chamber: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meetings"))
 
-@require_paid_access
-@mcp.tool("get_committee_meetings_by_committee")
+# @require_paid_access
 async def get_committee_meetings_by_committee(ctx: Context, congress: int, chamber: str, committee_code: str) -> str:
     """
     Get committee meetings for a specific committee.
@@ -303,8 +299,7 @@ Committee code requested: {committee_code}"""
         logger.error(f"Unexpected error in get_committee_meetings_by_committee: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meetings"))
 
-@require_paid_access
-@mcp.tool("get_committee_meeting_details")
+# @require_paid_access
 async def get_committee_meeting_details(ctx: Context, congress: int, chamber: str, committee_code: str, event_id: int) -> str:
     """
     Get detailed information about a specific committee meeting.
@@ -349,8 +344,7 @@ async def get_committee_meeting_details(ctx: Context, congress: int, chamber: st
         logger.error(f"Unexpected error in get_committee_meeting_details: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meeting details"))
 
-@require_paid_access
-@mcp.tool("search_committee_meetings")
+# @require_paid_access
 async def search_committee_meetings(
     ctx: Context,
     keywords: Optional[str] = None,

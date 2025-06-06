@@ -293,7 +293,6 @@ def format_bill_text_versions(versions: List[Dict[str, Any]]) -> str:
 
 # --- Tools ---
 
-@mcp.tool("search_bills")
 async def search_bills(
     ctx: Context,
     keywords: str, 
@@ -478,7 +477,7 @@ async def search_bills(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_details")
+# @require_paid_access
 async def get_bill_details(
     ctx: Context,
     congress: int,
@@ -542,7 +541,6 @@ async def get_bill_details(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_actions")
 async def get_bill_actions(
     ctx: Context,
     congress: int,
@@ -614,7 +612,6 @@ async def get_bill_actions(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_titles")
 async def get_bill_titles(
     ctx: Context,
     congress: int,
@@ -686,7 +683,6 @@ async def get_bill_titles(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_cosponsors")
 async def get_bill_cosponsors(
     ctx: Context,
     congress: int,
@@ -768,7 +764,6 @@ async def get_bill_cosponsors(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_subjects")
 async def get_bill_subjects(
     ctx: Context,
     congress: int,
@@ -845,7 +840,6 @@ async def get_bill_subjects(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_text_versions")
 async def get_bill_text_versions(
     ctx: Context,
     congress: int,
@@ -909,7 +903,6 @@ async def get_bill_text_versions(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_related_bills")
 async def get_bill_related_bills(
     ctx: Context,
     congress: int,
@@ -988,7 +981,6 @@ async def get_bill_related_bills(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_amendments")
 async def get_bill_amendments(
     ctx: Context,
     congress: int,
@@ -1074,7 +1066,6 @@ async def get_bill_amendments(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_summaries")
 async def get_bill_summaries(
     ctx: Context,
     congress: int,
@@ -1153,7 +1144,6 @@ async def get_bill_summaries(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_committees")
 async def get_bill_committees(
     ctx: Context,
     congress: int,
@@ -1235,7 +1225,6 @@ async def get_bill_committees(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_text")
 async def get_bill_text(
     ctx: Context,
     congress: int, 
@@ -1374,7 +1363,6 @@ async def get_bill_text(
         error_response.details = {"exception": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool("get_bill_content")
 async def get_bill_content(
     ctx: Context,
     congress: int, 

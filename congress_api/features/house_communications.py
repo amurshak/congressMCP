@@ -180,7 +180,7 @@ async def get_latest_house_communications(ctx: Context, limit: int = 10) -> List
 
 # --- MCP Resources ---
 
-@require_paid_access
+# @require_paid_access
 @mcp.resource("congress://house-communications/latest")
 async def latest_house_communications_resource(ctx: Context) -> str:
     """Static resource providing the 10 most recent house communications."""
@@ -203,8 +203,7 @@ async def latest_house_communications_resource(ctx: Context) -> str:
 
 # --- MCP Tools ---
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_house_communication_details(
     ctx: Context,
     congress: int,
@@ -273,8 +272,7 @@ async def get_house_communication_details(
         logger.error(f"Unexpected error getting house communication details {congress}/{communication_type}/{communication_number}: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"/house-communication/{congress}/{communication_type}/{communication_number}", message=str(e)))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def search_house_communications(
     ctx: Context,
     congress: Optional[int] = None,

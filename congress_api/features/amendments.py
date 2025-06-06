@@ -214,8 +214,7 @@ async def get_amendments_by_type(ctx: Context,congress: str, amendment_type: str
         return f"Error retrieving {amendment_type.upper()} amendments for the {congress}th Congress: {str(e)}"
 
 # Tools
-@mcp.tool()
-@require_paid_access
+# @require_paid_access
 async def get_bill_amendments(
     ctx: Context,
     congress: int,
@@ -295,8 +294,7 @@ async def get_bill_amendments(
             error_code="BILL_AMENDMENTS_RETRIEVAL_FAILED"
         ))
 
-@mcp.tool()
-@require_paid_access
+# @require_paid_access
 async def search_amendments(
     ctx: Context,
     keywords: str, 
@@ -394,8 +392,7 @@ async def search_amendments(
             error_code="SEARCH_FAILED"
         ))
 
-@mcp.tool()
-@require_paid_access
+# @require_paid_access
 async def get_amendment_details(
     ctx: Context,
     congress: int,
@@ -482,8 +479,7 @@ async def get_amendment_details(
             error_code="DETAILS_RETRIEVAL_FAILED"
         ))
 
-@mcp.tool()
-@require_paid_access
+# @require_paid_access
 async def get_amendment_actions(
     ctx: Context,
     congress: int,
@@ -574,8 +570,7 @@ async def get_amendment_actions(
             error_code="AMENDMENT_ACTIONS_RETRIEVAL_FAILED"
         ))
 
-@mcp.tool()
-@require_paid_access
+# @require_paid_access
 async def get_amendment_sponsors(
     ctx: Context,
     congress: int,

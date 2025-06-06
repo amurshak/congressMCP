@@ -117,7 +117,7 @@ def format_record_detail(record_data: Dict[str, Any]) -> str:
 
 # --- MCP Resources (Static/Reference Data) ---
 
-@require_paid_access
+# @require_paid_access
 @mcp.resource("congress://congressional-record/latest")
 async def get_latest_congressional_record(ctx: Context) -> str:
     """
@@ -171,8 +171,7 @@ async def get_latest_congressional_record(ctx: Context) -> str:
 
 # --- MCP Tools (Interactive/Parameterized Functions) ---
 
-@require_paid_access
-@mcp.tool("search_congressional_record")
+# @require_paid_access
 async def search_congressional_record(
     ctx: Context,
     year: Optional[int] = None,

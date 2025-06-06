@@ -65,8 +65,7 @@ def format_committee_print_text_version(text_item: Dict[str, Any]) -> str:
 
 # --- MCP Tools ---
 
-@require_paid_access
-@mcp.tool("get_latest_committee_prints")
+# @require_paid_access
 async def get_latest_committee_prints(ctx: Context) -> str:
     """
     Get a list of the most recent committee prints.
@@ -123,8 +122,7 @@ async def get_latest_committee_prints(ctx: Context) -> str:
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
-@require_paid_access
-@mcp.tool("get_committee_prints_by_congress")
+# @require_paid_access
 async def get_committee_prints_by_congress(ctx: Context, congress: int) -> str:
     """
     Get committee prints for a specific Congress.
@@ -191,8 +189,7 @@ async def get_committee_prints_by_congress(ctx: Context, congress: int) -> str:
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
-@require_paid_access
-@mcp.tool("get_committee_prints_by_congress_and_chamber")
+# @require_paid_access
 async def get_committee_prints_by_congress_and_chamber(ctx: Context, congress: int, chamber: str) -> str:
     """
     Get committee prints for a specific Congress and chamber.
@@ -268,8 +265,7 @@ async def get_committee_prints_by_congress_and_chamber(ctx: Context, congress: i
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
-@require_paid_access
-@mcp.tool("get_committee_print_details")
+# @require_paid_access
 async def get_committee_print_details(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
     Get detailed information about a specific committee print.
@@ -364,8 +360,7 @@ async def get_committee_print_details(ctx: Context, congress: int, chamber: str,
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
-@require_paid_access
-@mcp.tool("get_committee_print_text_versions")
+# @require_paid_access
 async def get_committee_print_text_versions(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
     Get text versions for a specific committee print.
@@ -447,8 +442,7 @@ async def get_committee_print_text_versions(ctx: Context, congress: int, chamber
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def search_committee_prints(
     ctx: Context,
     offset: Optional[int] = None,

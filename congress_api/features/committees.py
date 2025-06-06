@@ -189,7 +189,6 @@ async def get_committee_details(ctx: Context, chamber: str, committee_code: str)
 # - get_committee_communications: Communications with limit parameter
 # - search_committees: Search functionality
 
-@mcp.tool()
 async def get_committee_bills(
     ctx: Context,
     chamber: str,
@@ -264,7 +263,6 @@ async def get_committee_bills(
         error_response.details = {"error": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool()
 async def get_committee_reports(
     ctx: Context,
     chamber: str,
@@ -335,7 +333,6 @@ async def get_committee_reports(
         error_response.details = {"error": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool()
 async def get_committee_nominations(
     ctx: Context,
     committee_code: str,
@@ -409,7 +406,6 @@ async def get_committee_nominations(
         error_response.details = {"error": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool()
 async def get_committee_communications(
     ctx: Context,
     chamber: str,
@@ -486,7 +482,6 @@ async def get_committee_communications(
         error_response.details = {"error": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool()
 async def search_committees(
     ctx: Context,
     keywords: str,
@@ -552,7 +547,6 @@ async def search_committees(
         error_response.details = {"error": str(e)}
         return format_error_response(error_response)
 
-@mcp.tool()
 async def get_committee_communication_details(
     ctx: Context,
     congress: int,

@@ -148,7 +148,7 @@ def format_crs_reports_list(data: Dict[str, Any]) -> str:
 
 # --- MCP Resources (Static/Reference Data Only) ---
 
-@require_paid_access
+# @require_paid_access
 @mcp.resource("congress://crs-reports/latest")
 async def get_latest_crs_reports(ctx: Context) -> str:
     """
@@ -193,8 +193,7 @@ async def get_latest_crs_reports(ctx: Context) -> str:
 
 # --- MCP Tools (Interactive/Parameterized Functions) ---
 
-@require_paid_access
-@mcp.tool("search_crs_reports")
+# @require_paid_access
 async def search_crs_reports(
     ctx: Context,
     keywords: Optional[str] = None,
