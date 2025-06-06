@@ -8,6 +8,7 @@ from ..core.api_wrapper import safe_committee_prints_request
 from ..core.validators import ParameterValidator, ValidationResult
 from ..core.exceptions import APIErrorResponse, ErrorType, format_error_response, CommonErrors
 from ..core.response_utils import CommitteePrintsProcessor, clean_committee_prints_response
+from ..core.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -64,6 +65,7 @@ def format_committee_print_text_version(text_item: Dict[str, Any]) -> str:
 
 # --- MCP Tools ---
 
+@require_paid_access
 @mcp.tool("get_latest_committee_prints")
 async def get_latest_committee_prints(ctx: Context) -> str:
     """
@@ -121,6 +123,7 @@ async def get_latest_committee_prints(ctx: Context) -> str:
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
+@require_paid_access
 @mcp.tool("get_committee_prints_by_congress")
 async def get_committee_prints_by_congress(ctx: Context, congress: int) -> str:
     """
@@ -188,6 +191,7 @@ async def get_committee_prints_by_congress(ctx: Context, congress: int) -> str:
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
+@require_paid_access
 @mcp.tool("get_committee_prints_by_congress_and_chamber")
 async def get_committee_prints_by_congress_and_chamber(ctx: Context, congress: int, chamber: str) -> str:
     """
@@ -264,6 +268,7 @@ async def get_committee_prints_by_congress_and_chamber(ctx: Context, congress: i
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
+@require_paid_access
 @mcp.tool("get_committee_print_details")
 async def get_committee_print_details(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
@@ -359,6 +364,7 @@ async def get_committee_print_details(ctx: Context, congress: int, chamber: str,
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
+@require_paid_access
 @mcp.tool("get_committee_print_text_versions")
 async def get_committee_print_text_versions(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
@@ -441,6 +447,7 @@ async def get_committee_print_text_versions(ctx: Context, congress: int, chamber
         logger.error(f"API request failed: {str(e)}")
         return format_error_response(error)
 
+@require_paid_access
 @mcp.tool()
 async def search_committee_prints(
     ctx: Context,

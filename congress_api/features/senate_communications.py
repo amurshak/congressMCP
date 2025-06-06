@@ -6,6 +6,7 @@ from ..core.api_wrapper import safe_senate_communications_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import SenateCommunicationsProcessor, clean_senate_communications_response
+from ..core.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -106,6 +107,7 @@ def format_senate_communications_list(communications: List[Dict[str, Any]], titl
 
 # --- MCP Resources ---
 
+@require_paid_access
 @mcp.resource("congress://senate-communications/latest")
 async def get_latest_senate_communications(ctx: Context) -> str:
     """
@@ -137,6 +139,7 @@ async def get_latest_senate_communications(ctx: Context) -> str:
 
 # --- MCP Tools ---
 
+@require_paid_access
 @mcp.tool("get_senate_communication_details")
 async def get_senate_communication_details(
     ctx: Context,
@@ -189,6 +192,7 @@ async def get_senate_communication_details(
         logger.error(f"Error in get_senate_communication_details: {str(e)}")
         return CommonErrors.api_server_error(f"/senate-communication/{congress}/{communication_type}/{communication_number}", str(e))
 
+@require_paid_access
 @mcp.tool("search_senate_communications")
 async def search_senate_communications(
     ctx: Context,

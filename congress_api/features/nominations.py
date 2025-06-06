@@ -12,6 +12,7 @@ from ..core.api_wrapper import safe_nominations_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
+from ..core.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -207,6 +208,7 @@ def format_nomination_hearings(hearings: List[Dict[str, Any]]) -> str:
 
 # MCP Tools
 @mcp.tool("get_latest_nominations")
+@require_paid_access
 async def get_latest_nominations(ctx: Context) -> str:
     """
     Get the most recent nominations.
@@ -244,6 +246,7 @@ async def get_latest_nominations(ctx: Context) -> str:
     return "\n".join(lines)
 
 @mcp.tool("get_nominations_by_congress")
+@require_paid_access
 async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
     """
     Get nominations for a specific Congress.
@@ -289,6 +292,7 @@ async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
     return "\n".join(lines)
 
 @mcp.tool("get_nomination_details")
+@require_paid_access
 async def get_nomination_details(ctx: Context, congress: int, nomination_number: int) -> str:
     """
     Get detailed information about a specific nomination.
@@ -329,6 +333,7 @@ async def get_nomination_details(ctx: Context, congress: int, nomination_number:
     return format_nomination_detail(nomination)
 
 @mcp.tool("get_nomination_nominees")
+@require_paid_access
 async def get_nomination_nominees(ctx: Context, congress: int, nomination_number: int, ordinal: int) -> str:
     """
     Get nominees for a specific position within a nomination.
@@ -382,6 +387,7 @@ async def get_nomination_nominees(ctx: Context, congress: int, nomination_number
     return format_nominees_list(nominees)
 
 @mcp.tool("get_nomination_actions")
+@require_paid_access
 async def get_nomination_actions(ctx: Context, congress: int, nomination_number: int) -> str:
     """
     Get actions for a specific nomination.
@@ -433,6 +439,7 @@ async def get_nomination_actions(ctx: Context, congress: int, nomination_number:
     return format_nomination_actions(deduplicated_actions)
 
 @mcp.tool("get_nomination_committees")
+@require_paid_access
 async def get_nomination_committees(ctx: Context, congress: int, nomination_number: int) -> str:
     """
     Get committees for a specific nomination.
@@ -484,6 +491,7 @@ async def get_nomination_committees(ctx: Context, congress: int, nomination_numb
     return format_nomination_committees(ctx, deduplicated_committees)
 
 @mcp.tool("get_nomination_hearings")
+@require_paid_access
 async def get_nomination_hearings(ctx: Context, congress: int, nomination_number: int) -> str:
     """
     Get hearings for a specific nomination.
@@ -536,6 +544,7 @@ async def get_nomination_hearings(ctx: Context, congress: int, nomination_number
 
 # MCP Tool
 @mcp.tool("search_nominations")
+@require_paid_access
 async def search_nominations(
     ctx: Context,
     keywords: Optional[str] = None,

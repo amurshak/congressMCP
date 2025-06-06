@@ -8,6 +8,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
+from ..core.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -126,6 +127,7 @@ def format_daily_record_articles(articles_data: Dict[str, Any]) -> str:
 # MCP RESOURCES (Static/Reference Data Only - No User Parameters)
 # =============================================================================
 
+@require_paid_access
 @mcp.resource("congress://daily-congressional-record/latest")
 async def get_latest_daily_congressional_record(ctx: Context) -> str:
     """
@@ -199,6 +201,7 @@ async def get_latest_daily_congressional_record(ctx: Context) -> str:
 # MCP TOOLS (Interactive/Parameterized Functions)
 # =============================================================================
 
+@require_paid_access
 @mcp.tool()
 async def search_daily_congressional_record(
     ctx: Context,

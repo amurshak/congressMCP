@@ -8,6 +8,7 @@ from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
+from ..core.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -164,6 +165,7 @@ class HearingsProcessor:
 
 # --- MCP Resources ---
 
+@require_paid_access
 @mcp.resource("congress://hearings/latest")
 async def latest_hearings_resource(ctx: Context) -> str:
     """Static resource providing the latest hearings."""
@@ -171,6 +173,7 @@ async def latest_hearings_resource(ctx: Context) -> str:
 
 # --- MCP Tools ---
 
+@require_paid_access
 @mcp.tool("get_hearings_by_congress")
 async def get_hearings_by_congress(ctx: Context, congress: int) -> str:
     """
@@ -234,6 +237,7 @@ async def get_hearings_by_congress(ctx: Context, congress: int) -> str:
         )
         return format_error_response(error_response)
 
+@require_paid_access
 @mcp.tool("get_hearings_by_congress_and_chamber")
 async def get_hearings_by_congress_and_chamber(ctx: Context, congress: int, chamber: str) -> str:
     """
@@ -308,6 +312,7 @@ async def get_hearings_by_congress_and_chamber(ctx: Context, congress: int, cham
         )
         return format_error_response(error_response)
 
+@require_paid_access
 @mcp.tool("get_hearing_details")
 async def get_hearing_details(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
@@ -387,6 +392,7 @@ async def get_hearing_details(ctx: Context, congress: int, chamber: str, jacket_
         )
         return format_error_response(error_response)
 
+@require_paid_access
 @mcp.tool("get_hearing_content")
 async def get_hearing_content(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
@@ -521,6 +527,7 @@ async def get_hearing_content(ctx: Context, congress: int, chamber: str, jacket_
         )
         return format_error_response(error_response)
 
+@require_paid_access
 @mcp.tool("search_hearings")
 async def search_hearings(
     ctx: Context,

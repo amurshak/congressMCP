@@ -9,6 +9,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
+from ..core.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -152,6 +153,7 @@ def format_matching_communications(comms_data: Dict[str, Any]) -> str:
 
 # --- MCP Resources ---
 
+@require_paid_access
 @mcp.resource("congress://house-requirements/latest")
 async def get_latest_house_requirements(ctx: Context) -> str:
     """
@@ -196,6 +198,7 @@ async def get_latest_house_requirements(ctx: Context) -> str:
 
 # --- MCP Tools ---
 
+@require_paid_access
 @mcp.tool()
 async def search_house_requirements(
     ctx: Context,
@@ -261,6 +264,7 @@ async def search_house_requirements(
         logger.error(f"Unexpected error searching house requirements: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(endpoint, message=str(e)))
 
+@require_paid_access
 @mcp.tool()
 async def get_house_requirement_details(
     ctx: Context,
@@ -310,6 +314,7 @@ async def get_house_requirement_details(
         logger.error(f"Unexpected error fetching house requirement details: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(endpoint, message=str(e)))
 
+@require_paid_access
 @mcp.tool()
 async def get_house_requirement_matching_communications(
     ctx: Context,

@@ -41,7 +41,7 @@ TIER_CONFIG = {
                     "congressional_record", "daily_congressional_record", 
                     "bound_congressional_record", "house_communications",
                     "house_requirements", "senate_communications",
-                    "nominations", "crs_reports", "treaties"]  # All 23 tool categories
+                    "nominations", "crs_reports", "treaties"]  # All tools for paid tiers
     },
     SubscriptionTier.ENTERPRISE: {
         "rate_limit": 100000,  # Very high limit (effectively unlimited)
@@ -177,6 +177,107 @@ def check_feature_access(feature: str, tier: str) -> bool:
     """Check if a user's tier has access to a specific feature."""
     return feature in TIER_CONFIG[tier]["features"]
 
+# --- FastMCP Tier Authorization Decorators ---
+
+from functools import wraps
+from fastmcp import Context
+from fastmcp.exceptions import ToolError
+
+def get_user_tier_from_context(ctx: Context) -> str:
+    """
+    Extract user tier from FastMCP context
+    The ASGI middleware should have added user info to the request scope
+    """
+    try:
+        # Check if user info was added by ASGI middleware
+        if hasattr(ctx, 'request') and hasattr(ctx.request, 'scope'):
+            scope = ctx.request.scope
+            if 'user' in scope:
+                user_info = scope['user']
+                return user_info.get('tier', 'free').lower()
+        
+        # Fallback: try to get from other context attributes
+        if hasattr(ctx, 'user_tier'):
+            return ctx.user_tier.lower()
+            
+        # Default to free tier if no user info found
+        logger.warning("No user tier found in context, defaulting to free")
+        return "free"
+        
+    except Exception as e:
+        logger.error(f"Error extracting user tier from context: {e}")
+        return "free"
+
+def require_paid_access(func):
+    """
+    Decorator to require paid subscription (Pro or Enterprise) for tool access.
+    Blocks free tier users with clear upgrade message.
+    """
+    @wraps(func)
+    async def wrapper(ctx: Context, *args, **kwargs):
+        try:
+            user_tier = get_user_tier_from_context(ctx)
+            
+            # Handle both enum and string tier values
+            if isinstance(user_tier, SubscriptionTier):
+                tier_value = user_tier.value
+                is_paid = user_tier in [SubscriptionTier.PRO, SubscriptionTier.ENTERPRISE]
+            else:
+                # Handle string tier values (fallback)
+                tier_value = str(user_tier).lower()
+                is_paid = tier_value in ['pro', 'enterprise']
+            
+            # Allow all paid tiers (Pro and Enterprise)
+            if is_paid:
+                return await func(ctx, *args, **kwargs)
+            
+            # Block free tier users with clear upgrade message
+            error_msg = (
+                f"Access denied: This tool requires a paid subscription (Pro or Enterprise). "
+                f"Your current tier: {tier_value.title()}. "
+                f"Please upgrade your subscription to access this feature."
+            )
+            logger.warning(f"Access denied: {func.__name__} requires paid subscription, user tier: {tier_value}")
+            raise ToolError(error_msg)
+            
+        except ToolError:
+            # Re-raise ToolError as-is (preserves our upgrade message)
+            raise
+        except Exception as e:
+            # Log the actual error for debugging
+            logger.error(f"Error in tier authorization for {func.__name__}: {str(e)}")
+            # Still show upgrade message for any auth-related errors
+            error_msg = (
+                f"Access denied: This tool requires a paid subscription (Pro or Enterprise). "
+                f"Please upgrade your subscription to access this feature."
+            )
+            raise ToolError(error_msg)
+    
+    return wrapper
+
+async def generate_api_key(user_id: str, tier: SubscriptionTier) -> str:
+    """Generate an API key for a user."""
+    if ENABLE_DATABASE:
+        from .database import db_client
+        api_key = await db_client.create_api_key(user_id, tier)
+        if not api_key:
+            raise HTTPException(status_code=500, detail="Failed to generate API key")
+        return api_key
+    else:
+        # Simple key generation for development
+        key = f"{tier.value}:{user_id}:{int(time.time())}"
+        return key
+
+def generate_jwt_token(user_id: str, tier: SubscriptionTier, expiry_days: int = 30) -> str:
+    """Generate a JWT token for a user."""
+    payload = {
+        "user_id": user_id,
+        "tier": tier.value,
+        "exp": datetime.utcnow() + timedelta(days=expiry_days)
+    }
+    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    return token
+
 # async def auth_middleware(request: Request, call_next):
 #     """Middleware to handle authentication and rate limiting."""
 #     # Skip authentication for OPTIONS requests and if auth is disabled
@@ -231,26 +332,3 @@ def check_feature_access(feature: str, tier: str) -> bool:
 #     except Exception as e:
 #         logger.error(f"Authentication error: {str(e)}")
 #         raise HTTPException(status_code=401, detail="Authentication failed")
-
-async def generate_api_key(user_id: str, tier: SubscriptionTier) -> str:
-    """Generate an API key for a user."""
-    if ENABLE_DATABASE:
-        from .database import db_client
-        api_key = await db_client.create_api_key(user_id, tier)
-        if not api_key:
-            raise HTTPException(status_code=500, detail="Failed to generate API key")
-        return api_key
-    else:
-        # Simple key generation for development
-        key = f"{tier.value}:{user_id}:{int(time.time())}"
-        return key
-
-def generate_jwt_token(user_id: str, tier: SubscriptionTier, expiry_days: int = 30) -> str:
-    """Generate a JWT token for a user."""
-    payload = {
-        "user_id": user_id,
-        "tier": tier.value,
-        "exp": datetime.utcnow() + timedelta(days=expiry_days)
-    }
-    token = jwt.encode(payload, JWT_SECRET, algorithm="HS256")
-    return token

@@ -8,6 +8,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
+from ..core.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -147,6 +148,7 @@ def format_crs_reports_list(data: Dict[str, Any]) -> str:
 
 # --- MCP Resources (Static/Reference Data Only) ---
 
+@require_paid_access
 @mcp.resource("congress://crs-reports/latest")
 async def get_latest_crs_reports(ctx: Context) -> str:
     """
@@ -191,6 +193,7 @@ async def get_latest_crs_reports(ctx: Context) -> str:
 
 # --- MCP Tools (Interactive/Parameterized Functions) ---
 
+@require_paid_access
 @mcp.tool("search_crs_reports")
 async def search_crs_reports(
     ctx: Context,
