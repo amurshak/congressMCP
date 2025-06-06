@@ -2,7 +2,7 @@
 
 **🎉 Production Ready - Complete Legislative Data Access for Claude Desktop**
 
-This project provides a Model Context Protocol (MCP) server for accessing the Congress.gov API, allowing AI systems to retrieve and interact with legislative data from the United States Congress.
+This project provides a Model Context Protocol (MCP) server for accessing the Congress.gov API through 6 organized bucket tools, allowing AI systems to retrieve and interact with legislative data from the United States Congress with a clean, unified interface.
 
 [![smithery badge](https://smithery.ai/badge/@amurshak/podbeanmcp)](https://smithery.ai/server/@amurshak/podbeanmcp)
 
@@ -34,42 +34,61 @@ Add this to your Claude Desktop configuration:
 ```
 
 ### 4. Restart Claude Desktop
-You'll now have access to 42+ Congressional tools!
+You'll now have access to 6 organized bucket tools covering 116+ congressional operations!
 
 ---
 
+## 🗂️ Bucket Tool Architecture (v1.5.0)
+
+### 6 Organized Bucket Tools
+
+#### 1. **Legislation Hub** (`legislation_hub`)
+- **Bills**: Search, details, text, actions, amendments, cosponsors, subjects
+- **Amendments**: Search, details, actions, sponsors  
+- **Summaries**: Bill summaries with keyword search
+- **Treaties**: Search, actions, committees, text
+- **Operations**: 30 total (7 free, 23 paid)
+
+#### 2. **Members and Committees** (`members_and_committees`)
+- **Members**: Search by name/state/party, sponsored/cosponsored legislation
+- **Committees**: Search, bills, reports, communications, nominations
+- **Operations**: 20 total (3 free, 17 paid)
+
+#### 3. **Voting and Nominations** (`voting_and_nominations`)
+- **House Votes**: By congress/session, vote details, member votes
+- **Nominations**: Search, details, actions, committees, hearings, nominees
+- **Operations**: 20 total (2 free, 18 paid)
+
+#### 4. **Records and Hearings** (`records_and_hearings`)
+- **Congressional Records**: Daily and bound record search
+- **Communications**: House and Senate communications, requirements
+- **Hearings**: Search, details, content by congress/chamber
+- **Operations**: 20 total (3 free, 17 paid)
+
+#### 5. **Committee Intelligence** (`committee_intelligence`)
+- **Committee Reports**: Latest, by congress/type, details, content
+- **Committee Prints**: Latest, by congress/chamber, details
+- **Committee Meetings**: Latest, by congress/chamber/committee, details
+- **Operations**: 20 total (0 free, 20 paid - professional tier)
+
+#### 6. **Research and Professional** (`research_and_professional`)
+- **Congress Information**: Basic and enhanced congress details
+- **CRS Reports**: Congressional Research Service report search
+- **Operations**: 6 total (1 free, 5 paid)
+
 ## Features
 
-### Legislative Information
-- **Bills**: Access bill information, including actions, amendments, cosponsors, subjects, and more
-- **Amendments**: Search and retrieve amendment details, actions, and sponsors
-- **Summaries**: Access bill summaries with keyword search capabilities
-- **Treaties**: Search and access treaty information, actions, and committees
+### Unified Interface
+- **Operation-Based Routing**: Each bucket accepts an `operation` parameter
+- **Consistent Parameters**: Unified parameter handling across all buckets
+- **Clear Documentation**: Detailed operation descriptions and tier access info
+- **Error Handling**: User-friendly error messages with operation guidance
 
-### Congressional Members & Committees
-- **Members**: Search for members of Congress by name, state, party, and other criteria
-- **Committees**: Browse congressional committees, their activities, bills, and reports
-- **Committee Reports**: Access committee reports with search capabilities
-- **Committee Prints**: Retrieve committee prints filtered by congress and chamber
-- **Committee Meetings**: Get information about scheduled and past committee meetings
-
-### Congressional Records & Communications
-- **Congressional Record**: Access the Congressional Record with search capabilities
-- **Daily Congressional Record**: Retrieve daily congressional record issues
-- **Bound Congressional Record**: Access bound congressional record issues
-- **House Communications**: Retrieve house communications by type and congress
-- **Senate Communications**: Access senate communications by type and congress
-- **CRS Reports**: Search and access Congressional Research Service reports
-
-### Other Resources
-- **Congress Information**: Get information about current and past Congresses
-- **Nominations**: Search and retrieve nomination details, actions, and committees
-- **House Requirements**: Access house requirements information
-
-### General Features
-- Pre-defined prompts for common legislative research tasks
-- Comprehensive search tools for all data types
-- Formatted outputs for better readability
+### Access Control
+- **Free Tier**: Access to 13 basic operations across buckets
+- **Paid Tier**: Full access to all 116+ operations
+- **Bucket-Level Management**: Centralized FREE_OPERATIONS and PAID_OPERATIONS
+- **Clear Messaging**: Users receive detailed tier information for each bucket
 
 ## Project Structure
 
