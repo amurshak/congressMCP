@@ -4,6 +4,7 @@
 
 This Model Context Protocol (MCP) server provides comprehensive access to the Congress.gov API through 6 organized bucket tools, enabling AI systems to retrieve and interact with legislative data from the United States Congress with a clean, unified interface.
 
+**🎯 Complete Access: 6 Bucket Tools • 90 Operations • 36 Resources**
 
 ## 🚀 Quick Start
 
@@ -33,7 +34,7 @@ Add this to your Claude Desktop configuration:
 ```
 
 ### 4. Restart Claude Desktop
-You'll now have access to 6 organized bucket tools covering 116+ congressional operations!
+You'll now have access to 6 organized bucket tools covering 90 congressional operations plus 36 resources!
 
 ---
 
@@ -45,42 +46,42 @@ We've successfully consolidated 87+ individual tools into 6 logical, organized b
 
 #### 1. **📋 Legislation Hub** (`legislation_hub`)
 **Consolidates:** Bills, Amendments, Summaries, Treaties  
-**Operations:** 30 total (7 free, 23 paid)
+**Operations:** 22 total (7 free, 15 paid)
 - **Bills**: Search, details, text, actions, amendments, cosponsors, subjects
 - **Amendments**: Search, details, actions, sponsors  
 - **Summaries**: Bill summaries with keyword search
 - **Treaties**: Search, actions, committees, text
-- **Operations**: 30 total (7 free, 23 paid)
+- **Operations**: 22 total (7 free, 15 paid)
 
 #### 2. **👥 Members and Committees** (`members_and_committees`)
 **Consolidates:** Congressional Members, Committees, Committee Operations  
-**Operations:** 20 total (3 free, 17 paid)
+**Operations:** 13 total (3 free, 10 paid)
 - **Members**: Search, details, sponsored/cosponsored legislation
 - **Committees**: Search, bills, reports, communications, nominations
-- **Operations**: 20 total (3 free, 17 paid)
+- **Operations**: 13 total (3 free, 10 paid)
 
 #### 3. **🗳️ Voting and Nominations** (`voting_and_nominations`)
 **Consolidates:** House Votes, Nominations  
-**Operations:** 20 total (2 free, 18 paid)
+**Operations:** 14 total (2 free, 12 paid)
 - **House Votes**: By Congress/session, details, member votes, XML data
 - **Nominations**: Search, details, actions, committees, hearings
-- **Operations**: 20 total (2 free, 18 paid)
+- **Operations**: 14 total (2 free, 12 paid)
 
 #### 4. **📰 Records and Hearings** (`records_and_hearings`)
 **Consolidates:** Congressional Records, Communications, Hearings  
-**Operations:** 20 total (3 free, 17 paid)
+**Operations:** 16 total (3 free, 13 paid)
 - **Congressional Records**: Daily/bound records, search functionality
 - **Communications**: House/Senate communications, requirements
 - **Hearings**: Search, details, content by Congress/chamber
-- **Operations**: 20 total (3 free, 17 paid)
+- **Operations**: 16 total (3 free, 13 paid)
 
 #### 5. **📊 Committee Intelligence** (`committee_intelligence`)
 **Consolidates:** Committee Reports, Prints, Meetings  
-**Operations:** 20 total (0 free, 20 paid)
+**Operations:** 19 total (0 free, 19 paid)
 - **Committee Reports**: Latest, by Congress/type, details, content
 - **Committee Prints**: Latest, by Congress/chamber, details
 - **Committee Meetings**: Latest, by Congress/chamber/committee, search
-- **Operations**: 20 total (0 free, 20 paid)
+- **Operations**: 19 total (0 free, 19 paid)
 
 #### 6. **🔬 Research and Professional** (`research_and_professional`)
 **Consolidates:** Congress Information, CRS Reports  
