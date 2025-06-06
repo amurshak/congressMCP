@@ -11,6 +11,7 @@ from ..core.api_wrapper import safe_summaries_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import SummariesProcessor, clean_summaries_response
+from ..core.auth import require_paid_access
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -464,6 +465,7 @@ async def get_summaries_api_info(ctx: Context) -> str:
 
 # Tools
 @mcp.tool("search_summaries")
+@require_paid_access
 async def search_summaries(
     ctx: Context,
     keywords: str, 
@@ -588,6 +590,7 @@ async def search_summaries(
 
 
 @mcp.tool("get_bill_summaries")
+@require_paid_access
 async def get_bill_summaries(
     ctx: Context,
     congress: int,

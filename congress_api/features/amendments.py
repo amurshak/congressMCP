@@ -9,6 +9,7 @@ from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import format_error_response, APIErrorResponse
 from ..core.response_utils import ResponseProcessor
+from ..core.auth import require_paid_access
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -214,6 +215,7 @@ async def get_amendments_by_type(ctx: Context,congress: str, amendment_type: str
 
 # Tools
 @mcp.tool()
+@require_paid_access
 async def get_bill_amendments(
     ctx: Context,
     congress: int,
@@ -294,6 +296,7 @@ async def get_bill_amendments(
         ))
 
 @mcp.tool()
+@require_paid_access
 async def search_amendments(
     ctx: Context,
     keywords: str, 
@@ -392,6 +395,7 @@ async def search_amendments(
         ))
 
 @mcp.tool()
+@require_paid_access
 async def get_amendment_details(
     ctx: Context,
     congress: int,
@@ -479,6 +483,7 @@ async def get_amendment_details(
         ))
 
 @mcp.tool()
+@require_paid_access
 async def get_amendment_actions(
     ctx: Context,
     congress: int,
@@ -570,6 +575,7 @@ async def get_amendment_actions(
         ))
 
 @mcp.tool()
+@require_paid_access
 async def get_amendment_sponsors(
     ctx: Context,
     congress: int,

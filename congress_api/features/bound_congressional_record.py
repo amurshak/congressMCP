@@ -15,6 +15,7 @@ from ..core.api_wrapper import safe_bound_record_request
 from ..core.exceptions import handle_validation_error, format_error_response, CommonErrors
 from ..core.response_utils import clean_bound_congressional_record_response
 from ..mcp_app import mcp
+from ..core.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ def format_bound_record_detail(record_data: Dict[str, Any]) -> str:
 
 # --- MCP Resources ---
 
+@require_paid_access
 @mcp.resource("congress://bound-congressional-record/latest")
 async def get_latest_bound_congressional_record(ctx: Context) -> str:
     """
@@ -120,6 +122,7 @@ async def get_latest_bound_congressional_record(ctx: Context) -> str:
     
     return "\n".join(lines)
 
+@require_paid_access
 @mcp.resource("congress://bound-congressional-record/{year}")
 async def get_bound_congressional_record_by_year(ctx: Context, year: str) -> str:
     """
@@ -156,6 +159,7 @@ async def get_bound_congressional_record_by_year(ctx: Context, year: str) -> str
     
     return "\n".join(lines)
 
+@require_paid_access
 @mcp.resource("congress://bound-congressional-record/{year}/{month}")
 async def get_bound_congressional_record_by_year_month(ctx: Context, year: str, month: str) -> str:
     """
@@ -193,6 +197,7 @@ async def get_bound_congressional_record_by_year_month(ctx: Context, year: str, 
     
     return "\n".join(lines)
 
+@require_paid_access
 @mcp.resource("congress://bound-congressional-record/{year}/{month}/{day}")
 async def get_bound_congressional_record_by_date(ctx: Context, year: str, month: str, day: str) -> str:
     """
@@ -236,6 +241,7 @@ async def get_bound_congressional_record_by_date(ctx: Context, year: str, month:
 
 # --- MCP Tools ---
 
+@require_paid_access
 @mcp.tool()
 async def search_bound_congressional_record(
     ctx: Context,

@@ -10,6 +10,7 @@ from ..core.api_wrapper import safe_committee_reports_request
 from ..core.validators import ParameterValidator, ValidationResult
 from ..core.exceptions import APIErrorResponse, ErrorType, format_error_response, CommonErrors
 from ..core.response_utils import CommitteeReportsProcessor, clean_committee_reports_response
+from ..core.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -73,6 +74,7 @@ def format_committee_report_text_version(text_version_item: Dict[str, Any]) -> s
 
 # --- MCP Tools ---
 
+@require_paid_access
 @mcp.tool()
 async def get_latest_committee_reports(ctx: Context) -> str:
     """
@@ -122,6 +124,7 @@ async def get_latest_committee_reports(ctx: Context) -> str:
             message=str(e)
         ))
 
+@require_paid_access
 @mcp.tool()
 async def get_committee_reports_by_congress(ctx: Context, congress: int) -> str:
     """
@@ -185,6 +188,7 @@ async def get_committee_reports_by_congress(ctx: Context, congress: int) -> str:
             message=str(e)
         ))
 
+@require_paid_access
 @mcp.tool()
 async def get_committee_reports_by_congress_and_type(
     ctx: Context,
@@ -263,6 +267,7 @@ async def get_committee_reports_by_congress_and_type(
             message=str(e)
         ))
 
+@require_paid_access
 @mcp.tool()
 async def get_committee_report_details(
     ctx: Context,
@@ -338,6 +343,7 @@ async def get_committee_report_details(
             message=str(e)
         ))
 
+@require_paid_access
 @mcp.tool()
 async def get_committee_report_text_versions(
     ctx: Context,
@@ -417,6 +423,7 @@ async def get_committee_report_text_versions(
             message=str(e)
         ))
 
+@require_paid_access
 @mcp.tool()
 async def search_committee_reports(
     ctx: Context,
@@ -536,6 +543,7 @@ async def search_committee_reports(
             message=str(e)
         ))
 
+@require_paid_access
 @mcp.tool("get_committee_report_content")
 async def get_committee_report_content(
     ctx: Context,
