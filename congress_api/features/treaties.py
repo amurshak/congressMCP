@@ -195,7 +195,7 @@ def format_treaties_list(data: Dict[str, Any]) -> str:
 # --- MCP Resources ---
 
 @mcp.resource("congress://treaties/latest")
-@require_paid_access
+# @require_paid_access
 async def get_latest_treaties(ctx: Context) -> str:
     """
     Get the most recent treaties.
@@ -239,7 +239,7 @@ async def get_latest_treaties(ctx: Context) -> str:
         return format_error_response(error_response)
 
 @mcp.resource("congress://treaties/{congress}")
-@require_paid_access
+# @require_paid_access
 async def get_treaties_by_congress(ctx: Context, congress: int) -> str:
     """
     Get treaties for a specific Congress.
@@ -296,7 +296,7 @@ async def get_treaties_by_congress(ctx: Context, congress: int) -> str:
         return format_error_response(error_response)
 
 @mcp.resource("congress://treaties/{congress}/{treaty_number}")
-@require_paid_access
+# @require_paid_access
 async def get_treaty_detail(ctx: Context, congress: int, treaty_number: int) -> str:
     """Get detailed information about a specific treaty"""
     try:
@@ -334,7 +334,7 @@ async def get_treaty_detail(ctx: Context, congress: int, treaty_number: int) -> 
         return format_error_response(error_response)
 
 @mcp.resource("congress://treaties/{congress}/{treaty_number}/{treaty_suffix}")
-@require_paid_access
+# @require_paid_access
 async def get_treaty_detail_with_suffix(ctx: Context, congress: int, treaty_number: int, treaty_suffix: str) -> str:
     """Get detailed information about a specific partitioned treaty with suffix"""
     try:
@@ -374,8 +374,7 @@ async def get_treaty_detail_with_suffix(ctx: Context, congress: int, treaty_numb
 
 # --- MCP Tools ---
 
-@mcp.tool("get_treaty_actions")
-@require_paid_access
+# @require_paid_access
 async def get_treaty_actions(
     ctx: Context,
     congress: int,
@@ -463,8 +462,7 @@ async def get_treaty_actions(
         )
         return format_error_response(error_response)
 
-@mcp.tool("get_treaty_committees")
-@require_paid_access
+# @require_paid_access
 async def get_treaty_committees(
     ctx: Context,
     congress: int,
@@ -530,8 +528,7 @@ async def get_treaty_committees(
         )
         return format_error_response(error_response)
 
-@mcp.tool("get_treaty_text")
-@require_paid_access
+# @require_paid_access
 async def get_treaty_text(
     ctx: Context,
     congress: int,
@@ -689,8 +686,7 @@ async def get_treaty_text(
             message=f"Failed to retrieve treaty text: {str(e)}"
         )
 
-@mcp.tool("search_treaties")
-@require_paid_access
+# @require_paid_access
 async def search_treaties(
     ctx: Context,
     congress: Optional[int] = None,
@@ -813,7 +809,7 @@ async def search_treaties(
 # --- Helper Resources ---
 
 @mcp.resource("congress://treaties/help")
-@require_paid_access
+# @require_paid_access
 async def get_treaties_help(ctx: Context) -> str:
     """
     Get comprehensive help and usage guide for the Treaties API.
@@ -974,7 +970,7 @@ For additional help or to report issues:
 """
 
 @mcp.resource("congress://treaties/api-info")
-@require_paid_access
+# @require_paid_access
 async def get_treaties_api_info(ctx: Context) -> str:
     """
     Get technical API information for the Treaties API.

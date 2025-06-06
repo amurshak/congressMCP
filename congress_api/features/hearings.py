@@ -165,7 +165,7 @@ class HearingsProcessor:
 
 # --- MCP Resources ---
 
-@require_paid_access
+# @require_paid_access
 @mcp.resource("congress://hearings/latest")
 async def latest_hearings_resource(ctx: Context) -> str:
     """Static resource providing the latest hearings."""
@@ -173,8 +173,7 @@ async def latest_hearings_resource(ctx: Context) -> str:
 
 # --- MCP Tools ---
 
-@require_paid_access
-@mcp.tool("get_hearings_by_congress")
+# @require_paid_access
 async def get_hearings_by_congress(ctx: Context, congress: int) -> str:
     """
     Get hearings for a specific Congress.
@@ -237,8 +236,7 @@ async def get_hearings_by_congress(ctx: Context, congress: int) -> str:
         )
         return format_error_response(error_response)
 
-@require_paid_access
-@mcp.tool("get_hearings_by_congress_and_chamber")
+# @require_paid_access
 async def get_hearings_by_congress_and_chamber(ctx: Context, congress: int, chamber: str) -> str:
     """
     Get hearings for a specific Congress and chamber.
@@ -312,8 +310,7 @@ async def get_hearings_by_congress_and_chamber(ctx: Context, congress: int, cham
         )
         return format_error_response(error_response)
 
-@require_paid_access
-@mcp.tool("get_hearing_details")
+# @require_paid_access
 async def get_hearing_details(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
     Get detailed information for a specific hearing.
@@ -392,8 +389,7 @@ async def get_hearing_details(ctx: Context, congress: int, chamber: str, jacket_
         )
         return format_error_response(error_response)
 
-@require_paid_access
-@mcp.tool("get_hearing_content")
+# @require_paid_access
 async def get_hearing_content(ctx: Context, congress: int, chamber: str, jacket_number: int) -> str:
     """
     Get the actual content/text of a specific hearing.
@@ -527,8 +523,7 @@ async def get_hearing_content(ctx: Context, congress: int, chamber: str, jacket_
         )
         return format_error_response(error_response)
 
-@require_paid_access
-@mcp.tool("search_hearings")
+# @require_paid_access
 async def search_hearings(
     ctx: Context,
     keywords: Optional[str] = None,

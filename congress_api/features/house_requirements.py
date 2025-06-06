@@ -153,7 +153,7 @@ def format_matching_communications(comms_data: Dict[str, Any]) -> str:
 
 # --- MCP Resources ---
 
-@require_paid_access
+# @require_paid_access
 @mcp.resource("congress://house-requirements/latest")
 async def get_latest_house_requirements(ctx: Context) -> str:
     """
@@ -198,8 +198,7 @@ async def get_latest_house_requirements(ctx: Context) -> str:
 
 # --- MCP Tools ---
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def search_house_requirements(
     ctx: Context,
     limit: int = 10
@@ -264,8 +263,7 @@ async def search_house_requirements(
         logger.error(f"Unexpected error searching house requirements: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(endpoint, message=str(e)))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_house_requirement_details(
     ctx: Context,
     requirement_number: int
@@ -314,8 +312,7 @@ async def get_house_requirement_details(
         logger.error(f"Unexpected error fetching house requirement details: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(endpoint, message=str(e)))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_house_requirement_matching_communications(
     ctx: Context,
     requirement_number: int

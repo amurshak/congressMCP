@@ -107,7 +107,7 @@ def format_senate_communications_list(communications: List[Dict[str, Any]], titl
 
 # --- MCP Resources ---
 
-@require_paid_access
+# @require_paid_access
 @mcp.resource("congress://senate-communications/latest")
 async def get_latest_senate_communications(ctx: Context) -> str:
     """
@@ -139,8 +139,7 @@ async def get_latest_senate_communications(ctx: Context) -> str:
 
 # --- MCP Tools ---
 
-@require_paid_access
-@mcp.tool("get_senate_communication_details")
+# @require_paid_access
 async def get_senate_communication_details(
     ctx: Context,
     congress: int,
@@ -192,8 +191,7 @@ async def get_senate_communication_details(
         logger.error(f"Error in get_senate_communication_details: {str(e)}")
         return CommonErrors.api_server_error(f"/senate-communication/{congress}/{communication_type}/{communication_number}", str(e))
 
-@require_paid_access
-@mcp.tool("search_senate_communications")
+# @require_paid_access
 async def search_senate_communications(
     ctx: Context,
     congress: Optional[int] = None,

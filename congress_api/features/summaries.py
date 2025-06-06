@@ -464,8 +464,7 @@ async def get_summaries_api_info(ctx: Context) -> str:
 """
 
 # Tools
-@mcp.tool("search_summaries")
-@require_paid_access
+# @require_paid_access
 async def search_summaries(
     ctx: Context,
     keywords: str, 
@@ -589,8 +588,7 @@ async def search_summaries(
         )
 
 
-@mcp.tool("get_bill_summaries")
-@require_paid_access
+# @require_paid_access
 async def get_bill_summaries(
     ctx: Context,
     congress: int,

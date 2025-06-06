@@ -74,8 +74,7 @@ def format_committee_report_text_version(text_version_item: Dict[str, Any]) -> s
 
 # --- MCP Tools ---
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_latest_committee_reports(ctx: Context) -> str:
     """
     Get a list of the most recent committee reports.
@@ -124,8 +123,7 @@ async def get_latest_committee_reports(ctx: Context) -> str:
             message=str(e)
         ))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_committee_reports_by_congress(ctx: Context, congress: int) -> str:
     """
     Get committee reports for a specific Congress.
@@ -188,8 +186,7 @@ async def get_committee_reports_by_congress(ctx: Context, congress: int) -> str:
             message=str(e)
         ))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_committee_reports_by_congress_and_type(
     ctx: Context,
     congress: int, 
@@ -267,8 +264,7 @@ async def get_committee_reports_by_congress_and_type(
             message=str(e)
         ))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_committee_report_details(
     ctx: Context,
     congress: int,
@@ -343,8 +339,7 @@ async def get_committee_report_details(
             message=str(e)
         ))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def get_committee_report_text_versions(
     ctx: Context,
     congress: int, 
@@ -423,8 +418,7 @@ async def get_committee_report_text_versions(
             message=str(e)
         ))
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def search_committee_reports(
     ctx: Context,
     conference: Optional[str] = None,
@@ -543,8 +537,7 @@ async def search_committee_reports(
             message=str(e)
         ))
 
-@require_paid_access
-@mcp.tool("get_committee_report_content")
+# @require_paid_access
 async def get_committee_report_content(
     ctx: Context,
     congress: int, 

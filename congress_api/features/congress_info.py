@@ -219,7 +219,6 @@ async def get_all_congresses(ctx: Context) -> str:
         return format_error_response(error)
 
 # Tools (Interactive/Parameterized Functions)
-@mcp.tool()
 async def get_congress_info(
     ctx: Context,
     congress: Optional[int] = None,
@@ -305,7 +304,6 @@ async def get_congress_info(
         error = CommonErrors.general_error(f"Error retrieving Congress information: {str(e)}")
         return format_error_response(error)
 
-@mcp.tool()
 async def search_congresses(
     ctx: Context,
     keywords: str,

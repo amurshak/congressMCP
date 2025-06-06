@@ -127,7 +127,7 @@ def format_daily_record_articles(articles_data: Dict[str, Any]) -> str:
 # MCP RESOURCES (Static/Reference Data Only - No User Parameters)
 # =============================================================================
 
-@require_paid_access
+# @require_paid_access
 @mcp.resource("congress://daily-congressional-record/latest")
 async def get_latest_daily_congressional_record(ctx: Context) -> str:
     """
@@ -201,8 +201,7 @@ async def get_latest_daily_congressional_record(ctx: Context) -> str:
 # MCP TOOLS (Interactive/Parameterized Functions)
 # =============================================================================
 
-@require_paid_access
-@mcp.tool()
+# @require_paid_access
 async def search_daily_congressional_record(
     ctx: Context,
     volume_number: Optional[str] = None,

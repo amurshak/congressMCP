@@ -13,15 +13,15 @@ mcp = FastMCP(
 )
 
 def initialize_features():
-    """Initialize all features - called after server setup to avoid circular imports"""
-    from .features import (
-        bills, members, committees, congress_info, amendments, 
-        committee_reports, committee_prints, committee_meetings,
-        hearings, congressional_record, daily_congressional_record,
-        bound_congressional_record, house_communications, house_requirements,
-        senate_communications, nominations, treaties, summaries,
-        house_votes, crs_reports
-    )
+    # DEPRECATED: ORIGINAL FEATURES REPLACED BY BUCKETS """Initialize all features - called after server setup to avoid circular imports"""
+    # from .features import (
+    #     bills, members, committees, congress_info, amendments, 
+    #     committee_reports, committee_prints, committee_meetings,
+    #     hearings, congressional_record, daily_congressional_record,
+    #     bound_congressional_record, house_communications, house_requirements,
+    #     senate_communications, nominations, treaties, summaries,
+    #     house_votes, crs_reports
+    # )
     
     # Initialize bucket tools
     from .features.buckets import (

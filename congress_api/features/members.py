@@ -65,7 +65,6 @@ async def get_all_members(ctx: Context) -> str:
     return "\n".join(result)
 
 # Tools (Interactive functions with parameters)
-@mcp.tool()
 async def get_member_details(ctx: Context, bioguide_id: str) -> str:
     """
     Get detailed information about a specific member of Congress.
@@ -171,7 +170,6 @@ async def get_member_details(ctx: Context, bioguide_id: str) -> str:
         logger.error(f"Error in get_member_details: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-@mcp.tool()
 async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str) -> str:
     """
     Get legislation sponsored by a specific member of Congress.
@@ -238,7 +236,6 @@ async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str) -> st
         logger.error(f"Error in get_member_sponsored_legislation: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-@mcp.tool()
 async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str) -> str:
     """
     Get legislation cosponsored by a specific member of Congress.
@@ -305,7 +302,6 @@ async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str) -> 
         logger.error(f"Error in get_member_cosponsored_legislation: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-@mcp.tool()
 async def get_members_by_congress(ctx: Context, congress: int) -> str:
     """
     Get members of a specific Congress.
@@ -350,7 +346,6 @@ async def get_members_by_congress(ctx: Context, congress: int) -> str:
         logger.error(f"Error in get_members_by_congress: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-@mcp.tool()
 async def get_members_by_state(ctx: Context, state_code: str) -> str:
     """
     Get members from a specific state.
@@ -397,7 +392,6 @@ async def get_members_by_state(ctx: Context, state_code: str) -> str:
         logger.error(f"Error in get_members_by_state: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-@mcp.tool()
 async def get_members_by_district(ctx: Context, state_code: str, district: int) -> str:
     """
     Get members from a specific congressional district.
@@ -451,7 +445,6 @@ async def get_members_by_district(ctx: Context, state_code: str, district: int) 
         logger.error(f"Error in get_members_by_district: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-@mcp.tool()
 async def search_members(
     ctx: Context,
     name: Optional[str] = None,
@@ -649,7 +642,6 @@ async def search_members(
         logger.error(f"Error in search_members: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-@mcp.tool()
 async def get_members_by_congress_state_district(
     ctx: Context,
     congress: int,
