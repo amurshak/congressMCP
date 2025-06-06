@@ -177,60 +177,60 @@ def check_feature_access(feature: str, tier: str) -> bool:
     """Check if a user's tier has access to a specific feature."""
     return feature in TIER_CONFIG[tier]["features"]
 
-async def auth_middleware(request: Request, call_next):
-    """Middleware to handle authentication and rate limiting."""
-    # Skip authentication for OPTIONS requests and if auth is disabled
-    if request.method == "OPTIONS" or not ENABLE_AUTH:
-        return await call_next(request)
+# async def auth_middleware(request: Request, call_next):
+#     """Middleware to handle authentication and rate limiting."""
+#     # Skip authentication for OPTIONS requests and if auth is disabled
+#     if request.method == "OPTIONS" or not ENABLE_AUTH:
+#         return await call_next(request)
     
-    # Skip authentication for certain paths
-    skip_auth_paths = ["/docs", "/redoc", "/openapi.json", "/health", "/stripe/webhook", "/stripe/", "/keys/"]
-    if any(request.url.path.startswith(path) for path in skip_auth_paths):
-        return await call_next(request)
+#     # Skip authentication for certain paths
+#     skip_auth_paths = ["/docs", "/redoc", "/openapi.json", "/health", "/stripe/webhook", "/stripe/", "/keys/"]
+#     if any(request.url.path.startswith(path) for path in skip_auth_paths):
+#         return await call_next(request)
     
-    try:
-        # Extract the token from the Authorization header
-        auth_header = request.headers.get("Authorization")
-        if not auth_header:
-            raise HTTPException(status_code=401, detail="Authorization header missing")
+#     try:
+#         # Extract the token from the Authorization header
+#         auth_header = request.headers.get("Authorization")
+#         if not auth_header:
+#             raise HTTPException(status_code=401, detail="Authorization header missing")
         
-        # Validate the token
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]  # Remove "Bearer " prefix
-            try:
-                # Try to decode as JWT
-                payload = decode_jwt_token(token)
-            except:
-                # If JWT decode fails, try as API key
-                payload = await validate_api_key(token)
-        else:
-            # Treat as API key
-            payload = await validate_api_key(auth_header)
+#         # Validate the token
+#         if auth_header.startswith("Bearer "):
+#             token = auth_header[7:]  # Remove "Bearer " prefix
+#             try:
+#                 # Try to decode as JWT
+#                 payload = decode_jwt_token(token)
+#             except:
+#                 # If JWT decode fails, try as API key
+#                 payload = await validate_api_key(token)
+#         else:
+#             # Treat as API key
+#             payload = await validate_api_key(auth_header)
         
-        # Check rate limit
-        await check_rate_limit(payload["user_id"], payload["tier"])
+#         # Check rate limit
+#         await check_rate_limit(payload["user_id"], payload["tier"])
         
-        # Check feature access based on the path
-        path_parts = request.url.path.strip("/").split("/")
-        if len(path_parts) > 0:
-            feature = path_parts[0]
-            if feature and not check_feature_access(feature, payload["tier"]):
-                raise HTTPException(
-                    status_code=403, 
-                    detail=f"Your subscription tier ({payload['tier']}) does not have access to this feature"
-                )
+#         # Check feature access based on the path
+#         path_parts = request.url.path.strip("/").split("/")
+#         if len(path_parts) > 0:
+#             feature = path_parts[0]
+#             if feature and not check_feature_access(feature, payload["tier"]):
+#                 raise HTTPException(
+#                     status_code=403, 
+#                     detail=f"Your subscription tier ({payload['tier']}) does not have access to this feature"
+#                 )
         
-        # Add user info to request state
-        request.state.user = payload
+#         # Add user info to request state
+#         request.state.user = payload
         
-        # Continue with the request
-        return await call_next(request)
-    except HTTPException as e:
-        # Re-raise HTTP exceptions
-        raise e
-    except Exception as e:
-        logger.error(f"Authentication error: {str(e)}")
-        raise HTTPException(status_code=401, detail="Authentication failed")
+#         # Continue with the request
+#         return await call_next(request)
+#     except HTTPException as e:
+#         # Re-raise HTTP exceptions
+#         raise e
+#     except Exception as e:
+#         logger.error(f"Authentication error: {str(e)}")
+#         raise HTTPException(status_code=401, detail="Authentication failed")
 
 async def generate_api_key(user_id: str, tier: SubscriptionTier) -> str:
     """Generate an API key for a user."""
