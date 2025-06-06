@@ -238,6 +238,40 @@ async def records_and_hearings(
         
     Raises:
         ToolError: If operation is unknown or user lacks required access
+    
+    Examples:
+        Search congressional record:
+        {
+            "operation": "search_congressional_record",
+            "year": 2024,
+            "month": 3,
+            "limit": 10
+        }
+        
+        Search hearings:
+        {
+            "operation": "search_hearings",
+            "keywords": "climate change",
+            "from_date_time": "2024-01-01T00:00:00Z",
+            "to_date_time": "2024-12-31T00:00:00Z"
+        }
+        
+        Get hearing details (requires paid tier):
+        {
+            "operation": "get_hearing_details",
+            "jacket_number": 12345
+        }
+        
+        Search House communications:
+        {
+            "operation": "search_house_communications",
+            "communication_type": "ec",
+            "limit": 5
+        }
+        
+        Note: All parameters are provided at the same level. The 'operation' 
+        parameter determines which function to call, and other parameters are 
+        passed to that function.
     """
     try:
         # Check operation access based on user tier

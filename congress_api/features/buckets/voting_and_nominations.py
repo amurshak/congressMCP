@@ -193,6 +193,41 @@ async def voting_and_nominations(
         
     Raises:
         ToolError: If operation is unknown or user lacks required access
+    
+    Examples:
+        Get House votes by Congress:
+        {
+            "operation": "get_house_votes_by_congress",
+            "congress": 118,
+            "limit": 20
+        }
+        
+        Search nominations:
+        {
+            "operation": "search_nominations",
+            "keywords": "judge",
+            "from_date": "2024-01-01T00:00:00Z",
+            "to_date": "2024-12-31T00:00:00Z"
+        }
+        
+        Get vote details (requires paid tier):
+        {
+            "operation": "get_house_vote_details",
+            "congress": 118,
+            "session": 1,
+            "vote_number": 150
+        }
+        
+        Get nomination details (requires paid tier):
+        {
+            "operation": "get_nomination_details",
+            "congress": 118,
+            "nomination_number": 123
+        }
+        
+        Note: All parameters are provided at the same level. The 'operation' 
+        parameter determines which function to call, and other parameters are 
+        passed to that function.
     """
     try:
         # Check operation access based on user tier

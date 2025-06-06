@@ -246,6 +246,40 @@ async def committee_intelligence(
         
     Raises:
         ToolError: If operation is unknown or user lacks required access
+    
+    Examples:
+        Get latest committee reports:
+        {
+            "operation": "get_latest_committee_reports",
+            "limit": 10
+        }
+        
+        Search committee meetings:
+        {
+            "operation": "search_committee_meetings",
+            "keywords": "infrastructure",
+            "scheduled_from": "2024-01-01T00:00:00Z",
+            "scheduled_to": "2024-12-31T00:00:00Z"
+        }
+        
+        Get committee report details:
+        {
+            "operation": "get_committee_report_details",
+            "congress": 118,
+            "report_type": "hrpt",
+            "report_number": 100
+        }
+        
+        Get committee print details:
+        {
+            "operation": "get_committee_print_details",
+            "congress": 118,
+            "jacket_number": 12345
+        }
+        
+        Note: All parameters are provided at the same level. The 'operation' 
+        parameter determines which function to call, and other parameters are 
+        passed to that function. All operations in this bucket require paid access.
     """
     try:
         # Check operation access based on user tier

@@ -156,6 +156,40 @@ async def research_and_professional(
         
     Raises:
         ToolError: If operation is unknown or user lacks required access
+    
+    Examples:
+        Get basic Congress information (free):
+        {
+            "operation": "get_congress_info",
+            "congress": 118
+        }
+        
+        Search CRS reports (requires paid tier):
+        {
+            "operation": "search_crs_reports",
+            "keywords": "climate policy",
+            "limit": 10
+        }
+        
+        Get enhanced Congress analytics (requires paid tier):
+        {
+            "operation": "get_congress_info_enhanced",
+            "congress": 118,
+            "detailed": true,
+            "format_type": "markdown"
+        }
+        
+        Search historical Congresses (requires paid tier):
+        {
+            "operation": "search_congresses",
+            "start_year": 2000,
+            "end_year": 2024,
+            "keywords": "healthcare reform"
+        }
+        
+        Note: All parameters are provided at the same level. The 'operation' 
+        parameter determines which function to call, and other parameters are 
+        passed to that function.
     """
     try:
         # Check operation access based on user tier

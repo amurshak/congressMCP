@@ -244,6 +244,41 @@ async def legislation_hub(
         
     Raises:
         ToolError: If operation is unknown or user lacks required access
+    
+    Examples:
+        Search for bills:
+        {
+            "operation": "search_bills",
+            "keywords": "healthcare",
+            "congress": 118,
+            "limit": 10
+        }
+        
+        Get bill details:
+        {
+            "operation": "get_bill_details",
+            "congress": 118,
+            "bill_type": "hr",
+            "bill_number": 1234
+        }
+        
+        Search amendments (requires paid tier):
+        {
+            "operation": "search_amendments",
+            "keywords": "budget",
+            "congress": 118
+        }
+        
+        Get treaty details (requires paid tier):
+        {
+            "operation": "get_treaty_text",
+            "congress": 118,
+            "treaty_number": 5
+        }
+        
+        Note: All parameters are provided at the same level. The 'operation' 
+        parameter determines which function to call, and other parameters are 
+        passed to that function.
     """
     try:
         # Check operation access based on user tier

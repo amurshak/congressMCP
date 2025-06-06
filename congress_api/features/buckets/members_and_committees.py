@@ -195,6 +195,36 @@ async def members_and_committees(
         
     Raises:
         ToolError: If operation is unknown or user lacks required access
+    
+    Examples:
+        Search for members by name:
+        {
+            "operation": "search_members",
+            "name": "Pelosi",
+            "limit": 5
+        }
+        
+        Get member details:
+        {
+            "operation": "get_member_details",
+            "bioguide_id": "P000197"
+        }
+        
+        Search committees:
+        {
+            "operation": "search_committees",
+            "keywords": "intelligence"
+        }
+        
+        Get member's sponsored legislation (requires paid tier):
+        {
+            "operation": "get_member_sponsored_legislation",
+            "bioguide_id": "S000033"
+        }
+        
+        Note: All parameters are provided at the same level. The 'operation' 
+        parameter determines which function to call, and other parameters are 
+        passed to that function.
     """
     try:
         # Check operation access based on user tier
