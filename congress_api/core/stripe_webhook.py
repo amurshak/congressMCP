@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 
-from .auth import generate_api_key, generate_jwt_token, SubscriptionTier
+from .auth import generate_api_key, generate_jwt_token
 from .user_service import UserService
 
 # Configure logger
@@ -26,11 +26,8 @@ router = APIRouter()
 # Initialize user service
 user_service = UserService()
 
-# Map Stripe price IDs to subscription tiers
-price_tier_mapping = {
-    "price_1RVWCJCrAoNgWc5EZbpHinj9": SubscriptionTier.PRO,  # Pro Monthly $29/month
-    "price_1RVWCQCrAoNgWc5EodIUwBDv": SubscriptionTier.PRO,  # Pro Annual $299/year
-}
+# Price ID mapping is handled by UserService._get_tier_from_price_id() 
+# which reads from environment variables
 
 def verify_stripe_signature(payload: bytes, sig_header: str) -> bool:
     """Verify that the webhook came from Stripe."""

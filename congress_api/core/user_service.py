@@ -149,8 +149,8 @@ class UserService:
     def _get_tier_from_price_id(self, price_id: str) -> Optional[SubscriptionTier]:
         """Map Stripe price ID to subscription tier"""
         # Get price IDs from environment variables
-        stripe_pro_monthly_price = os.getenv("STRIPE_PRO_MONTHLY_PRICE_ID")
-        stripe_pro_annual_price = os.getenv("STRIPE_PRO_ANNUAL_PRICE_ID")
+        stripe_pro_monthly_price = os.getenv("STRIPE_PRICE_PRO_MONTHLY")
+        stripe_pro_annual_price = os.getenv("STRIPE_PRICE_PRO_ANNUAL")
         
         # Map price IDs to tiers
         if price_id == stripe_pro_monthly_price:

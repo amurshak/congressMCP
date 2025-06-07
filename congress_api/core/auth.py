@@ -30,28 +30,31 @@ class SubscriptionTier(str, Enum):
 # Define rate limits and feature access for each tier
 TIER_CONFIG = {
     SubscriptionTier.FREE: {
-        "rate_limit": 200,  # 50 calls per week * 4 weeks = 200 per month
-        "features": ["bills", "members", "committees", "congress_info"]  # Basic tools only
+        "rate_limit": 200,  # 200 calls per month
+        "total_functions": 16,  # 16 functions permanently available
+        "features": [
+            # Legislation Hub (7 free functions)
+            "search_bills", "get_bill_details", "get_bill_text", 
+            "get_bill_text_versions", "get_bill_titles", "get_bill_content", "get_bill_summaries",
+            # People & Relationships (3 free functions)  
+            "search_members", "get_member_details", "search_committees",
+            # Voting & Political (2 free functions)
+            "get_house_votes_by_congress", "search_nominations",
+            # Records & Communications (3 free functions)
+            "search_congressional_record", "search_house_communications", "search_hearings",
+            # Research & Professional (1 free function)
+            "get_congress_info"
+        ]
     },
     SubscriptionTier.PRO: {
-        "rate_limit": 5000,  # 5,000 calls per month
-        "features": ["bills", "members", "committees", "congress_info", 
-                    "amendments", "summaries", "committee_reports", 
-                    "committee_prints", "committee_meetings", "hearings",
-                    "congressional_record", "daily_congressional_record", 
-                    "bound_congressional_record", "house_communications",
-                    "house_requirements", "senate_communications",
-                    "nominations", "crs_reports", "treaties"]  # All tools for paid tiers
+        "rate_limit": 5000,  # 5,000 calls per month to all functions
+        "total_functions": 91,  # All 91 functions available
+        "features": ["*"]  # All tools for Pro tier (wildcard for all functions)
     },
     SubscriptionTier.ENTERPRISE: {
         "rate_limit": 100000,  # Very high limit (effectively unlimited)
-        "features": ["bills", "members", "committees", "congress_info", 
-                    "amendments", "summaries", "committee_reports", 
-                    "committee_prints", "committee_meetings", "hearings",
-                    "congressional_record", "daily_congressional_record", 
-                    "bound_congressional_record", "house_communications",
-                    "house_requirements", "senate_communications", 
-                    "nominations", "crs_reports", "treaties"]  # All tools + future features
+        "total_functions": 91,  # All 91 functions available
+        "features": ["*"]  # All tools + priority support (wildcard for all functions)
     }
 }
 
@@ -145,6 +148,15 @@ async def get_token_from_request(credentials: HTTPAuthorizationCredentials = Dep
 
 async def check_rate_limit(user_id: str, tier: str, feature: str = "general", endpoint: str = "") -> None:
     """Check if a user has exceeded their rate limit."""
+    rate_limit = TIER_CONFIG.get(SubscriptionTier(tier), {}).get("rate_limit", 100)
+    
+    # Skip rate limiting if limit is -1 (unlimited)
+    if rate_limit == -1:
+        # Still track usage for analytics, but don't enforce limits
+        if ENABLE_DATABASE:
+            await db_track_usage(user_id, feature, endpoint)
+        return
+    
     if ENABLE_DATABASE:
         # Track usage in database
         await db_track_usage(user_id, feature, endpoint)
@@ -152,7 +164,6 @@ async def check_rate_limit(user_id: str, tier: str, feature: str = "general", en
         # Get daily usage from database
         from .database import db_client
         daily_usage = await db_client.get_daily_usage(user_id)
-        rate_limit = TIER_CONFIG.get(SubscriptionTier(tier), {}).get("rate_limit", 100)
         
         if daily_usage >= rate_limit:
             raise HTTPException(
@@ -161,7 +172,6 @@ async def check_rate_limit(user_id: str, tier: str, feature: str = "general", en
             )
     else:
         # Use in-memory rate limiting
-        rate_limit = TIER_CONFIG.get(SubscriptionTier(tier), {}).get("rate_limit", 100)
         count, reset_time = rate_limit_storage.get_user_requests(user_id)
         
         if count >= rate_limit:
@@ -175,7 +185,14 @@ async def check_rate_limit(user_id: str, tier: str, feature: str = "general", en
 
 def check_feature_access(feature: str, tier: str) -> bool:
     """Check if a user's tier has access to a specific feature."""
-    return feature in TIER_CONFIG[tier]["features"]
+    tier_features = TIER_CONFIG[tier]["features"]
+    
+    # Check for wildcard access (Pro/Enterprise)
+    if "*" in tier_features:
+        return True
+    
+    # Check specific feature access (Free tier)
+    return feature in tier_features
 
 # --- FastMCP Tier Authorization Decorators ---
 
