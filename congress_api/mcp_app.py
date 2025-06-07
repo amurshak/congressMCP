@@ -559,8 +559,8 @@ async def regenerate_api_key(request: Request) -> JSONResponse:
         # Parse request body
         body = await request.body()
         data = json.loads(body.decode('utf-8'))
-        token = data.get('token', '').strip()
-        email = data.get('email', '').strip().lower()
+        token = (data.get('token') or '').strip()
+        email = (data.get('email') or '').strip().lower()
         request_new_link = data.get('requestNewLink', False)
         
         # Validation
