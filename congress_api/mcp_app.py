@@ -41,7 +41,7 @@ from starlette.responses import JSONResponse
 async def stripe_webhook_handler(request: Request) -> JSONResponse:
     """Handle Stripe webhook requests"""
     try:
-        from .core.stripe_webhook import stripe_webhook
+        from .core.services.stripe_webhook import stripe_webhook
         stripe_signature = request.headers.get("stripe-signature")
         return await stripe_webhook(request, stripe_signature)
     except Exception as e:
@@ -107,7 +107,7 @@ async def register_free_user(request: Request) -> JSONResponse:
     import json
     import logging
     import os
-    from .core.user_service import UserService
+    from .core.services.user_service import UserService
     from .core.auth import SubscriptionTier
     
     logger = logging.getLogger(__name__)
@@ -304,7 +304,7 @@ async def request_magic_link(request: Request) -> JSONResponse:
     """Request a magic link for key management"""
     import json
     import logging
-    from .core.magic_link_service import get_magic_link_service
+    from .core.auth.magic_link_service import get_magic_link_service
     
     logger = logging.getLogger(__name__)
     
@@ -395,7 +395,7 @@ async def verify_magic_link(request: Request) -> JSONResponse:
     """Verify a magic link token"""
     import json
     import logging
-    from .core.magic_link_service import get_magic_link_service
+    from .core.auth.magic_link_service import get_magic_link_service
     
     logger = logging.getLogger(__name__)
     
@@ -473,7 +473,7 @@ async def get_user_dashboard(request: Request) -> JSONResponse:
     """Get user dashboard data"""
     import json
     import logging
-    from .core.magic_link_service import get_magic_link_service
+    from .core.auth.magic_link_service import get_magic_link_service
     
     logger = logging.getLogger(__name__)
     
@@ -551,7 +551,7 @@ async def regenerate_api_key(request: Request) -> JSONResponse:
     """Regenerate user's API key"""
     import json
     import logging
-    from .core.magic_link_service import get_magic_link_service
+    from .core.auth.magic_link_service import get_magic_link_service
     
     logger = logging.getLogger(__name__)
     

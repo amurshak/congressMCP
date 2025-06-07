@@ -7,7 +7,7 @@ from ..core.api_wrapper import safe_committee_meetings_request
 from ..core.validators import ParameterValidator
 from ..core.response_utils import ResponseProcessor
 from ..core.exceptions import format_error_response, CommonErrors, APIErrorResponse
-from ..core.auth import require_paid_access
+from ..core.auth.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)

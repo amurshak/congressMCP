@@ -8,7 +8,7 @@ from ..core.api_wrapper import safe_committee_prints_request
 from ..core.validators import ParameterValidator, ValidationResult
 from ..core.exceptions import APIErrorResponse, ErrorType, format_error_response, CommonErrors
 from ..core.response_utils import CommitteePrintsProcessor, clean_committee_prints_response
-from ..core.auth import require_paid_access
+from ..core.auth.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)

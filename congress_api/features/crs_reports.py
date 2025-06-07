@@ -8,7 +8,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
-from ..core.auth import require_paid_access
+from ..core.auth.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)
