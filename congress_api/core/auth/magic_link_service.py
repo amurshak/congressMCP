@@ -237,9 +237,9 @@ class MagicLinkService:
             await self.db.deactivate_user_api_keys(user.id)
             
             # Generate new API key
-            from ..services.user_service import UserService
-            user_service = UserService()
-            new_api_key = await user_service.generate_api_key(user.id, user.subscription_tier)
+            from ..auth.auth import generate_api_key, SubscriptionTier
+            tier = SubscriptionTier(user.subscription_tier)
+            new_api_key = await generate_api_key(user.id, tier)
             
             if not new_api_key:
                 return {

@@ -280,6 +280,7 @@ class UserService:
             logger.error(f"Error getting user stats: {e}")
             return {"error": str(e)}
 
+
 # Global user service instance
 user_service = UserService()
 
