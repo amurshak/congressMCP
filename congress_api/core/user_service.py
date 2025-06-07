@@ -61,8 +61,11 @@ class UserService:
             logger.info(f"User {email} already exists, updating Stripe customer ID")
             # Update the existing user with Stripe customer ID if not set
             if not existing_user.stripe_customer_id:
-                # TODO: Add method to update stripe_customer_id
-                pass
+                success = await self.db.update_stripe_customer_id(existing_user.id, stripe_customer_id)
+                if success:
+                    logger.info(f"Updated Stripe customer ID for existing user {email}")
+                else:
+                    logger.error(f"Failed to update Stripe customer ID for user {email}")
             return existing_user, None
         
         # Create new user with FREE tier
@@ -143,6 +146,61 @@ class UserService:
         success = await self.db.update_user_tier(user.id, SubscriptionTier.FREE)
         if success:
             logger.info(f"Downgraded user {user.email} to FREE tier")
+        
+        return success
+
+    async def handle_invoice_payment_failed(self, stripe_customer_id: str) -> bool:
+        """Handle failed payment - notify user and start grace period"""
+        logger.info(f"Processing payment failure for customer: {stripe_customer_id}")
+        
+        user = await self.db.get_user_by_stripe_customer_id(stripe_customer_id)
+        if not user:
+            logger.error(f"User not found for Stripe customer: {stripe_customer_id}")
+            return False
+        
+        # Send payment failed notification email
+        email_sent = await email_service.send_payment_failed_email(
+            email=user.email,
+            tier=user.subscription_tier
+        )
+        if email_sent:
+            logger.info(f"Payment failed email sent to {user.email}")
+        else:
+            logger.warning(f"Failed to send payment failed email to {user.email}")
+        
+        # Note: Don't downgrade immediately - Stripe will retry
+        # Downgrade will happen on subscription.updated with status 'past_due' or 'canceled'
+        return True
+
+    async def handle_invoice_payment_succeeded(self, invoice_data: dict) -> bool:
+        """Handle successful payment - confirm subscription active"""
+        logger.info(f"Processing successful payment for invoice: {invoice_data.get('id')}")
+        
+        stripe_customer_id = invoice_data.get("customer")
+        user = await self.db.get_user_by_stripe_customer_id(stripe_customer_id)
+        if not user:
+            logger.error(f"User not found for Stripe customer: {stripe_customer_id}")
+            return False
+        
+        # Send payment success notification if needed
+        logger.info(f"Payment succeeded for user {user.email}")
+        return True
+
+    async def handle_customer_deleted(self, stripe_customer_id: str) -> bool:
+        """Handle customer deletion - deactivate user account"""
+        logger.info(f"Processing customer deletion for customer: {stripe_customer_id}")
+        
+        user = await self.db.get_user_by_stripe_customer_id(stripe_customer_id)
+        if not user:
+            logger.error(f"User not found for Stripe customer: {stripe_customer_id}")
+            return False
+        
+        # Deactivate user account
+        success = await self.db.deactivate_user(user.id)
+        if success:
+            logger.info(f"Deactivated user account for {user.email}")
+        else:
+            logger.error(f"Failed to deactivate user account for {user.email}")
         
         return success
 
@@ -260,6 +318,19 @@ async def handle_stripe_webhook(event_type: str, data: Dict[str, Any]) -> bool:
             subscription = data
             customer_id = subscription["customer"]
             return await user_service.handle_stripe_subscription_deleted(customer_id)
+            
+        elif event_type == "invoice.payment_failed":
+            invoice = data
+            customer_id = invoice["customer"]
+            return await user_service.handle_invoice_payment_failed(customer_id)
+            
+        elif event_type == "invoice.payment_succeeded":
+            invoice = data
+            return await user_service.handle_invoice_payment_succeeded(invoice)
+            
+        elif event_type == "customer.deleted":
+            customer_id = data["id"]
+            return await user_service.handle_customer_deleted(customer_id)
             
         else:
             logger.info(f"Unhandled webhook event: {event_type}")

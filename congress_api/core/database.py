@@ -416,6 +416,52 @@ class SupabaseClient:
             logger.error(f"Failed to get daily usage for user {user_id}: {e}")
             return 0
 
+    async def update_stripe_customer_id(self, user_id: str, stripe_customer_id: str) -> bool:
+        """Update user's Stripe customer ID"""
+        if not self.is_available():
+            return False
+            
+        try:
+            def _update_stripe_customer_id_sync():
+                return self.client.table("users").update({
+                    "stripe_customer_id": stripe_customer_id,
+                    "updated_at": datetime.utcnow().isoformat()
+                }).eq("id", user_id).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _update_stripe_customer_id_sync)
+            
+            success = len(result.data) > 0
+            if success:
+                logger.info(f"Updated Stripe customer ID for user {user_id}")
+            return success
+            
+        except Exception as e:
+            logger.error(f"Failed to update Stripe customer ID for user {user_id}: {e}")
+            return False
+
+    async def deactivate_user(self, user_id: str) -> bool:
+        """Deactivate user account"""
+        if not self.is_available():
+            return False
+            
+        try:
+            def _deactivate_user_sync():
+                return self.client.table("users").update({
+                    "is_active": False,
+                    "updated_at": datetime.utcnow().isoformat()
+                }).eq("id", user_id).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _deactivate_user_sync)
+            
+            success = len(result.data) > 0
+            if success:
+                logger.info(f"Deactivated user {user_id}")
+            return success
+            
+        except Exception as e:
+            logger.error(f"Failed to deactivate user {user_id}: {e}")
+            return False
+
 # Global database client instance
 db_client = SupabaseClient()
 

@@ -321,5 +321,108 @@ class EmailService:
         </html>
         """
 
+    async def send_payment_failed_email(self,
+                                       email: str,
+                                       tier: SubscriptionTier,
+                                       user_name: Optional[str] = None) -> bool:
+        """Send payment failed notification email"""
+        if not self.enabled:
+            logger.warning(f"Email service disabled - cannot send payment failed email to {email}")
+            return False
+        
+        try:
+            subject = "🚨 CongressMCP Payment Failed - Action Required"
+            
+            html_content = self._generate_payment_failed_email_html(
+                email=email,
+                tier=tier,
+                user_name=user_name or email.split('@')[0]
+            )
+            
+            params = {
+                "from": self.from_email,
+                "to": [email],
+                "subject": subject,
+                "html": html_content,
+                "tags": [
+                    {"name": "category", "value": "payment_failed"},
+                    {"name": "tier", "value": tier.value}
+                ]
+            }
+            
+            email_response = resend.Emails.send(params)
+            
+            if email_response:
+                logger.info(f"Payment failed email sent successfully to {email} (ID: {email_response.get('id')})")
+                return True
+            else:
+                logger.error(f"Failed to send payment failed email to {email}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error sending payment failed email to {email}: {e}")
+            return False
+
+    def _generate_payment_failed_email_html(self, 
+                                           email: str, 
+                                           tier: SubscriptionTier,
+                                           user_name: str) -> str:
+        """Generate HTML content for payment failed email"""
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>CongressMCP Payment Failed</title>
+            <style>
+                body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; }}
+                .container {{ max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+                .header {{ background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 30px; border-radius: 8px 8px 0 0; text-align: center; }}
+                .content {{ padding: 30px; line-height: 1.6; color: #333333; }}
+                .footer {{ background-color: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; text-align: center; color: #6c757d; font-size: 14px; }}
+                .button {{ display: inline-block; background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 10px 0; }}
+                .alert {{ background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>🚨 Payment Failed</h1>
+                    <p>Action required for your CongressMCP subscription</p>
+                </div>
+                
+                <div class="content">
+                    <p>Hi {user_name},</p>
+                    
+                    <div class="alert">
+                        <strong>Payment Failed:</strong> We were unable to process payment for your CongressMCP {tier.value.title()} subscription.
+                    </div>
+                    
+                    <p>We'll automatically retry your payment in the next few days. To avoid any service interruption, please:</p>
+                    
+                    <ol>
+                        <li>Check that your payment method is up to date in your Stripe customer portal</li>
+                        <li>Ensure sufficient funds are available</li>
+                        <li>Contact your bank if the payment method should be valid</li>
+                    </ol>
+                    
+                    <p style="text-align: center;">
+                        <a href="https://billing.stripe.com/p/login/test_00000000000000" class="button">Update Payment Method</a>
+                    </p>
+                    
+                    <p>If you continue to experience issues, please don't hesitate to reach out to our support team.</p>
+                    
+                    <p>Best regards,<br>The CongressMCP Team</p>
+                </div>
+                
+                <div class="footer">
+                    <p>Questions? Contact <a href="mailto:support@congressmcp.lawgiver.ai">support@congressmcp.lawgiver.ai</a></p>
+                    <p>CongressMCP - AI-powered legislative intelligence</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
 # Create global email service instance
 email_service = EmailService()
