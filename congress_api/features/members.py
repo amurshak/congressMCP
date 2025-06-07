@@ -1,12 +1,10 @@
 # members.py
-from typing import Dict, List, Any, Optional
-import json
+from typing import Dict, Any, Optional
 from fastmcp import Context
 from ..mcp_app import mcp
-from ..core.client_handler import make_api_request
-from ..core.validators import ParameterValidator, ValidationResult
+from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper, safe_members_request
-from ..core.exceptions import CommonErrors, format_error_response, APIErrorResponse
+from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
 import logging
 
@@ -770,7 +768,11 @@ def format_member_summary(member: Dict[str, Any]) -> str:
     
     # Handle party information - try multiple possible fields
     party = "Unknown"
-    if "partyName" in member and member["partyName"]:
+    if "partyHistory" in member and isinstance(member["partyHistory"], list) and member["partyHistory"]:
+        party_history = member["partyHistory"][0]
+        if isinstance(party_history, dict):
+            party = party_history.get("partyAbbreviation", "")
+    elif "partyName" in member and member["partyName"]:
         party = member["partyName"]
     elif "party" in member and member["party"]:
         party = member["party"]

@@ -1,16 +1,13 @@
 # congress_api/features/committee_reports.py
 import logging
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 import httpx
 from fastmcp import Context
-from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.api_wrapper import safe_committee_reports_request
-from ..core.validators import ParameterValidator, ValidationResult
-from ..core.exceptions import APIErrorResponse, ErrorType, format_error_response, CommonErrors
-from ..core.response_utils import CommitteeReportsProcessor, clean_committee_reports_response
-from ..core.auth.auth import require_paid_access
+from ..core.validators import ParameterValidator
+from ..core.exceptions import format_error_response, CommonErrors
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -476,7 +473,7 @@ async def search_committee_reports(
         params['limit'] = limit
     
     if fromDateTime is not None:
-        from_date_validation = ParameterValidator.validate_datetime_format(fromDateTime)
+        from_date_validation = ParameterValidator.validate_date_format(fromDateTime)
         if not from_date_validation.is_valid:
             logger.warning(f"Invalid fromDateTime parameter: {fromDateTime}")
             return format_error_response(CommonErrors.invalid_parameter(
@@ -487,7 +484,7 @@ async def search_committee_reports(
         params['fromDateTime'] = fromDateTime
     
     if toDateTime is not None:
-        to_date_validation = ParameterValidator.validate_datetime_format(toDateTime)
+        to_date_validation = ParameterValidator.validate_date_format(toDateTime)
         if not to_date_validation.is_valid:
             logger.warning(f"Invalid toDateTime parameter: {toDateTime}")
             return format_error_response(CommonErrors.invalid_parameter(

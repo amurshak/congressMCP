@@ -210,7 +210,7 @@ async def get_committee_bills(
             logger.warning(f"Invalid chamber: {chamber}")
             return chamber_validation.error_message
             
-        limit_validation = ParameterValidator.validate_limit(limit)
+        limit_validation = ParameterValidator.validate_limit_range(limit)
         if not limit_validation.is_valid:
             logger.warning(f"Invalid limit: {limit}")
             return limit_validation.error_message
@@ -284,7 +284,7 @@ async def get_committee_reports(
             logger.warning(f"Invalid chamber: {chamber}")
             return chamber_validation.error_message
             
-        limit_validation = ParameterValidator.validate_limit(limit)
+        limit_validation = ParameterValidator.validate_limit_range(limit)
         if not limit_validation.is_valid:
             logger.warning(f"Invalid limit: {limit}")
             return limit_validation.error_message
@@ -347,7 +347,7 @@ async def get_committee_nominations(
     """
     try:
         # Validate parameters
-        limit_validation = ParameterValidator.validate_limit(limit)
+        limit_validation = ParameterValidator.validate_limit_range(limit)
         if not limit_validation.is_valid:
             logger.warning(f"Invalid limit: {limit}")
             return limit_validation.error_message
@@ -427,7 +427,7 @@ async def get_committee_communications(
             logger.warning(f"Invalid chamber: {chamber}")
             return chamber_validation.error_message
             
-        limit_validation = ParameterValidator.validate_limit(limit)
+        limit_validation = ParameterValidator.validate_limit_range(limit)
         if not limit_validation.is_valid:
             logger.warning(f"Invalid limit: {limit}")
             return limit_validation.error_message
@@ -510,7 +510,7 @@ async def search_committees(
                 logger.warning(f"Invalid congress number: {congress}")
                 return congress_validation.error_message
                 
-        limit_validation = ParameterValidator.validate_limit(limit)
+        limit_validation = ParameterValidator.validate_limit_range(limit)
         if not limit_validation.is_valid:
             logger.warning(f"Invalid limit: {limit}")
             return limit_validation.error_message
