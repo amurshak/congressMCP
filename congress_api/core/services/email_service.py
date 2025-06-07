@@ -269,7 +269,7 @@ class EmailService:
                 }}
                 .btn-primary {{
                     background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-                    color: white;
+                    color: white !important;
                     padding: 14px 28px;
                     border-radius: 8px;
                     font-weight: 600;
@@ -388,10 +388,10 @@ class EmailService:
                                     <strong>📖 Setup Guide</strong><br>
                                     <span class="body-sm">Step-by-step installation instructions</span>
                                 </a>
-                                <a href="https://congressmcp.lawgiver.ai/examples" class="glass-subtle" style="display: block; text-decoration: none; color: rgba(255,255,255,0.9); transition: all 0.2s ease;">
+                                <!-- <a href="https://congressmcp.lawgiver.ai/examples" class="glass-subtle" style="display: block; text-decoration: none; color: rgba(255,255,255,0.9); transition: all 0.2s ease;">
                                     <strong>💡 Usage Examples</strong><br>
                                     <span class="body-sm">Sample queries and use cases</span>
-                                </a>
+                                </a> -->
                                 <a href="mailto:support@congressmcp.lawgiver.ai" class="glass-subtle" style="display: block; text-decoration: none; color: rgba(255,255,255,0.9); transition: all 0.2s ease;">
                                     <strong>✉️ Email Support</strong><br>
                                     <span class="body-sm">Get help from our team</span>
@@ -401,7 +401,7 @@ class EmailService:
                     </div>
                     
                     <div class="footer">
-                        <p style="margin: 0 0 8px 0;">Questions? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai" style="color: #60a5fa; text-decoration: none;">support@congressmcp.lawgiver.ai</a></p>
+                        <p style="margin: 0 0 8px 0; color: rgba(255, 255, 255, 0.5);">Questions? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai" style="color: #60a5fa; text-decoration: none;">support@congressmcp.lawgiver.ai</a></p>
                         <p style="margin: 0; font-size: 13px;">CongressMCP - AI-powered legislative intelligence through the Model Context Protocol</p>
                     </div>
                 </div>
