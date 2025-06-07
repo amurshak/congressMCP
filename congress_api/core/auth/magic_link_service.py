@@ -218,7 +218,12 @@ class MagicLinkService:
         """
         try:
             # Verify session token (basic implementation - could be enhanced)
-            if not self._verify_session_token(session_token, email):
+            # DEV MODE: Allow dev-token for development/testing
+            import os
+            is_dev_mode = session_token == "dev-token" and email == "dev@example.com"
+            is_dev_env = os.getenv("CONGRESS_API_ENV", "").lower() in ["development", "dev"]
+            
+            if not (is_dev_mode and is_dev_env) and not self._verify_session_token(session_token, email):
                 return {
                     "success": False,
                     "message": "Invalid session. Please request a new magic link."
@@ -227,6 +232,19 @@ class MagicLinkService:
             # Get user
             from ..database import get_user_by_email
             user = await get_user_by_email(email)
+            
+            # DEV MODE: Create dev user if it doesn't exist
+            if not user and is_dev_mode and is_dev_env:
+                from ..services.user_service import UserService
+                from ..auth.auth import SubscriptionTier
+                user_service = UserService()
+                user, _ = await user_service.create_user_with_api_key(
+                    email=email,
+                    stripe_customer_id=None,
+                    tier=SubscriptionTier.PRO
+                )
+                logger.info(f"Created dev user: {email}")
+            
             if not user:
                 return {
                     "success": False,
