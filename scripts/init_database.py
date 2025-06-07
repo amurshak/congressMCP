@@ -16,8 +16,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from congress_api.core.database import db_client
-from congress_api.core.user_service import UserService
-from congress_api.core.auth import SubscriptionTier
+from congress_api.core.services.user_service import UserService
+from congress_api.core.auth.auth import SubscriptionTier
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

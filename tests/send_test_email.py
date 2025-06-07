@@ -13,8 +13,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 from dotenv import load_dotenv
 load_dotenv()
 
-from congress_api.core.email_service import email_service
-from congress_api.core.auth import SubscriptionTier
+from congress_api.core.services.email_service import email_service
+from congress_api.core.auth.auth import SubscriptionTier
 
 async def send_test_email(test_email: str):
     """Send a test welcome email"""

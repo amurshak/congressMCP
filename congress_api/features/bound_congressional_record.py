@@ -15,7 +15,7 @@ from ..core.api_wrapper import safe_bound_record_request
 from ..core.exceptions import handle_validation_error, format_error_response, CommonErrors
 from ..core.response_utils import clean_bound_congressional_record_response
 from ..mcp_app import mcp
-from ..core.auth import require_paid_access
+from ..core.auth.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)

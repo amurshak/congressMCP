@@ -2,8 +2,8 @@
 import logging
 import os
 from typing import Optional, Tuple, Dict, Any
-from .database import db_client, User
-from .auth import SubscriptionTier
+from ..database import db_client, User
+from ..auth.auth import SubscriptionTier
 from .email_service import email_service
 
 logger = logging.getLogger(__name__)
@@ -248,14 +248,14 @@ class UserService:
 
     def _check_feature_access(self, feature: str, tier: SubscriptionTier) -> bool:
         """Check if a tier has access to a specific feature"""
-        from .auth import TIER_CONFIG
+        from ..auth.auth import TIER_CONFIG
         
         tier_features = TIER_CONFIG.get(tier, {}).get("features", [])
         return feature in tier_features
 
     def _get_rate_limit(self, tier: SubscriptionTier) -> int:
         """Get rate limit for a subscription tier"""
-        from .auth import TIER_CONFIG
+        from ..auth.auth import TIER_CONFIG
         
         return TIER_CONFIG.get(tier, {}).get("rate_limit", 100)
 

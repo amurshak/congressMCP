@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from urllib.parse import urlencode
 
-from .email_service import EmailService, email_service
+from ..services.email_service import EmailService, email_service
 from .auth import SubscriptionTier
 
 # Configure logger
@@ -34,7 +34,7 @@ class MagicLinkService:
         """
         try:
             # Check if user exists
-            from .database import get_user_by_email
+            from ..database import get_user_by_email
             user = await get_user_by_email(email)
             
             if not user and purpose == "key_management":
@@ -147,7 +147,7 @@ class MagicLinkService:
             await self.db.mark_magic_link_used(token)
             
             # Get or create user
-            from .database import get_user_by_email
+            from ..database import get_user_by_email
             user = await get_user_by_email(email)
             if not user:
                 # This shouldn't happen for key_management links, but handle gracefully
@@ -165,7 +165,7 @@ class MagicLinkService:
                 }
             
             # Get usage statistics using helper functions
-            from .database import get_monthly_usage
+            from ..database import get_monthly_usage
             monthly_usage = await get_monthly_usage(user.id)
             
             # Determine limits based on tier
@@ -225,7 +225,7 @@ class MagicLinkService:
                 }
             
             # Get user
-            from .database import get_user_by_email
+            from ..database import get_user_by_email
             user = await get_user_by_email(email)
             if not user:
                 return {
@@ -237,7 +237,7 @@ class MagicLinkService:
             await self.db.deactivate_user_api_keys(user.id)
             
             # Generate new API key
-            from .user_service import UserService
+            from ..services.user_service import UserService
             user_service = UserService()
             new_api_key = await user_service.generate_api_key(user.id, user.subscription_tier)
             
@@ -286,7 +286,7 @@ class MagicLinkService:
                 }
             
             # Get user
-            from .database import get_user_by_email
+            from ..database import get_user_by_email
             user = await get_user_by_email(email)
             if not user:
                 return {
@@ -298,7 +298,7 @@ class MagicLinkService:
             api_key_data = await self.db.get_active_api_key_for_user(user.id)
             
             # Get usage statistics using helper functions
-            from .database import get_monthly_usage
+            from ..database import get_monthly_usage
             monthly_usage = await get_monthly_usage(user.id)
             
             # Determine limits based on tier
@@ -619,6 +619,6 @@ def get_magic_link_service() -> MagicLinkService:
     """Get or create the global magic link service instance"""
     global magic_link_service
     if magic_link_service is None:
-        from .database import db_client  # Use the existing global client
+        from ..database import db_client  # Use the existing global client
         magic_link_service = MagicLinkService(db_client, email_service)
     return magic_link_service

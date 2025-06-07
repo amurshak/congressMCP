@@ -10,7 +10,7 @@ from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # Import database functionality
-from .database import validate_api_key as db_validate_api_key, track_usage as db_track_usage
+from ..database import validate_api_key as db_validate_api_key, track_usage as db_track_usage
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -162,7 +162,7 @@ async def check_rate_limit(user_id: str, tier: str, feature: str = "general", en
         await db_track_usage(user_id, feature, endpoint)
         
         # Get daily usage from database
-        from .database import db_client
+        from ..database import db_client
         daily_usage = await db_client.get_daily_usage(user_id)
         
         if daily_usage >= rate_limit:
@@ -275,7 +275,7 @@ def require_paid_access(func):
 async def generate_api_key(user_id: str, tier: SubscriptionTier) -> str:
     """Generate an API key for a user."""
     if ENABLE_DATABASE:
-        from .database import db_client
+        from ..database import db_client
         api_key = await db_client.create_api_key(user_id, tier)
         if not api_key:
             raise HTTPException(status_code=500, detail="Failed to generate API key")

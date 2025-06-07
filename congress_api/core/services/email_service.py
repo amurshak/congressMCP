@@ -5,7 +5,7 @@ import resend
 from typing import Optional, Dict, Any
 from enum import Enum
 
-from .auth import SubscriptionTier
+from ..auth.auth import SubscriptionTier
 
 # Configure logger
 logger = logging.getLogger(__name__)

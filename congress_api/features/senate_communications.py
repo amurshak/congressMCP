@@ -6,7 +6,7 @@ from ..core.api_wrapper import safe_senate_communications_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import SenateCommunicationsProcessor, clean_senate_communications_response
-from ..core.auth import require_paid_access
+from ..core.auth.auth import require_paid_access
 
 # Set up logger
 logger = logging.getLogger(__name__)

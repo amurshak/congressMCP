@@ -13,8 +13,8 @@ import random
 # Add the parent directory to Python path so we can import our modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from congress_api.core.user_service import UserService
-from congress_api.core.auth import SubscriptionTier
+from congress_api.core.services.user_service import UserService
+from congress_api.core.auth.auth import SubscriptionTier
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')

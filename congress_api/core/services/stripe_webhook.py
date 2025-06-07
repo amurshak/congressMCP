@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Request, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
 
-from .auth import generate_api_key, generate_jwt_token
+from ..auth.auth import generate_api_key, generate_jwt_token
 from .user_service import UserService
 
 # Configure logger

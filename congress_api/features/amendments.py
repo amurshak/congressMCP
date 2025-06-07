@@ -9,7 +9,7 @@ from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import format_error_response, APIErrorResponse
 from ..core.response_utils import ResponseProcessor
-from ..core.auth import require_paid_access
+from ..core.auth.auth import require_paid_access
 
 # Configure logging
 logger = logging.getLogger(__name__)

@@ -22,8 +22,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Import our modules
-from congress_api.core.email_service import email_service
-from congress_api.core.auth import SubscriptionTier
+from congress_api.core.services.email_service import email_service
+from congress_api.core.auth.auth import SubscriptionTier
 
 async def test_email_service():
     """Test email service functionality"""

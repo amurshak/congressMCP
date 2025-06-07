@@ -16,7 +16,7 @@ from congress_api.features.buckets.records_communications_hub import (
     FREE_OPERATIONS,
     PAID_OPERATIONS
 )
-from congress_api.core.auth import SubscriptionTier
+from congress_api.core.auth.auth import SubscriptionTier
 
 
 class TestRecordsCommunicationsHubAccessControl:
