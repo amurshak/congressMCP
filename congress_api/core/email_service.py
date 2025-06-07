@@ -124,34 +124,57 @@ class EmailService:
                                    user_name: str) -> str:
         """Generate HTML content for welcome email"""
         
-        # Feature lists based on tier
+        # Feature lists based on tier with updated data
         if tier == SubscriptionTier.PRO:
             features = [
-                "✅ <strong>5,000 tool calls per month</strong>",
-                "✅ <strong>Access to all 110+ congressional tools</strong>",
+                "✅ <strong>5,000 API calls per month</strong>",
+                "✅ <strong>Access to all 116+ congressional tools</strong>",
+                "✅ <strong>6 organized tool buckets for easy discovery</strong>",
                 "✅ <strong>Bills, votes, members, committees, amendments</strong>",
                 "✅ <strong>Congressional Record, hearings, committee reports</strong>",
                 "✅ <strong>CRS reports, treaties, nominations</strong>",
+                "✅ <strong>Committee intelligence and professional research</strong>",
                 "✅ <strong>Priority email support</strong>"
             ]
-            tier_note = """
-            <div style="background: linear-gradient(135deg, #28a745, #20c997); padding: 20px; border-radius: 8px; margin: 20px 0; color: white;">
-                <h3 style="color: white; margin-top: 0;">🎉 Pro Features Unlocked!</h3>
-                <p style="margin-bottom: 0; color: rgba(255,255,255,0.9);">You have access to our complete congressional intelligence suite with 5,000 monthly tool calls.</p>
+            tier_badge = """
+            <div class="glass-card" style="text-align: center; border: 1px solid rgba(16, 185, 129, 0.3); background: linear-gradient(108.74deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%);">
+                <div style="font-size: 32px; margin-bottom: 12px;">🎉</div>
+                <h3 style="color: #34d399; margin: 0 0 8px 0; font-size: 20px; font-weight: 600;">Pro Features Unlocked!</h3>
+                <p style="margin: 0; color: rgba(255,255,255,0.8); font-size: 16px;">Complete congressional intelligence suite with 5,000 monthly API calls</p>
+            </div>
+            """
+            cta_section = """
+            <div class="glass-card" style="text-align: center;">
+                <h3 style="color: rgba(255,255,255,0.9); margin: 0 0 12px 0;">🚀 Ready to Start?</h3>
+                <p class="body-lg" style="margin: 0 0 20px 0;">Get up and running in minutes with our setup guide</p>
+                <a href="https://congressmcp.lawgiver.ai/setup" class="btn-primary">View Setup Guide</a>
             </div>
             """
         else:
             features = [
-                "✅ <strong>50 tool calls per week</strong>",
+                "✅ <strong>200 API calls per month</strong>",
                 "✅ <strong>16 essential congressional tools</strong>",
                 "✅ <strong>Bills, members, committees, voting records</strong>",
-                "✅ <strong>Congress information and search</strong>",
-                "✅ <strong>Email support</strong>"
+                "✅ <strong>Congress information and basic search</strong>",
+                "✅ <strong>Community email support</strong>"
             ]
-            tier_note = """
-            <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); padding: 20px; border-radius: 8px; margin: 20px 0; color: white;">
-                <h3 style="color: white; margin-top: 0;">🚀 You're All Set!</h3>
-                <p style="margin-bottom: 0; color: rgba(255,255,255,0.9);">Your free tier gives you everything needed to start exploring congressional data with AI.</p>
+            tier_badge = """
+            <div class="glass-card" style="text-align: center; border: 1px solid rgba(59, 130, 246, 0.3); background: linear-gradient(108.74deg, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.04) 100%);">
+                <div style="font-size: 32px; margin-bottom: 12px;">🚀</div>
+                <h3 style="color: #60a5fa; margin: 0 0 8px 0; font-size: 20px; font-weight: 600;">You're All Set!</h3>
+                <p style="margin: 0; color: rgba(255,255,255,0.8); font-size: 16px;">Everything you need to start exploring congressional data with AI</p>
+            </div>
+            """
+            cta_section = """
+            <div class="glass-card" style="text-align: center;">
+                <h3 style="color: rgba(255,255,255,0.9); margin: 0 0 12px 0;">🚀 Ready to Start?</h3>
+                <p class="body-lg" style="margin: 0 0 20px 0;">Get up and running in minutes with our setup guide</p>
+                <div style="margin-bottom: 20px;">
+                    <a href="https://congressmcp.lawgiver.ai/setup" class="btn-primary">View Setup Guide</a>
+                </div>
+                <p class="body-sm" style="margin: 0;">
+                    Want more tools? <a href="https://congressmcp.lawgiver.ai/pricing" style="color: #34d399; text-decoration: none; font-weight: 600;">Upgrade to Pro</a> for 25x more API calls and all 116+ tools
+                </p>
             </div>
             """
         
@@ -163,71 +186,224 @@ class EmailService:
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>Welcome to CongressMCP</title>
             <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ text-align: center; margin-bottom: 30px; }}
-                .api-key-box {{ background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; padding: 20px; margin: 20px 0; font-family: monospace; }}
-                .features {{ list-style: none; padding: 0; }}
-                .features li {{ margin: 10px 0; }}
-                .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 14px; }}
-                .button {{ display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; }}
+                body {{ 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                    line-height: 1.6; 
+                    margin: 0; 
+                    padding: 0; 
+                    background-color: #151c2c;
+                    color: rgba(255, 255, 255, 0.8);
+                }}
+                .email-wrapper {{
+                    background: #151c2c;
+                    padding: 20px;
+                    min-height: 100vh;
+                }}
+                .container {{ 
+                    max-width: 600px; 
+                    margin: 0 auto; 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 50%);
+                    border-radius: 12px; 
+                    overflow: hidden;
+                    box-shadow: 0px 0px 50px -25px rgba(0, 0, 0, 0.5);
+                    backdrop-filter: blur(50px);
+                    border: 0.5px solid rgba(196, 213, 232, 0.22);
+                    position: relative;
+                }}
+                .header {{ 
+                    background: linear-gradient(135deg, #1e293b, #334155); 
+                    color: white; 
+                    padding: 48px 32px; 
+                    text-align: center; 
+                    position: relative;
+                }}
+                .content {{ 
+                    padding: 32px; 
+                    position: relative;
+                    z-index: 10;
+                }}
+                .api-key-box {{ 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%); 
+                    border: 1px solid rgba(196, 213, 232, 0.22); 
+                    border-radius: 12px; 
+                    padding: 24px; 
+                    margin: 24px 0; 
+                    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                    backdrop-filter: blur(20px);
+                }}
+                .features {{ 
+                    list-style: none; 
+                    padding: 0; 
+                    margin: 0;
+                }}
+                .features li {{ 
+                    margin: 16px 0; 
+                    padding: 12px 0;
+                    border-bottom: 1px solid rgba(196, 213, 232, 0.1);
+                    color: rgba(255, 255, 255, 0.8);
+                }}
+                .features li:last-child {{ border-bottom: none; }}
+                .footer {{ 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%); 
+                    padding: 24px 32px; 
+                    border-top: 1px solid rgba(196, 213, 232, 0.22); 
+                    color: rgba(255, 255, 255, 0.5); 
+                    font-size: 14px; 
+                    text-align: center;
+                }}
+                .glass-card {{ 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 50%); 
+                    border-radius: 12px; 
+                    padding: 24px; 
+                    margin: 20px 0; 
+                    border: 1px solid rgba(196, 213, 232, 0.22);
+                    backdrop-filter: blur(30px);
+                }}
+                .glass-subtle {{
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin: 12px 0;
+                    border: 1px solid rgba(196, 213, 232, 0.15);
+                    backdrop-filter: blur(20px);
+                }}
+                .btn-primary {{
+                    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+                    color: white;
+                    padding: 14px 28px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    text-decoration: none;
+                    display: inline-block;
+                    transition: all 0.2s ease;
+                    border: none;
+                    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+                }}
+                .code-block {{ 
+                    background: #1e293b; 
+                    color: #e2e8f0; 
+                    padding: 12px 16px; 
+                    border-radius: 8px; 
+                    font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace; 
+                    font-size: 14px;
+                    display: inline-block;
+                    margin: 8px 0;
+                    border: 1px solid rgba(59, 130, 246, 0.2);
+                }}
+                .heading-xl {{
+                    font-size: 2.25rem;
+                    font-weight: 700;
+                    line-height: 1.2;
+                    color: white;
+                    margin: 0;
+                }}
+                .heading-lg {{
+                    font-size: 1.5rem;
+                    font-weight: 600;
+                    line-height: 1.3;
+                    color: white;
+                    margin: 0 0 16px 0;
+                }}
+                .heading-md {{
+                    font-size: 1.25rem;
+                    font-weight: 600;
+                    line-height: 1.4;
+                    color: rgba(255, 255, 255, 0.9);
+                    margin: 0 0 12px 0;
+                }}
+                .body-lg {{
+                    font-size: 1rem;
+                    line-height: 1.6;
+                    color: rgba(255, 255, 255, 0.8);
+                }}
+                .body-sm {{
+                    font-size: 0.875rem;
+                    line-height: 1.5;
+                    color: rgba(255, 255, 255, 0.6);
+                }}
             </style>
         </head>
         <body>
-            <div class="container">
-                <div class="header">
-                    <h1 style="color: #2c3e50; margin-bottom: 10px;">🏛️ Welcome to CongressMCP!</h1>
-                    <p style="color: #6c757d; font-size: 18px;">Hi {user_name}! You're now connected to the most powerful legislative intelligence platform.</p>
-                    <p style="color: #495057; font-size: 16px; margin-top: 15px;">CongressMCP brings congressional data directly to your AI workflows through the Model Context Protocol.</p>
-                </div>
-                
-                {"" if not api_key else f'''
-                <div style="margin: 30px 0;">
-                    <h2 style="color: #495057;">🔑 Your API Key</h2>
-                    <div class="api-key-box">
-                        <p style="margin: 0 0 10px 0; font-weight: bold;">Your Personal API Key:</p>
-                        <code style="background: #fff; padding: 10px; border-radius: 4px; display: block; word-break: break-all; border: 1px solid #dee2e6;">{api_key}</code>
+            <div class="email-wrapper">
+                <div class="container">
+                    <div class="header">
+                        <div style="font-size: 56px; margin-bottom: 16px;">🏛️</div>
+                        <h1 class="heading-xl">Welcome to CongressMCP!</h1>
+                        <p style="color: rgba(255,255,255,0.9); font-size: 18px; margin: 8px 0 0 0;">Hi {user_name}! You're now connected to AI-powered legislative intelligence.</p>
                     </div>
-                    <p style="color: #dc3545; margin: 10px 0;"><strong>⚠️ Keep this key secure and never share it publicly!</strong></p>
-                </div>
-                '''}
-                
-                {setup_note}
-                
-                <div style="margin: 30px 0;">
-                    <h2 style="color: #495057;">📋 Your Plan Features</h2>
-                    <ul class="features">
-                        {"".join(f'<li>{feature}</li>' for feature in features)}
-                    </ul>
-                </div>
-                
-                <div style="margin: 30px 0;">
-                    <h2 style="color: #495057;">🚀 Quick Start Guide</h2>
-                    <ol style="line-height: 1.6;">
-                        <li><strong>Install the NPM package:</strong><br>
-                            <code style="background: #f8f9fa; padding: 5px 10px; border-radius: 4px;">npm install -g congressional-mcp</code>
-                        </li>
-                        <li><strong>Configure Claude Desktop:</strong><br>
-                            Add CongressMCP to your Claude Desktop MCP settings with your API key
-                        </li>
-                        <li><strong>Start using:</strong><br>
-                            Ask Claude about bills, members, committees, and more!
-                        </li>
-                    </ol>
-                </div>
-                
-                <div style="margin: 30px 0;">
-                    <h2 style="color: #495057;">📚 Setup Guide & Support</h2>
-                    <ul style="line-height: 1.6;">
-                        <li><a href="https://github.com/your-repo/CongressionalMCP">📖 Setup Guide</a></li>
-                        <li><a href="https://congressmcp.com/examples">💡 Usage Examples</a></li>
-                        <li><a href="mailto:support@congressmcp.lawgiver.ai">✉️ Email Support</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer">
-                    <p>Questions? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai">support@congressmcp.lawgiver.ai</a></p>
-                    <p>CongressMCP - Access congressional data through the Model Context Protocol</p>
+                    
+                    <div class="content">
+                        {"" if not api_key else f'''
+                        <div style="margin: 24px 0;">
+                            <h2 class="heading-lg">🔑 Your API Key</h2>
+                            <div class="api-key-box">
+                                <p style="margin: 0 0 12px 0; font-weight: 600; color: rgba(255,255,255,0.9);">Your Personal API Key:</p>
+                                <code style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; display: block; word-break: break-all; border: 1px solid rgba(196, 213, 232, 0.22); font-size: 13px; color: #e2e8f0;">{api_key}</code>
+                            </div>
+                            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px;">
+                                <p style="margin: 0; color: #fca5a5; font-size: 14px;"><strong>⚠️ Security Notice:</strong> Keep this key secure and never share it publicly!</p>
+                            </div>
+                        </div>
+                        '''}
+                        
+                        {tier_badge}
+                        
+                        <div style="margin: 32px 0;">
+                            <h2 class="heading-lg">📋 Your Plan Features</h2>
+                            <ul class="features">
+                                {"".join(f'<li>{feature}</li>' for feature in features)}
+                            </ul>
+                        </div>
+                        
+                        {cta_section}
+                        
+                        <div style="margin: 32px 0;">
+                            <h2 class="heading-lg">🚀 Quick Start (3 steps)</h2>
+                            
+                            <div class="glass-subtle">
+                                <h3 class="heading-md">1. Install the NPM package</h3>
+                                <div class="code-block">npm install -g congressmcp</div>
+                            </div>
+                            
+                            <div class="glass-subtle">
+                                <h3 class="heading-md">2. Configure Claude Desktop</h3>
+                                <p class="body-sm">Add CongressMCP to your Claude Desktop MCP settings with your API key</p>
+                            </div>
+                            
+                            <div class="glass-subtle">
+                                <h3 class="heading-md">3. Start exploring</h3>
+                                <p class="body-sm">Ask Claude: "What bills were introduced this week?" or "Show me the House Intelligence Committee members"</p>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card" style="border-left: 4px solid #3b82f6;">
+                            <h3 style="color: #60a5fa; margin: 0 0 12px 0; font-size: 16px;">💡 Pro Tip</h3>
+                            <p class="body-sm">Try asking Claude about current legislation, member voting records, or committee activities. CongressMCP provides real-time access to Congress.gov data through AI.</p>
+                        </div>
+                        
+                        <div style="margin: 32px 0;">
+                            <h2 class="heading-lg">📚 Resources</h2>
+                            <div style="display: grid; gap: 12px;">
+                                <a href="https://congressmcp.lawgiver.ai/setup" class="glass-subtle" style="display: block; text-decoration: none; color: rgba(255,255,255,0.9); transition: all 0.2s ease;">
+                                    <strong>📖 Setup Guide</strong><br>
+                                    <span class="body-sm">Step-by-step installation instructions</span>
+                                </a>
+                                <a href="https://congressmcp.lawgiver.ai/examples" class="glass-subtle" style="display: block; text-decoration: none; color: rgba(255,255,255,0.9); transition: all 0.2s ease;">
+                                    <strong>💡 Usage Examples</strong><br>
+                                    <span class="body-sm">Sample queries and use cases</span>
+                                </a>
+                                <a href="mailto:support@congressmcp.lawgiver.ai" class="glass-subtle" style="display: block; text-decoration: none; color: rgba(255,255,255,0.9); transition: all 0.2s ease;">
+                                    <strong>✉️ Email Support</strong><br>
+                                    <span class="body-sm">Get help from our team</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="footer">
+                        <p style="margin: 0 0 8px 0;">Questions? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai" style="color: #60a5fa; text-decoration: none;">support@congressmcp.lawgiver.ai</a></p>
+                        <p style="margin: 0; font-size: 13px;">CongressMCP - AI-powered legislative intelligence through the Model Context Protocol</p>
+                    </div>
                 </div>
             </div>
         </body>
@@ -235,7 +411,7 @@ class EmailService:
         """
     
     def _generate_upgrade_email_html(self,
-                                   email: str,
+                                   user_email: str,
                                    api_key: str,
                                    tier: SubscriptionTier,
                                    user_name: str) -> str:
@@ -249,76 +425,183 @@ class EmailService:
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>CongressMCP Upgrade Complete</title>
             <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ text-align: center; margin-bottom: 30px; }}
-                .api-key-box {{ background: #d4edda; border: 2px solid #c3e6cb; border-radius: 8px; padding: 20px; margin: 20px 0; font-family: monospace; }}
-                .features {{ list-style: none; padding: 0; }}
-                .features li {{ margin: 10px 0; }}
-                .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 14px; }}
+                body {{ 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                    line-height: 1.6; 
+                    margin: 0; 
+                    padding: 0; 
+                    background-color: #151c2c;
+                    color: rgba(255, 255, 255, 0.8);
+                }}
+                .email-wrapper {{
+                    background: #151c2c;
+                    padding: 20px;
+                    min-height: 100vh;
+                }}
+                .container {{ 
+                    max-width: 600px; 
+                    margin: 0 auto; 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 50%);
+                    border-radius: 12px; 
+                    overflow: hidden;
+                    box-shadow: 0px 0px 50px -25px rgba(0, 0, 0, 0.5);
+                    backdrop-filter: blur(50px);
+                    border: 0.5px solid rgba(196, 213, 232, 0.22);
+                    position: relative;
+                }}
+                .header {{ 
+                    background: linear-gradient(135deg, #059669, #10b981); 
+                    color: white; 
+                    padding: 48px 32px; 
+                    text-align: center; 
+                    position: relative;
+                }}
+                .content {{ 
+                    padding: 32px; 
+                    position: relative;
+                    z-index: 10;
+                }}
+                .footer {{ 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%); 
+                    padding: 24px 32px; 
+                    border-top: 1px solid rgba(196, 213, 232, 0.22); 
+                    color: rgba(255, 255, 255, 0.5); 
+                    font-size: 14px; 
+                    text-align: center;
+                }}
+                .api-key-box {{ 
+                    background: linear-gradient(108.74deg, rgba(16, 185, 129, 0.08) 0%, rgba(16, 185, 129, 0.02) 100%); 
+                    border: 1px solid rgba(16, 185, 129, 0.3); 
+                    border-radius: 12px; 
+                    padding: 24px; 
+                    margin: 24px 0; 
+                    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+                    backdrop-filter: blur(20px);
+                }}
+                .glass-card {{ 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 50%); 
+                    border-radius: 12px; 
+                    padding: 24px; 
+                    margin: 20px 0; 
+                    border: 1px solid rgba(196, 213, 232, 0.22);
+                    backdrop-filter: blur(30px);
+                }}
+                .glass-subtle {{
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
+                    border-radius: 8px;
+                    padding: 16px;
+                    margin: 12px 0;
+                    border: 1px solid rgba(196, 213, 232, 0.15);
+                    backdrop-filter: blur(20px);
+                }}
+                .features {{ 
+                    list-style: none; 
+                    padding: 0; 
+                    margin: 0;
+                }}
+                .features li {{ 
+                    margin: 16px 0; 
+                    padding: 12px 0;
+                    border-bottom: 1px solid rgba(196, 213, 232, 0.1);
+                    color: rgba(255, 255, 255, 0.8);
+                }}
+                .features li:last-child {{ border-bottom: none; }}
+                .heading-xl {{
+                    font-size: 2.25rem;
+                    font-weight: 700;
+                    line-height: 1.2;
+                    color: white;
+                    margin: 0;
+                }}
+                .heading-lg {{
+                    font-size: 1.5rem;
+                    font-weight: 600;
+                    line-height: 1.3;
+                    color: white;
+                    margin: 0 0 16px 0;
+                }}
+                .body-lg {{
+                    font-size: 1rem;
+                    line-height: 1.6;
+                    color: rgba(255, 255, 255, 0.8);
+                }}
             </style>
         </head>
         <body>
-            <div class="container">
-                <div class="header">
-                    <h1 style="color: #28a745; margin-bottom: 10px;">🎉 Upgrade Complete!</h1>
-                    <p style="color: #6c757d; font-size: 18px;">Hi {user_name}, welcome to CongressMCP {tier.value.title()}!</p>
-                </div>
-                
-                <div style="background: #d1ecf1; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <h3 style="color: #0c5460; margin-top: 0;">🔄 New API Key Required</h3>
-                    <p style="margin-bottom: 0;">Your subscription has been upgraded! Please use your new API key below to access your enhanced features.</p>
-                </div>
-                
-                <div style="margin: 30px 0;">
-                    <h2 style="color: #495057;">🔑 Your New API Key</h2>
-                    <div class="api-key-box">
-                        <p style="margin: 0 0 10px 0; font-weight: bold;">Your Updated API Key:</p>
-                        <code style="background: #fff; padding: 10px; border-radius: 4px; display: block; word-break: break-all; border: 1px solid #dee2e6;">{api_key}</code>
+            <div class="email-wrapper">
+                <div class="container">
+                    <div class="header">
+                        <div style="font-size: 56px; margin-bottom: 16px;">🎉</div>
+                        <h1 class="heading-xl">Upgrade Complete!</h1>
+                        <p style="color: rgba(255,255,255,0.9); font-size: 18px; margin: 8px 0 0 0;">Hi {user_name}, welcome to CongressMCP {tier.value.title()}!</p>
                     </div>
-                    <p style="color: #dc3545; margin: 10px 0;"><strong>⚠️ Update your configuration with this new key!</strong></p>
-                </div>
-                
-                <div style="margin: 30px 0;">
-                    <h2 style="color: #495057;">🚀 Your New Pro Features</h2>
-                    <ul class="features">
-                        <li>✅ <strong>5,000 API calls per month</strong> (up from 200)</li>
-                        <li>✅ <strong>Access to all 23+ tool categories</strong></li>
-                        <li>✅ <strong>Bills, Members, Committees, Votes, Amendments</strong></li>
-                        <li>✅ <strong>Congressional Record, Hearings, Reports</strong></li>
-                        <li>✅ <strong>CRS Reports, Treaties, Nominations</strong></li>
-                        <li>✅ <strong>Standard email support</strong></li>
-                    </ul>
-                </div>
-                
-                <div style="margin: 30px 0;">
-                    <h2 style="color: #495057;">🔧 Next Steps</h2>
-                    <ol style="line-height: 1.6;">
-                        <li><strong>Update your API key:</strong><br>
-                            Replace your old API key with the new one above in your Claude Desktop MCP settings
-                        </li>
-                        <li><strong>Restart Claude Desktop:</strong><br>
-                            Close and reopen Claude Desktop for the changes to take effect
-                        </li>
-                        <li><strong>Start exploring:</strong><br>
-                            Try asking Claude about congressional data with your enhanced access!
-                        </li>
-                    </ol>
-                </div>
-                
-                <div style="margin: 30px 0;">
-                    <h2 style="color: #495057;">💡 Pro Tips</h2>
-                    <ul style="line-height: 1.6;">
-                        <li>📊 Access voting records with the new <code>votes</code> tools</li>
-                        <li>📄 Search Congressional Record entries</li>
-                        <li>🎧 Browse committee hearings and reports</li>
-                        <li>📚 Access CRS research reports</li>
-                    </ul>
-                </div>
-                
-                <div class="footer">
-                    <p>Questions about your upgrade? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai">support@congressmcp.lawgiver.ai</a></p>
-                    <p>Thank you for upgrading to CongressMCP Pro! 🏛️</p>
+                    
+                    <div class="content">
+                        <div class="glass-card" style="border: 1px solid rgba(16, 185, 129, 0.3); background: linear-gradient(108.74deg, rgba(16, 185, 129, 0.12) 0%, rgba(16, 185, 129, 0.04) 100%);">
+                            <h3 style="color: #34d399; margin: 0 0 12px 0; font-size: 18px;">🔄 New API Key Required</h3>
+                            <p class="body-lg">Your subscription has been upgraded! Please use your new API key below to access your enhanced features.</p>
+                        </div>
+                        
+                        <div style="margin: 32px 0;">
+                            <h2 class="heading-lg">🔑 Your New API Key</h2>
+                            <div class="api-key-box">
+                                <p style="margin: 0 0 12px 0; font-weight: 600; color: #34d399;">Your Updated API Key:</p>
+                                <code style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 6px; display: block; word-break: break-all; border: 1px solid rgba(16, 185, 129, 0.3); font-size: 13px; color: #e2e8f0;">{api_key}</code>
+                            </div>
+                            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px;">
+                                <p style="margin: 0; color: #fca5a5; font-size: 14px;"><strong>⚠️ Update your configuration with this new key!</strong></p>
+                            </div>
+                        </div>
+                        
+                        <div style="margin: 32px 0;">
+                            <h2 class="heading-lg">🚀 Your New Pro Features</h2>
+                            <ul class="features">
+                                <li>✅ <strong>5,000 API calls per month</strong> (up from 200)</li>
+                                <li>✅ <strong>Access to all 116+ congressional tools</strong></li>
+                                <li>✅ <strong>6 organized tool buckets for easy discovery</strong></li>
+                                <li>✅ <strong>Bills, Members, Committees, Votes, Amendments</strong></li>
+                                <li>✅ <strong>Congressional Record, Hearings, Reports</strong></li>
+                                <li>✅ <strong>CRS Reports, Treaties, Nominations</strong></li>
+                                <li>✅ <strong>Committee intelligence and professional research</strong></li>
+                                <li>✅ <strong>Priority email support</strong></li>
+                            </ul>
+                        </div>
+                        
+                        <div style="margin: 32px 0;">
+                            <h2 class="heading-lg">🔧 Next Steps</h2>
+                            
+                            <div class="glass-subtle">
+                                <h3 style="color: rgba(255,255,255,0.9); margin: 0 0 8px 0; font-size: 16px;">1. Update your API key</h3>
+                                <p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 14px;">Replace your old API key with the new one above in your Claude Desktop MCP settings</p>
+                            </div>
+                            
+                            <div class="glass-subtle">
+                                <h3 style="color: rgba(255,255,255,0.9); margin: 0 0 8px 0; font-size: 16px;">2. Restart Claude Desktop</h3>
+                                <p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 14px;">Close and reopen Claude Desktop for the changes to take effect</p>
+                            </div>
+                            
+                            <div class="glass-subtle">
+                                <h3 style="color: rgba(255,255,255,0.9); margin: 0 0 8px 0; font-size: 16px;">3. Start exploring</h3>
+                                <p style="margin: 0; color: rgba(255,255,255,0.7); font-size: 14px;">Try asking Claude about congressional data with your enhanced access!</p>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card" style="border-left: 4px solid #34d399;">
+                            <h3 style="color: #34d399; margin: 0 0 16px 0; font-size: 18px;">💡 Pro Tips</h3>
+                            <ul style="line-height: 1.6; color: rgba(255, 255, 255, 0.7); margin: 0; padding-left: 20px;">
+                                <li>📊 Access voting records with enhanced tools</li>
+                                <li>📄 Search Congressional Record entries</li>
+                                <li>🎧 Browse committee hearings and reports</li>
+                                <li>📚 Access CRS research reports</li>
+                                <li>🔍 Use committee intelligence features</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div class="footer">
+                        <p style="margin: 0 0 8px 0;">Questions about your upgrade? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai" style="color: #60a5fa; text-decoration: none;">support@congressmcp.lawgiver.ai</a></p>
+                        <p style="margin: 0; font-size: 13px;">Thank you for upgrading to CongressMCP Pro! 🏛️</p>
+                    </div>
                 </div>
             </div>
         </body>

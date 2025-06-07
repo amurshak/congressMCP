@@ -459,59 +459,153 @@ class MagicLinkService:
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>{title}</title>
             <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ text-align: center; margin-bottom: 30px; }}
-                .button {{ display: inline-block; background: #3b82f6; color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; margin: 20px 0; box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.25); transition: all 0.2s ease; }}
-                .button:hover {{ background: #2563eb; transform: translateY(-1px); box-shadow: 0 6px 20px 0 rgba(59, 130, 246, 0.35); }}
-                .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 14px; }}
-                .warning {{ background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0; }}
+                body {{ 
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+                    line-height: 1.6; 
+                    margin: 0; 
+                    padding: 0; 
+                    background-color: #151c2c;
+                    color: rgba(255, 255, 255, 0.8);
+                }}
+                .email-wrapper {{
+                    background: #151c2c;
+                    padding: 20px;
+                    min-height: 100vh;
+                }}
+                .container {{ 
+                    max-width: 600px; 
+                    margin: 0 auto; 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 50%);
+                    border-radius: 12px; 
+                    overflow: hidden;
+                    box-shadow: 0px 0px 50px -25px rgba(0, 0, 0, 0.5);
+                    backdrop-filter: blur(50px);
+                    border: 0.5px solid rgba(196, 213, 232, 0.22);
+                    position: relative;
+                }}
+                .header {{ 
+                    background: linear-gradient(135deg, #1e293b, #334155); 
+                    color: white; 
+                    padding: 48px 32px; 
+                    text-align: center; 
+                    position: relative;
+                }}
+                .content {{ 
+                    padding: 32px; 
+                    position: relative;
+                    z-index: 10;
+                }}
+                .footer {{ 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%); 
+                    padding: 24px 32px; 
+                    border-top: 1px solid rgba(196, 213, 232, 0.22); 
+                    color: rgba(255, 255, 255, 0.5); 
+                    font-size: 14px; 
+                    text-align: center;
+                }}
+                .glass-card {{ 
+                    background: linear-gradient(108.74deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 50%); 
+                    border-radius: 12px; 
+                    padding: 24px; 
+                    margin: 20px 0; 
+                    border: 1px solid rgba(196, 213, 232, 0.22);
+                    backdrop-filter: blur(30px);
+                }}
+                .btn-primary {{
+                    background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+                    color: white;
+                    padding: 16px 32px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    text-decoration: none;
+                    display: inline-block;
+                    transition: all 0.2s ease;
+                    border: none;
+                    box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25);
+                    font-size: 16px;
+                }}
+                .warning-card {{
+                    background: linear-gradient(108.74deg, rgba(245, 158, 11, 0.12) 0%, rgba(245, 158, 11, 0.04) 100%);
+                    border: 1px solid rgba(245, 158, 11, 0.3);
+                    border-radius: 12px;
+                    padding: 20px;
+                    margin: 20px 0;
+                }}
+                .heading-xl {{
+                    font-size: 2.25rem;
+                    font-weight: 700;
+                    line-height: 1.2;
+                    color: white;
+                    margin: 0;
+                }}
+                .heading-lg {{
+                    font-size: 1.5rem;
+                    font-weight: 600;
+                    line-height: 1.3;
+                    color: white;
+                    margin: 0 0 16px 0;
+                }}
+                .body-lg {{
+                    font-size: 1rem;
+                    line-height: 1.6;
+                    color: rgba(255, 255, 255, 0.8);
+                }}
+                .body-sm {{
+                    font-size: 0.875rem;
+                    line-height: 1.5;
+                    color: rgba(255, 255, 255, 0.6);
+                }}
             </style>
         </head>
         <body>
-            <div class="container">
-                <div class="header">
-                    <h1 style="color: #2c3e50; margin-bottom: 10px;">🏛️ {heading}</h1>
-                    <p style="color: #6c757d; font-size: 18px;">Hi {user_name}!</p>
-                </div>
-                
-                <div style="margin: 30px 0;">
-                    <p style="line-height: 1.6; color: #495057;">
-                        {description}
-                    </p>
-                    
-                    <div style="text-align: center; margin: 30px 0;">
-                        <a href="{magic_url}" class="button">Manage Your API Key</a>
+            <div class="email-wrapper">
+                <div class="container">
+                    <div class="header">
+                        <div style="font-size: 56px; margin-bottom: 16px;">🏛️</div>
+                        <h1 class="heading-xl">{heading}</h1>
+                        <p style="color: rgba(255,255,255,0.9); font-size: 18px; margin: 8px 0 0 0;">Hi {user_name}!</p>
                     </div>
                     
-                    <div class="warning">
-                        <p style="margin: 0; color: #856404; font-size: 14px;">
-                            <strong>⏰ This link expires in {expires_minutes} minutes (1 hour)</strong><br>
-                            For security reasons, this link can only be used once and will expire automatically.
-                        </p>
+                    <div class="content">
+                        <div style="margin: 24px 0;">
+                            <p class="body-lg" style="margin-bottom: 24px;">
+                                {description}
+                            </p>
+                            
+                            <div style="text-align: center; margin: 32px 0;">
+                                <a href="{magic_url}" class="btn-primary">Manage Your API Key</a>
+                            </div>
+                            
+                            <div class="warning-card">
+                                <p style="margin: 0; color: #fbbf24; font-size: 14px;">
+                                    <strong>⏰ This link expires in {expires_minutes} minutes</strong><br>
+                                    For security reasons, this link can only be used once and will expire automatically.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="glass-card">
+                            <h3 style="color: #60a5fa; margin: 0 0 16px 0; font-size: 18px;">🔒 Security Notice</h3>
+                            <ul style="line-height: 1.6; color: rgba(255, 255, 255, 0.7); margin: 0; padding-left: 20px;">
+                                <li>This link is only valid for {expires_minutes} minutes</li>
+                                <li>The link can only be used once</li>
+                                <li>Never share this link with anyone</li>
+                                <li>If you didn't request this, please ignore this email</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="glass-card">
+                            <p style="margin: 0; font-size: 14px; color: rgba(255, 255, 255, 0.7);">
+                                <strong>Can't click the button?</strong> Copy and paste this link into your browser:<br>
+                                <span style="word-break: break-all; color: #60a5fa; font-family: monospace; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 4px; display: inline-block; margin-top: 8px;">{magic_url}</span>
+                            </p>
+                        </div>
                     </div>
-                </div>
-                
-                <div style="margin: 30px 0;">
-                    <h3 style="color: #495057; margin-bottom: 15px;">🔒 Security Notice</h3>
-                    <ul style="line-height: 1.6; color: #6c757d;">
-                        <li>This link is only valid for {expires_minutes} minutes (1 hour)</li>
-                        <li>The link can only be used once</li>
-                        <li>Never share this link with anyone</li>
-                        <li>If you didn't request this, please ignore this email</li>
-                    </ul>
-                </div>
-                
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                    <p style="margin: 0; font-size: 14px; color: #6c757d;">
-                        <strong>Can't click the button?</strong> Copy and paste this link into your browser:<br>
-                        <span style="word-break: break-all; color: #3b82f6;">{magic_url}</span>
-                    </p>
-                </div>
-                
-                <div class="footer">
-                    <p>Questions? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai" style="color: #3b82f6;">support@congressmcp.lawgiver.ai</a></p>
-                    <p>CongressMCP - AI-powered legislative intelligence</p>
+                    
+                    <div class="footer">
+                        <p style="margin: 0 0 8px 0;">Questions? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai" style="color: #60a5fa; text-decoration: none;">support@congressmcp.lawgiver.ai</a></p>
+                        <p style="margin: 0; font-size: 13px;">CongressMCP - AI-powered legislative intelligence</p>
+                    </div>
                 </div>
             </div>
         </body>
