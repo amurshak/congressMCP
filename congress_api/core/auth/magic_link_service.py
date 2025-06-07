@@ -513,7 +513,7 @@ class MagicLinkService:
                 }}
                 .btn-primary {{
                     background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-                    color: white;
+                    color: white !important;
                     padding: 16px 32px;
                     border-radius: 8px;
                     font-weight: 600;
@@ -603,7 +603,7 @@ class MagicLinkService:
                     </div>
                     
                     <div class="footer">
-                        <p style="margin: 0 0 8px 0;">Questions? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai" style="color: #60a5fa; text-decoration: none;">support@congressmcp.lawgiver.ai</a></p>
+                        <p style="margin: 0 0 8px 0; color: rgba(255, 255, 255, 0.5);">Questions? Reply to this email or contact <a href="mailto:support@congressmcp.lawgiver.ai" style="color: #60a5fa; text-decoration: none;">support@congressmcp.lawgiver.ai</a></p>
                         <p style="margin: 0; font-size: 13px;">CongressMCP - AI-powered legislative intelligence</p>
                     </div>
                 </div>
