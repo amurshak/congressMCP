@@ -108,7 +108,7 @@ async def register_free_user(request: Request) -> JSONResponse:
     import logging
     import os
     from .core.services.user_service import UserService
-    from .core.auth import SubscriptionTier
+    from .core.auth.auth import SubscriptionTier
     
     logger = logging.getLogger(__name__)
     

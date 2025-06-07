@@ -9,10 +9,10 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from fastmcp import Context
 from fastmcp.exceptions import ToolError
 
-from congress_api.features.buckets.records_communications_hub import (
-    congressional_records_communications_hub,
+from congress_api.features.buckets.records_and_hearings import (
+    records_and_hearings,
     check_operation_access,
-    route_records_communications_operation,
+    route_records_and_hearings_operation,
     FREE_OPERATIONS,
     PAID_OPERATIONS
 )
@@ -87,7 +87,7 @@ class TestRecordsCommunicationsHubRouting:
             with patch(mock_path, new_callable=AsyncMock) as mock_func:
                 mock_func.return_value = f"Mock result for {operation}"
                 
-                result = await route_records_communications_operation(
+                result = await route_records_and_hearings_operation(
                     ctx, operation, year=2022, congress=117
                 )
                 
@@ -108,7 +108,7 @@ class TestRecordsCommunicationsHubRouting:
             with patch(mock_path, new_callable=AsyncMock) as mock_func:
                 mock_func.return_value = f"Mock result for {operation}"
                 
-                result = await route_records_communications_operation(
+                result = await route_records_and_hearings_operation(
                     ctx, operation, congress=117, communication_type="ec"
                 )
                 
@@ -129,7 +129,7 @@ class TestRecordsCommunicationsHubRouting:
             with patch(mock_path, new_callable=AsyncMock) as mock_func:
                 mock_func.return_value = f"Mock result for {operation}"
                 
-                result = await route_records_communications_operation(
+                result = await route_records_and_hearings_operation(
                     ctx, operation, congress=117, chamber="house"
                 )
                 
@@ -142,7 +142,7 @@ class TestRecordsCommunicationsHubRouting:
         ctx = MagicMock()
         
         with pytest.raises(ToolError) as exc_info:
-            await route_records_communications_operation(ctx, "invalid_operation")
+            await route_records_and_hearings_operation(ctx, "invalid_operation")
         assert "Unknown operation" in str(exc_info.value)
 
 
@@ -160,7 +160,7 @@ class TestRecordsCommunicationsHubIntegration:
             with patch('congress_api.features.congressional_record.search_congressional_record', new_callable=AsyncMock) as mock_search:
                 mock_search.return_value = "Mock congressional record results"
                 
-                result = await congressional_records_communications_hub(
+                result = await records_and_hearings(
                     ctx,
                     operation="search_congressional_record",
                     year=2022,
@@ -180,7 +180,7 @@ class TestRecordsCommunicationsHubIntegration:
             mock_get_tier.return_value = SubscriptionTier.FREE
             
             with pytest.raises(ToolError) as exc_info:
-                await congressional_records_communications_hub(
+                await records_and_hearings(
                     ctx,
                     operation="get_house_communication_details",
                     congress=117,
@@ -201,7 +201,7 @@ class TestRecordsCommunicationsHubIntegration:
             with patch('congress_api.features.house_communications.get_house_communication_details', new_callable=AsyncMock) as mock_get_details:
                 mock_get_details.return_value = "Mock communication details"
                 
-                result = await congressional_records_communications_hub(
+                result = await records_and_hearings(
                     ctx,
                     operation="get_house_communication_details",
                     congress=117,
@@ -225,7 +225,7 @@ class TestRecordsCommunicationsHubIntegration:
             with patch('congress_api.features.hearings.search_hearings', new_callable=AsyncMock) as mock_search:
                 mock_search.return_value = "Mock hearing results"
                 
-                result = await congressional_records_communications_hub(
+                result = await records_and_hearings(
                     ctx,
                     operation="search_hearings",
                     keywords="agriculture",
@@ -254,7 +254,7 @@ class TestRecordsCommunicationsHubIntegration:
                 mock_search.side_effect = Exception("API Error")
                 
                 with pytest.raises(ToolError) as exc_info:
-                    await congressional_records_communications_hub(
+                    await records_and_hearings(
                         ctx,
                         operation="search_congressional_record",
                         year=2022
