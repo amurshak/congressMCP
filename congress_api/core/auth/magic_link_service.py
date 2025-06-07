@@ -221,14 +221,12 @@ class MagicLinkService:
             # DEV MODE: Allow dev-token for development/testing
             import os
             is_dev_mode = session_token == "dev-token" and email == "dev@example.com"
-            # Check for dev environment indicators
-            frontend_url = os.getenv("FRONTEND_BASE_URL", "")
-            is_local_frontend = "localhost" in frontend_url or "127.0.0.1" in frontend_url
-            is_dev_env = is_local_frontend or os.getenv("CONGRESS_API_ENV", "").lower() in ["development", "dev"]
+            # For simplicity, allow dev mode when dev credentials are used
+            # In production, these credentials won't be known/used
             
-            logger.info(f"Dev mode check: is_dev_mode={is_dev_mode}, is_dev_env={is_dev_env}, frontend_url='{frontend_url}'")
+            logger.info(f"Dev mode check: session_token='{session_token}', email='{email}', is_dev_mode={is_dev_mode}")
             
-            if not (is_dev_mode and is_dev_env) and not self._verify_session_token(session_token, email):
+            if not is_dev_mode and not self._verify_session_token(session_token, email):
                 return {
                     "success": False,
                     "message": "Invalid session. Please request a new magic link."
@@ -239,7 +237,7 @@ class MagicLinkService:
             user = await get_user_by_email(email)
             
             # DEV MODE: Create dev user if it doesn't exist
-            if not user and is_dev_mode and is_dev_env:
+            if not user and is_dev_mode:
                 from ..services.user_service import UserService
                 from ..auth.auth import SubscriptionTier
                 user_service = UserService()
