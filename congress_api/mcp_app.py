@@ -212,12 +212,12 @@ async def register_free_user(request: Request) -> JSONResponse:
             # Email sending is handled automatically by user_service.create_user_with_api_key
             return JSONResponse({
                 "success": True,
-                "message": "Registration successful! Check your email for your API key.",
+                "message": "Registration successful! Your API key is shown below.",
                 "user_id": user.id,
                 "tier": user.subscription_tier,
                 "stripe_customer_id": stripe_customer_id,
-                # Note: In production, remove api_key from response and only send via email
-                "api_key": api_key if api_key else None
+                "api_key": api_key if api_key else None,
+                "email": email
             },
             headers={
                 "Access-Control-Allow-Origin": "*",
@@ -284,3 +284,347 @@ async def health_check(request: Request) -> JSONResponse:
         "service": "Congressional MCP Server",
         "version": "1.0.0"
     })
+
+# Magic Link Authentication Endpoints
+
+@mcp.custom_route("/api/auth/request-magic-link", methods=["OPTIONS"])
+async def handle_magic_link_preflight(request: Request) -> JSONResponse:
+    """Handle CORS preflight requests for magic link"""
+    return JSONResponse(
+        {},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+@mcp.custom_route("/api/auth/request-magic-link", methods=["POST"])
+async def request_magic_link(request: Request) -> JSONResponse:
+    """Request a magic link for key management"""
+    import json
+    import logging
+    from .core.magic_link_service import get_magic_link_service
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Parse request body
+        body = await request.body()
+        data = json.loads(body.decode('utf-8'))
+        email = data.get('email', '').strip().lower()
+        
+        # Basic email validation
+        if not email:
+            return JSONResponse(
+                {"success": False, "message": "Email is required"}, 
+                status_code=400,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
+        
+        # Simple email format validation
+        import re
+        email_regex = r'^[^\s@]+@[^\s@]+\.[^\s@]+$'
+        if not re.match(email_regex, email):
+            return JSONResponse(
+                {"success": False, "message": "Please enter a valid email address"}, 
+                status_code=400,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
+        
+        # Request magic link
+        magic_link_service = get_magic_link_service()
+        result = await magic_link_service.request_magic_link(email, purpose="key_management")
+        
+        logger.info(f"Magic link request for {email}: {result.get('success', False)}")
+        
+        return JSONResponse(
+            result,
+            status_code=200 if result.get("success") else 400,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+        
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"success": False, "message": "Invalid JSON data"}, 
+            status_code=400,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Magic link request error: {e}")
+        return JSONResponse(
+            {"success": False, "message": "An unexpected error occurred. Please try again."}, 
+            status_code=500,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+
+@mcp.custom_route("/api/auth/verify-magic-link", methods=["OPTIONS"])
+async def handle_verify_magic_link_preflight(request: Request) -> JSONResponse:
+    """Handle CORS preflight requests for magic link verification"""
+    return JSONResponse(
+        {},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+@mcp.custom_route("/api/auth/verify-magic-link", methods=["POST"])
+async def verify_magic_link(request: Request) -> JSONResponse:
+    """Verify a magic link token"""
+    import json
+    import logging
+    from .core.magic_link_service import get_magic_link_service
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Parse request body
+        body = await request.body()
+        data = json.loads(body.decode('utf-8'))
+        token = data.get('token', '').strip()
+        email = data.get('email', '').strip().lower()
+        
+        # Validation
+        if not token or not email:
+            return JSONResponse(
+                {"valid": False, "message": "Token and email are required"}, 
+                status_code=400,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
+        
+        # Verify magic link
+        magic_link_service = get_magic_link_service()
+        result = await magic_link_service.verify_magic_link(token, email)
+        
+        logger.info(f"Magic link verification for {email}: {result.get('valid', False)}")
+        
+        return JSONResponse(
+            result,
+            status_code=200 if result.get("valid") else 400,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+        
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"valid": False, "message": "Invalid JSON data"}, 
+            status_code=400,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Magic link verification error: {e}")
+        return JSONResponse(
+            {"valid": False, "message": "An unexpected error occurred. Please try again."}, 
+            status_code=500,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+
+@mcp.custom_route("/api/user/dashboard", methods=["OPTIONS"])
+async def handle_dashboard_preflight(request: Request) -> JSONResponse:
+    """Handle CORS preflight requests for user dashboard"""
+    return JSONResponse(
+        {},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+@mcp.custom_route("/api/user/dashboard", methods=["POST"])
+async def get_user_dashboard(request: Request) -> JSONResponse:
+    """Get user dashboard data"""
+    import json
+    import logging
+    from .core.magic_link_service import get_magic_link_service
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Parse request body
+        body = await request.body()
+        data = json.loads(body.decode('utf-8'))
+        token = data.get('token', '').strip()
+        email = data.get('email', '').strip().lower()
+        
+        # Validation
+        if not token or not email:
+            return JSONResponse(
+                {"success": False, "message": "Token and email are required"}, 
+                status_code=400,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
+        
+        # Get dashboard data
+        magic_link_service = get_magic_link_service()
+        result = await magic_link_service.get_user_dashboard_data(token, email)
+        
+        logger.info(f"Dashboard data request for {email}: {result.get('success', False)}")
+        
+        return JSONResponse(
+            result,
+            status_code=200 if result.get("success") else 400,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+        
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"success": False, "message": "Invalid JSON data"}, 
+            status_code=400,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Dashboard data error: {e}")
+        return JSONResponse(
+            {"success": False, "message": "An unexpected error occurred. Please try again."}, 
+            status_code=500,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+
+@mcp.custom_route("/api/user/regenerate-key", methods=["OPTIONS"])
+async def handle_regenerate_key_preflight(request: Request) -> JSONResponse:
+    """Handle CORS preflight requests for API key regeneration"""
+    return JSONResponse(
+        {},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+@mcp.custom_route("/api/user/regenerate-key", methods=["POST"])
+async def regenerate_api_key(request: Request) -> JSONResponse:
+    """Regenerate user's API key"""
+    import json
+    import logging
+    from .core.magic_link_service import get_magic_link_service
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Parse request body
+        body = await request.body()
+        data = json.loads(body.decode('utf-8'))
+        token = data.get('token', '').strip()
+        email = data.get('email', '').strip().lower()
+        request_new_link = data.get('requestNewLink', False)
+        
+        # Validation
+        if not email:
+            return JSONResponse(
+                {"success": False, "message": "Email is required"}, 
+                status_code=400,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
+        
+        magic_link_service = get_magic_link_service()
+        
+        # Handle request for new magic link
+        if request_new_link:
+            result = await magic_link_service.request_magic_link(email, purpose="key_management")
+        else:
+            # Validate token for API key regeneration
+            if not token:
+                return JSONResponse(
+                    {"success": False, "message": "Session token is required"}, 
+                    status_code=400,
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                        "Access-Control-Allow-Headers": "*",
+                    }
+                )
+            
+            result = await magic_link_service.regenerate_api_key(token, email)
+        
+        logger.info(f"API key regeneration for {email}: {result.get('success', False)}")
+        
+        return JSONResponse(
+            result,
+            status_code=200 if result.get("success") else 400,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+        
+    except json.JSONDecodeError:
+        return JSONResponse(
+            {"success": False, "message": "Invalid JSON data"}, 
+            status_code=400,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )
+    except Exception as e:
+        logger.error(f"API key regeneration error: {e}")
+        return JSONResponse(
+            {"success": False, "message": "An unexpected error occurred. Please try again."}, 
+            status_code=500,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+            }
+        )

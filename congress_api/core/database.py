@@ -202,6 +202,34 @@ class SupabaseClient:
             logger.error(f"Failed to get user by Stripe ID {stripe_customer_id}: {e}")
             return None
 
+    async def get_user_by_id(self, user_id: str) -> Optional[User]:
+        """Get user by ID"""
+        if not self.is_available():
+            return None
+            
+        try:
+            def _get_user_by_id_sync():
+                return self.client.table("users").select("*").eq("id", user_id).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _get_user_by_id_sync)
+            
+            if result.data:
+                user_record = result.data[0]
+                return User(
+                    id=user_record["id"],
+                    email=user_record["email"],
+                    stripe_customer_id=user_record["stripe_customer_id"],
+                    subscription_tier=SubscriptionTier(user_record["subscription_tier"]),
+                    created_at=datetime.fromisoformat(user_record["created_at"]),
+                    updated_at=datetime.fromisoformat(user_record["updated_at"]),
+                    is_active=user_record["is_active"]
+                )
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to get user by ID {user_id}: {e}")
+            return None
+
     async def update_user_tier(self, user_id: str, tier: SubscriptionTier) -> bool:
         """Update user subscription tier"""
         if not self.is_available():
@@ -462,8 +490,199 @@ class SupabaseClient:
             logger.error(f"Failed to deactivate user {user_id}: {e}")
             return False
 
+    # Magic Link Methods
+    async def create_magic_link(self, user_id: Optional[str], email: str, token: str, 
+                              expires_at: datetime, purpose: str = "key_management") -> Optional[str]:
+        """Create a new magic link"""
+        if not self.is_available():
+            return None
+            
+        try:
+            def _create_magic_link_sync():
+                return self.client.table("magic_links").insert({
+                    "user_id": user_id,
+                    "email": email.lower(),
+                    "token": token,
+                    "expires_at": expires_at.isoformat(),
+                    "purpose": purpose,
+                    "is_used": False
+                }).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _create_magic_link_sync)
+            
+            if result.data:
+                magic_link_id = result.data[0]["id"]
+                logger.info(f"Created magic link {magic_link_id} for {email}")
+                return magic_link_id
+            return None
+            
+        except Exception as e:
+            logger.error(f"Failed to create magic link for {email}: {e}")
+            return None
+
+    async def get_magic_link(self, token: str) -> Optional[Dict[str, Any]]:
+        """Get magic link by token"""
+        if not self.is_available():
+            return None
+            
+        try:
+            def _get_magic_link_sync():
+                return self.client.table("magic_links").select("*").eq("token", token).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _get_magic_link_sync)
+            
+            return result.data[0] if result.data else None
+            
+        except Exception as e:
+            logger.error(f"Failed to get magic link {token}: {e}")
+            return None
+
+    async def mark_magic_link_used(self, token: str) -> bool:
+        """Mark magic link as used"""
+        if not self.is_available():
+            return False
+            
+        try:
+            def _mark_magic_link_used_sync():
+                return self.client.table("magic_links").update({
+                    "is_used": True,
+                    "used_at": datetime.utcnow().isoformat()
+                }).eq("token", token).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _mark_magic_link_used_sync)
+            
+            success = len(result.data) > 0
+            if success:
+                logger.info(f"Marked magic link as used: {token}")
+            return success
+            
+        except Exception as e:
+            logger.error(f"Failed to mark magic link as used {token}: {e}")
+            return False
+
+    async def delete_magic_link(self, token: str) -> bool:
+        """Delete magic link"""
+        if not self.is_available():
+            return False
+            
+        try:
+            def _delete_magic_link_sync():
+                return self.client.table("magic_links").delete().eq("token", token).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _delete_magic_link_sync)
+            
+            success = len(result.data) > 0
+            if success:
+                logger.info(f"Deleted magic link: {token}")
+            return success
+            
+        except Exception as e:
+            logger.error(f"Failed to delete magic link {token}: {e}")
+            return False
+
+    async def delete_expired_magic_links(self) -> int:
+        """Delete all expired magic links"""
+        if not self.is_available():
+            return 0
+            
+        try:
+            def _delete_expired_magic_links_sync():
+                return self.client.table("magic_links").delete().lt("expires_at", datetime.utcnow().isoformat()).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _delete_expired_magic_links_sync)
+            
+            deleted_count = len(result.data) if result.data else 0
+            if deleted_count > 0:
+                logger.info(f"Deleted {deleted_count} expired magic links")
+            return deleted_count
+            
+        except Exception as e:
+            logger.error(f"Failed to delete expired magic links: {e}")
+            return 0
+
+    async def delete_expired_magic_links_for_email(self, email: str) -> int:
+        """Delete expired magic links for specific email"""
+        if not self.is_available():
+            return 0
+            
+        try:
+            def _delete_expired_magic_links_for_email_sync():
+                return self.client.table("magic_links").delete().eq("email", email.lower()).lt("expires_at", datetime.utcnow().isoformat()).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _delete_expired_magic_links_for_email_sync)
+            
+            deleted_count = len(result.data) if result.data else 0
+            return deleted_count
+            
+        except Exception as e:
+            logger.error(f"Failed to delete expired magic links for {email}: {e}")
+            return 0
+
+    async def get_active_api_key_for_user(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Get active API key for user"""
+        if not self.is_available():
+            return None
+            
+        try:
+            def _get_active_api_key_sync():
+                return self.client.table("api_keys").select("*").eq("user_id", user_id).eq("is_active", True).order("created_at", desc=True).limit(1).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _get_active_api_key_sync)
+            
+            return result.data[0] if result.data else None
+            
+        except Exception as e:
+            logger.error(f"Failed to get active API key for user {user_id}: {e}")
+            return None
+
+    async def deactivate_user_api_keys(self, user_id: str) -> bool:
+        """Deactivate all API keys for user"""
+        if not self.is_available():
+            return False
+            
+        try:
+            def _deactivate_user_api_keys_sync():
+                return self.client.table("api_keys").update({
+                    "is_active": False
+                }).eq("user_id", user_id).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _deactivate_user_api_keys_sync)
+            
+            success = len(result.data) > 0
+            if success:
+                logger.info(f"Deactivated API keys for user {user_id}")
+            return success
+            
+        except Exception as e:
+            logger.error(f"Failed to deactivate API keys for user {user_id}: {e}")
+            return False
+
+    async def get_monthly_usage(self, user_id: str) -> int:
+        """Get monthly usage count for a user"""
+        if not self.is_available():
+            return 0
+            
+        try:
+            # Get current month usage
+            current_month = datetime.utcnow().replace(day=1).date()
+            
+            def _get_monthly_usage_sync():
+                return self.client.table("usage_tracking").select("request_count").eq("user_id", user_id).gte("date", current_month.isoformat()).execute()
+            
+            result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _get_monthly_usage_sync)
+            
+            total_requests = sum(record["request_count"] for record in result.data) if result.data else 0
+            return total_requests
+            
+        except Exception as e:
+            logger.error(f"Failed to get monthly usage for user {user_id}: {e}")
+            return 0
+
 # Global database client instance
 db_client = SupabaseClient()
+
+# Update db_manager alias for compatibility
+db_manager = db_client
 
 # Helper functions for easy access
 async def get_user_by_email(email: str) -> Optional[User]:
@@ -481,3 +700,7 @@ async def track_usage(user_id: str, feature: str, endpoint: str) -> bool:
 async def get_daily_usage(user_id: str) -> int:
     """Get daily usage count"""
     return await db_client.get_daily_usage(user_id)
+
+async def get_monthly_usage(user_id: str) -> int:
+    """Get monthly usage count"""
+    return await db_client.get_monthly_usage(user_id)

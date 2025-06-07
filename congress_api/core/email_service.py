@@ -33,7 +33,7 @@ class EmailService:
     
     async def send_welcome_email(self, 
                                email: str, 
-                               api_key: str, 
+                               api_key: Optional[str], 
                                tier: SubscriptionTier,
                                user_name: Optional[str] = None) -> bool:
         """Send welcome email with API key to new user"""
@@ -119,7 +119,7 @@ class EmailService:
     
     def _generate_welcome_email_html(self, 
                                    email: str, 
-                                   api_key: str, 
+                                   api_key: Optional[str], 
                                    tier: SubscriptionTier,
                                    user_name: str) -> str:
         """Generate HTML content for welcome email"""
@@ -127,31 +127,31 @@ class EmailService:
         # Feature lists based on tier
         if tier == SubscriptionTier.PRO:
             features = [
-                "✅ <strong>5,000 API calls per month</strong>",
-                "✅ <strong>Access to all 23+ tool categories</strong>",
-                "✅ <strong>Bills, Members, Committees, Votes, Amendments</strong>",
-                "✅ <strong>Congressional Record, Hearings, Reports</strong>",
-                "✅ <strong>CRS Reports, Treaties, Nominations</strong>",
-                "✅ <strong>Standard email support</strong>"
+                "✅ <strong>5,000 tool calls per month</strong>",
+                "✅ <strong>Access to all 110+ congressional tools</strong>",
+                "✅ <strong>Bills, votes, members, committees, amendments</strong>",
+                "✅ <strong>Congressional Record, hearings, committee reports</strong>",
+                "✅ <strong>CRS reports, treaties, nominations</strong>",
+                "✅ <strong>Priority email support</strong>"
             ]
-            setup_note = """
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="color: #28a745; margin-top: 0;">🎉 Pro Features Unlocked!</h3>
-                <p style="margin-bottom: 0;">You now have access to our complete congressional data suite with 5,000 monthly API calls.</p>
+            tier_note = """
+            <div style="background: linear-gradient(135deg, #28a745, #20c997); padding: 20px; border-radius: 8px; margin: 20px 0; color: white;">
+                <h3 style="color: white; margin-top: 0;">🎉 Pro Features Unlocked!</h3>
+                <p style="margin-bottom: 0; color: rgba(255,255,255,0.9);">You have access to our complete congressional intelligence suite with 5,000 monthly tool calls.</p>
             </div>
             """
         else:
             features = [
-                "✅ <strong>200 API calls per month</strong>",
-                "✅ <strong>Basic tools: Bills, Members, Committees</strong>",
+                "✅ <strong>50 tool calls per week</strong>",
+                "✅ <strong>16 essential congressional tools</strong>",
+                "✅ <strong>Bills, members, committees, voting records</strong>",
                 "✅ <strong>Congress information and search</strong>",
                 "✅ <strong>Email support</strong>"
             ]
-            setup_note = """
-            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="color: #17a2b8; margin-top: 0;">🚀 Ready to Upgrade?</h3>
-                <p style="margin-bottom: 10px;">Need more API calls or access to all tools?</p>
-                <a href="https://congressmcp.com" style="display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold;">Upgrade to Pro →</a>
+            tier_note = """
+            <div style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); padding: 20px; border-radius: 8px; margin: 20px 0; color: white;">
+                <h3 style="color: white; margin-top: 0;">🚀 You're All Set!</h3>
+                <p style="margin-bottom: 0; color: rgba(255,255,255,0.9);">Your free tier gives you everything needed to start exploring congressional data with AI.</p>
             </div>
             """
         
@@ -170,15 +170,18 @@ class EmailService:
                 .features {{ list-style: none; padding: 0; }}
                 .features li {{ margin: 10px 0; }}
                 .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #e9ecef; color: #6c757d; font-size: 14px; }}
+                .button {{ display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; }}
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="header">
                     <h1 style="color: #2c3e50; margin-bottom: 10px;">🏛️ Welcome to CongressMCP!</h1>
-                    <p style="color: #6c757d; font-size: 18px;">Hi {user_name}, your congressional data API is ready!</p>
+                    <p style="color: #6c757d; font-size: 18px;">Hi {user_name}! You're now connected to the most powerful legislative intelligence platform.</p>
+                    <p style="color: #495057; font-size: 16px; margin-top: 15px;">CongressMCP brings congressional data directly to your AI workflows through the Model Context Protocol.</p>
                 </div>
                 
+                {"" if not api_key else f'''
                 <div style="margin: 30px 0;">
                     <h2 style="color: #495057;">🔑 Your API Key</h2>
                     <div class="api-key-box">
@@ -187,6 +190,7 @@ class EmailService:
                     </div>
                     <p style="color: #dc3545; margin: 10px 0;"><strong>⚠️ Keep this key secure and never share it publicly!</strong></p>
                 </div>
+                '''}
                 
                 {setup_note}
                 

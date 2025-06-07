@@ -33,10 +33,10 @@ class UserService:
                 
             logger.info(f"Created user {email} with API key and tier {tier.value}")
             
-            # Send welcome email with API key
+            # Send welcome email (without API key - shown in frontend)
             email_sent = await email_service.send_welcome_email(
                 email=user.email,
-                api_key=api_key,
+                api_key=None,  # Don't include API key in email
                 tier=tier
             )
             if email_sent:
