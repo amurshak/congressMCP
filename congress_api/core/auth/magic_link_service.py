@@ -218,13 +218,15 @@ class MagicLinkService:
         """
         try:
             # Verify session token (basic implementation - could be enhanced)
-            # DEV MODE: Allow dev-token for development/testing
+            # DEV MODE: Only allow in development environment with explicit flag
             import os
-            is_dev_mode = session_token == "dev-token" and email == "dev@example.com"
-            # For simplicity, allow dev mode when dev credentials are used
-            # In production, these credentials won't be known/used
+            is_dev_credentials = session_token == "dev-token" and email == "dev@example.com"
+            is_dev_env = os.getenv("ENABLE_DEV_MODE", "false").lower() == "true"
+            is_dev_mode = is_dev_credentials and is_dev_env
             
-            logger.info(f"Dev mode check: session_token='{session_token}', email='{email}', is_dev_mode={is_dev_mode}")
+            # Security: Never log dev credentials in production
+            if is_dev_env:
+                logger.info(f"Dev mode check: is_dev_mode={is_dev_mode}")
             
             if not is_dev_mode and not self._verify_session_token(session_token, email):
                 return {
