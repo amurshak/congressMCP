@@ -564,7 +564,10 @@ async def regenerate_api_key(request: Request) -> JSONResponse:
         request_new_link = data.get('requestNewLink', False)
         
         # Validation
+        logger.info(f"Regenerate key request - email: '{email}', token: '{token}', requestNewLink: {request_new_link}")
+        
         if not email:
+            logger.warning("Email validation failed - email is empty")
             return JSONResponse(
                 {"success": False, "message": "Email is required"}, 
                 status_code=400,
@@ -583,6 +586,7 @@ async def regenerate_api_key(request: Request) -> JSONResponse:
         else:
             # Validate token for API key regeneration
             if not token:
+                logger.warning("Token validation failed - token is empty")
                 return JSONResponse(
                     {"success": False, "message": "Session token is required"}, 
                     status_code=400,
