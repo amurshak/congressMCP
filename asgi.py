@@ -64,7 +64,8 @@ try:
     logger.info("MCP endpoint available at /mcp/ (FastMCP default path)")
 
 except Exception as e:
-    logger.error(f"Failed to create FastMCP app: {e}")
+    error_message = str(e)
+    logger.error(f"Failed to create FastMCP app: {error_message}")
     import traceback
     traceback.print_exc()
 
@@ -76,7 +77,7 @@ except Exception as e:
     async def error_handler(request):
         return JSONResponse({
             "error": "FastMCP failed to initialize",
-            "details": str(e)
+            "details": error_message
         }, status_code=500)
 
     app = Starlette(routes=[
