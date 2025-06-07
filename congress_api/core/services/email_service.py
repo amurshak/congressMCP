@@ -173,7 +173,7 @@ class EmailService:
                     <a href="https://congressmcp.lawgiver.ai/setup" class="btn-primary">View Setup Guide</a>
                 </div>
                 <p class="body-sm" style="margin: 0;">
-                    Want more tools? <a href="https://congressmcp.lawgiver.ai/pricing" style="color: #34d399; text-decoration: none; font-weight: 600;">Upgrade to Pro</a> for 25x more API calls and all 116+ tools
+                    Want more tools? <a href="https://congressmcp.lawgiver.ai/#pricing" style="color: #34d399; text-decoration: none; font-weight: 600;">Upgrade to Pro</a> for 25x more API calls and all 116+ tools
                 </p>
             </div>
             """
