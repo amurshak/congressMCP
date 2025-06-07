@@ -221,7 +221,12 @@ class MagicLinkService:
             # DEV MODE: Allow dev-token for development/testing
             import os
             is_dev_mode = session_token == "dev-token" and email == "dev@example.com"
-            is_dev_env = os.getenv("CONGRESS_API_ENV", "").lower() in ["development", "dev"]
+            # Check for dev environment indicators
+            frontend_url = os.getenv("FRONTEND_BASE_URL", "")
+            is_local_frontend = "localhost" in frontend_url or "127.0.0.1" in frontend_url
+            is_dev_env = is_local_frontend or os.getenv("CONGRESS_API_ENV", "").lower() in ["development", "dev"]
+            
+            logger.info(f"Dev mode check: is_dev_mode={is_dev_mode}, is_dev_env={is_dev_env}, frontend_url='{frontend_url}'")
             
             if not (is_dev_mode and is_dev_env) and not self._verify_session_token(session_token, email):
                 return {
