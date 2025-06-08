@@ -206,14 +206,18 @@ def get_user_tier_from_context(ctx: Context) -> str:
     The ASGI middleware should have added user info to the request scope
     """
     try:
-        # Check if user info was added by ASGI middleware
-        if hasattr(ctx, 'request') and hasattr(ctx.request, 'scope'):
-            scope = ctx.request.scope
-            if 'user' in scope:
-                user_info = scope['user']
+        # Use FastMCP's dependency system to access HTTP request
+        from fastmcp.server.dependencies import get_http_request
+        try:
+            request = get_http_request()
+            if hasattr(request, 'scope') and 'user' in request.scope:
+                user_info = request.scope['user']
+                logger.debug(f"Found user in request scope: {user_info}")
                 return user_info.get('tier', 'free').lower()
+        except RuntimeError as e:
+            logger.debug(f"No HTTP request available: {e}")
         
-        # Fallback: try to get from other context attributes
+        # Fallback: try to get from context attributes
         if hasattr(ctx, 'user_tier'):
             return ctx.user_tier.lower()
             
