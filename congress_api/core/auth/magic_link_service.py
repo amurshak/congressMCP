@@ -619,7 +619,7 @@ class MagicLinkService:
                         
                         <div class="glass-card">
                             <p style="margin: 0; font-size: 14px; color: rgba(255, 255, 255, 0.7);">
-                                <strong>Can't click the button?</strong> Copy and paste this link into your browser:<br>
+                                <strong style="color: rgba(255, 255, 255, 0.9);">Can't click the button?</strong> Copy and paste this link into your browser:<br>
                                 <span style="word-break: break-all; color: #60a5fa; font-family: monospace; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 4px; display: inline-block; margin-top: 8px;">{magic_url}</span>
                             </p>
                         </div>
