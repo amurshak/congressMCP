@@ -1233,13 +1233,17 @@ async def get_bill_text(
     version: str = "latest"
 ) -> str:
     """
-    Get the text versions and URLs for a specific bill with reliability framework.
+    Get available text versions and download URLs for a specific bill (metadata only).
+    For actual bill text content, use get_bill_content() instead.
     
     Args:
         congress: Congress number (e.g., 117 for 117th Congress)
         bill_type: Bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         bill_number: Bill number
         version: Text version to retrieve ('latest', 'introduced', 'reported', or specific version code)
+        
+    Returns:
+        Formatted list of available text formats (HTML, PDF, XML) with download URLs
     """
     try:
         # Validate congress parameter
@@ -1373,7 +1377,8 @@ async def get_bill_content(
     chunk_size: int = 8000
 ) -> str:
     """
-    Get the actual text content of a specific bill, with chunking support for large bills.
+    Get the actual text content of a specific bill (full text, not just URLs).
+    Use this function to retrieve readable bill text with chunking support for large bills.
     
     Args:
         congress: Congress number (e.g., 117 for 117th Congress)
@@ -1382,6 +1387,9 @@ async def get_bill_content(
         version: Text version to retrieve ('latest', 'introduced', 'reported', or specific version code)
         chunk_number: Chunk number to retrieve (1-based, default: 1)
         chunk_size: Size of each chunk in characters (default: 8000)
+        
+    Returns:
+        Formatted bill text content, stripped of HTML tags and cleaned for readability
     """
     try:
         # Validate congress parameter
