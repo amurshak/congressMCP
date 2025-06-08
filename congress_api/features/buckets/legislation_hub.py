@@ -1,8 +1,8 @@
 """
 Congressional Legislation Hub - Consolidated MCP bucket tool for all legislation-related operations.
 
-This bucket consolidates 30 individual tools into a single interface with operation-based routing:
-- FREE Operations (7): Basic bill search, details, text, basic member lookup
+This bucket consolidates 32 individual tools into a single interface with operation-based routing:
+- FREE Operations (9): Basic bill search, details, text, recent bills, basic member lookup
 - PAID Operations (23): Advanced bills, amendments, summaries, treaties, full member features
 
 Operation-level access control ensures granular tier-based access within the bucket.
@@ -31,7 +31,9 @@ FREE_OPERATIONS = {
     "get_bill_text_versions",
     "get_bill_titles",
     "get_bill_content",
-    "get_bill_summaries"
+    "get_bill_summaries",
+    "get_recent_bills",
+    "get_bills_by_date_range"
 }
 
 PAID_OPERATIONS = {
@@ -135,6 +137,12 @@ async def route_legislation_operation(ctx: Context, operation: str, **kwargs) ->
     elif operation == "get_bill_content":
         from ..bills import get_bill_content
         return await get_bill_content(ctx, **kwargs)
+    elif operation == "get_recent_bills":
+        from ..bills import get_recent_bills
+        return await get_recent_bills(ctx, **kwargs)
+    elif operation == "get_bills_by_date_range":
+        from ..bills import get_bills_by_date_range
+        return await get_bills_by_date_range(ctx, **kwargs)
     
     # Amendment operations
     elif operation == "search_amendments":
@@ -185,6 +193,7 @@ async def legislation_hub(
     sort: Optional[str] = None,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
+    days_back: Optional[int] = None,
     version: Optional[str] = None,
     chunk_number: Optional[int] = None,
     chunk_size: Optional[int] = None,
@@ -202,7 +211,7 @@ async def legislation_hub(
     This bucket provides access to bills, amendments, summaries, and treaties with 
     tier-based access control:
     
-    FREE TIER OPERATIONS (7):
+    FREE TIER OPERATIONS (9):
     - search_bills: Search for bills by keywords
     - get_bill_details: Get detailed bill information
     - get_bill_text: Get bill text and URLs
@@ -210,6 +219,8 @@ async def legislation_hub(
     - get_bill_titles: Get bill titles
     - get_bill_content: Get actual bill content with chunking
     - get_bill_summaries: Get bill summaries
+    - get_recent_bills: Get recently active bills without keywords
+    - get_bills_by_date_range: Get bills within specific date range
     
     PAID TIER OPERATIONS (23):
     Bills (Advanced):
@@ -295,6 +306,7 @@ async def legislation_hub(
             'sort': sort,
             'from_date': from_date,
             'to_date': to_date,
+            'days_back': days_back,
             'version': version,
             'chunk_number': chunk_number,
             'chunk_size': chunk_size,

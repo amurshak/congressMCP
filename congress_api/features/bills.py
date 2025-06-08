@@ -3,6 +3,7 @@ import logging
 from fastmcp import Context
 import httpx
 import re
+from datetime import datetime, timedelta
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -2038,3 +2039,272 @@ get_bill_related_bills(congress, bill_type, number)
 - Monitor sponsor patterns
 - Analyze success rates by bill type
 """
+
+# --- Date-Only Search Functions ---
+
+async def get_recent_bills(
+    ctx: Context,
+    limit: int = 20,
+    congress: Optional[int] = None,
+    bill_type: Optional[str] = None,
+    days_back: int = 30
+) -> str:
+    """
+    Get recently active bills without requiring keywords.
+    Useful for monitoring all recent legislative activity.
+    
+    Args:
+        limit: Maximum number of results to return (default: 20)
+        congress: Optional Congress number to filter by
+        bill_type: Optional bill type to filter by (hr, s, etc.)
+        days_back: Number of days to look back for activity (default: 30)
+    
+    Returns:
+        Formatted list of recent bills with basic metadata
+    """
+    try:
+        # Calculate from_date based on days_back
+        from_date = (datetime.utcnow() - timedelta(days=days_back)).strftime('%Y-%m-%dT00:00:00Z')
+        
+        # Validate congress parameter
+        if congress is not None:
+            congress_validation = ParameterValidator.validate_congress_number(congress)
+            if not congress_validation.is_valid:
+                return format_error_response(CommonErrors.invalid_congress_number(congress))
+        
+        # Validate bill_type parameter
+        if bill_type is not None:
+            bill_type_validation = ParameterValidator.validate_bill_type(bill_type)
+            if not bill_type_validation.is_valid:
+                return format_error_response(CommonErrors.invalid_bill_type(bill_type))
+            bill_type = bill_type_validation.sanitized_value
+        
+        # Validate limit parameter
+        limit_validation = ParameterValidator.validate_limit_range(limit)
+        if not limit_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter("limit", limit, limit_validation.error_message))
+        limit = limit_validation.sanitized_value
+        
+        # Build search parameters
+        params = {
+            'limit': min(limit, 250),
+            'sort': 'updateDate+desc',
+            'fromDateTime': from_date
+        }
+        
+        # Fetch data based on scope
+        if congress and bill_type:
+            data = await _fetch_bill_data(ctx, congress=congress, bill_type=bill_type, **params)
+            search_scope = f"recent {bill_type.upper()} bills in the {congress}th Congress"
+        elif congress:
+            data = await _fetch_bill_data(ctx, congress=congress, **params)
+            search_scope = f"recent bills in the {congress}th Congress"
+        elif bill_type:
+            # For bill_type only, we need to search all recent bills and filter
+            data = await _fetch_bill_data(ctx, **params)
+            search_scope = f"recent {bill_type.upper()} bills"
+        else:
+            data = await _fetch_bill_data(ctx, **params)
+            search_scope = "recent bills"
+        
+        # Handle API errors
+        if "error" in data:
+            error_response = CommonErrors.api_server_error("bills endpoint")
+            error_response.details = {"api_error": data["error"]}
+            return format_error_response(error_response)
+        
+        # Process response
+        bills = data.get("bills", [])
+        if not bills:
+            error_response = CommonErrors.data_not_found("recent bills", {
+                "days_back": days_back,
+                "congress": congress,
+                "bill_type": bill_type,
+                "search_scope": search_scope
+            })
+            return format_error_response(error_response)
+        
+        # Filter by bill_type if specified and not already filtered
+        if bill_type and not congress:
+            bills = [bill for bill in bills if bill.get('type', '').lower() == bill_type.lower()]
+            if not bills:
+                error_response = CommonErrors.data_not_found(f"recent {bill_type.upper()} bills", {
+                    "days_back": days_back,
+                    "bill_type": bill_type
+                })
+                return format_error_response(error_response)
+        
+        # Limit results
+        bills = bills[:limit]
+        
+        # Format response
+        result = [f"**Recent Bills ({search_scope} - last {days_back} days)**\n"]
+        result.append(f"Found {len(bills)} bills\n")
+        
+        for i, bill in enumerate(bills, 1):
+            title = bill.get('title', 'No title available')
+            bill_number = bill.get('number', 'Unknown')
+            bill_type_display = bill.get('type', 'Unknown').upper()
+            congress_num = bill.get('congress', 'Unknown')
+            update_date = bill.get('updateDate', 'Unknown')
+            
+            # Truncate title if too long
+            if len(title) > 120:
+                title = title[:117] + "..."
+            
+            result.append(f"{i}. **{bill_type_display} {bill_number}** (Congress {congress_num})")
+            result.append(f"   {title}")
+            result.append(f"   Updated: {update_date}")
+            result.append("")
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in get_recent_bills: {str(e)}")
+        error_response = CommonErrors.api_server_error("recent bills retrieval")
+        error_response.details = {"exception": str(e)}
+        return format_error_response(error_response)
+
+async def get_bills_by_date_range(
+    ctx: Context,
+    from_date: str,
+    to_date: Optional[str] = None,
+    limit: int = 20,
+    congress: Optional[int] = None,
+    bill_type: Optional[str] = None
+) -> str:
+    """
+    Get bills within a specific date range without requiring keywords.
+    Useful for analyzing legislative activity during specific time periods.
+    
+    Args:
+        from_date: Start date (format: YYYY-MM-DDTHH:MM:SSZ)
+        to_date: Optional end date (format: YYYY-MM-DDTHH:MM:SSZ, defaults to now)
+        limit: Maximum number of results to return (default: 20)
+        congress: Optional Congress number to filter by
+        bill_type: Optional bill type to filter by (hr, s, etc.)
+    
+    Returns:
+        Formatted list of bills within the date range
+    """
+    try:
+        # Validate date parameters
+        if not re.match(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', from_date):
+            error_response = CommonErrors.invalid_parameter(
+                "from_date", 
+                from_date, 
+                "Date must be in format YYYY-MM-DDTHH:MM:SSZ"
+            )
+            return format_error_response(error_response)
+        
+        if to_date and not re.match(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z', to_date):
+            error_response = CommonErrors.invalid_parameter(
+                "to_date", 
+                to_date, 
+                "Date must be in format YYYY-MM-DDTHH:MM:SSZ"
+            )
+            return format_error_response(error_response)
+        
+        # Validate congress parameter
+        if congress is not None:
+            congress_validation = ParameterValidator.validate_congress_number(congress)
+            if not congress_validation.is_valid:
+                return format_error_response(CommonErrors.invalid_congress_number(congress))
+        
+        # Validate bill_type parameter
+        if bill_type is not None:
+            bill_type_validation = ParameterValidator.validate_bill_type(bill_type)
+            if not bill_type_validation.is_valid:
+                return format_error_response(CommonErrors.invalid_bill_type(bill_type))
+            bill_type = bill_type_validation.sanitized_value
+        
+        # Validate limit parameter
+        limit_validation = ParameterValidator.validate_limit_range(limit)
+        if not limit_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter("limit", limit, limit_validation.error_message))
+        limit = limit_validation.sanitized_value
+        
+        # Build search parameters
+        params = {
+            'limit': min(limit, 250),
+            'sort': 'updateDate+desc',
+            'fromDateTime': from_date
+        }
+        
+        if to_date:
+            params['toDateTime'] = to_date
+        
+        # Fetch data based on scope
+        if congress and bill_type:
+            data = await _fetch_bill_data(ctx, congress=congress, bill_type=bill_type, **params)
+            search_scope = f"{bill_type.upper()} bills in the {congress}th Congress"
+        elif congress:
+            data = await _fetch_bill_data(ctx, congress=congress, **params)
+            search_scope = f"bills in the {congress}th Congress"
+        elif bill_type:
+            data = await _fetch_bill_data(ctx, **params)
+            search_scope = f"{bill_type.upper()} bills"
+        else:
+            data = await _fetch_bill_data(ctx, **params)
+            search_scope = "bills"
+        
+        # Handle API errors
+        if "error" in data:
+            error_response = CommonErrors.api_server_error("bills endpoint")
+            error_response.details = {"api_error": data["error"]}
+            return format_error_response(error_response)
+        
+        # Process response
+        bills = data.get("bills", [])
+        if not bills:
+            date_range_str = f"from {from_date}" + (f" to {to_date}" if to_date else " to now")
+            error_response = CommonErrors.data_not_found(f"bills in date range", {
+                "date_range": date_range_str,
+                "congress": congress,
+                "bill_type": bill_type,
+                "search_scope": search_scope
+            })
+            return format_error_response(error_response)
+        
+        # Filter by bill_type if specified and not already filtered
+        if bill_type and not congress:
+            bills = [bill for bill in bills if bill.get('type', '').lower() == bill_type.lower()]
+            if not bills:
+                error_response = CommonErrors.data_not_found(f"{bill_type.upper()} bills in date range", {
+                    "bill_type": bill_type,
+                    "from_date": from_date,
+                    "to_date": to_date
+                })
+                return format_error_response(error_response)
+        
+        # Limit results
+        bills = bills[:limit]
+        
+        # Format response
+        date_range_str = f"from {from_date.split('T')[0]}" + (f" to {to_date.split('T')[0]}" if to_date else " to now")
+        result = [f"**Bills by Date Range ({search_scope} {date_range_str})**\n"]
+        result.append(f"Found {len(bills)} bills\n")
+        
+        for i, bill in enumerate(bills, 1):
+            title = bill.get('title', 'No title available')
+            bill_number = bill.get('number', 'Unknown')
+            bill_type_display = bill.get('type', 'Unknown').upper()
+            congress_num = bill.get('congress', 'Unknown')
+            update_date = bill.get('updateDate', 'Unknown')
+            
+            # Truncate title if too long
+            if len(title) > 120:
+                title = title[:117] + "..."
+            
+            result.append(f"{i}. **{bill_type_display} {bill_number}** (Congress {congress_num})")
+            result.append(f"   {title}")
+            result.append(f"   Updated: {update_date}")
+            result.append("")
+        
+        return "\n".join(result)
+        
+    except Exception as e:
+        logger.error(f"Error in get_bills_by_date_range: {str(e)}")
+        error_response = CommonErrors.api_server_error("bills by date range retrieval")
+        error_response.details = {"exception": str(e)}
+        return format_error_response(error_response)
