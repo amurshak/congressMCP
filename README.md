@@ -1,10 +1,10 @@
 # Congress.gov API MCP Server
 
-**🎉 Production Ready - Complete Legislative Data Access via 6 Bucket Tools**
+**🎉 Production Ready - Complete Legislative Data Access via 6 Toolsets**
 
-This Model Context Protocol (MCP) server provides comprehensive access to the Congress.gov API through 6 organized bucket tools, enabling AI systems to retrieve and interact with legislative data from the United States Congress with a clean, unified interface.
+This Model Context Protocol (MCP) server provides comprehensive access to the Congress.gov API through 6 organized toolsets, enabling AI systems to retrieve and interact with legislative data from the United States Congress with a clean, unified interface.
 
-**🎯 Complete Access: 6 Bucket Tools • 90 Operations • 36 Resources**
+**🎯 Complete Access: 6 Toolsets • 92 Operations • All Functions Available**
 
 ## 🚀 Quick Start
 
@@ -16,8 +16,8 @@ Visit [congressmcp.lawgiver.ai](https://congressmcp.lawgiver.ai) to register and
 npm install -g congressmcp
 ```
 
-### 3. Configure Claude Desktop
-Add this to your Claude Desktop configuration:
+### 3. Configure Your MCP Client
+Add this to your MCP client configuration (e.g., Claude Desktop):
 
 ```json
 {
@@ -33,70 +33,64 @@ Add this to your Claude Desktop configuration:
 }
 ```
 
-### 4. Restart Claude Desktop
-You'll now have access to 6 organized bucket tools covering 90 congressional operations plus 36 resources!
+### 4. Restart Your MCP Client
+You'll now have access to 6 organized toolsets covering 92 congressional operations!
 
 ---
 
-## 🗂️ Bucket Tool Architecture (v1.5.0)
+## 🗂️ Toolset Architecture (v1.6.0)
 
-### 🎯 **Major Achievement: 87+ Tools → 6 Organized Buckets**
+### 🎯 **Major Achievement: 87+ Tools → 6 Organized Toolsets**
 
-We've successfully consolidated 87+ individual tools into 6 logical, organized bucket tools for a dramatically improved user experience:
+We've successfully consolidated 87+ individual tools into 6 logical, organized toolsets for a dramatically improved user experience. All operations are now available to all users, with rate limiting based on tier:
 
 #### 1. **📋 Legislation Hub** (`legislation_hub`)
 **Consolidates:** Bills, Amendments, Summaries, Treaties  
-**Operations:** 22 total (7 free, 15 paid)
+**Operations:** 24 total (all available)
 - **Bills**: Search, details, text, actions, amendments, cosponsors, subjects
 - **Amendments**: Search, details, actions, sponsors  
 - **Summaries**: Bill summaries with keyword search
 - **Treaties**: Search, actions, committees, text
-- **Operations**: 22 total (7 free, 15 paid)
 
 #### 2. **👥 Members and Committees** (`members_and_committees`)
 **Consolidates:** Congressional Members, Committees, Committee Operations  
-**Operations:** 13 total (3 free, 10 paid)
+**Operations:** 13 total (all available)
 - **Members**: Search, details, sponsored/cosponsored legislation
 - **Committees**: Search, bills, reports, communications, nominations
-- **Operations**: 13 total (3 free, 10 paid)
 
 #### 3. **🗳️ Voting and Nominations** (`voting_and_nominations`)
 **Consolidates:** House Votes, Nominations  
-**Operations:** 14 total (2 free, 12 paid)
+**Operations:** 14 total (all available)
 - **House Votes**: By Congress/session, details, member votes, XML data
 - **Nominations**: Search, details, actions, committees, hearings
-- **Operations**: 14 total (2 free, 12 paid)
 
 #### 4. **📰 Records and Hearings** (`records_and_hearings`)
 **Consolidates:** Congressional Records, Communications, Hearings  
-**Operations:** 16 total (3 free, 13 paid)
+**Operations:** 16 total (all available)
 - **Congressional Records**: Daily/bound records, search functionality
 - **Communications**: House/Senate communications, requirements
 - **Hearings**: Search, details, content by Congress/chamber
-- **Operations**: 16 total (3 free, 13 paid)
 
 #### 5. **📊 Committee Intelligence** (`committee_intelligence`)
 **Consolidates:** Committee Reports, Prints, Meetings  
-**Operations:** 19 total (0 free, 19 paid)
+**Operations:** 19 total (all available)
 - **Committee Reports**: Latest, by Congress/type, details, content
 - **Committee Prints**: Latest, by Congress/chamber, details
 - **Committee Meetings**: Latest, by Congress/chamber/committee, search
-- **Operations**: 19 total (0 free, 19 paid)
 
 #### 6. **🔬 Research and Professional** (`research_and_professional`)
 **Consolidates:** Congress Information, CRS Reports  
-**Operations:** 6 total (1 free, 5 paid)
+**Operations:** 6 total (all available)
 - **Congress Info**: Basic and enhanced Congress information
 - **CRS Reports**: Congressional Research Service report search
 - **Professional Analytics**: Enhanced research capabilities
-- **Operations**: 6 total (1 free, 5 paid)
 
 ---
 
 ## 🏗️ Architecture Overview
 
-### Bucket Tool Design
-Each bucket tool accepts an `operation` parameter to route to specific functionality:
+### Toolset Design
+Each toolset accepts an `operation` parameter to route to specific functionality:
 
 ```python
 # Example usage
@@ -115,9 +109,9 @@ await members_and_committees(
 ```
 
 ### Access Control
-- **Operation-Level Control**: Each bucket manages FREE_OPERATIONS and PAID_OPERATIONS sets
-- **Tier-Based Access**: Free tier gets basic operations, paid tiers get full access
-- **Clear Messaging**: Users receive detailed tier information and upgrade guidance
+- **Universal Access**: All operations available to all users
+- **Rate Limiting**: Free tier gets 200 calls/month, Pro tier gets 5000 calls/month
+- **Usage Tracking**: Clear monitoring of API call usage and limits
 
 ### API Reliability Framework
 - **Parameter Validation**: Comprehensive input validation for all operations
@@ -138,7 +132,7 @@ CongressMCP/
 │   │   ├── database.py         # Database connections
 │   │   └── middleware.py       # ASGI middleware
 │   ├── features/               # Feature implementations
-│   │   ├── buckets/            # 🆕 Bucket tool implementations
+│   │   ├── buckets/            # 🆕 Toolset implementations
 │   │   │   ├── legislation_hub.py
 │   │   │   ├── members_and_committees.py
 │   │   │   ├── voting_and_nominations.py
@@ -166,7 +160,7 @@ CongressMCP/
 
 ## 🚀 Deployment
 
-### Production Deployment (Heroku)
+### Production Deployment
 The server is deployed at `api-cmcp.lawgiver.ai` with:
 - SSL/TLS encryption
 - Automatic scaling
@@ -197,24 +191,37 @@ The server is deployed at `api-cmcp.lawgiver.ai` with:
    ```
 
 ### Environment Configuration
-Key environment variables:
-- `CONGRESS_API_KEY`: Your Congress.gov API key
+
+**Core Configuration:**
+- `CONGRESS_API_KEY`: Your Congress.gov API key (required)
+- `ENABLE_AUTH`: Enable authentication (default: true)
+- `ENABLE_DATABASE`: Enable database features (default: true)
+- `ENABLE_STRIPE`: Enable payment integration (default: true)
+
+**Authentication:**
 - `LAWGIVER_JWT_SECRET`: JWT secret for authentication
 - `LAWGIVER_API_KEYS`: API keys for user authentication (format: tier:user:key)
-- `ENABLE_AUTH`: Enable authentication (true/false)
-- `ADMIN_API_KEY`: Admin API key (optional, for key management)
-- `ENABLE_KEY_MANAGEMENT`: Enable admin key management (true/false)
-- `STRIPE_SECRET_KEY`: Stripe secret key for payments
-- `STRIPE_WEBHOOK_SECRET`: Stripe webhook secret
-- `STRIPE_PRICE_PRO_MONTHLY`: Stripe price ID for Pro monthly
-- `STRIPE_PRICE_PRO_ANNUAL`: Stripe price ID for Pro annual
-- `ENABLE_STRIPE`: Enable Stripe integration (true/false)
+- `ADMIN_API_KEY`: Admin API key for key management
+- `ENABLE_KEY_MANAGEMENT`: Enable admin key management (default: false)
+
+**Database (Supabase):**
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_ANON_KEY`: Supabase anonymous key
 - `SUPABASE_SERVICE_KEY`: Supabase service role key
-- `ENABLE_DATABASE`: Enable database features (true/false)
-- `RESEND_API_KEY`: Resend API key for email
+
+**Payment Processing (Stripe):**
+- `STRIPE_SECRET_KEY`: Stripe secret key
+- `STRIPE_WEBHOOK_SECRET`: Stripe webhook secret
+- `STRIPE_PRICE_PRO_MONTHLY`: Stripe price ID for Pro monthly
+- `STRIPE_PRICE_PRO_ANNUAL`: Stripe price ID for Pro annual
+
+**Email Service (Resend):**
+- `RESEND_API_KEY`: Resend API key
 - `RESEND_FROM_EMAIL`: From email address
+- `FRONTEND_BASE_URL`: Frontend URL for magic links
+- `MAGIC_LINK_EXPIRY_MINUTES`: Magic link expiry time (default: 60)
+
+See `.env.example` for complete configuration with examples.
 
 ---
 
@@ -225,19 +232,19 @@ Key environment variables:
 # Run all tests
 pytest
 
-# Run specific bucket tests
-pytest tests/test_legislation_hub_bucket.py
-pytest tests/test_members_committees_bucket.py
+# Run specific toolset tests
+pytest tests/test_legislation_hub_toolset.py
+pytest tests/test_members_committees_toolset.py
 
 # Run with coverage
 pytest --cov=congress_api
 ```
 
 ### Test Coverage
-- **Bucket Tools**: Comprehensive operation routing and access control tests
-- **Individual Features**: Unit tests for all internal functions
-- **Integration**: End-to-end testing with real API responses
-- **Authentication**: Tier-based access control verification
+- **Toolset Operations**: Operation routing and validation tests for each of the 6 toolsets
+- **Core Features**: Selected tests for key functionality (amendments, email system)
+- **Authentication**: User registration, email templates, and API key validation tests
+- **Integration**: Basic endpoint testing with real API responses
 
 ---
 
@@ -247,11 +254,9 @@ pytest --cov=congress_api
 - **API_RELIABILITY_GUIDE.md**: Comprehensive reliability framework documentation
 - **TOOL_CONSOLIDATION_PLAN.md**: Bucket architecture implementation details
 
-### Project Documentation (CongressMcpFiles/docs/)
-- **PROJECT_STATUS.md**: Current project status and completion metrics
-- **TECHNICAL_OVERVIEW.md**: High-level technical architecture
-- **CHANGELOG.md**: Version history and feature releases
-- **BUSINESS_OVERVIEW.md**: Market analysis and business strategy
+### External Documentation
+- **GitHub Issues**: Bug reports and feature requests
+- **Website**: [congressmcp.lawgiver.ai](https://congressmcp.lawgiver.ai) for setup guides and API documentation
 
 ---
 
@@ -259,25 +264,28 @@ pytest --cov=congress_api
 
 ### Adding New Operations
 1. **Implement internal function** in appropriate feature file
-2. **Add operation to bucket** in relevant bucket tool
-3. **Update operation sets** (FREE_OPERATIONS/PAID_OPERATIONS)
+2. **Add operation to toolset** in relevant toolset tool
+3. **Update operation sets** (add to FREE_OPERATIONS and ALL_OPERATIONS)
 4. **Add comprehensive tests** for the new operation
 5. **Update documentation** with operation details
 
-### Bucket Tool Pattern
+### Toolset Pattern
 ```python
-@mcp.tool("bucket_name")
-async def bucket_tool(ctx: Context, operation: str, **kwargs) -> str:
-    # Access control check
-    if operation in PAID_OPERATIONS and not has_paid_access(ctx):
-        raise PaymentRequiredError(f"Operation '{operation}' requires paid subscription")
+@mcp.tool("toolset_name")
+async def toolset_tool(ctx: Context, operation: str, **kwargs) -> str:
+    # Validate operation exists
+    if operation not in ALL_OPERATIONS:
+        raise ValueError(f"Unknown operation: {operation}")
+    
+    # Rate limiting check (all operations available)
+    await check_rate_limit(ctx)
     
     # Route to internal function
     if operation == "example_operation":
         return await _example_operation(ctx, **kwargs)
     
-    # Handle unknown operations
-    raise ValueError(f"Unknown operation: {operation}")
+    # Handle routing
+    return await route_operation(operation, ctx, **kwargs)
 ```
 
 ---
@@ -285,25 +293,33 @@ async def bucket_tool(ctx: Context, operation: str, **kwargs) -> str:
 ## 🎯 Key Benefits
 
 ### For Users
-- **Simplified Discovery**: 6 logical buckets instead of 87+ scattered tools
+- **Simplified Discovery**: 6 logical toolsets instead of 87+ scattered tools
+- **Universal Access**: All 92 operations available regardless of tier
 - **Consistent Interface**: Unified parameter handling across all operations
 - **Clear Documentation**: Detailed operation descriptions and examples
 - **Reliable Performance**: Comprehensive error handling and retry logic
 
 ### For Developers
 - **Easier Maintenance**: Centralized logic and consistent patterns
-- **Better Testing**: Focused test suites per bucket
+- **Better Testing**: Focused test suites per toolset
 - **Reduced Complexity**: Eliminated 87 individual tool registrations
 - **Improved Organization**: Clear separation between interfaces and implementations
+- **Open Source Ready**: Easy configuration for self-hosting without commercial features
 
 ---
 
 ## 📊 Version History
 
-### v1.5.0 - Bucket Architecture Complete
-- **Major Achievement**: Consolidated 87+ tools into 6 organized buckets
+### v1.6.0 - Universal Free Access
+- **Major Achievement**: All 92 operations now available to free users
+- **Simplified Tiers**: Rate limiting (200/5000 calls) instead of function restrictions
+- **Open Source Ready**: Architecture supports easy deployment without commercial features
+- **Enhanced UX**: Simplified tool discovery and universal access
+
+### v1.5.0 - Toolset Architecture Complete
+- **Major Achievement**: Consolidated 87+ tools into 6 organized toolsets
 - **Enhanced UX**: Simplified tool discovery and consistent interfaces
-- **Access Control**: Operation-level tier management within buckets
+- **Access Control**: Operation-level tier management within toolsets
 - **API Reliability**: Full reliability framework integration
 
 ### Previous Versions
@@ -329,7 +345,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 🆘 Support
 
-- **Documentation**: [CongressMcpFiles/docs/](../docs/)
 - **Issues**: GitHub Issues
 - **Email**: support@lawgiver.ai
 - **Website**: [congressmcp.lawgiver.ai](https://congressmcp.lawgiver.ai)
