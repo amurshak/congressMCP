@@ -31,20 +31,8 @@ class SubscriptionTier(str, Enum):
 TIER_CONFIG = {
     SubscriptionTier.FREE: {
         "rate_limit": 200,  # 200 calls per month
-        "total_functions": 16,  # 16 functions permanently available
-        "features": [
-            # Legislation Hub (7 free functions)
-            "search_bills", "get_bill_details", "get_bill_text", 
-            "get_bill_text_versions", "get_bill_titles", "get_bill_content", "get_bill_summaries",
-            # People & Relationships (3 free functions)  
-            "search_members", "get_member_details", "search_committees",
-            # Voting & Political (2 free functions)
-            "get_house_votes_by_congress", "search_nominations",
-            # Records & Communications (3 free functions)
-            "search_congressional_record", "search_house_communications", "search_hearings",
-            # Research & Professional (1 free function)
-            "get_congress_info"
-        ]
+        "total_functions": 91,  # All functions available
+        "features": ["*"]  # All tools for Free tier (wildcard for all functions)
     },
     SubscriptionTier.PRO: {
         "rate_limit": 5000,  # 5,000 calls per month to all functions

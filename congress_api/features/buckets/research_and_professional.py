@@ -21,8 +21,14 @@ logger = logging.getLogger(__name__)
 
 # Define operation access levels
 FREE_OPERATIONS = {
-    # Basic congress information for free tier
-    "get_congress_info"
+    # All research and professional operations now available for free tier
+    "get_congress_info",
+    # Professional research services
+    "search_crs_reports",
+    "get_congress_info_enhanced",
+    "search_congresses",
+    "get_congress_statistics",
+    "get_legislative_analysis"
 }
 
 PAID_OPERATIONS = {

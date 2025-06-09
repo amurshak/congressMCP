@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Define operation access levels
 FREE_OPERATIONS = {
-    # Basic bill operations for free tier
+    # All bill operations now available for free tier
     "search_bills",
     "get_bill_details", 
     "get_bill_text",
@@ -33,7 +33,26 @@ FREE_OPERATIONS = {
     "get_bill_content",
     "get_bill_summaries",
     "get_recent_bills",
-    "get_bills_by_date_range"
+    "get_bills_by_date_range",
+    # Advanced bill features
+    "get_bill_actions",
+    "get_bill_amendments", 
+    "get_bill_committees",
+    "get_bill_cosponsors",
+    "get_bill_related_bills",
+    "get_bill_subjects",
+    # Amendment features
+    "search_amendments",
+    "get_amendment_details",
+    "get_amendment_actions", 
+    "get_amendment_sponsors",
+    # Summary features
+    "search_summaries",
+    # Treaty features
+    "search_treaties",
+    "get_treaty_actions",
+    "get_treaty_committees", 
+    "get_treaty_text"
 }
 
 PAID_OPERATIONS = {
