@@ -21,9 +21,23 @@ logger = logging.getLogger(__name__)
 
 # Define operation access levels
 FREE_OPERATIONS = {
-    # Basic voting and nomination access for free tier
+    # All voting and nomination operations now available for free tier
     "get_house_votes_by_congress",
-    "search_nominations"
+    "search_nominations",
+    # Advanced voting operations
+    "get_house_votes_by_session", 
+    "get_house_vote_details",
+    "get_house_vote_details_enhanced",
+    "get_house_vote_member_votes",
+    "get_house_vote_member_votes_xml",
+    # Nomination operations
+    "get_latest_nominations",
+    "get_nomination_details",
+    "get_nomination_actions",
+    "get_nomination_committees", 
+    "get_nomination_hearings",
+    "get_nomination_nominees",
+    "get_nominations_by_congress"
 }
 
 PAID_OPERATIONS = {

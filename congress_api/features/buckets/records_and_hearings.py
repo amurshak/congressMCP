@@ -21,10 +21,28 @@ logger = logging.getLogger(__name__)
 
 # Define operation access levels
 FREE_OPERATIONS = {
-    # Basic record and communication access for free tier
+    # All record and communication operations now available for free tier
     "search_congressional_record",
     "search_house_communications", 
-    "search_hearings"
+    "search_hearings",
+    # Advanced congressional record operations
+    "search_daily_congressional_record",
+    "search_bound_congressional_record",
+    # House communication operations
+    "get_house_communication_details",
+    "search_house_requirements",
+    "get_house_requirement_details",
+    "get_house_requirement_matching_communications",
+    # Senate communication operations
+    "search_senate_communications",
+    "get_senate_communication_details",
+    # Committee communication operations
+    "get_committee_communication_details",
+    # Hearing operations
+    "get_hearings_by_congress",
+    "get_hearings_by_congress_and_chamber", 
+    "get_hearing_details",
+    "get_hearing_content"
 }
 
 PAID_OPERATIONS = {

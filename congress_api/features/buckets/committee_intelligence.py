@@ -20,7 +20,31 @@ from ...core.auth import get_user_tier_from_context, SubscriptionTier
 logger = logging.getLogger(__name__)
 
 # Define operation access levels
-FREE_OPERATIONS = set()  # No free operations - all committee document operations are paid
+FREE_OPERATIONS = {
+    # All committee operations now available for free tier
+    # Committee report operations
+    "get_latest_committee_reports",
+    "get_committee_reports_by_congress",
+    "get_committee_reports_by_congress_and_type",
+    "get_committee_report_details",
+    "get_committee_report_text_versions",
+    "get_committee_report_content",
+    "search_committee_reports",
+    # Committee print operations
+    "get_latest_committee_prints",
+    "get_committee_prints_by_congress",
+    "get_committee_prints_by_congress_and_chamber",
+    "get_committee_print_details",
+    "get_committee_print_text_versions",
+    "search_committee_prints",
+    # Committee meeting operations
+    "get_latest_committee_meetings",
+    "get_committee_meetings_by_congress",
+    "get_committee_meetings_by_congress_and_chamber",
+    "get_committee_meetings_by_committee",
+    "get_committee_meeting_details",
+    "search_committee_meetings"
+}
 
 PAID_OPERATIONS = {
     # Committee report operations

@@ -21,10 +21,22 @@ logger = logging.getLogger(__name__)
 
 # Define operation access levels
 FREE_OPERATIONS = {
-    # Basic member and committee operations for free tier
+    # All member and committee operations now available for free tier
     "search_members",
     "get_member_details", 
-    "search_committees"
+    "search_committees",
+    # Advanced member features
+    "get_member_sponsored_legislation",
+    "get_member_cosponsored_legislation",
+    "get_members_by_congress",
+    "get_members_by_state",
+    "get_members_by_district", 
+    "get_members_by_congress_state_district",
+    # Committee operations
+    "get_committee_bills",
+    "get_committee_reports",
+    "get_committee_communications", 
+    "get_committee_nominations"
 }
 
 PAID_OPERATIONS = {
