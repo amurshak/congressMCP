@@ -110,7 +110,8 @@ async def stripe_webhook(
             event_type = event.get("type")
             event_data = event.get("data", {}).get("object", {})
             
-            result = await user_service.handle_stripe_webhook(event_type, event_data)
+            from .user_service import handle_stripe_webhook
+            result = await handle_stripe_webhook(event_type, event_data)
             if result:
                 logger.info(f"Successfully processed {event_type} event")
                 return JSONResponse({"status": "success", "processed": True})
