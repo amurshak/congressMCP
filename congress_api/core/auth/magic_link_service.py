@@ -128,7 +128,16 @@ class MagicLinkService:
             # Check if expired
             expires_at = magic_link.get("expires_at")
             if isinstance(expires_at, str):
-                expires_at = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+                # Handle different microsecond formats from database
+                expires_str = expires_at.replace('Z', '+00:00')
+                # Pad microseconds to 6 digits if needed
+                if '+' in expires_str and '.' in expires_str:
+                    parts = expires_str.split('.')
+                    if len(parts) == 2:
+                        microseconds, timezone = parts[1].split('+')
+                        microseconds = microseconds.ljust(6, '0')[:6]  # Pad or truncate to 6 digits
+                        expires_str = f"{parts[0]}.{microseconds}+{timezone}"
+                expires_at = datetime.fromisoformat(expires_str)
             
             if datetime.now(timezone.utc) > expires_at:
                 return {
