@@ -1,0 +1,73 @@
+Sustainable Use License
+
+Copyright (c) 2025-present Physinomos, Inc.
+
+This software and associated documentation files (the "Software") are made available under the following terms:
+
+1. PERMISSIONS
+   Subject to the restrictions below, you are granted the following permissions:
+   
+   a) Permission to use, copy, modify, and distribute the Software.
+   
+   b) Permission to use the Software for commercial purposes.
+   
+   c) Permission to distribute modified versions of the Software.
+
+2. RESTRICTIONS
+   The above permissions are subject to the following restrictions:
+   
+   a) You may not provide the Software to third parties as a hosted or managed service, 
+      where the service provides users with access to any substantial set of the 
+      features or functionality of the Software.
+   
+   b) You may not move, change, disable, or circumvent the license key functionality 
+      in the Software, and you may not remove or obscure any functionality in the 
+      Software that is protected by a license key.
+   
+   c) You may not alter, remove, or obscure any licensing, copyright, or other notices 
+      of Lawgiver in the Software. Any use of Lawgiver's trademarks is subject to 
+      applicable law.
+
+3. FAIR USE
+   The following uses are explicitly allowed and do not violate the restrictions above:
+   
+   a) Using the Software for your organization's internal business operations.
+   
+   b) Using the Software to develop and test integrations or plugins.
+   
+   c) Providing consulting or support services where you install and configure 
+      the Software for clients on their own infrastructure.
+   
+   d) Using the Software as part of a larger application where the Congressional 
+      data access is not the primary value proposition.
+
+4. NOTICES
+   You must include the following notices in all copies or substantial portions 
+   of the Software:
+   
+   "This software includes code from CongressMCP by Lawgiver AI, Inc., licensed 
+   under the Sustainable Use License. For a hosted solution, visit 
+   https://congressmcp.lawgiver.ai"
+
+5. FUTURE VERSIONS
+   Lawgiver reserves the right to change the license terms for future versions 
+   of the Software. However, any version of the Software released under this 
+   license will remain available under this license.
+
+6. DISCLAIMER
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, 
+   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+   THE SOFTWARE.
+
+7. INTERPRETATION
+   This license shall be interpreted in a manner that makes it as similar as 
+   possible to the Apache License, Version 2.0, while maintaining the restrictions 
+   in Section 2.
+
+---
+
+For questions about this license or commercial hosting rights, contact: legal@lawgiver.ai

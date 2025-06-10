@@ -339,7 +339,15 @@ See [CHANGELOG.md](../docs/CHANGELOG.md) for complete version history.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the Sustainable Use License - see the [LICENSE](LICENSE) file for details.
+
+**In short:**
+- ✅ **Free to use** for self-hosting and internal use
+- ✅ **Modify and distribute** freely
+- ❌ **Cannot offer as a competing hosted service**
+- ✅ **Commercial use allowed** (except competitive hosting)
+
+Want a hosted version without the hassle? Check out [congressmcp.lawgiver.ai](https://congressmcp.lawgiver.ai)
 
 ---
 
