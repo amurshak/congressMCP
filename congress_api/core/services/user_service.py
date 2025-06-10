@@ -176,6 +176,9 @@ class UserService:
         if success:
             logger.info(f"Upgraded user {user.email} to {tier.value}")
             
+            # Deactivate existing API keys before creating new one
+            await self.db.deactivate_user_api_keys(user.id)
+            
             # Generate new API key with updated tier
             new_api_key = await self.db.create_api_key(user.id, tier)
             if new_api_key:
