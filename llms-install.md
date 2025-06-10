@@ -14,7 +14,15 @@ npm install -g congressmcp
 3. Verify email to receive your API key
 
 ## Step 3: Configure Cline
-Add this configuration to your MCP settings:
+Add this configuration to your Cline MCP settings file:
+
+**Settings File Location:**
+- **macOS:** `/Users/[username]/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+- **Windows:** `C:\Users\[username]\AppData\Roaming\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+- **Linux:** `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+
+**Configuration:**
+Add this to your `cline_mcp_settings.json` file:
 
 ```json
 {
@@ -29,6 +37,8 @@ Add this configuration to your MCP settings:
   }
 }
 ```
+
+**Note:** If the file doesn't exist, create it with the configuration above.
 
 ## Step 4: Restart Cline
 Restart Cline to activate the congressional research tools.
