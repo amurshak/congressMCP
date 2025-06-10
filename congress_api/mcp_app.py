@@ -107,8 +107,7 @@ async def register_free_user(request: Request) -> JSONResponse:
     import json
     import logging
     import os
-    from .core.services.user_service import UserService
-    from .core.auth.auth import SubscriptionTier
+    from .core.services.user_service import register_or_send_magic_link
     
     logger = logging.getLogger(__name__)
     
@@ -147,32 +146,8 @@ async def register_free_user(request: Request) -> JSONResponse:
         # Check if Stripe is enabled
         enable_stripe = os.getenv("ENABLE_STRIPE", "true").lower() == "true"
         
-        # Initialize user service
-        user_service = UserService()
-        
-        # Check if user already exists
-        try:
-            from .core.database import db_client
-            existing_user = await db_client.get_user_by_email(email)
-            if existing_user:
-                logger.info(f"User {email} already exists")
-                return JSONResponse({
-                    "success": True,
-                    "message": "Registration successful! Check your email for your API key.",
-                    "user_exists": True
-                },
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                })
-        except Exception as e:
-            logger.warning(f"Could not check existing user: {e}")
-            # Continue with registration if database check fails
-        
+        # Handle Stripe customer creation for new users
         stripe_customer_id = None
-        
-        # Create Stripe customer for free user (enables seamless upgrades)
         if enable_stripe:
             try:
                 import stripe
@@ -189,45 +164,34 @@ async def register_free_user(request: Request) -> JSONResponse:
                         }
                     )
                     stripe_customer_id = customer.id
-                    logger.info(f"✅ Created Stripe customer {stripe_customer_id} for free user {email}")
+                    logger.info(f"✅ Created Stripe customer {stripe_customer_id} for {email}")
                 else:
                     logger.warning("❌ Stripe API key not configured, creating user without Stripe customer")
             except Exception as e:
                 logger.error(f"❌ Failed to create Stripe customer for {email}: {str(e)}")
-                logger.error(f"Exception type: {type(e).__name__}")
                 # Continue without Stripe customer - this is graceful degradation
         else:
             logger.info("Stripe is disabled, skipping customer creation")
         
-        # Create new user with free tier
-        user, api_key = await user_service.create_user_with_api_key(
-            email=email,
-            stripe_customer_id=stripe_customer_id,
-            tier=SubscriptionTier.FREE
-        )
+        # Use UserService helper function to handle registration logic
+        result = await register_or_send_magic_link(email, stripe_customer_id)
         
-        if user and api_key:
-            logger.info(f"Successfully created free tier user: {email} (Stripe: {stripe_customer_id})")
+        if result.get("success"):
+            # Add Stripe customer ID to successful responses
+            if stripe_customer_id and not result.get("user_exists"):
+                result["stripe_customer_id"] = stripe_customer_id
             
-            # Email sending is handled automatically by user_service.create_user_with_api_key
-            return JSONResponse({
-                "success": True,
-                "message": "Registration successful! Your API key is shown below.",
-                "user_id": user.id,
-                "tier": user.subscription_tier,
-                "stripe_customer_id": stripe_customer_id,
-                "api_key": api_key if api_key else None,
-                "email": email
-            },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            })
-        else:
-            logger.error(f"Failed to create user: {email}")
             return JSONResponse(
-                {"error": "Registration failed. Please try again."}, 
+                result,
+                headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                }
+            )
+        else:
+            return JSONResponse(
+                {"error": result.get("message", "Registration failed. Please try again.")}, 
                 status_code=500,
                 headers={
                     "Access-Control-Allow-Origin": "*",

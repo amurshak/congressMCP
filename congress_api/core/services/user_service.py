@@ -50,6 +50,89 @@ class UserService:
             logger.error(f"Error creating user with API key: {e}")
             return None, None
 
+    async def register_or_send_magic_link(self, email: str, stripe_customer_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Smart registration: handle both new users and existing users
+        - New users: create account + send registration magic link
+        - Existing users: send key management magic link
+        """
+        try:
+            # Check if user already exists
+            existing_user = await self.db.get_user_by_email(email)
+            
+            if existing_user:
+                # Existing user - send key management magic link
+                logger.info(f"Existing user {email} requesting access - sending key management magic link")
+                from ..auth.magic_link_service import get_magic_link_service
+                magic_link_service = get_magic_link_service()
+                magic_result = await magic_link_service.request_magic_link(email, purpose="key_management")
+                
+                if magic_result.get("success"):
+                    return {
+                        "success": True,
+                        "message": "Check your email for a magic link to access your API key.",
+                        "user_exists": True
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": "Failed to send magic link. Please try again.",
+                        "user_exists": True
+                    }
+            else:
+                # New user - create account without API key + send registration magic link
+                user = await self.create_user_for_registration(email, stripe_customer_id, SubscriptionTier.FREE)
+                if not user:
+                    return {
+                        "success": False,
+                        "message": "Failed to create account. Please try again."
+                    }
+                
+                # Send registration magic link
+                from ..auth.magic_link_service import get_magic_link_service
+                magic_link_service = get_magic_link_service()
+                magic_result = await magic_link_service.request_magic_link(email, purpose="registration")
+                
+                if magic_result.get("success"):
+                    return {
+                        "success": True,
+                        "message": "Registration successful! Check your email for a verification link to get your API key.",
+                        "user_id": user.id,
+                        "tier": user.subscription_tier,
+                        "verification_required": True
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": "Registration created but verification email failed. Please try requesting a new magic link.",
+                        "user_created": True
+                    }
+                    
+        except Exception as e:
+            logger.error(f"Error in register_or_send_magic_link: {e}")
+            return {
+                "success": False,
+                "message": "An unexpected error occurred. Please try again."
+            }
+
+    async def create_user_for_registration(self, email: str, 
+                                         stripe_customer_id: Optional[str] = None,
+                                         tier: SubscriptionTier = SubscriptionTier.FREE) -> Optional[User]:
+        """Create a new user without API key (for magic link registration flow)"""
+        try:
+            # Create the user (no API key yet)
+            user = await self.db.create_user(email, stripe_customer_id, tier)
+            if not user:
+                logger.error(f"Failed to create user: {email}")
+                return None
+                
+            logger.info(f"Created user {email} with tier {tier.value} (API key pending verification)")
+            return user
+            
+        except Exception as e:
+            logger.error(f"Error creating user for registration: {e}")
+            return None
+
     async def handle_stripe_customer_created(self, stripe_customer_id: str, 
                                            email: str) -> Tuple[Optional[User], Optional[str]]:
         """Handle Stripe customer creation - create user with FREE tier"""
@@ -288,6 +371,14 @@ user_service = UserService()
 async def create_user_with_api_key(email: str, stripe_customer_id: Optional[str] = None) -> Tuple[Optional[User], Optional[str]]:
     """Create user with API key"""
     return await user_service.create_user_with_api_key(email, stripe_customer_id)
+
+async def register_or_send_magic_link(email: str, stripe_customer_id: Optional[str] = None) -> Dict[str, Any]:
+    """Smart registration: handle both new users and existing users"""
+    return await user_service.register_or_send_magic_link(email, stripe_customer_id)
+
+async def create_user_for_registration(email: str, stripe_customer_id: Optional[str] = None) -> Optional[User]:
+    """Create user without API key for magic link registration flow"""
+    return await user_service.create_user_for_registration(email, stripe_customer_id)
 
 async def validate_api_key_with_features(api_key: str, feature: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:
     """Validate API key and check feature access"""

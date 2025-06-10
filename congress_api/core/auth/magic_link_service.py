@@ -146,23 +146,43 @@ class MagicLinkService:
             # Mark magic link as used
             await self.db.mark_magic_link_used(token)
             
-            # Get or create user
+            # Get user and handle based on purpose
             from ..database import get_user_by_email
             user = await get_user_by_email(email)
+            purpose = magic_link.get("purpose", "key_management")
+            
             if not user:
-                # This shouldn't happen for key_management links, but handle gracefully
+                # This shouldn't happen for any valid magic link
                 return {
                     "valid": False,
                     "message": "User account not found. Please sign up first."
                 }
             
-            # Get user's API key info (we can't retrieve the actual key, only metadata)
-            api_key_data = await self.db.get_active_api_key_for_user(user.id)
-            if not api_key_data:
-                return {
-                    "valid": False,
-                    "message": "No active API key found. Please regenerate your API key."
-                }
+            # Handle registration purpose - create API key if needed
+            if purpose == "registration":
+                # Check if user already has an API key
+                api_key_data = await self.db.get_active_api_key_for_user(user.id)
+                if not api_key_data:
+                    # Generate first API key for new registration
+                    api_key = await self.db.create_api_key(user.id, user.subscription_tier)
+                    if not api_key:
+                        return {
+                            "valid": False,
+                            "message": "Failed to create API key. Please try again."
+                        }
+                    logger.info(f"Generated first API key for user {email} during registration verification")
+                    # Refresh api_key_data after creation
+                    api_key_data = await self.db.get_active_api_key_for_user(user.id)
+                else:
+                    logger.info(f"User {email} already has API key during registration verification")
+            else:
+                # Handle key_management purpose - expect existing API key
+                api_key_data = await self.db.get_active_api_key_for_user(user.id)
+                if not api_key_data:
+                    return {
+                        "valid": False,
+                        "message": "No active API key found. Please regenerate your API key."
+                    }
             
             # Get usage statistics using helper functions
             from ..database import get_monthly_usage
