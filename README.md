@@ -361,5 +361,5 @@ Want a hosted version without the hassle? Check out [congressmcp.lawgiver.ai](ht
 ## 🆘 Support
 
 - **Issues**: GitHub Issues
-- **Email**: support@lawgiver.ai
+- **Email**: support@congressmcp.lawgiver.ai
 - **Website**: [congressmcp.lawgiver.ai](https://congressmcp.lawgiver.ai)
