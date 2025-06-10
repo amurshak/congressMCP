@@ -6,12 +6,12 @@ This Model Context Protocol (MCP) server provides comprehensive access to the Co
 
 **🎯 Complete Access: 6 Toolsets • 92 Operations • All Functions Available**
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Hosted Service - Recommended)
 
 ### 1. Get Your API Key
 Visit [congressmcp.lawgiver.ai](https://congressmcp.lawgiver.ai) to register and get your API key.
 
-### 2. Install via NPM (Recommended)
+### 2. Install via NPM
 ```bash
 npm install -g congressmcp
 ```
@@ -35,6 +35,8 @@ Add this to your MCP client configuration (e.g., Claude Desktop):
 
 ### 4. Restart Your MCP Client
 You'll now have access to 6 organized toolsets covering 92 congressional operations!
+
+**For most users, this hosted approach provides the best experience with reliable uptime, automatic updates, and professional support.**
 
 ---
 
@@ -167,7 +169,12 @@ The server is deployed at `api-cmcp.lawgiver.ai` with:
 - Environment-based configuration
 - Health monitoring
 
-### Local Development
+### Self-Hosting (Advanced Users)
+
+**Note:** Self-hosting requires significant technical setup and maintenance. The hosted service provides better reliability and support for most users.
+
+For developers and enterprises who need full control:
+
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
