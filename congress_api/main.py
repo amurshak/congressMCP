@@ -126,15 +126,14 @@ def main():
         logger.info(f"API key configured: {config['api_key_configured']}")
         logger.info(f"Caching enabled: {config['caching_enabled']}")
     
-    # Initialize features for tool registration at import time
-    # This is required for MCP directory platforms like Smithery that scan tools
-    # by importing the server module rather than starting it
+    # For Smithery: Always register lightweight tools for scanning, regardless of config
+    # Heavy initialization will happen only when tools are actually called
     try:
-        from congress_api.mcp_app import initialize_features
-        initialize_features()
-        logger.info("Features initialized for tool scanning")
+        from congress_api.mcp_app import register_lightweight_tools
+        register_lightweight_tools()
+        logger.info("Lightweight tools registered for Smithery scanning")
     except Exception as e:
-        logger.warning(f"Feature initialization failed: {e}")
+        logger.warning(f"Tool registration failed: {e}")
         # Continue without features - server will still work for basic operations
     
     logger.info("Server is ready")
