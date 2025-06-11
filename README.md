@@ -4,9 +4,9 @@
 
 Interact with the Congress.gov API with AI through any MCP client. Get live congressional data including bills, votes, committee reports, member information, and more. Research legislation, track voting patterns, and access official government documents through natural language.
 
-✨ **6 organized toolsets • 92 operations** | 🏛️ **Official Congress.gov data** | 🚀 **Ready in 5 minutes**
+**6 organized toolsets • 92 operations** | **Official Congress.gov data** | **Ready in 5 minutes**
 
-## 🚀 Quick Start
+## Quick Start
 
 **Get up and running in 5 minutes with our hosted service:**
 
@@ -38,7 +38,7 @@ Add this to your MCP client configuration (e.g., Claude Desktop):
 ### 4. Start Reasoning
 Restart your MCP client and start asking about bills, votes, committees, and more!
 
-💡 **Example:** "Find recent climate change bills in the current Congress"
+**Example:** "Find recent climate change bills in the current Congress"
 
 ---
 
@@ -49,7 +49,7 @@ Restart your MCP client and start asking about bills, votes, committees, and mor
 
 ---
 
-## 🗂️ What You Can Research
+## What You Can Research
 
 **6 comprehensive categories of congressional data:**
 
@@ -59,56 +59,56 @@ Restart your MCP client and start asking about bills, votes, committees, and mor
 - Access full bill text, voting records, and sponsor information
 - Find bill summaries and legislative analysis
 
-### 👥 **Members & Committees**
+### **Members & Committees**
 - Research representatives and senators by name, state, or district
 - Find committee membership, leadership, and activities
 - Track member voting patterns and sponsored legislation
 - Access member biographical and contact information
 
-### 🗳️ **Voting Records**
+### **Voting Records**
 - Access detailed House and Senate voting records
 - Research presidential nominations and confirmations
 - Analyze voting patterns and member positions
 - Find roll call votes and voting statistics
 
-### 📰 **Congressional Records & Hearings**
+### **Congressional Records & Hearings**
 - Search the Congressional Record and daily proceedings
 - Access committee hearing transcripts and witness testimony
 - Find House and Senate floor communications
 - Browse historical congressional documents
 
-### 📊 **Committee Reports & Intelligence**
+### **Committee Reports & Intelligence**
 - Access committee reports, prints, and publications
 - Find committee meeting schedules, minutes, and agendas  
 - Research committee-specific legislative activities
 - Track committee markup sessions and votes
 
-### 🔬 **Research & Analysis**
+### **Research & Analysis**
 - Access Congressional Research Service (CRS) reports
 - Get detailed Congress session information and statistics
 - Use advanced search and filtering capabilities
 - Access professional legislative research tools
 
-## 💡 Example Use Cases
+## Example Use Cases
 
-**📊 Policy Research**  
+**Policy Research**  
 *"Find all climate change bills introduced in the 118th Congress and their current status"*
 
-**🗳️ Voting Analysis**  
+**Voting Analysis**  
 *"How did senators from California vote on recent healthcare legislation?"*
 
-**👥 Member Research**  
+**Member Research**  
 *"Who are the current members of the House Energy and Commerce Committee?"*
 
-**📋 Bill Tracking**  
+**Bill Tracking**  
 *"What's the latest action on H.R. 1234 and who are its cosponsors?"*
 
-**📰 Committee Activity**  
+**Committee Activity**  
 *"Show me recent hearings by the Senate Judiciary Committee on AI regulation"*
 
 ---
 
-## 🛠️ Self-Hosting
+## Self-Hosting
 
 **Need full control or want to contribute?** You can run your own instance.
 
@@ -143,7 +143,7 @@ For production deployments, see `.env.example` for complete configuration option
 - Payment processing (Stripe)  
 - Email services (Resend)
 
-## 📚 Resources
+## Resources
 
 - **[Setup Guide](https://congressmcp.lawgiver.ai)** - Complete setup and usage documentation
 - **[API Reference](./documentation/)** - Technical details for developers
@@ -151,7 +151,7 @@ For production deployments, see `.env.example` for complete configuration option
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions!
 
@@ -160,7 +160,7 @@ We welcome contributions!
 3. Add tests for new functionality
 4. Submit a pull request
 
-## 📄 License
+## License
 
 Open source under the Sustainable Use License:
 - ✅ Free to use and modify
@@ -168,7 +168,7 @@ Open source under the Sustainable Use License:
 - ✅ Commercial use allowed
 - ❌ Cannot offer as competing hosted service
 
-## 🆘 Support
+## Support
 
 - **Documentation** - [congressmcp.lawgiver.ai](https://congressmcp.lawgiver.ai)
 - **GitHub Issues** - Bug reports and feature requests  
@@ -176,4 +176,4 @@ Open source under the Sustainable Use License:
 
 ---
 
-**Built with ❤️ for government transparency and accessible civic data**
+**Built for government transparency and accessible civic data**
