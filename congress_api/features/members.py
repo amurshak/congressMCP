@@ -553,25 +553,54 @@ async def search_members(
         if not members:
             return "No members found matching the specified criteria."
         
+        # Debug: Log the first few members and their name fields
+        if name and len(members) > 0:
+            logger.info(f"DEBUG: Searching for name '{name}' in {len(members)} members")
+            for i, member in enumerate(members[:3]):  # Log first 3 members
+                name_fields = {
+                    "directOrderName": member.get("directOrderName"),
+                    "invertedOrderName": member.get("invertedOrderName"),
+                    "name": member.get("name"),
+                    "bioguideId": member.get("bioguideId")
+                }
+                logger.info(f"DEBUG: Member {i+1} name fields: {name_fields}")
+        
         # Apply client-side filtering for parameters not supported by the API endpoint
         filtered_members = []
         
         for member in members:
             # Filter by name if provided
             if name:
-                member_name = ""
-                if "directOrderName" in member:
-                    member_name = member["directOrderName"].lower()
-                elif "invertedOrderName" in member:
-                    member_name = member["invertedOrderName"].lower()
-                elif isinstance(member.get("name"), str):
-                    member_name = member["name"].lower()
-                elif isinstance(member.get("name"), dict):
-                    first = member["name"].get("firstName", "")
-                    last = member["name"].get("lastName", "")
-                    member_name = f"{first} {last}".lower()
+                member_names = []
                 
-                if name.lower() not in member_name:
+                # Collect all possible name representations
+                if "directOrderName" in member and member["directOrderName"]:
+                    member_names.append(member["directOrderName"].lower())
+                if "invertedOrderName" in member and member["invertedOrderName"]:
+                    member_names.append(member["invertedOrderName"].lower())
+                if isinstance(member.get("name"), str):
+                    member_names.append(member["name"].lower())
+                elif isinstance(member.get("name"), dict):
+                    name_dict = member["name"]
+                    first = name_dict.get("firstName", "")
+                    last = name_dict.get("lastName", "")
+                    if first and last:
+                        member_names.append(f"{first} {last}".lower())
+                        member_names.append(f"{last}, {first}".lower())
+                    if first:
+                        member_names.append(first.lower())
+                    if last:
+                        member_names.append(last.lower())
+                
+                # Check if the search name matches any of the member name representations
+                search_name = name.lower().strip()
+                name_match = any(search_name in member_name for member_name in member_names)
+                
+                # Debug: Log the name matching attempt
+                bioguide_id = member.get("bioguideId", "unknown")
+                logger.info(f"DEBUG: Matching '{search_name}' against {member_names} (bioguideId: {bioguide_id}): {name_match}")
+                
+                if not name_match:
                     continue
             
             # Filter by party if provided
