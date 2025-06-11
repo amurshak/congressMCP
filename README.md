@@ -1,4 +1,4 @@
-# CongressMCP Server
+# CongressMCP
 
 **Give your AI assistant access to comprehensive U.S. Congress data**
 
