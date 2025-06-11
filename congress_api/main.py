@@ -126,9 +126,16 @@ def main():
         logger.info(f"API key configured: {config['api_key_configured']}")
         logger.info(f"Caching enabled: {config['caching_enabled']}")
     
-    # Skip feature initialization to avoid timeout during tool scanning
-    # Tools will be lazy-loaded on first use for Smithery compatibility
-    logger.info("Server ready for tool scanning (features will lazy-load)")
+    # Initialize features for tool registration at import time
+    # This is required for MCP directory platforms like Smithery that scan tools
+    # by importing the server module rather than starting it
+    try:
+        from congress_api.mcp_app import initialize_features
+        initialize_features()
+        logger.info("Features initialized for tool scanning")
+    except Exception as e:
+        logger.warning(f"Feature initialization failed: {e}")
+        # Continue without features - server will still work for basic operations
     
     logger.info("Server is ready")
     return mcp
