@@ -12,59 +12,26 @@ mcp = FastMCP(
     transport="streamable-http"  # Use streamable HTTP transport (correct per FastMCP docs)
 )
 
-def register_lightweight_tools():
-    """Register lightweight placeholder tools for Smithery tool scanning.
-    
-    These tools can be listed without requiring configuration or authentication.
-    Heavy bucket imports happen only when tools are actually called.
-    """
-    # Import only when tools are actually called, not during registration
-    
-    @mcp.tool()
-    async def legislation_hub(ctx, operation: str, keywords: str = None, congress: int = None, 
-                             bill_type: str = None, bill_number: int = None, limit: int = None):
-        """Access comprehensive legislative data including bills, amendments, summaries, and treaties."""
-        from .features.buckets.legislation_hub import legislation_hub as real_tool
-        return await real_tool(ctx, operation, keywords, congress, bill_type, bill_number, limit)
-    
-    @mcp.tool()
-    async def members_and_committees(ctx, operation: str, keywords: str = None, state: str = None,
-                                   congress: int = None, limit: int = None):
-        """Research members of Congress, committees, and their relationships."""
-        from .features.buckets.members_and_committees import members_and_committees as real_tool
-        return await real_tool(ctx, operation, keywords, state, congress, limit)
-    
-    @mcp.tool()
-    async def voting_and_nominations(ctx, operation: str, keywords: str = None, congress: int = None,
-                                   limit: int = None):
-        """Access voting records and presidential nominations data.""" 
-        from .features.buckets.voting_and_nominations import voting_and_nominations as real_tool
-        return await real_tool(ctx, operation, keywords, congress, limit)
-    
-    @mcp.tool()
-    async def records_and_hearings(ctx, operation: str, keywords: str = None, congress: int = None,
-                                 limit: int = None):
-        """Search congressional records, hearings, and floor communications."""
-        from .features.buckets.records_and_hearings import records_and_hearings as real_tool
-        return await real_tool(ctx, operation, keywords, congress, limit)
-    
-    @mcp.tool()
-    async def committee_intelligence(ctx, operation: str, keywords: str = None, congress: int = None,
-                                   limit: int = None):
-        """Access committee reports, prints, meetings, and specialized intelligence."""
-        from .features.buckets.committee_intelligence import committee_intelligence as real_tool
-        return await real_tool(ctx, operation, keywords, congress, limit)
-    
-    @mcp.tool()
-    async def research_and_professional(ctx, operation: str, keywords: str = None, congress: int = None,
-                                      limit: int = None):
-        """Access CRS reports, session information, and professional research tools."""
-        from .features.buckets.research_and_professional import research_and_professional as real_tool
-        return await real_tool(ctx, operation, keywords, congress, limit)
-
 def initialize_features():
-    """Legacy function - now handled by register_lightweight_tools."""
-    return register_lightweight_tools()
+    # DEPRECATED: ORIGINAL FEATURES REPLACED BY BUCKETS """Initialize all features - called after server setup to avoid circular imports"""
+    # from .features import (
+    #     bills, members, committees, congress_info, amendments, 
+    #     committee_reports, committee_prints, committee_meetings,
+    #     hearings, congressional_record, daily_congressional_record,
+    #     bound_congressional_record, house_communications, house_requirements,
+    #     senate_communications, nominations, treaties, summaries,
+    #     house_votes, crs_reports
+    # )
+    
+    # Initialize bucket tools
+    from .features.buckets import (
+        legislation_hub, 
+        members_and_committees, 
+        voting_and_nominations, 
+        records_and_hearings,
+        committee_intelligence,
+        research_and_professional
+    )
 
 # Add webhook routes using FastMCP's custom route decorator
 from starlette.requests import Request

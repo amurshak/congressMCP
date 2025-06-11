@@ -1,4 +1,4 @@
-"""
+"""More actions
 Main application setup for the Congressional MCP server.
 Handles FastMCP server creation, routing, and middleware configuration.
 """
@@ -21,14 +21,22 @@ from congress_api.mcp_app import mcp
 #DEPRECATED Import all features to register them with the MCP server
 # from congress_api.features import bills, members, committees, congress_info, amendments, summaries, committee_reports, committee_prints, committee_meetings, hearings, congressional_record, daily_congressional_record, bound_congressional_record, house_communications, house_requirements, senate_communications, nominations, crs_reports, treaties
 
-# Bucket tools will be loaded lazily via initialize_features()
+# Import bucket hub tools to register them with the MCP server
+from congress_api.features.buckets import (
+    legislation_hub, 
+    members_and_committees, 
+    voting_and_nominations, 
+    records_and_hearings,
+    committee_intelligence,
+    research_and_professional
+)
 
 # Import prompts
 from congress_api import prompts_module
 
 class SensitiveInfoFilter(logging.Filter):
     """Filter to redact sensitive information from logs."""
-    
+
     def __init__(self, patterns=None):
         super().__init__()
         self.patterns = patterns or [
@@ -36,7 +44,7 @@ class SensitiveInfoFilter(logging.Filter):
             (r'"api_key_configured":\s*true', '"api_key_configured": [REDACTED]'),
             (r'"base_url":\s*"[^"]+"', '"base_url": "[REDACTED]"')
         ]
-    
+
     def filter(self, record):
         if isinstance(record.msg, str):
             for pattern, replacement in self.patterns:
@@ -47,7 +55,7 @@ def setup_logging():
     """Configure logging for the application based on environment with security considerations."""
     from congress_api.core.api_config import ENV
     import re
-    
+
     # Determine log level based on environment
     if ENV == "production":
         default_level = logging.INFO
@@ -55,7 +63,7 @@ def setup_logging():
         default_level = logging.INFO
     else:  # development
         default_level = logging.DEBUG
-    
+
     # Allow override via environment variable
     log_level_name = os.getenv("LOG_LEVEL", "")
     if log_level_name:
@@ -63,7 +71,7 @@ def setup_logging():
             default_level = getattr(logging, log_level_name.upper())
         except AttributeError:
             print(f"Invalid LOG_LEVEL: {log_level_name}. Using default.", file=sys.stderr)
-    
+
     # Configure logging format - JSON in production for better parsing
     if ENV == "production":
         # Simple JSON-like format for production without file paths and line numbers
@@ -71,20 +79,20 @@ def setup_logging():
     else:
         # More readable format for development and staging, still without exposing file paths
         log_format = "%(asctime)s - %(levelname)s - %(message)s"
-    
+
     # Create a filter for sensitive information
     sensitive_filter = SensitiveInfoFilter()
-    
+
     # Configure handler with filter
     handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(logging.Formatter(log_format))
     handler.addFilter(sensitive_filter)
-    
+
     # Configure root logger
     root_logger = logging.getLogger()
     root_logger.setLevel(default_level)
     root_logger.handlers = [handler]  # Replace any existing handlers
-    
+
     # Set specific logger levels
     loggers_config = {
         'congress_api': default_level,
@@ -92,30 +100,30 @@ def setup_logging():
         'httpx': logging.WARNING,
         'uvicorn': logging.INFO,
     }
-    
+
     for logger_name, level in loggers_config.items():
         logging.getLogger(logger_name).setLevel(level)
-    
+
     # Get logger for this module
     logger = logging.getLogger(__name__)
-    
+
     # Log minimal startup information in production
     if ENV == "production":
         logger.info("Application starting in production mode")
     else:
         logger.info(f"Application starting in {ENV} mode with log level {logging.getLevelName(default_level)}")
-    
+
     return logger
 
 def main():
     """Main entry point for the Congress.gov API MCP server."""
     logger = setup_logging()
     logger.info("Starting Congress.gov API MCP server")
-    
+
     # Log server health at startup
     from congress_api.core.api_config import get_api_config, ENV
     config = get_api_config()
-    
+
     # Log minimal server health information
     if ENV == "production":
         # In production, only log that the server is configured
@@ -125,17 +133,19 @@ def main():
         # The sensitive info filter will redact sensitive values
         logger.info(f"API key configured: {config['api_key_configured']}")
         logger.info(f"Caching enabled: {config['caching_enabled']}")
-    
-    # For Smithery: Always register lightweight tools for scanning, regardless of config
-    # Heavy initialization will happen only when tools are actually called
-    try:
-        from congress_api.mcp_app import register_lightweight_tools
-        register_lightweight_tools()
-        logger.info("Lightweight tools registered for Smithery scanning")
-    except Exception as e:
-        logger.warning(f"Tool registration failed: {e}")
-        # Continue without features - server will still work for basic operations
-    
+
+    # Note: For production monitoring, implement health checks at the infrastructure level
+    # such as in the Docker container or using a separate HTTP endpoint in a wrapper application
+
+
+
+
+
+
+
+
+
+
     logger.info("Server is ready")
     return mcp
 
@@ -145,16 +155,16 @@ server = main()
 if __name__ == "__main__":
     import argparse
     import uvicorn
-    
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Run the Congress.gov API MCP server')
     parser.add_argument('--port', type=int, default=8000, help='Port to run the server on')
     parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to run the server on')
     args = parser.parse_args()
-    
+
     # Use the FastMCP server's http_app() method directly - keep it pure
     app = server.http_app()
-    
+
     # Run the server
     print(f"Starting FastMCP server on {args.host}:{args.port}")
     print("Note: For webhook support, use the asgi.py deployment")
