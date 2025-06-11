@@ -317,7 +317,8 @@ async def get_members_by_congress(ctx: Context, congress: int) -> str:
                 "congress", congress, congress_validation.error_message
             ))
         
-        data = await safe_members_request(f"/member/congress/{congress}", ctx, {"limit": 20})
+        # Use pagination to get all members of the congress
+        data = await get_all_members_paginated(ctx, f"/member/congress/{congress}", {})
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error retrieving members for Congress {congress}: {data['error']}"))
@@ -543,8 +544,50 @@ async def search_members(
         elif congress:
             endpoint = f"/member/congress/{congress}"
         
-        # Make the API request
-        data = await safe_members_request(endpoint, ctx, params)
+        # For name-only searches, we need comprehensive data across congresses
+        # Use pagination to get all members
+        if name and not any([state, congress, district, chamber, party]):
+            # Progressive search strategy: current congress first, then previous
+            congress_search_order = [118, 117, 116]  # Current and recent congresses
+            
+            all_members = []
+            for search_congress in congress_search_order:
+                congress_members = await get_all_members_paginated(
+                    ctx, f"/member/congress/{search_congress}", params
+                )
+                if "error" in congress_members:
+                    continue  # Skip this congress if error, try next
+                
+                members_list = congress_members.get("members", [])
+                if members_list:
+                    all_members.extend(members_list)
+                
+                # Early termination if we find matches
+                if name:
+                    # Quick check if any member might match the name
+                    potential_matches = []
+                    search_name = name.lower().strip()
+                    for member in members_list:
+                        member_names = []
+                        if "directOrderName" in member and member["directOrderName"]:
+                            member_names.append(member["directOrderName"].lower())
+                        if "invertedOrderName" in member and member["invertedOrderName"]:
+                            member_names.append(member["invertedOrderName"].lower())
+                        if isinstance(member.get("name"), str):
+                            member_names.append(member["name"].lower())
+                        
+                        if any(search_name in member_name for member_name in member_names):
+                            potential_matches.append(member)
+                    
+                    if potential_matches:
+                        # Found matches in this congress, no need to search further back
+                        break
+            
+            # Use the aggregated data
+            data = {"members": all_members}
+        else:
+            # Use single endpoint request for other cases
+            data = await safe_members_request(endpoint, ctx, params)
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error searching members: {data['error']}"))
@@ -774,6 +817,68 @@ async def get_members_by_congress_state_district(
     except Exception as e:
         logger.error(f"Error in get_members_by_congress_state_district: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
+
+async def get_all_members_paginated(ctx: Context, endpoint: str, base_params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Get all members from an endpoint using pagination.
+    
+    Args:
+        ctx: The context object
+        endpoint: The API endpoint to call
+        base_params: Base parameters for the request
+        
+    Returns:
+        Dictionary containing all members or error information
+    """
+    try:
+        all_members = []
+        offset = 0
+        limit = 250  # Maximum per request
+        
+        while True:
+            # Create params for this request
+            params = base_params.copy()
+            params.update({"limit": limit, "offset": offset})
+            
+            # Make the API request
+            logger.info(f"Fetching members from {endpoint} with offset={offset}, limit={limit}")
+            data = await safe_members_request(endpoint, ctx, params)
+            
+            if "error" in data:
+                if offset == 0:
+                    # If first request fails, return the error
+                    return data
+                else:
+                    # If later request fails, break and return what we have
+                    logger.warning(f"Pagination request failed at offset {offset}: {data['error']}")
+                    break
+            
+            members = data.get("members", [])
+            if not members:
+                # No more members to fetch
+                break
+            
+            all_members.extend(members)
+            logger.info(f"Fetched {len(members)} members (total so far: {len(all_members)})")
+            
+            # If we got fewer members than the limit, we've reached the end
+            if len(members) < limit:
+                break
+            
+            # Move to next page
+            offset += limit
+            
+            # Safety check to prevent infinite loops
+            if offset > 2000:  # More than reasonable for any congress
+                logger.warning(f"Pagination safety limit reached at offset {offset}")
+                break
+        
+        logger.info(f"Pagination complete. Total members fetched: {len(all_members)}")
+        return {"members": all_members}
+        
+    except Exception as e:
+        logger.error(f"Error in get_all_members_paginated: {str(e)}")
+        return {"error": f"Pagination error: {str(e)}"}
 
 # Formatting helpers
 def format_member_summary(member: Dict[str, Any]) -> str:
