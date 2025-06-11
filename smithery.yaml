@@ -1,0 +1,23 @@
+runtime: "container"
+startCommand:
+  type: "http"
+  configSchema:
+    type: "object"
+    properties:
+      CONGRESS_API_KEY:
+        type: "string"
+        title: "Congress API Key"
+        description: "Congress.gov API key for accessing legislative data. Get yours at https://api.congress.gov/sign-up/"
+      CONGRESS_API_ENV:
+        type: "string"
+        title: "Environment"
+        description: "Runtime environment for the Congressional MCP server"
+        default: "production"
+        enum: ["production", "development", "staging"]
+    required: ["CONGRESS_API_KEY"]
+  exampleConfig:
+    CONGRESS_API_KEY: "your-congress-api-key-here"
+    CONGRESS_API_ENV: "production"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
