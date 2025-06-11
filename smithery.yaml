@@ -3,6 +3,7 @@ startCommand:
   type: "http"
 configSchema:
   type: "object"
+  required: ["CONGRESS_API_KEY"]
   properties:
     CONGRESS_API_KEY:
       type: "string"
@@ -14,7 +15,9 @@ configSchema:
       description: "Runtime environment for the Congressional MCP server"
       default: "production"
       enum: ["production", "development", "staging"]
-  required: ["CONGRESS_API_KEY"]
 exampleConfig:
   CONGRESS_API_KEY: "your-congress-api-key-here"
   CONGRESS_API_ENV: "production"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
