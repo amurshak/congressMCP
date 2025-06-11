@@ -21,15 +21,7 @@ from congress_api.mcp_app import mcp
 #DEPRECATED Import all features to register them with the MCP server
 # from congress_api.features import bills, members, committees, congress_info, amendments, summaries, committee_reports, committee_prints, committee_meetings, hearings, congressional_record, daily_congressional_record, bound_congressional_record, house_communications, house_requirements, senate_communications, nominations, crs_reports, treaties
 
-# Import bucket hub tools to register them with the MCP server
-from congress_api.features.buckets import (
-    legislation_hub, 
-    members_and_committees, 
-    voting_and_nominations, 
-    records_and_hearings,
-    committee_intelligence,
-    research_and_professional
-)
+# Bucket tools will be loaded lazily via initialize_features()
 
 # Import prompts
 from congress_api import prompts_module
@@ -134,8 +126,17 @@ def main():
         logger.info(f"API key configured: {config['api_key_configured']}")
         logger.info(f"Caching enabled: {config['caching_enabled']}")
     
-    # Note: For production monitoring, implement health checks at the infrastructure level
-    # such as in the Docker container or using a separate HTTP endpoint in a wrapper application
+    # Initialize features for tool registration at import time
+    # This is required for MCP directory platforms like Smithery that scan tools
+    # by importing the server module rather than starting it (lifespan-based initialization
+    # would be too late since lifespan only runs when the server actually starts)
+    try:
+        from congress_api.mcp_app import initialize_features
+        initialize_features()
+        logger.info("Features initialized for tool scanning")
+    except Exception as e:
+        logger.warning(f"Feature initialization failed: {e}")
+        # Continue without features - server will still work for basic operations
     
     logger.info("Server is ready")
     return mcp

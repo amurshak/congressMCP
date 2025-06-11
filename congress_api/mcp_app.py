@@ -13,17 +13,13 @@ mcp = FastMCP(
 )
 
 def initialize_features():
-    # DEPRECATED: ORIGINAL FEATURES REPLACED BY BUCKETS """Initialize all features - called after server setup to avoid circular imports"""
-    # from .features import (
-    #     bills, members, committees, congress_info, amendments, 
-    #     committee_reports, committee_prints, committee_meetings,
-    #     hearings, congressional_record, daily_congressional_record,
-    #     bound_congressional_record, house_communications, house_requirements,
-    #     senate_communications, nominations, treaties, summaries,
-    #     house_votes, crs_reports
-    # )
+    """Initialize all features - called during server creation for tool registration.
     
-    # Initialize bucket tools
+    This is called at import time to register tools with the MCP server,
+    which is required for platforms like Smithery that scan tools by importing
+    the server module rather than starting it.
+    """
+    # Import bucket tools to register them with the MCP server
     from .features.buckets import (
         legislation_hub, 
         members_and_committees, 
@@ -32,6 +28,7 @@ def initialize_features():
         committee_intelligence,
         research_and_professional
     )
+    return True
 
 # Add webhook routes using FastMCP's custom route decorator
 from starlette.requests import Request
