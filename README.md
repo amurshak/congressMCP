@@ -1,8 +1,8 @@
 # CongressMCP
 
-**Give your AI assistant access to comprehensive U.S. Congress data**
+**Give your AI assistant access to comprehensive U.S. Congressional data**
 
-Connect any MCP-compatible AI client to live congressional data including bills, votes, committee reports, member information, and more. Research legislation, track voting patterns, and access official government documents through simple AI conversations.
+Interact with the Congress.gov API with AI through any MCP client. Get live congressional data including bills, votes, committee reports, member information, and more. Research legislation, track voting patterns, and access official government documents through natural language.
 
 ✨ **6 organized toolsets • 92 operations** | 🏛️ **Official Congress.gov data** | 🚀 **Ready in 5 minutes**
 
