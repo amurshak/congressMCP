@@ -1,5 +1,7 @@
 # CongressMCP
 
+[![smithery badge](https://smithery.ai/badge/congressmcp)](https://smithery.ai/server/congressmcp)
+
 **Give your AI assistant access to comprehensive U.S. Congress data**
 
 Connect any MCP-compatible AI client to live congressional data including bills, votes, committee reports, member information, and more. Research legislation, track voting patterns, and access official government documents through simple AI conversations.
