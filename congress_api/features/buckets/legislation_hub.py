@@ -1,11 +1,13 @@
 """
 Congressional Legislation Hub - Consolidated MCP bucket tool for all legislation-related operations.
 
-This bucket consolidates 32 individual tools into a single interface with operation-based routing:
-- FREE Operations (9): Basic bill search, details, text, recent bills, basic member lookup
-- PAID Operations (23): Advanced bills, amendments, summaries, treaties, full member features
+This bucket consolidates 25+ individual tools into a single interface with operation-based routing.
+ALL operations are available to ALL users regardless of tier - only usage limits differ by subscription:
+- FREE Tier: All operations, 200 calls/month
+- PRO Tier: All operations, 5,000 calls/month  
+- ENTERPRISE Tier: All operations, 100,000 calls/month
 
-Operation-level access control ensures granular tier-based access within the bucket.
+Universal access model provides competitive advantage through generous freemium offering.
 """
 
 import logging
@@ -22,9 +24,11 @@ from ...core.auth import get_user_tier_from_context, SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
-# Define operation access levels
-FREE_OPERATIONS = {
-    # All bill operations now available for free tier
+# Define operation access levels - CURRENTLY ALL OPERATIONS AVAILABLE TO ALL TIERS
+# Note: Both FREE_OPERATIONS and PAID_OPERATIONS contain the same operations
+# This reflects the current universal access model while preserving infrastructure for future changes
+ALL_OPERATIONS = {
+    # Complete Bill Operations Suite
     "search_bills",
     "get_bill_details", 
     "get_bill_text",
@@ -34,29 +38,6 @@ FREE_OPERATIONS = {
     "get_bill_summaries",
     "get_recent_bills",
     "get_bills_by_date_range",
-    # Advanced bill features
-    "get_bill_actions",
-    "get_bill_amendments", 
-    "get_bill_committees",
-    "get_bill_cosponsors",
-    "get_bill_related_bills",
-    "get_bill_subjects",
-    # Amendment features
-    "search_amendments",
-    "get_amendment_details",
-    "get_amendment_actions", 
-    "get_amendment_sponsors",
-    # Summary features
-    "search_summaries",
-    # Treaty features
-    "search_treaties",
-    "get_treaty_actions",
-    "get_treaty_committees", 
-    "get_treaty_text"
-}
-
-PAID_OPERATIONS = {
-    # Advanced bill features
     "get_bill_actions",
     "get_bill_amendments", 
     "get_bill_committees",
@@ -64,23 +45,25 @@ PAID_OPERATIONS = {
     "get_bill_related_bills",
     "get_bill_subjects",
     
-    # Amendment features (all paid)
+    # Complete Amendment Operations Suite
     "search_amendments",
     "get_amendment_details",
     "get_amendment_actions", 
     "get_amendment_sponsors",
     
-    # Summary features (paid)
+    # Complete Summary Operations Suite
     "search_summaries",
     
-    # Treaty features (all paid)
+    # Complete Treaty Operations Suite
     "search_treaties",
     "get_treaty_actions",
     "get_treaty_committees", 
     "get_treaty_text"
 }
 
-ALL_OPERATIONS = FREE_OPERATIONS | PAID_OPERATIONS
+# Legacy compatibility - maintained for existing code that references these
+FREE_OPERATIONS = ALL_OPERATIONS  # All operations available to free tier
+PAID_OPERATIONS = ALL_OPERATIONS  # All operations available to paid tiers
 
 def check_operation_access(ctx: Context, operation: str) -> None:
     """Check if user has access to the requested operation based on tier."""
@@ -227,10 +210,15 @@ async def legislation_hub(
     """
     Congressional Legislation Hub - Unified access to all legislation-related operations.
     
-    This bucket provides access to bills, amendments, summaries, and treaties with 
-    tier-based access control:
+    This bucket provides access to bills, amendments, summaries, and treaties.
+    ALL operations are available to ALL users regardless of tier - only usage limits differ:
+    - FREE Tier: All operations, 200 calls/month
+    - PRO Tier: All operations, 5,000 calls/month
+    - ENTERPRISE Tier: All operations
     
-    FREE TIER OPERATIONS (9):
+    AVAILABLE OPERATIONS (25+):
+    
+    Complete Bills Suite:
     - search_bills: Search for bills by keywords
     - get_bill_details: Get detailed bill information
     - get_bill_text: Get bill text and URLs
@@ -240,9 +228,6 @@ async def legislation_hub(
     - get_bill_summaries: Get bill summaries
     - get_recent_bills: Get recently active bills without keywords
     - get_bills_by_date_range: Get bills within specific date range
-    
-    PAID TIER OPERATIONS (23):
-    Bills (Advanced):
     - get_bill_actions: Get bill actions/history
     - get_bill_amendments: Get bill amendments
     - get_bill_committees: Get bill committees
@@ -250,16 +235,16 @@ async def legislation_hub(
     - get_bill_related_bills: Get related bills
     - get_bill_subjects: Get bill subjects/topics
     
-    Amendments (All Paid):
+    Complete Amendments Suite:
     - search_amendments: Search amendments by keywords
     - get_amendment_details: Get amendment details
     - get_amendment_actions: Get amendment actions
     - get_amendment_sponsors: Get amendment sponsors
     
-    Summaries (Paid):
+    Complete Summaries Suite:
     - search_summaries: Search bill summaries
     
-    Treaties (All Paid):
+    Complete Treaties Suite:
     - search_treaties: Search treaties
     - get_treaty_actions: Get treaty actions
     - get_treaty_committees: Get treaty committees

@@ -1,11 +1,13 @@
 """
 Congressional Members and Committees - Consolidated MCP bucket tool for members and committees.
 
-This bucket consolidates ~20 individual tools into a single interface with operation-based routing:
-- FREE Operations (3): Basic member search, member details, committee search
-- PAID Operations (17): Advanced member features, committee operations, relationship analysis
+This bucket consolidates 13+ individual tools into a single interface with operation-based routing.
+ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
+- FREE Tier: All operations, 200 calls/month
+- PRO Tier: All operations, 5,000 calls/month  
+- ENTERPRISE Tier: All operations
 
-Operation-level access control ensures granular tier-based access within the bucket.
+Access control infrastructure maintained for potential future tier differentiation.
 """
 
 import logging
@@ -19,9 +21,11 @@ from ...core.auth import get_user_tier_from_context, SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
-# Define operation access levels
+# Define operation access levels - CURRENTLY ALL OPERATIONS AVAILABLE TO ALL TIERS
+# Note: Both FREE_OPERATIONS and PAID_OPERATIONS contain the same operations
+# This reflects the current universal access model while preserving infrastructure for future changes
 FREE_OPERATIONS = {
-    # All member and committee operations now available for free tier
+    # All member and committee operations currently available for free tier
     "search_members",
     "get_member_details", 
     "search_committees",
@@ -156,15 +160,15 @@ async def members_and_committees(
     """
     Congressional Members and Committees - Unified access to members and committees.
     
-    This bucket provides access to congressional members and committees with 
-    tier-based access control:
+    ALL operations are available to ALL users regardless of tier - only usage limits differ:
+    - FREE (200), PRO (5,000), ENTERPRISE (100,000) calls/month
     
-    FREE TIER OPERATIONS (3):
+    AVAILABLE OPERATIONS:
+    Basic Member Operations:
     - search_members: Search for members by name, state, party, chamber
     - get_member_details: Get detailed member information
     - search_committees: Search committees by keywords
     
-    PAID TIER OPERATIONS (17):
     Member Legislation:
     - get_member_sponsored_legislation: Get legislation sponsored by member
     - get_member_cosponsored_legislation: Get legislation cosponsored by member
@@ -228,7 +232,7 @@ async def members_and_committees(
             "keywords": "intelligence"
         }
         
-        Get member's sponsored legislation (requires paid tier):
+        Get member's sponsored legislation:
         {
             "operation": "get_member_sponsored_legislation",
             "bioguide_id": "S000033"

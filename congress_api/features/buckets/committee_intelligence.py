@@ -1,10 +1,14 @@
 """
 Congressional Committee Intelligence - Consolidated MCP bucket tool for committee documents.
 
-This bucket consolidates ~30 individual tools into a single interface with operation-based routing:
-- FREE Operations (0): All committee document operations are paid-tier
-- PAID Operations (30): Committee reports, prints, meetings, and document analysis
+This bucket consolidates ~30 individual tools into a single interface with operation-based routing.
 
+ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
+- FREE tier: 200 calls/month
+- PRO tier: 5,000 calls/month  
+- ENTERPRISE tier: 100,000 calls/month
+
+Access control infrastructure maintained for potential future tier differentiation.
 Operation-level access control ensures granular tier-based access within the bucket.
 """
 
@@ -20,6 +24,9 @@ from ...core.auth import get_user_tier_from_context, SubscriptionTier
 logger = logging.getLogger(__name__)
 
 # Define operation access levels
+# Note: Both FREE_OPERATIONS and PAID_OPERATIONS currently contain the same operations,
+# reflecting universal access model where all operations are available to all tiers.
+# Access control infrastructure maintained for potential future differentiation.
 FREE_OPERATIONS = {
     # All committee operations now available for free tier
     # Committee report operations
@@ -204,10 +211,14 @@ async def committee_intelligence(
     Congressional Committee Intelligence - Professional committee document access.
     
     This premium bucket provides comprehensive access to committee documents, reports, 
-    and meeting intelligence with advanced analysis capabilities:
+    and meeting intelligence with advanced analysis capabilities.
     
-    ALL OPERATIONS REQUIRE PAID SUBSCRIPTION (Pro or Enterprise):
+    ALL operations are available to ALL users regardless of tier - only usage limits differ:
+    - FREE tier: All operations, 200 calls/month
+    - PRO tier: All operations, 5,000 calls/month 
+    - ENTERPRISE tier: All operatios, 
     
+    AVAILABLE OPERATIONS:
     Committee Reports (Advanced Analytics):
     - get_latest_committee_reports: Get most recent committee reports
     - get_committee_reports_by_congress: Get reports by Congress number
@@ -303,7 +314,7 @@ async def committee_intelligence(
         
         Note: All parameters are provided at the same level. The 'operation' 
         parameter determines which function to call, and other parameters are 
-        passed to that function. All operations in this bucket require paid access.
+        passed to that function.
     """
     try:
         # Check operation access based on user tier

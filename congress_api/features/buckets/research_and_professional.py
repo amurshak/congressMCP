@@ -1,10 +1,14 @@
 """
 Congressional Research and Professional - Consolidated MCP bucket tool for professional research.
 
-This bucket consolidates specialized research tools into a single interface with operation-based routing:
-- FREE Operations (1): Basic congress information
-- PAID Operations (5): CRS reports, enhanced congress analytics, professional research features
+This bucket consolidates specialized research tools into a single interface with operation-based routing.
 
+ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
+- FREE tier: All operations, 200 calls/month
+- PRO tier: All operations, 5,000 calls/month  
+- ENTERPRISE tier: All operations
+
+Access control infrastructure maintained for potential future tier differentiation.
 Operation-level access control ensures granular tier-based access within the bucket.
 """
 
@@ -20,6 +24,9 @@ from ...core.auth import get_user_tier_from_context, SubscriptionTier
 logger = logging.getLogger(__name__)
 
 # Define operation access levels
+# Note: Both FREE_OPERATIONS and PAID_OPERATIONS currently contain the same operations,
+# reflecting universal access model where all operations are available to all tiers.
+# Access control infrastructure maintained for potential future differentiation.
 FREE_OPERATIONS = {
     # All research and professional operations now available for free tier
     "get_congress_info",
@@ -124,12 +131,15 @@ async def research_and_professional(
     Congressional Research and Professional - Professional research and analytics.
     
     This specialized bucket provides access to professional research services and 
-    enhanced congressional analytics:
+    enhanced congressional analytics.
     
-    FREE TIER OPERATIONS (1):
+    ALL operations are available to ALL users regardless of tier - only usage limits differ:
+    - FREE (200), PRO (5,000), ENTERPRISE (100,000) calls/month
+    
+    AVAILABLE OPERATIONS:
+    Basic Congress Operations:
     - get_congress_info: Basic Congress information
     
-    PAID TIER OPERATIONS (5):
     Professional Research Services:
     - search_crs_reports: Search Congressional Research Service reports
     - get_congress_info_enhanced: Enhanced Congress analytics with detailed metadata
@@ -164,20 +174,20 @@ async def research_and_professional(
         ToolError: If operation is unknown or user lacks required access
     
     Examples:
-        Get basic Congress information (free):
+        Get basic Congress information:
         {
             "operation": "get_congress_info",
             "congress": 118
         }
         
-        Search CRS reports (requires paid tier):
+        Search CRS reports:
         {
             "operation": "search_crs_reports",
             "keywords": "climate policy",
             "limit": 10
         }
         
-        Get enhanced Congress analytics (requires paid tier):
+        Get enhanced Congress analytics:
         {
             "operation": "get_congress_info_enhanced",
             "congress": 118,
@@ -185,7 +195,7 @@ async def research_and_professional(
             "format_type": "markdown"
         }
         
-        Search historical Congresses (requires paid tier):
+        Search historical Congresses:
         {
             "operation": "search_congresses",
             "start_year": 2000,

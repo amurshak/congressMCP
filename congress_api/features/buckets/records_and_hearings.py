@@ -1,10 +1,14 @@
 """
 Congressional Records and Hearings - Consolidated MCP bucket tool for records and communications.
 
-This bucket consolidates ~20 individual tools into a single interface with operation-based routing:
-- FREE Operations (3): Basic record search, communication search, hearing search
-- PAID Operations (17): Advanced records, communication details, hearing content, bound records
+This bucket consolidates ~20 individual tools into a single interface with operation-based routing.
 
+ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
+- FREE tier: All operations, 200 calls/month
+- PRO tier: All operations, 5,000 calls/month  
+- ENTERPRISE tier: All operations
+
+Access control infrastructure maintained for potential future tier differentiation.
 Operation-level access control ensures granular tier-based access within the bucket.
 """
 
@@ -20,6 +24,9 @@ from ...core.auth import get_user_tier_from_context, SubscriptionTier
 logger = logging.getLogger(__name__)
 
 # Define operation access levels
+# Note: Both FREE_OPERATIONS and PAID_OPERATIONS currently contain the same operations,
+# reflecting universal access model where all operations are available to all tiers.
+# Access control infrastructure maintained for potential future differentiation.
 FREE_OPERATIONS = {
     # All record and communication operations now available for free tier
     "search_congressional_record",
@@ -193,20 +200,19 @@ async def records_and_hearings(
     """
     Congressional Records and Hearings - Unified access to records and communications.
     
-    This bucket provides access to congressional records, communications, and hearings with 
-    tier-based access control:
+    This bucket provides access to congressional records, communications, and hearings.
     
-    FREE TIER OPERATIONS (3):
-    - search_congressional_record: Search congressional record issues
-    - search_house_communications: Search House communications
-    - search_hearings: Search committee hearings
+    ALL operations are available to ALL users regardless of tier - only usage limits differ:
+    - FREE (200), PRO (5,000), ENTERPRISE (100,000) calls/month
     
-    PAID TIER OPERATIONS (17):
+    AVAILABLE OPERATIONS:
     Congressional Records:
+    - search_congressional_record: Search congressional record issues
     - search_daily_congressional_record: Search daily record issues
     - search_bound_congressional_record: Search bound record volumes
     
     House Communications:
+    - search_house_communications: Search House communications
     - get_house_communication_details: Get detailed communication info
     - search_house_requirements: Search House requirements
     - get_house_requirement_details: Get requirement details
@@ -220,6 +226,7 @@ async def records_and_hearings(
     - get_committee_communication_details: Get committee communication details
     
     Hearing Operations:
+    - search_hearings: Search committee hearings
     - get_hearings_by_congress: Get hearings by Congress
     - get_hearings_by_congress_and_chamber: Get hearings by Congress and chamber
     - get_hearing_details: Get detailed hearing information
@@ -274,7 +281,7 @@ async def records_and_hearings(
             "to_date_time": "2024-12-31T00:00:00Z"
         }
         
-        Get hearing details (requires paid tier):
+        Get hearing details:
         {
             "operation": "get_hearing_details",
             "jacket_number": 12345

@@ -1,11 +1,13 @@
 """
 Congressional Voting and Nominations - Consolidated MCP bucket tool for voting and nominations.
 
-This bucket consolidates ~20 individual tools into a single interface with operation-based routing:
-- FREE Operations (2): Basic vote lookup, nomination search
-- PAID Operations (18): Advanced voting analysis, nomination details, vote member data
+This bucket consolidates 13+ individual tools into a single interface with operation-based routing.
+ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
+- FREE Tier: All operations, 200 calls/month
+- PRO Tier: All operations, 5,000 calls/month  
+- ENTERPRISE Tier: All operations
 
-Operation-level access control ensures granular tier-based access within the bucket.
+Access control infrastructure maintained for potential future tier differentiation.
 """
 
 import logging
@@ -160,14 +162,14 @@ async def voting_and_nominations(
     """
     Congressional Voting and Nominations - Unified access to voting and nominations.
     
-    This bucket provides access to congressional voting records and nominations with 
-    tier-based access control:
+    ALL operations are available to ALL users regardless of tier - only usage limits differ:
+    - FREE (200), PRO (5,000), ENTERPRISE (100,000) calls/month
     
-    FREE TIER OPERATIONS (2):
+    AVAILABLE OPERATIONS:
+    Basic Voting Operations:
     - get_house_votes_by_congress: Get House votes for specific Congress
     - search_nominations: Search nominations by keywords
     
-    PAID TIER OPERATIONS (18):
     Advanced House Voting:
     - get_house_votes_by_session: Get votes by Congress and session
     - get_house_vote_details: Get detailed vote information
@@ -224,7 +226,7 @@ async def voting_and_nominations(
             "to_date": "2024-12-31T00:00:00Z"
         }
         
-        Get vote details (requires paid tier):
+        Get vote details:
         {
             "operation": "get_house_vote_details",
             "congress": 118,
@@ -232,7 +234,7 @@ async def voting_and_nominations(
             "vote_number": 150
         }
         
-        Get nomination details (requires paid tier):
+        Get nomination details:
         {
             "operation": "get_nomination_details",
             "congress": 118,
