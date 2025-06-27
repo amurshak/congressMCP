@@ -4,6 +4,7 @@ Validates API keys and enforces tier-based access control without interfering wi
 """
 import json
 import logging
+import asyncio
 from typing import Dict, Any, Callable, Awaitable
 from starlette.types import ASGIApp, Scope, Receive, Send, Message
 from starlette.responses import JSONResponse
@@ -15,11 +16,13 @@ class AuthenticationMiddleware:
     
     def __init__(self, app: ASGIApp):
         self.app = app
+        self._initialization_complete = False
+        self._initialization_lock = asyncio.Lock()
     
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        # Pass through lifespan events immediately
+        # Pass through lifespan events immediately and track initialization
         if scope["type"] == "lifespan":
-            await self.app(scope, receive, send)
+            await self._handle_lifespan(scope, receive, send)
             return
         
         # Only apply auth to HTTP requests to /mcp/ endpoints
@@ -27,10 +30,64 @@ class AuthenticationMiddleware:
             scope["method"] == "POST" and 
             scope.get("path", "").startswith("/mcp")):
             
-            await self._handle_mcp_request(scope, receive, send)
+            await self._handle_mcp_request_with_readiness_check(scope, receive, send)
         else:
             # Pass through all other requests unchanged
             await self.app(scope, receive, send)
+    
+    async def _handle_lifespan(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Handle lifespan events and track initialization status"""
+        async def lifespan_receive():
+            message = await receive()
+            if message["type"] == "lifespan.startup":
+                logger.info("MCP server lifespan startup beginning...")
+            elif message["type"] == "lifespan.shutdown":
+                logger.info("MCP server lifespan shutdown beginning...")
+                async with self._initialization_lock:
+                    self._initialization_complete = False
+            return message
+        
+        async def lifespan_send(message):
+            if message["type"] == "lifespan.startup.complete":
+                logger.info("MCP server initialization complete - ready for requests")
+                async with self._initialization_lock:
+                    self._initialization_complete = True
+            elif message["type"] == "lifespan.startup.failed":
+                logger.error("MCP server initialization failed")
+                async with self._initialization_lock:
+                    self._initialization_complete = False
+            elif message["type"] == "lifespan.shutdown.complete":
+                logger.info("MCP server shutdown complete")
+            await send(message)
+        
+        await self.app(scope, lifespan_receive, lifespan_send)
+    
+    async def _handle_mcp_request_with_readiness_check(self, scope: Scope, receive: Receive, send: Send) -> None:
+        """Handle MCP requests with initialization readiness check"""
+        
+        # Check if initialization is complete with timeout
+        max_wait_time = 5.0  # 5 seconds max wait
+        check_interval = 0.1  # Check every 100ms
+        waited_time = 0.0
+        
+        while not self._initialization_complete and waited_time < max_wait_time:
+            logger.debug(f"MCP request waiting for initialization... ({waited_time:.1f}s)")
+            await asyncio.sleep(check_interval)
+            waited_time += check_interval
+        
+        if not self._initialization_complete:
+            logger.error("MCP request timed out waiting for initialization")
+            await self._send_auth_error(
+                send,
+                code=-32003,
+                message="Server not ready",
+                details="MCP server is still initializing. Please wait a moment and try again.",
+                status_code=503
+            )
+            return
+        
+        # Proceed with normal authentication
+        await self._handle_mcp_request(scope, receive, send)
     
     async def _handle_mcp_request(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Handle authentication for MCP requests"""
