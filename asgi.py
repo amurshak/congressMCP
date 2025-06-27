@@ -46,8 +46,10 @@ try:
     # Apply authentication middleware but ensure FastMCP app maintains control
     from congress_api.core.auth.auth_middleware import AuthenticationMiddleware
     
-    # Get the FastMCP HTTP app - this has the proper lifespan management
-    fastmcp_app = server.http_app()
+    # Get the FastMCP HTTP app in stateless mode to prevent session conflicts
+    # This prevents the "Received request before initialization was complete" errors
+    # that occur when multiple concurrent requests create conflicting sessions
+    fastmcp_app = server.http_app(stateless_http=True)
     
     # Apply authentication middleware - it properly forwards lifespan events
     app = AuthenticationMiddleware(fastmcp_app)
