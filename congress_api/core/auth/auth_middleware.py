@@ -148,14 +148,22 @@ class AuthenticationMiddleware:
             await self.app(scope, receive, send)
         
         except Exception as e:
-            logger.error(f"Error in authentication middleware: {e}")
-            await self._send_auth_error(
-                send,
-                code=-32000,
-                message="Internal server error",
-                details="Please try again or contact support",
-                status_code=500
-            )
+            # Check if this is the FastMCP task group initialization error
+            error_str = str(e)
+            if "Task group is not initialized" in error_str or "StreamableHTTPSessionManager" in error_str:
+                logger.error(f"FastMCP's StreamableHTTPSessionManager task group was not initialized. This commonly occurs when the FastMCP application's lifespan is not passed to the parent ASGI application (e.g., FastAPI or Starlette). Please ensure you are setting `lifespan=mcp_app.lifespan` in your parent app's constructor, where `mcp_app` is the application instance returned by `fastmcp_instance.http_app()`. \nFor more details, see the FastMCP ASGI integration documentation: https://gofastmcp.com/deployment/asgi\nOriginal error: {error_str}")
+                # Don't try to send a response - FastMCP might have already sent one
+                # Let the error bubble up to be handled by the ASGI server
+                raise
+            else:
+                logger.error(f"Error in authentication middleware: {e}")
+                await self._send_auth_error(
+                    send,
+                    code=-32000,
+                    message="Internal server error", 
+                    details="Please try again or contact support",
+                    status_code=500
+                )
     
     async def _send_auth_error(self, send: Send, code: int, message: str, details: str, status_code: int = 401):
         """Send JSON-RPC error response for authentication failures"""

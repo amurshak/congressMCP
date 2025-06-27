@@ -43,10 +43,14 @@ try:
     initialize_features()
     
     # Use FastMCP directly as the main ASGI app
-    # No mounting, no wrapper, no complexity
-    # ASGI HTTP app with authentication middleware (streaming-aware)
+    # Apply authentication middleware but ensure FastMCP app maintains control
     from congress_api.core.auth.auth_middleware import AuthenticationMiddleware
-    app = AuthenticationMiddleware(server.http_app())
+    
+    # Get the FastMCP HTTP app - this has the proper lifespan management
+    fastmcp_app = server.http_app()
+    
+    # Apply authentication middleware - it properly forwards lifespan events
+    app = AuthenticationMiddleware(fastmcp_app)
     
     logger.info(f"FastMCP app created successfully: {type(app)}")
     
