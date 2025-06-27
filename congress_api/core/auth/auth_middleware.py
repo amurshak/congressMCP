@@ -65,29 +65,40 @@ class AuthenticationMiddleware:
     async def _handle_mcp_request_with_readiness_check(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Handle MCP requests with initialization readiness check"""
         
-        # Check if initialization is complete with timeout
-        max_wait_time = 5.0  # 5 seconds max wait
-        check_interval = 0.1  # Check every 100ms
-        waited_time = 0.0
-        
-        while not self._initialization_complete and waited_time < max_wait_time:
-            logger.debug(f"MCP request waiting for initialization... ({waited_time:.1f}s)")
-            await asyncio.sleep(check_interval)
-            waited_time += check_interval
-        
+        # Immediately reject requests during initialization to prevent race conditions
         if not self._initialization_complete:
-            logger.error("MCP request timed out waiting for initialization")
+            logger.warning("MCP request received before server initialization complete - rejecting")
             await self._send_auth_error(
                 send,
                 code=-32003,
-                message="Server not ready",
-                details="MCP server is still initializing. Please wait a moment and try again.",
+                message="Server initializing",
+                details="MCP server is still starting up. Please wait a moment and try again.",
                 status_code=503
             )
             return
         
-        # Proceed with normal authentication
-        await self._handle_mcp_request(scope, receive, send)
+        # Additional check: Try to detect if FastMCP session manager is ready
+        # by attempting a quick test call that would fail if not initialized
+        try:
+            # Proceed with normal authentication - this will fail fast if FastMCP isn't ready
+            await self._handle_mcp_request(scope, receive, send)
+        except Exception as e:
+            error_str = str(e)
+            if ("Task group is not initialized" in error_str or 
+                "Received request before initialization was complete" in error_str or
+                "StreamableHTTPSessionManager" in error_str):
+                logger.warning(f"FastMCP not ready for requests: {error_str}")
+                await self._send_auth_error(
+                    send,
+                    code=-32003,
+                    message="Server not ready",
+                    details="MCP server is still initializing internal components. Please wait a moment and try again.",
+                    status_code=503
+                )
+                return
+            else:
+                # Re-raise other errors
+                raise
     
     async def _handle_mcp_request(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Handle authentication for MCP requests"""
