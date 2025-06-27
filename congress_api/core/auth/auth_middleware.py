@@ -17,6 +17,11 @@ class AuthenticationMiddleware:
         self.app = app
     
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        # Pass through lifespan events immediately
+        if scope["type"] == "lifespan":
+            await self.app(scope, receive, send)
+            return
+        
         # Only apply auth to HTTP requests to /mcp/ endpoints
         if (scope["type"] == "http" and 
             scope["method"] == "POST" and 
