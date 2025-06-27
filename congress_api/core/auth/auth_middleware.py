@@ -18,6 +18,7 @@ class AuthenticationMiddleware:
         self.app = app
         self._initialization_complete = False
         self._initialization_lock = asyncio.Lock()
+        self._request_semaphore = asyncio.Semaphore(1)  # Only allow 1 concurrent MCP request
     
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         # Pass through lifespan events immediately and track initialization
@@ -63,7 +64,7 @@ class AuthenticationMiddleware:
         await self.app(scope, lifespan_receive, lifespan_send)
     
     async def _handle_mcp_request_with_readiness_check(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Handle MCP requests with initialization readiness check"""
+        """Handle MCP requests with initialization readiness check and concurrency limiting"""
         
         # Immediately reject requests during initialization to prevent race conditions
         if not self._initialization_complete:
@@ -77,28 +78,60 @@ class AuthenticationMiddleware:
             )
             return
         
-        # Additional check: Try to detect if FastMCP session manager is ready
-        # by attempting a quick test call that would fail if not initialized
+        # Use semaphore to ensure only 1 concurrent MCP request to prevent FastMCP session conflicts
         try:
-            # Proceed with normal authentication - this will fail fast if FastMCP isn't ready
-            await self._handle_mcp_request(scope, receive, send)
-        except Exception as e:
-            error_str = str(e)
-            if ("Task group is not initialized" in error_str or 
-                "Received request before initialization was complete" in error_str or
-                "StreamableHTTPSessionManager" in error_str):
-                logger.warning(f"FastMCP not ready for requests: {error_str}")
+            # Try to acquire semaphore with timeout to avoid blocking forever
+            acquired = await asyncio.wait_for(
+                self._request_semaphore.acquire(), 
+                timeout=30.0  # 30 second timeout
+            )
+            if not acquired:
+                logger.warning("Failed to acquire MCP request semaphore - server busy")
                 await self._send_auth_error(
                     send,
                     code=-32003,
-                    message="Server not ready",
-                    details="MCP server is still initializing internal components. Please wait a moment and try again.",
+                    message="Server busy",
+                    details="MCP server is handling another request. Please wait a moment and try again.",
                     status_code=503
                 )
                 return
-            else:
-                # Re-raise other errors
-                raise
+        except asyncio.TimeoutError:
+            logger.warning("Timeout waiting for MCP request semaphore")
+            await self._send_auth_error(
+                send,
+                code=-32003,
+                message="Server busy",
+                details="MCP server is busy processing other requests. Please try again later.",
+                status_code=503
+            )
+            return
+        
+        try:
+            # Additional check: Try to detect if FastMCP session manager is ready
+            # by attempting a quick test call that would fail if not initialized
+            try:
+                # Proceed with normal authentication - this will fail fast if FastMCP isn't ready
+                await self._handle_mcp_request(scope, receive, send)
+            except Exception as e:
+                error_str = str(e)
+                if ("Task group is not initialized" in error_str or 
+                    "Received request before initialization was complete" in error_str or
+                    "StreamableHTTPSessionManager" in error_str):
+                    logger.warning(f"FastMCP not ready for requests: {error_str}")
+                    await self._send_auth_error(
+                        send,
+                        code=-32003,
+                        message="Server not ready",
+                        details="MCP server is still initializing internal components. Please wait a moment and try again.",
+                        status_code=503
+                    )
+                    return
+                else:
+                    # Re-raise other errors
+                    raise
+        finally:
+            # Always release the semaphore
+            self._request_semaphore.release()
     
     async def _handle_mcp_request(self, scope: Scope, receive: Receive, send: Send) -> None:
         """Handle authentication for MCP requests"""
