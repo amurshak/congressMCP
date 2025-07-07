@@ -149,24 +149,25 @@ async def check_rate_limit(user_id: str, tier: str, feature: str = "general", en
         # Track usage in database
         await db_track_usage(user_id, feature, endpoint)
         
-        # Get daily usage from database
+        # Get monthly usage from database
         from ..database import db_client
-        daily_usage = await db_client.get_daily_usage(user_id)
+        monthly_usage = await db_client.get_monthly_usage(user_id)
         
-        if daily_usage >= rate_limit:
+        if monthly_usage >= rate_limit:
             raise HTTPException(
                 status_code=429, 
-                detail=f"Daily rate limit ({rate_limit}) exceeded. Usage: {daily_usage}"
+                detail=f"Monthly rate limit ({rate_limit}) exceeded. Usage: {monthly_usage}"
             )
     else:
-        # Use in-memory rate limiting
+        # Use in-memory rate limiting (daily subset of monthly limit)
         count, reset_time = rate_limit_storage.get_user_requests(user_id)
+        daily_limit = rate_limit // 30  # Approximate daily limit from monthly
         
-        if count >= rate_limit:
+        if count >= daily_limit:
             reset_time_str = reset_time.strftime("%Y-%m-%d %H:%M:%S UTC")
             raise HTTPException(
                 status_code=429, 
-                detail=f"Rate limit exceeded. Limit: {rate_limit} requests per day. Resets at {reset_time_str}"
+                detail=f"Daily rate limit ({daily_limit}) exceeded. Monthly limit: {rate_limit}. Resets at {reset_time_str}"
             )
         
         rate_limit_storage.increment_user_requests(user_id)
