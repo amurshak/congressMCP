@@ -3,7 +3,7 @@ Congressional Members and Committees - Consolidated MCP bucket tool for members 
 
 This bucket consolidates 13+ individual tools into a single interface with operation-based routing.
 ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
-- FREE Tier: All operations, 200 calls/month
+- FREE Tier: All operations, 500 calls/month
 - PRO Tier: All operations, 5,000 calls/month  
 - ENTERPRISE Tier: All operations
 
@@ -161,7 +161,7 @@ async def members_and_committees(
     Congressional Members and Committees - Unified access to members and committees.
     
     ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE (200), PRO (5,000), ENTERPRISE (100,000) calls/month
+    - FREE (500), PRO (5,000), ENTERPRISE (100,000) calls/month
     
     AVAILABLE OPERATIONS:
     Basic Member Operations:

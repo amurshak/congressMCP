@@ -4,7 +4,7 @@ Congressional Committee Intelligence - Consolidated MCP bucket tool for committe
 This bucket consolidates ~30 individual tools into a single interface with operation-based routing.
 
 ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
-- FREE tier: 200 calls/month
+- FREE tier: 500 calls/month
 - PRO tier: 5,000 calls/month  
 - ENTERPRISE tier: 100,000 calls/month
 
@@ -214,7 +214,7 @@ async def committee_intelligence(
     and meeting intelligence with advanced analysis capabilities.
     
     ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE tier: All operations, 200 calls/month
+    - FREE tier: All operations, 500 calls/month
     - PRO tier: All operations, 5,000 calls/month 
     - ENTERPRISE tier: All operatios, 
     

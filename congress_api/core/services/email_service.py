@@ -152,7 +152,7 @@ class EmailService:
             """
         else:
             features = [
-                "✅ <strong>200 API calls per month</strong>",
+                "✅ <strong>500 API calls per month</strong>",
                 "✅ <strong>16 essential congressional tools</strong>",
                 "✅ <strong>Bills, members, committees, voting records</strong>",
                 "✅ <strong>Congress information and basic search</strong>",

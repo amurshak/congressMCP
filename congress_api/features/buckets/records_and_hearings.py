@@ -4,7 +4,7 @@ Congressional Records and Hearings - Consolidated MCP bucket tool for records an
 This bucket consolidates ~20 individual tools into a single interface with operation-based routing.
 
 ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
-- FREE tier: All operations, 200 calls/month
+- FREE tier: All operations, 500 calls/month
 - PRO tier: All operations, 5,000 calls/month  
 - ENTERPRISE tier: All operations
 
@@ -203,7 +203,7 @@ async def records_and_hearings(
     This bucket provides access to congressional records, communications, and hearings.
     
     ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE (200), PRO (5,000), ENTERPRISE (100,000) calls/month
+    - FREE (500), PRO (5,000), ENTERPRISE (100,000) calls/month
     
     AVAILABLE OPERATIONS:
     Congressional Records:

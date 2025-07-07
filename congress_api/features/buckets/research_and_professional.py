@@ -4,7 +4,7 @@ Congressional Research and Professional - Consolidated MCP bucket tool for profe
 This bucket consolidates specialized research tools into a single interface with operation-based routing.
 
 ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
-- FREE tier: All operations, 200 calls/month
+- FREE tier: All operations, 500 calls/month
 - PRO tier: All operations, 5,000 calls/month  
 - ENTERPRISE tier: All operations
 
@@ -134,7 +134,7 @@ async def research_and_professional(
     enhanced congressional analytics.
     
     ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE (200), PRO (5,000), ENTERPRISE (100,000) calls/month
+    - FREE (500), PRO (5,000), ENTERPRISE (100,000) calls/month
     
     AVAILABLE OPERATIONS:
     Basic Congress Operations:

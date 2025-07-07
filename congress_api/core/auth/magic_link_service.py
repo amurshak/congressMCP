@@ -203,7 +203,7 @@ class MagicLinkService:
             elif user.subscription_tier == "enterprise":
                 limit = -1  # Unlimited
             else:
-                limit = 200
+                limit = 500
                 
             usage_stats = {
                 "current": monthly_usage,
@@ -359,7 +359,7 @@ class MagicLinkService:
             elif user.subscription_tier == "enterprise":
                 limit = -1  # Unlimited
             else:
-                limit = 200
+                limit = 500
                 
             usage_stats = {
                 "current": monthly_usage,

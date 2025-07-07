@@ -3,7 +3,7 @@ Congressional Legislation Hub - Consolidated MCP bucket tool for all legislation
 
 This bucket consolidates 25+ individual tools into a single interface with operation-based routing.
 ALL operations are available to ALL users regardless of tier - only usage limits differ by subscription:
-- FREE Tier: All operations, 200 calls/month
+- FREE Tier: All operations, 500 calls/month
 - PRO Tier: All operations, 5,000 calls/month  
 - ENTERPRISE Tier: All operations, 100,000 calls/month
 
@@ -212,7 +212,7 @@ async def legislation_hub(
     
     This bucket provides access to bills, amendments, summaries, and treaties.
     ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE Tier: All operations, 200 calls/month
+    - FREE Tier: All operations, 500 calls/month
     - PRO Tier: All operations, 5,000 calls/month
     - ENTERPRISE Tier: All operations
     

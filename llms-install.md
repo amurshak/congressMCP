@@ -61,7 +61,7 @@ Once configured, you can ask questions like:
 
 ## Free Tier
 - All 113+ functions included
-- 200 API calls per month
+- 500 API calls per month
 - No credit card required
 
 ## Troubleshooting

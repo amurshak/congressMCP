@@ -81,7 +81,7 @@ async def test_email_templates(test_email: str, test_type: str = "both"):
     print("-" * 60)
     if test_type in ["both", "welcome", "free"]:
         print("🆓 FREE TIER WELCOME EMAIL:")
-        print("  • 200 API calls per month")
+        print("  • 500 API calls per month")
         print("  • Basic tools: Bills, Members, Committees")
         print("  • Congress information and search")
         print("  • Email support (no community support)")

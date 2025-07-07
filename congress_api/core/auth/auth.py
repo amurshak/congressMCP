@@ -30,7 +30,7 @@ class SubscriptionTier(str, Enum):
 # Define rate limits and feature access for each tier
 TIER_CONFIG = {
     SubscriptionTier.FREE: {
-        "rate_limit": 200,  # 200 calls per month
+        "rate_limit": 500,  # 500 calls per month
         "total_functions": 91,  # All functions available
         "features": ["*"]  # All tools for Free tier (wildcard for all functions)
     },
