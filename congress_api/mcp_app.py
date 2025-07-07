@@ -144,44 +144,11 @@ async def register_free_user(request: Request) -> JSONResponse:
                 }
             )
         
-        # Check if Stripe is enabled
-        enable_stripe = os.getenv("ENABLE_STRIPE", "true").lower() == "true"
-        
-        # Handle Stripe customer creation for new users
-        stripe_customer_id = None
-        if enable_stripe:
-            try:
-                import stripe
-                stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-                
-                if stripe.api_key:
-                    logger.info(f"Creating Stripe customer for {email}...")
-                    customer = stripe.Customer.create(
-                        email=email,
-                        metadata={
-                            'tier': 'FREE',
-                            'source': 'free_signup',
-                            'created_via': 'congressional_mcp_frontend'
-                        }
-                    )
-                    stripe_customer_id = customer.id
-                    logger.info(f"✅ Created Stripe customer {stripe_customer_id} for {email}")
-                else:
-                    logger.warning("❌ Stripe API key not configured, creating user without Stripe customer")
-            except Exception as e:
-                logger.error(f"❌ Failed to create Stripe customer for {email}: {str(e)}")
-                # Continue without Stripe customer - this is graceful degradation
-        else:
-            logger.info("Stripe is disabled, skipping customer creation")
-        
         # Use UserService helper function to handle registration logic
-        result = await register_or_send_magic_link(email, stripe_customer_id)
+        # Note: Stripe customer creation now happens in user service to avoid duplicates
+        result = await register_or_send_magic_link(email)
         
         if result.get("success"):
-            # Add Stripe customer ID to successful responses
-            if stripe_customer_id and not result.get("user_exists"):
-                result["stripe_customer_id"] = stripe_customer_id
-            
             return JSONResponse(
                 result,
                 headers={

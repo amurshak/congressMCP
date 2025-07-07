@@ -50,7 +50,7 @@ class UserService:
             logger.error(f"Error creating user with API key: {e}")
             return None, None
 
-    async def register_or_send_magic_link(self, email: str, stripe_customer_id: Optional[str] = None) -> Dict[str, Any]:
+    async def register_or_send_magic_link(self, email: str) -> Dict[str, Any]:
         """
         Smart registration: handle both new users and existing users
         - New users: create account + send registration magic link
@@ -81,6 +81,8 @@ class UserService:
                     }
             else:
                 # New user - create account without API key + send registration magic link
+                # First get or create Stripe customer to avoid duplicates
+                stripe_customer_id = await self._get_or_create_stripe_customer(email)
                 user = await self.create_user_for_registration(email, stripe_customer_id, SubscriptionTier.FREE)
                 if not user:
                     return {
@@ -114,6 +116,51 @@ class UserService:
                 "success": False,
                 "message": "An unexpected error occurred. Please try again."
             }
+
+    async def _get_or_create_stripe_customer(self, email: str) -> Optional[str]:
+        """
+        Get existing Stripe customer or create new one to avoid duplicates
+        """
+        try:
+            # Check if Stripe is enabled
+            enable_stripe = os.getenv("ENABLE_STRIPE", "true").lower() == "true"
+            if not enable_stripe:
+                logger.info("Stripe is disabled, skipping customer creation")
+                return None
+                
+            import stripe
+            stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+            
+            if not stripe.api_key:
+                logger.warning("❌ Stripe API key not configured, creating user without Stripe customer")
+                return None
+                
+            # First, check for existing Stripe customer with this email
+            logger.info(f"Checking for existing Stripe customer with email {email}...")
+            customers = stripe.Customer.list(email=email, limit=1)
+            
+            if customers.data:
+                existing_customer = customers.data[0]
+                logger.info(f"✅ Found existing Stripe customer {existing_customer.id} for {email}")
+                return existing_customer.id
+            
+            # No existing customer found, create new one
+            logger.info(f"Creating new Stripe customer for {email}...")
+            customer = stripe.Customer.create(
+                email=email,
+                metadata={
+                    'tier': 'FREE',
+                    'source': 'free_signup',
+                    'created_via': 'congressional_mcp_frontend'
+                }
+            )
+            logger.info(f"✅ Created new Stripe customer {customer.id} for {email}")
+            return customer.id
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get or create Stripe customer for {email}: {str(e)}")
+            # Continue without Stripe customer - this is graceful degradation
+            return None
 
     async def create_user_for_registration(self, email: str, 
                                          stripe_customer_id: Optional[str] = None,
