@@ -424,7 +424,7 @@ async def create_user_with_api_key(email: str, stripe_customer_id: Optional[str]
 
 async def register_or_send_magic_link(email: str, stripe_customer_id: Optional[str] = None) -> Dict[str, Any]:
     """Smart registration: handle both new users and existing users"""
-    return await user_service.register_or_send_magic_link(email, stripe_customer_id)
+    return await user_service.register_or_send_magic_link(email)
 
 async def create_user_for_registration(email: str, stripe_customer_id: Optional[str] = None) -> Optional[User]:
     """Create user without API key for magic link registration flow"""
