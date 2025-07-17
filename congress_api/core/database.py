@@ -663,7 +663,7 @@ class SupabaseClient:
             return 0
             
         try:
-            # Get current month usage
+            # Get current month usage - use UTC consistently
             current_month = datetime.utcnow().replace(day=1).date()
             
             def _get_monthly_usage_sync():
@@ -672,6 +672,10 @@ class SupabaseClient:
             result = await asyncio.get_event_loop().run_in_executor(_db_thread_pool, _get_monthly_usage_sync)
             
             total_requests = sum(record["request_count"] for record in result.data) if result.data else 0
+            
+            # Add debug logging for monthly usage queries
+            logger.debug(f"Monthly usage query for user {user_id}: month_start={current_month}, records_found={len(result.data) if result.data else 0}, total_usage={total_requests}")
+            
             return total_requests
             
         except Exception as e:

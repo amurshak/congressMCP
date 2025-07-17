@@ -367,9 +367,16 @@ class MagicLinkService:
                 "period": "monthly"
             }
             
-            # Calculate billing period (simplified)
-            billing_start = user.created_at.replace(day=1) if user.created_at else datetime.now(timezone.utc).replace(day=1)
-            billing_end = (billing_start + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            # Calculate current billing period - align with monthly usage calculation
+            # Use the same logic as monthly usage tracking (current calendar month)
+            now = datetime.now(timezone.utc)
+            billing_start = now.replace(day=1)
+            # Calculate last day of current month
+            if now.month == 12:
+                next_month = now.replace(year=now.year + 1, month=1, day=1)
+            else:
+                next_month = now.replace(month=now.month + 1, day=1)
+            billing_end = next_month - timedelta(days=1)
             
             return {
                 "success": True,

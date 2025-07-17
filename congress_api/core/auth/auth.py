@@ -158,6 +158,9 @@ async def check_rate_limit(user_id: str, tier: str, feature: str = "general", en
         from ..database import db_client
         monthly_usage = await db_client.get_monthly_usage(user_id)
         
+        # Add debug logging for rate limit checks
+        logger.debug(f"Rate limit check for user {user_id}: usage={monthly_usage}, limit={rate_limit}, tier={tier}")
+        
         if monthly_usage >= rate_limit:
             # Use custom exception instead of HTTPException for ASGI compatibility
             raise RateLimitExceeded(f"Monthly rate limit ({rate_limit}) exceeded. Usage: {monthly_usage}")
