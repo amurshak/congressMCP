@@ -112,6 +112,15 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         logger.critical(f"Failed to initialize API client: {e}")
         # Re-raise to prevent server from starting with a broken client
         raise
+    finally:
+        # Ensure clean shutdown even if there are errors
+        try:
+            logger.info("Cleaning up HTTP client resources...")
+            # The async context manager should handle cleanup automatically
+            # but we add this for explicit logging
+        except Exception as cleanup_error:
+            # Log cleanup errors but don't re-raise them during shutdown
+            logger.error(f"Error during HTTP client cleanup: {cleanup_error}")
 
 def generate_cache_key(endpoint: str, params: Dict[str, Any]) -> str:
     """Generate a cache key from endpoint and parameters."""
@@ -126,7 +135,15 @@ async def make_api_request(endpoint: str, ctx: Context, params: Optional[Dict[st
     
     try:
         logger.debug(f"Starting make_api_request for endpoint: {endpoint}")
-        app_ctx = ctx.request_context.lifespan_context
+        # Access the lifespan context to get the HTTP client with error handling
+        try:
+            app_ctx = ctx.request_context.lifespan_context
+            if app_ctx is None:
+                raise ValueError("Lifespan context is None - server may not be fully initialized")
+        except AttributeError as e:
+            logger.error(f"Failed to access lifespan context: {e}")
+            raise RuntimeError("Server not properly initialized - lifespan context unavailable") from e
+        
         client = app_ctx.client
         api_key = app_ctx.api_key
         

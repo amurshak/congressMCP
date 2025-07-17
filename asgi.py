@@ -49,9 +49,11 @@ try:
     # Get the FastMCP HTTP app - now configured in stateless mode to prevent session conflicts
     # This prevents the "Received request before initialization was complete" errors
     # that occur when multiple concurrent requests create conflicting sessions
+    logger.info("Creating FastMCP HTTP app with error handling...")
     fastmcp_app = server.http_app()
     
     # Apply authentication middleware - it properly forwards lifespan events
+    logger.info("Applying authentication middleware...")
     app = AuthenticationMiddleware(fastmcp_app)
     
     logger.info(f"FastMCP app created successfully: {type(app)}")

@@ -9,6 +9,11 @@ from datetime import datetime, timedelta
 from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
+# Custom exception for rate limiting that doesn't interfere with ASGI
+class RateLimitExceeded(Exception):
+    """Custom exception for rate limit errors that can be safely handled in ASGI middleware"""
+    pass
+
 # Import database functionality
 from ..database import validate_api_key as db_validate_api_key, track_usage as db_track_usage
 
@@ -154,10 +159,8 @@ async def check_rate_limit(user_id: str, tier: str, feature: str = "general", en
         monthly_usage = await db_client.get_monthly_usage(user_id)
         
         if monthly_usage >= rate_limit:
-            raise HTTPException(
-                status_code=429, 
-                detail=f"Monthly rate limit ({rate_limit}) exceeded. Usage: {monthly_usage}"
-            )
+            # Use custom exception instead of HTTPException for ASGI compatibility
+            raise RateLimitExceeded(f"Monthly rate limit ({rate_limit}) exceeded. Usage: {monthly_usage}")
     else:
         # Use in-memory rate limiting (daily subset of monthly limit)
         count, reset_time = rate_limit_storage.get_user_requests(user_id)
@@ -165,10 +168,8 @@ async def check_rate_limit(user_id: str, tier: str, feature: str = "general", en
         
         if count >= daily_limit:
             reset_time_str = reset_time.strftime("%Y-%m-%d %H:%M:%S UTC")
-            raise HTTPException(
-                status_code=429, 
-                detail=f"Daily rate limit ({daily_limit}) exceeded. Monthly limit: {rate_limit}. Resets at {reset_time_str}"
-            )
+            # Use custom exception instead of HTTPException for ASGI compatibility
+            raise RateLimitExceeded(f"Daily rate limit ({daily_limit}) exceeded. Monthly limit: {rate_limit}. Resets at {reset_time_str}")
         
         rate_limit_storage.increment_user_requests(user_id)
 

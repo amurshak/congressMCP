@@ -122,14 +122,25 @@ class AuthenticationMiddleware:
         # TODO: Re-implement selective tool validation after fixing streaming issue
         try:
             # Check rate limiting (always do this)
-            from .auth import check_rate_limit
+            from .auth import check_rate_limit, RateLimitExceeded
             try:
                 await check_rate_limit(user_info["user_id"], user_info["tier"])
+            except RateLimitExceeded as rate_error:
+                # Handle rate limit exceeded specifically
+                await self._send_rate_limit_error(send, str(rate_error))
+                return
             except Exception as rate_error:
-                if "rate limit" in str(rate_error).lower():
-                    await self._send_rate_limit_error(send, str(rate_error))
-                    return
+                # Handle any other rate limit check errors
                 logger.error(f"Rate limit check error: {rate_error}")
+                # For safety, treat unknown rate limit errors as server errors
+                await self._send_auth_error(
+                    send,
+                    code=-32000,
+                    message="Rate limit check failed",
+                    details="Please try again or contact support",
+                    status_code=500
+                )
+                return
             
             # Add user info to scope for downstream processing
             scope["user"] = user_info
@@ -142,19 +153,36 @@ class AuthenticationMiddleware:
             # Check if this is the FastMCP task group initialization error
             error_str = str(e)
             if "Task group is not initialized" in error_str or "StreamableHTTPSessionManager" in error_str:
-                logger.error(f"FastMCP's StreamableHTTPSessionManager task group was not initialized. This commonly occurs when the FastMCP application's lifespan is not passed to the parent ASGI application (e.g., FastAPI or Starlette). Please ensure you are setting `lifespan=mcp_app.lifespan` in your parent app's constructor, where `mcp_app` is the application instance returned by `fastmcp_instance.http_app()`. \nFor more details, see the FastMCP ASGI integration documentation: https://gofastmcp.com/deployment/asgi\nOriginal error: {error_str}")
-                # Don't try to send a response - FastMCP might have already sent one
-                # Let the error bubble up to be handled by the ASGI server
-                raise
+                logger.error(f"FastMCP initialization error detected: {error_str}")
+                # Instead of crashing, return a proper error response
+                try:
+                    await self._send_auth_error(
+                        send,
+                        code=-32003,
+                        message="Server initializing",
+                        details="MCP server is still starting up. Please wait a moment and try again.",
+                        status_code=503
+                    )
+                    return
+                except Exception as send_error:
+                    # If we can't send a response, log it but don't crash
+                    logger.error(f"Failed to send initialization error response: {send_error}")
+                    # Only re-raise if we absolutely cannot handle it
+                    raise e
             else:
                 logger.error(f"Error in authentication middleware: {e}")
-                await self._send_auth_error(
-                    send,
-                    code=-32000,
-                    message="Internal server error", 
-                    details="Please try again or contact support",
-                    status_code=500
-                )
+                try:
+                    await self._send_auth_error(
+                        send,
+                        code=-32000,
+                        message="Internal server error", 
+                        details="Please try again or contact support",
+                        status_code=500
+                    )
+                except Exception as send_error:
+                    # If we can't send error response, log and re-raise original error
+                    logger.error(f"Failed to send error response: {send_error}")
+                    raise e
     
     async def _send_auth_error(self, send: Send, code: int, message: str, details: str, status_code: int = 401):
         """Send JSON-RPC error response for authentication failures"""
