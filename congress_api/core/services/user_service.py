@@ -203,14 +203,45 @@ class UserService:
 
     async def handle_stripe_subscription_created(self, stripe_customer_id: str, 
                                                 stripe_price_id: str) -> bool:
-        """Handle Stripe subscription creation - upgrade user tier"""
+        """Handle Stripe subscription creation - create user if needed, then upgrade tier"""
         logger.info(f"Processing subscription creation for customer: {stripe_customer_id}")
+        
+        # Check if this is a CongressMCP price ID
+        tier = self._get_tier_from_price_id(stripe_price_id)
+        if not tier:
+            logger.info(f"Skipping subscription for unknown price ID: {stripe_price_id}")
+            return True  # Not our price ID, ignore
         
         # Get user by Stripe customer ID
         user = await self.db.get_user_by_stripe_customer_id(stripe_customer_id)
         if not user:
-            logger.error(f"User not found for Stripe customer: {stripe_customer_id}")
-            return False
+            # User doesn't exist - this is likely a Pro customer created via payment link
+            # Get customer email from Stripe and create CongressMCP user
+            logger.info(f"User not found for Stripe customer {stripe_customer_id}, creating CongressMCP user...")
+            
+            try:
+                import stripe
+                stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+                customer = stripe.Customer.retrieve(stripe_customer_id)
+                email = customer.email
+                
+                if not email:
+                    logger.error(f"No email found for Stripe customer: {stripe_customer_id}")
+                    return False
+                
+                logger.info(f"Creating CongressMCP user for Pro customer: {email}")
+                # Create user with Pro tier directly
+                user, api_key = await self.create_user_with_api_key(email, stripe_customer_id, tier)
+                if not user:
+                    logger.error(f"Failed to create CongressMCP user for Pro customer: {email}")
+                    return False
+                    
+                logger.info(f"Successfully created CongressMCP user {email} with Pro tier")
+                return True  # User created with correct tier, no need to upgrade
+                
+            except Exception as e:
+                logger.error(f"Error creating user for Pro subscription: {e}")
+                return False
         
         # Map Stripe price ID to subscription tier
         tier = self._get_tier_from_price_id(stripe_price_id)
@@ -440,6 +471,21 @@ async def handle_stripe_webhook(event_type: str, data: Dict[str, Any]) -> bool:
         if event_type == "customer.created":
             customer_id = data["id"]
             email = data["email"]
+            metadata = data.get("metadata", {})
+            
+            # Only process customers created by CongressMCP
+            congress_indicators = [
+                metadata.get("created_via") == "congressional_mcp_frontend",
+                metadata.get("source") == "free_signup",
+                "congressional" in metadata.get("created_via", "").lower(),
+                "congressmcp" in metadata.get("source", "").lower()
+            ]
+            
+            if not any(congress_indicators):
+                logger.info(f"Skipping customer {customer_id} ({email}) - not created by CongressMCP (metadata: {metadata})")
+                return True  # Return success but don't process
+            
+            logger.info(f"Processing CongressMCP customer {customer_id} ({email}) with metadata: {metadata}")
             user, api_key = await user_service.handle_stripe_customer_created(customer_id, email)
             return user is not None
             
