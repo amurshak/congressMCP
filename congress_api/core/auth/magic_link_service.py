@@ -425,10 +425,9 @@ class MagicLinkService:
             "email": email
         }
         
-        if purpose == "key_management":
-            base_path = "/manage"
-        else:
-            base_path = "/verify"
+        # Both registration and key_management use the same /manage route
+        # The frontend KeyManagementPage handles both purposes
+        base_path = "/manage"
         
         return f"{self.frontend_base_url}{base_path}?{urlencode(params)}"
     
