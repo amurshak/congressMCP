@@ -185,10 +185,10 @@ class UserService:
         """Handle Stripe customer creation - create user with FREE tier"""
         logger.info(f"Processing Stripe customer creation: {email}")
         
-        # Check if user already exists
+        # Check if user already exists by email
         existing_user = await self.db.get_user_by_email(email)
         if existing_user:
-            logger.info(f"User {email} already exists, updating Stripe customer ID")
+            logger.info(f"User {email} already exists with ID {existing_user.id}")
             # Update the existing user with Stripe customer ID if not set
             if not existing_user.stripe_customer_id:
                 success = await self.db.update_stripe_customer_id(existing_user.id, stripe_customer_id)
@@ -196,9 +196,18 @@ class UserService:
                     logger.info(f"Updated Stripe customer ID for existing user {email}")
                 else:
                     logger.error(f"Failed to update Stripe customer ID for user {email}")
+            elif existing_user.stripe_customer_id != stripe_customer_id:
+                logger.warning(f"User {email} already has different Stripe customer ID: {existing_user.stripe_customer_id} vs {stripe_customer_id}")
             return existing_user, None
         
+        # Also check if user already exists by Stripe customer ID
+        existing_user_by_stripe = await self.db.get_user_by_stripe_customer_id(stripe_customer_id)
+        if existing_user_by_stripe:
+            logger.info(f"User with Stripe customer ID {stripe_customer_id} already exists with email {existing_user_by_stripe.email}")
+            return existing_user_by_stripe, None
+        
         # Create new user with FREE tier
+        logger.info(f"Creating new user for {email} with Stripe customer ID {stripe_customer_id}")
         return await self.create_user_with_api_key(email, stripe_customer_id, SubscriptionTier.FREE)
 
     async def handle_stripe_subscription_created(self, stripe_customer_id: str, 

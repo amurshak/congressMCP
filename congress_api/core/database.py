@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
 from enum import Enum
 from dataclasses import dataclass
+from dateutil import parser as dateutil_parser
 from supabase import create_client, Client
 from .api_config import load_environment_config
 
@@ -136,8 +137,8 @@ class SupabaseClient:
                     email=user_record["email"],
                     stripe_customer_id=user_record["stripe_customer_id"],
                     subscription_tier=SubscriptionTier(user_record["subscription_tier"]),
-                    created_at=datetime.fromisoformat(user_record["created_at"]),
-                    updated_at=datetime.fromisoformat(user_record["updated_at"]),
+                    created_at=self._parse_datetime(user_record["created_at"]),
+                    updated_at=self._parse_datetime(user_record["updated_at"]),
                     is_active=user_record["is_active"]
                 )
             return None
@@ -164,8 +165,8 @@ class SupabaseClient:
                     email=user_record["email"],
                     stripe_customer_id=user_record["stripe_customer_id"],
                     subscription_tier=SubscriptionTier(user_record["subscription_tier"]),
-                    created_at=datetime.fromisoformat(user_record["created_at"]),
-                    updated_at=datetime.fromisoformat(user_record["updated_at"]),
+                    created_at=self._parse_datetime(user_record["created_at"]),
+                    updated_at=self._parse_datetime(user_record["updated_at"]),
                     is_active=user_record["is_active"]
                 )
             return None
@@ -192,8 +193,8 @@ class SupabaseClient:
                     email=user_record["email"],
                     stripe_customer_id=user_record["stripe_customer_id"],
                     subscription_tier=SubscriptionTier(user_record["subscription_tier"]),
-                    created_at=datetime.fromisoformat(user_record["created_at"]),
-                    updated_at=datetime.fromisoformat(user_record["updated_at"]),
+                    created_at=self._parse_datetime(user_record["created_at"]),
+                    updated_at=self._parse_datetime(user_record["updated_at"]),
                     is_active=user_record["is_active"]
                 )
             return None
@@ -220,8 +221,8 @@ class SupabaseClient:
                     email=user_record["email"],
                     stripe_customer_id=user_record["stripe_customer_id"],
                     subscription_tier=SubscriptionTier(user_record["subscription_tier"]),
-                    created_at=datetime.fromisoformat(user_record["created_at"]),
-                    updated_at=datetime.fromisoformat(user_record["updated_at"]),
+                    created_at=self._parse_datetime(user_record["created_at"]),
+                    updated_at=self._parse_datetime(user_record["updated_at"]),
                     is_active=user_record["is_active"]
                 )
             return None
@@ -250,6 +251,34 @@ class SupabaseClient:
             logger.error(f"Failed to update user {user_id} tier: {e}")
             return False
 
+    # Helper Methods
+    def _parse_datetime(self, dt_str: str) -> datetime:
+        """Parse datetime string from Supabase, handling various ISO formats."""
+        if not dt_str:
+            raise ValueError("Empty datetime string")
+            
+        # Clean the string of any potential invisible characters
+        dt_str = dt_str.strip()
+        
+        try:
+            # Try standard fromisoformat first (works for most cases)
+            # Handle Z timezone indicator
+            cleaned_str = dt_str.replace('Z', '+00:00')
+            return datetime.fromisoformat(cleaned_str)
+        except (ValueError, AttributeError) as e:
+            logger.debug(f"fromisoformat failed for '{dt_str}': {e}")
+            try:
+                # Fallback to dateutil parser for more complex formats
+                return dateutil_parser.isoparse(dt_str)
+            except Exception as e2:
+                logger.debug(f"dateutil.isoparse failed for '{dt_str}': {e2}")
+                try:
+                    # Last resort: try to parse with dateutil's general parser
+                    return dateutil_parser.parse(dt_str)
+                except Exception as e3:
+                    logger.error(f"All datetime parsing methods failed for '{dt_str}': fromisoformat={e}, isoparse={e2}, parse={e3}")
+                    raise ValueError(f"Unable to parse datetime string: '{dt_str}'")
+    
     # API Key Management Methods
     def _hash_key(self, api_key: str) -> str:
         """Hash an API key for secure storage"""

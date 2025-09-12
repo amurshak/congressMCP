@@ -46,3 +46,6 @@ alembic==1.15.0
 
 # Email service dependencies
 resend==2.3.0
+
+# Date parsing dependencies
+python-dateutil==2.9.0.post0
