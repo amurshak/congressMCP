@@ -201,7 +201,8 @@ async def get_recent_bills(
     limit: int = 20,
     congress: Optional[int] = None,
     bill_type: Optional[str] = None,
-    days_back: int = 30
+    days_back: int = 30,
+    sort: str = "updateDate+desc"
 ) -> str:
     """
     Convenience wrapper for get_bills() with recent date filtering.
@@ -213,6 +214,7 @@ async def get_recent_bills(
         congress: Optional Congress number
         bill_type: Optional bill type
         days_back: Number of days to look back for activity
+        sort: Sort order ('updateDate+asc' or 'updateDate+desc')
 
     Returns:
         Formatted recent bills list or error message
@@ -226,7 +228,7 @@ async def get_recent_bills(
             ctx=ctx,
             limit=limit,
             fromDateTime=from_date,
-            sort="updateDate+desc",
+            sort=sort,
             congress=congress,
             bill_type=bill_type
         )
