@@ -110,7 +110,7 @@ class TestParameterRouting:
     async def test_amendment_operations_routing(self, mock_context):
         """Test that amendment operations route to correct functions."""
         
-        with patch('congress_api.features.amendments.search_amendments', new_callable=AsyncMock) as mock_search:
+        with patch('congress_api.features.buckets.amendments.search_amendments', new_callable=AsyncMock) as mock_search:
             mock_search.return_value = "mock amendment search results"
             
             result = await route_legislation_operation(
@@ -220,7 +220,7 @@ class TestBucketToolIntegration:
             assert result == "mock bill search results"
         
         # Test paid operation
-        with patch('congress_api.features.amendments.search_amendments', new_callable=AsyncMock) as mock_amendments:
+        with patch('congress_api.features.buckets.amendments.search_amendments', new_callable=AsyncMock) as mock_amendments:
             mock_amendments.return_value = "mock amendment search results"
             
             result = await congressional_legislation_hub(

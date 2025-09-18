@@ -47,10 +47,13 @@ ALL_OPERATIONS = {
     "get_bill_subjects",
     
     # Complete Amendment Operations Suite
+    "get_amendments",  # NEW: Core missing function
     "search_amendments",
     "get_amendment_details",
-    "get_amendment_actions", 
+    "get_amendment_actions",
     "get_amendment_sponsors",
+    "get_amendment_amendments",
+    "get_amendment_text",
     
     # Complete Summary Operations Suite
     "search_summaries",
@@ -151,18 +154,27 @@ async def route_legislation_operation(ctx: Context, operation: str, **kwargs) ->
         return await get_bills_by_date_range(ctx, **kwargs)
     
     # Amendment operations
+    elif operation == "get_amendments":  # NEW: Core missing function
+        from .amendments import get_amendments
+        return await get_amendments(ctx, **kwargs)
     elif operation == "search_amendments":
-        from ..amendments import search_amendments
+        from .amendments import search_amendments
         return await search_amendments(ctx, **kwargs)
     elif operation == "get_amendment_details":
-        from ..amendments import get_amendment_details
+        from .amendments import get_amendment_details
         return await get_amendment_details(ctx, **kwargs)
     elif operation == "get_amendment_actions":
-        from ..amendments import get_amendment_actions
+        from .amendments import get_amendment_actions
         return await get_amendment_actions(ctx, **kwargs)
     elif operation == "get_amendment_sponsors":
-        from ..amendments import get_amendment_sponsors
+        from .amendments import get_amendment_sponsors
         return await get_amendment_sponsors(ctx, **kwargs)
+    elif operation == "get_amendment_amendments":
+        from .amendments import get_amendment_amendments
+        return await get_amendment_amendments(ctx, **kwargs)
+    elif operation == "get_amendment_text":
+        from .amendments import get_amendment_text
+        return await get_amendment_text(ctx, **kwargs)
     
     # Summary operations
     elif operation == "search_summaries":

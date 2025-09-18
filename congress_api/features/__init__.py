@@ -1,7 +1,7 @@
 # features package
 
 # Import all feature modules to make them available when importing the package
-from . import amendments
+from . import amendments_resources as amendments
 from . import bills_resources as bills
 from . import committees
 from . import congress_info
