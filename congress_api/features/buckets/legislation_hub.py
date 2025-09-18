@@ -29,8 +29,9 @@ logger = logging.getLogger(__name__)
 # This reflects the current universal access model while preserving infrastructure for future changes
 ALL_OPERATIONS = {
     # Complete Bill Operations Suite
+    "get_bills",  # ADDED: Core missing function
     "search_bills",
-    "get_bill_details", 
+    "get_bill_details",
     "get_bill_text",
     "get_bill_text_versions",
     "get_bill_titles",
@@ -39,7 +40,7 @@ ALL_OPERATIONS = {
     "get_recent_bills",
     "get_bills_by_date_range",
     "get_bill_actions",
-    "get_bill_amendments", 
+    "get_bill_amendments",
     "get_bill_committees",
     "get_bill_cosponsors",
     "get_bill_related_bills",
@@ -99,51 +100,54 @@ async def route_legislation_operation(ctx: Context, operation: str, **kwargs) ->
     # For now, we'll import and call the original functions directly
     # Later we'll refactor these to be internal functions
     
-    # Bills operations
+    # Bills operations - using new bills module
     if operation == "search_bills":
-        from ..bills import search_bills
+        from .bills import search_bills
         return await search_bills(ctx, **kwargs)
+    elif operation == "get_bills":  # NEW: Core missing function
+        from .bills import get_bills
+        return await get_bills(ctx, **kwargs)
     elif operation == "get_bill_details":
-        from ..bills import get_bill_details
+        from .bills import get_bill_details
         return await get_bill_details(ctx, **kwargs)
     elif operation == "get_bill_text":
-        from ..bills import get_bill_text
+        from .bills import get_bill_text
         return await get_bill_text(ctx, **kwargs)
     elif operation == "get_bill_actions":
-        from ..bills import get_bill_actions
+        from .bills import get_bill_actions
         return await get_bill_actions(ctx, **kwargs)
     elif operation == "get_bill_amendments":
-        from ..bills import get_bill_amendments
+        from .bills import get_bill_amendments
         return await get_bill_amendments(ctx, **kwargs)
     elif operation == "get_bill_committees":
-        from ..bills import get_bill_committees
+        from .bills import get_bill_committees
         return await get_bill_committees(ctx, **kwargs)
     elif operation == "get_bill_cosponsors":
-        from ..bills import get_bill_cosponsors
+        from .bills import get_bill_cosponsors
         return await get_bill_cosponsors(ctx, **kwargs)
     elif operation == "get_bill_related_bills":
-        from ..bills import get_bill_related_bills
+        from .bills import get_bill_related_bills
         return await get_bill_related_bills(ctx, **kwargs)
     elif operation == "get_bill_subjects":
-        from ..bills import get_bill_subjects
+        from .bills import get_bill_subjects
         return await get_bill_subjects(ctx, **kwargs)
     elif operation == "get_bill_summaries":
-        from ..bills import get_bill_summaries
+        from .bills import get_bill_summaries
         return await get_bill_summaries(ctx, **kwargs)
     elif operation == "get_bill_text_versions":
-        from ..bills import get_bill_text_versions
+        from .bills import get_bill_text_versions
         return await get_bill_text_versions(ctx, **kwargs)
     elif operation == "get_bill_titles":
-        from ..bills import get_bill_titles
+        from .bills import get_bill_titles
         return await get_bill_titles(ctx, **kwargs)
     elif operation == "get_bill_content":
-        from ..bills import get_bill_content
+        from .bills import get_bill_content
         return await get_bill_content(ctx, **kwargs)
     elif operation == "get_recent_bills":
-        from ..bills import get_recent_bills
+        from .bills import get_recent_bills
         return await get_recent_bills(ctx, **kwargs)
     elif operation == "get_bills_by_date_range":
-        from ..bills import get_bills_by_date_range
+        from .bills import get_bills_by_date_range
         return await get_bills_by_date_range(ctx, **kwargs)
     
     # Amendment operations
@@ -186,15 +190,17 @@ async def route_legislation_operation(ctx: Context, operation: str, **kwargs) ->
 async def legislation_hub(
     ctx: Context,
     operation: str,
-    # Bill parameters
+    # Bill parameters - API-faithful naming
     keywords: Optional[str] = None,
     congress: Optional[int] = None,
     bill_type: Optional[str] = None,
     bill_number: Optional[int] = None,
     limit: Optional[int] = None,
     sort: Optional[str] = None,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
+    format: Optional[str] = None,
+    offset: Optional[int] = None,
+    fromDateTime: Optional[str] = None,
+    toDateTime: Optional[str] = None,
     days_back: Optional[int] = None,
     version: Optional[str] = None,
     chunk_number: Optional[int] = None,
@@ -219,6 +225,7 @@ async def legislation_hub(
     AVAILABLE OPERATIONS (25+):
     
     Complete Bills Suite:
+    - get_bills: Core /bill endpoint access (the missing foundation)
     - search_bills: Search for bills by keywords
     - get_bill_details: Get detailed bill information
     - get_bill_text: Get bill text and URLs
@@ -252,7 +259,25 @@ async def legislation_hub(
     
     Args:
         operation: The specific operation to perform
-        **kwargs: Operation-specific parameters (see individual operations for details)
+        keywords: Optional keywords for search filtering
+        congress: Congress number (e.g., 118, 119)
+        bill_type: Bill type (hr, s, hjres, sjres, hconres, sconres, hres, sres)
+        bill_number: Bill number for specific bill operations
+        limit: Maximum number of results (max 250 for API compliance)
+        sort: Sort order (updateDate+asc or updateDate+desc)
+        format: Response format (json or xml) - API-faithful parameter
+        offset: Starting record for pagination (0-based) - API-faithful parameter
+        fromDateTime: Start date filter (YYYY-MM-DDTHH:MM:SSZ) - API-faithful parameter
+        toDateTime: End date filter (YYYY-MM-DDTHH:MM:SSZ) - API-faithful parameter
+        days_back: Number of days back for convenience date filtering
+        version: Version parameter for text operations
+        chunk_number: Chunk number for content operations
+        chunk_size: Chunk size for content operations
+        amendment_type: Amendment type for amendment operations
+        amendment_number: Amendment number for specific amendments
+        treaty_number: Treaty number for treaty operations
+        treaty_suffix: Treaty suffix for treaty operations
+        topic: Topic filter for various operations
     
     Returns:
         Operation results as formatted string
@@ -277,14 +302,23 @@ async def legislation_hub(
             "bill_number": 1234
         }
         
-        Search amendments (requires paid tier):
+        Get core bills with API parameters:
+        {
+            "operation": "get_bills",
+            "format": "json",
+            "limit": 20,
+            "fromDateTime": "2024-01-01T00:00:00Z",
+            "congress": 118
+        }
+
+        Search amendments:
         {
             "operation": "search_amendments",
             "keywords": "budget",
             "congress": 118
         }
-        
-        Get treaty details (requires paid tier):
+
+        Get treaty details:
         {
             "operation": "get_treaty_text",
             "congress": 118,
@@ -308,8 +342,10 @@ async def legislation_hub(
             'bill_number': bill_number,
             'limit': limit,
             'sort': sort,
-            'from_date': from_date,
-            'to_date': to_date,
+            'format': format,
+            'offset': offset,
+            'fromDateTime': fromDateTime,
+            'toDateTime': toDateTime,
             'days_back': days_back,
             'version': version,
             'chunk_number': chunk_number,
