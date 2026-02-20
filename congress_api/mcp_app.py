@@ -1,5 +1,6 @@
 # mcp_app.py
 from fastmcp import FastMCP
+from .core.cors import cors_headers
 from .core.client_handler import app_lifespan
 
 # Create the MCP server with metadata and stateless HTTP transport
@@ -61,11 +62,7 @@ async def handle_preflight(request: Request) -> JSONResponse:
     """Handle CORS preflight requests"""
     return JSONResponse(
         {},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
+        headers=cors_headers(request)
     )
 
 @mcp.custom_route("/api/register/free", methods=["POST"])
@@ -89,11 +86,7 @@ async def register_free_user(request: Request) -> JSONResponse:
             return JSONResponse(
                 {"error": "Email is required"}, 
                 status_code=400,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=cors_headers(request)
             )
         
         # Simple email format validation
@@ -103,11 +96,7 @@ async def register_free_user(request: Request) -> JSONResponse:
             return JSONResponse(
                 {"error": "Please enter a valid email address"}, 
                 status_code=400,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=cors_headers(request)
             )
         
         # Use UserService helper function to handle registration logic
@@ -117,43 +106,27 @@ async def register_free_user(request: Request) -> JSONResponse:
         if result.get("success"):
             return JSONResponse(
                 result,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=cors_headers(request)
             )
         else:
             return JSONResponse(
                 {"error": result.get("message", "Registration failed. Please try again.")}, 
                 status_code=500,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=cors_headers(request)
             )
             
     except json.JSONDecodeError:
         return JSONResponse(
             {"error": "Invalid JSON data"}, 
             status_code=400,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
     except Exception as e:
         logger.error(f"Registration error: {e}")
         return JSONResponse(
             {"error": "An unexpected error occurred. Please try again."}, 
             status_code=500,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
 
 # REMOVED: Debug endpoint that leaked Stripe configuration details
@@ -174,11 +147,7 @@ async def handle_magic_link_preflight(request: Request) -> JSONResponse:
     """Handle CORS preflight requests for magic link"""
     return JSONResponse(
         {},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
+        headers=cors_headers(request)
     )
 
 @mcp.custom_route("/api/auth/request-magic-link", methods=["POST"])
@@ -201,11 +170,7 @@ async def request_magic_link(request: Request) -> JSONResponse:
             return JSONResponse(
                 {"success": False, "message": "Email is required"}, 
                 status_code=400,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=cors_headers(request)
             )
         
         # Simple email format validation
@@ -215,11 +180,7 @@ async def request_magic_link(request: Request) -> JSONResponse:
             return JSONResponse(
                 {"success": False, "message": "Please enter a valid email address"}, 
                 status_code=400,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=cors_headers(request)
             )
         
         # Request magic link
@@ -231,33 +192,21 @@ async def request_magic_link(request: Request) -> JSONResponse:
         return JSONResponse(
             result,
             status_code=200 if result.get("success") else 400,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
         
     except json.JSONDecodeError:
         return JSONResponse(
             {"success": False, "message": "Invalid JSON data"}, 
             status_code=400,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
     except Exception as e:
         logger.error(f"Magic link request error: {e}")
         return JSONResponse(
             {"success": False, "message": "An unexpected error occurred. Please try again."}, 
             status_code=500,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
 
 @mcp.custom_route("/api/auth/verify-magic-link", methods=["OPTIONS"])
@@ -265,11 +214,7 @@ async def handle_verify_magic_link_preflight(request: Request) -> JSONResponse:
     """Handle CORS preflight requests for magic link verification"""
     return JSONResponse(
         {},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
+        headers=cors_headers(request)
     )
 
 @mcp.custom_route("/api/auth/verify-magic-link", methods=["POST"])
@@ -293,11 +238,7 @@ async def verify_magic_link(request: Request) -> JSONResponse:
             return JSONResponse(
                 {"valid": False, "message": "Token and email are required"}, 
                 status_code=400,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=cors_headers(request)
             )
         
         # Verify magic link
@@ -309,33 +250,21 @@ async def verify_magic_link(request: Request) -> JSONResponse:
         return JSONResponse(
             result,
             status_code=200 if result.get("valid") else 400,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
         
     except json.JSONDecodeError:
         return JSONResponse(
             {"valid": False, "message": "Invalid JSON data"}, 
             status_code=400,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
     except Exception as e:
         logger.error(f"Magic link verification error: {e}")
         return JSONResponse(
             {"valid": False, "message": "An unexpected error occurred. Please try again."}, 
             status_code=500,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
 
 @mcp.custom_route("/api/user/dashboard", methods=["OPTIONS"])
@@ -343,11 +272,7 @@ async def handle_dashboard_preflight(request: Request) -> JSONResponse:
     """Handle CORS preflight requests for user dashboard"""
     return JSONResponse(
         {},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
+        headers=cors_headers(request)
     )
 
 @mcp.custom_route("/api/user/dashboard", methods=["POST"])
@@ -371,11 +296,7 @@ async def get_user_dashboard(request: Request) -> JSONResponse:
             return JSONResponse(
                 {"success": False, "message": "Token and email are required"}, 
                 status_code=400,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=cors_headers(request)
             )
         
         # Get dashboard data
@@ -387,33 +308,21 @@ async def get_user_dashboard(request: Request) -> JSONResponse:
         return JSONResponse(
             result,
             status_code=200 if result.get("success") else 400,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
         
     except json.JSONDecodeError:
         return JSONResponse(
             {"success": False, "message": "Invalid JSON data"}, 
             status_code=400,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
     except Exception as e:
         logger.error(f"Dashboard data error: {e}")
         return JSONResponse(
             {"success": False, "message": "An unexpected error occurred. Please try again."}, 
             status_code=500,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
 
 @mcp.custom_route("/api/user/regenerate-key", methods=["OPTIONS"])
@@ -421,11 +330,7 @@ async def handle_regenerate_key_preflight(request: Request) -> JSONResponse:
     """Handle CORS preflight requests for API key regeneration"""
     return JSONResponse(
         {},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-        }
+        headers=cors_headers(request)
     )
 
 @mcp.custom_route("/api/user/regenerate-key", methods=["POST"])
@@ -453,11 +358,7 @@ async def regenerate_api_key(request: Request) -> JSONResponse:
             return JSONResponse(
                 {"success": False, "message": "Email is required"}, 
                 status_code=400,
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                }
+                headers=cors_headers(request)
             )
         
         magic_link_service = get_magic_link_service()
@@ -472,11 +373,7 @@ async def regenerate_api_key(request: Request) -> JSONResponse:
                 return JSONResponse(
                     {"success": False, "message": "Session token is required"}, 
                     status_code=400,
-                    headers={
-                        "Access-Control-Allow-Origin": "*",
-                        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                        "Access-Control-Allow-Headers": "*",
-                    }
+                    headers=cors_headers(request)
                 )
             
             result = await magic_link_service.regenerate_api_key(token, email)
@@ -486,31 +383,19 @@ async def regenerate_api_key(request: Request) -> JSONResponse:
         return JSONResponse(
             result,
             status_code=200 if result.get("success") else 400,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
         
     except json.JSONDecodeError:
         return JSONResponse(
             {"success": False, "message": "Invalid JSON data"}, 
             status_code=400,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
     except Exception as e:
         logger.error(f"API key regeneration error: {e}")
         return JSONResponse(
             {"success": False, "message": "An unexpected error occurred. Please try again."}, 
             status_code=500,
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-                "Access-Control-Allow-Headers": "*",
-            }
+            headers=cors_headers(request)
         )
