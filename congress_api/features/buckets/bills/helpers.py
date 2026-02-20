@@ -11,7 +11,7 @@ from mcp.server.fastmcp import Context
 
 # Import existing validation and API infrastructure
 from ....core.validators import ParameterValidator
-from ....core.api_wrapper import safe_bills_request
+from ....core.api_wrapper import safe_congressional_request
 from ....core.exceptions import CommonErrors, format_error_response
 
 # Set up logger
@@ -78,7 +78,7 @@ async def fetch_bill_data(
         query_params.update(params)
 
         # Use defensive API wrapper for the request
-        return await safe_bills_request(endpoint, ctx, query_params)
+        return await safe_congressional_request(endpoint, ctx, query_params, endpoint_type='bills')
 
     except Exception as e:
         logger.error(f"Error in fetch_bill_data: {str(e)}")

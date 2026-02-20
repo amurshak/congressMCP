@@ -7,7 +7,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
 # Reliability Framework Imports
-from ..core.api_wrapper import safe_summaries_request
+from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import SummariesProcessor, clean_summaries_response
@@ -102,7 +102,7 @@ async def get_latest_summaries(ctx: Context) -> str:
     logger.info("Accessing latest summaries resource")
     try:
         # Use defensive API wrapper
-        data = await safe_summaries_request("/summaries", ctx, {"limit": 10, "sort": "updateDate+desc"})
+        data = await safe_congressional_request("/summaries", ctx, {"limit": 10, "sort": "updateDate+desc"}, endpoint_type='summaries')
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")  
         
         if "error" in data:
@@ -149,7 +149,7 @@ async def get_summaries_by_congress(ctx: Context, congress: str) -> str:
             )
         
         # Use defensive API wrapper
-        data = await safe_summaries_request(f"/summaries/{congress}", ctx, {"limit": 10, "sort": "updateDate+desc"})
+        data = await safe_congressional_request(f"/summaries/{congress}", ctx, {"limit": 10, "sort": "updateDate+desc"}, endpoint_type='summaries')
         
         if "error" in data:
             logger.error(f"Error in API response: {data['error']}")
@@ -207,7 +207,7 @@ async def get_summaries_by_type(ctx: Context, congress: str, bill_type: str) -> 
             )
         
         # Use defensive API wrapper
-        data = await safe_summaries_request(f"/summaries/{congress}/{bill_type}", ctx, {"limit": 10, "sort": "updateDate+desc"})
+        data = await safe_congressional_request(f"/summaries/{congress}/{bill_type}", ctx, {"limit": 10, "sort": "updateDate+desc"}, endpoint_type='summaries')
         
         if "error" in data:
             logger.error(f"Error in API response: {data['error']}")
@@ -555,7 +555,7 @@ async def search_summaries(
                 endpoint = f"/summaries/{congress}/{bill_type}"
         
         # Use defensive API wrapper
-        data = await safe_summaries_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='summaries')
         
         if "error" in data:
             logger.error(f"Error in API response: {data['error']}")
@@ -627,7 +627,7 @@ async def get_bill_summaries(
         
         # Use the existing bill summaries endpoint with defensive wrapper
         endpoint = f"/bill/{congress}/{bill_type}/{bill_number}/summaries"
-        data = await safe_summaries_request(endpoint, ctx, {})
+        data = await safe_congressional_request(endpoint, ctx, {}, endpoint_type='summaries')
         
         if "error" in data:
             logger.error(f"Error in API response: {data['error']}")

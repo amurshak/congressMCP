@@ -4,7 +4,7 @@ from typing import Dict, List, Any, Optional
 from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
-from ..core.api_wrapper import safe_committee_prints_request
+from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator, ValidationResult
 from ..core.exceptions import APIErrorResponse, ErrorType, format_error_response, CommonErrors
 from ..core.response_utils import CommitteePrintsProcessor, clean_committee_prints_response
@@ -89,7 +89,7 @@ async def get_latest_committee_prints(ctx: Context) -> str:
     
     logger.debug("Fetching latest committee prints with reliability framework")
     try:
-        data = await safe_committee_prints_request("/committee-print", ctx, params)
+        data = await safe_congressional_request("/committee-print", ctx, params, endpoint_type='committee-prints')
         
         if "error" in data:
             error = CommonErrors.api_server_error(
@@ -156,7 +156,7 @@ async def get_committee_prints_by_congress(ctx: Context, congress: int) -> str:
     
     logger.debug(f"Fetching committee prints for Congress {congress} with reliability framework")
     try:
-        data = await safe_committee_prints_request(f"/committee-print/{congress}", ctx, params)
+        data = await safe_congressional_request(f"/committee-print/{congress}", ctx, params)
         
         if "error" in data:
             error = CommonErrors.api_server_error(
@@ -232,7 +232,7 @@ async def get_committee_prints_by_congress_and_chamber(ctx: Context, congress: i
     
     logger.debug(f"Fetching committee prints for Congress {congress}, chamber {chamber} with reliability framework")
     try:
-        data = await safe_committee_prints_request(f"/committee-print/{congress}/{chamber}", ctx, params)
+        data = await safe_congressional_request(f"/committee-print/{congress}/{chamber}", ctx, params)
         
         if "error" in data:
             error = CommonErrors.api_server_error(
@@ -302,7 +302,7 @@ async def get_committee_print_details(ctx: Context, congress: int, chamber: str,
     
     logger.debug(f"Fetching committee print details for Congress {congress}, chamber {chamber}, jacket {jacket_number} with reliability framework")
     try:
-        data = await safe_committee_prints_request(f"/committee-print/{congress}/{chamber}/{jacket_number}", ctx)
+        data = await safe_congressional_request(f"/committee-print/{congress}/{chamber}/{jacket_number}", ctx)
         
         # Handle different response structures
         if isinstance(data, list):
@@ -397,7 +397,7 @@ async def get_committee_print_text_versions(ctx: Context, congress: int, chamber
     
     logger.debug(f"Fetching committee print text versions for Congress {congress}, chamber {chamber}, jacket {jacket_number} with reliability framework")
     try:
-        data = await safe_committee_prints_request(f"/committee-print/{congress}/{chamber}/{jacket_number}/text", ctx)
+        data = await safe_congressional_request(f"/committee-print/{congress}/{chamber}/{jacket_number}/text", ctx)
         
         logger.debug(f"Text versions API response type: {type(data)}")
         logger.debug(f"Text versions API response: {data}")
@@ -511,7 +511,7 @@ async def search_committee_prints(
     
     logger.debug(f"Searching committee prints with reliability framework: offset={offset}, limit={limit}, from_date={from_date_time}, to_date={to_date_time}")
     try:
-        data = await safe_committee_prints_request("/committee-print", ctx, params)
+        data = await safe_congressional_request("/committee-print", ctx, params, endpoint_type='committee-prints')
         
         if "error" in data:
             error = CommonErrors.api_server_error(

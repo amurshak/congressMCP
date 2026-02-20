@@ -11,7 +11,7 @@ from mcp.server.fastmcp import Context
 
 from ..core.client_handler import make_api_request
 from ..core.validators import BoundCongressionalRecordValidator, ParameterValidator
-from ..core.api_wrapper import safe_bound_record_request
+from ..core.api_wrapper import safe_congressional_request
 from ..core.exceptions import handle_validation_error, format_error_response, CommonErrors
 from ..core.response_utils import clean_bound_congressional_record_response
 from ..mcp_app import mcp
@@ -302,7 +302,7 @@ async def search_bound_congressional_record(
         logger.info(f"Searching bound congressional record with {search_str}")
         
         # Use the defensive API wrapper
-        data = await safe_bound_record_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='bound_congressional_record')
         
         if "error" in data:
             logger.error(f"API returned error: {data['error']}")

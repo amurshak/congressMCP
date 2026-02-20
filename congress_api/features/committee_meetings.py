@@ -3,7 +3,7 @@ import logging
 from typing import Dict, Any, Optional
 from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
-from ..core.api_wrapper import safe_committee_meetings_request
+from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.response_utils import ResponseProcessor
 from ..core.exceptions import format_error_response, CommonErrors, APIErrorResponse
@@ -127,7 +127,7 @@ async def get_latest_committee_meetings(ctx: Context) -> str:
     
     try:
         logger.debug("Fetching latest committee meetings")
-        data = await safe_committee_meetings_request("/committee-meeting", ctx, params)
+        data = await safe_congressional_request("/committee-meeting", ctx, params, endpoint_type='committee-meetings')
         
         if "error" in data:
             logger.error(f"Error retrieving latest committee meetings: {data['error']}")
@@ -175,7 +175,7 @@ async def get_committee_meetings_by_congress(ctx: Context, congress: int) -> str
         }
         
         logger.debug(f"Fetching committee meetings for Congress {congress}")
-        data = await safe_committee_meetings_request(f"/committee-meeting/{congress}", ctx, params)
+        data = await safe_congressional_request(f"/committee-meeting/{congress}", ctx, params, endpoint_type='committee-meetings')
         
         if "error" in data:
             logger.error(f"Error retrieving committee meetings for Congress {congress}: {data['error']}")
@@ -228,7 +228,7 @@ async def get_committee_meetings_by_congress_and_chamber(ctx: Context, congress:
         }
         
         logger.debug(f"Fetching committee meetings for Congress {congress}, Chamber {chamber}")
-        data = await safe_committee_meetings_request(f"/committee-meeting/{congress}/{chamber}", ctx, params)
+        data = await safe_congressional_request(f"/committee-meeting/{congress}/{chamber}", ctx, params, endpoint_type='committee-meetings')
         
         if "error" in data:
             logger.error(f"Error retrieving committee meetings for Congress {congress}, Chamber {chamber}: {data['error']}")
@@ -326,7 +326,7 @@ async def get_committee_meeting_details(ctx: Context, congress: int, chamber: st
         }
         
         logger.debug(f"Fetching details for committee meeting {congress}/{chamber}/{event_id}")
-        data = await safe_committee_meetings_request(f"/committee-meeting/{congress}/{chamber}/{event_id}", ctx, params)
+        data = await safe_congressional_request(f"/committee-meeting/{congress}/{chamber}/{event_id}", ctx, params, endpoint_type='committee-meetings')
         
         if "error" in data:
             logger.error(f"Error retrieving committee meeting details: {data['error']}")
@@ -410,7 +410,7 @@ async def search_committee_meetings(
                     endpoint = f"{endpoint}/{committee_code}"
         
         logger.debug(f"Searching committee meetings with endpoint: {endpoint}, params: {params}")
-        data = await safe_committee_meetings_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='committee-meetings')
         
         if "error" in data:
             logger.error(f"Error searching committee meetings: {data['error']}")

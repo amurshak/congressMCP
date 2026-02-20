@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Any, Optional
 from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
-from ..core.api_wrapper import safe_senate_communications_request
+from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import SenateCommunicationsProcessor, clean_senate_communications_response
@@ -121,7 +121,7 @@ async def get_latest_senate_communications(ctx: Context) -> str:
         }
         
         logger.debug("Fetching latest senate communications")
-        data = await safe_senate_communications_request("/senate-communication", ctx, params)
+        data = await safe_congressional_request("/senate-communication", ctx, params, endpoint_type='senate_communications')
         
         # Process response using reliability framework
         processed_communications = clean_senate_communications_response(data, limit=10)
@@ -176,7 +176,7 @@ async def get_senate_communication_details(
         params = {"format": "json"}
         
         logger.debug(f"Fetching senate communication {congress_clean}/{type_clean}/{number_clean}")
-        data = await safe_senate_communications_request(f"/senate-communication/{congress_clean}/{type_clean}/{number_clean}", ctx, params)
+        data = await safe_congressional_request(f"/senate-communication/{congress_clean}/{type_clean}/{number_clean}", ctx, params, endpoint_type='senate_communications')
         
         # Check for different possible response formats
         if 'senateCommunication' in data:
@@ -249,7 +249,7 @@ async def search_senate_communications(
         logger.debug(f"Searching senate communications with {search_str}")
         
         # Make the API request using defensive wrapper
-        data = await safe_senate_communications_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='senate_communications')
         
         # Process response using reliability framework
         processed_communications = clean_senate_communications_response(data, limit=limit)

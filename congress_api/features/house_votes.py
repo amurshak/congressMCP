@@ -9,7 +9,7 @@ from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator, ValidationResult
-from ..core.api_wrapper import safe_house_votes_request
+from ..core.api_wrapper import safe_congressional_request
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
 from ..core.auth.auth import require_paid_access
@@ -359,7 +359,7 @@ async def get_latest_house_votes(ctx: Context) -> str:
         logger.debug("Fetching latest house votes")
         
         # Make the API request
-        data = await safe_house_votes_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
         
         if "error" in data:
             logger.error(f"Error fetching latest house votes: {data['error']}")
@@ -412,7 +412,7 @@ async def get_house_votes_by_congress(ctx: Context, congress: int, limit: int = 
         logger.debug(f"Fetching house votes for Congress {congress}")
         
         # Make the API request
-        data = await safe_house_votes_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
         
         if "error" in data:
             logger.error(f"Error fetching house votes for Congress {congress}: {data['error']}")
@@ -471,7 +471,7 @@ async def get_house_votes_by_session(ctx: Context, congress: int, session: int, 
         logger.debug(f"Fetching house votes for Congress {congress}, Session {session}")
         
         # Make the API request
-        data = await safe_house_votes_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
         
         if "error" in data:
             logger.error(f"Error fetching house votes for Congress {congress}, Session {session}: {data['error']}")
@@ -528,7 +528,7 @@ async def get_house_vote_details(ctx: Context, congress: int, session: int, vote
         logger.debug(f"Fetching details for house vote {congress}-{session}-{vote_number}")
         
         # Make the API request
-        data = await safe_house_votes_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
         
         if "error" in data:
             logger.error(f"Error fetching house vote details: {data['error']}")
@@ -577,7 +577,7 @@ async def get_house_vote_details_enhanced(ctx: Context, congress: int, session: 
         endpoint = f"house-vote/{congress}/{session}/{vote_number}"
         params = {"format": "json"}
         
-        data = await safe_house_votes_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(endpoint, message=data['error']))
@@ -641,7 +641,7 @@ async def get_house_vote_member_votes(ctx: Context, congress: int, session: int,
         logger.debug(f"Fetching house vote details to get XML URL for {congress}-{session}-{vote_number}")
         
         # Make the API request
-        data = await safe_house_votes_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
         
         if "error" in data:
             logger.error(f"Error fetching house vote details: {data['error']}")
@@ -706,7 +706,7 @@ async def get_house_vote_member_votes_xml(ctx: Context, congress: int, session: 
         logger.debug(f"Fetching house vote details to get XML URL for {congress}-{session}-{vote_number}")
         
         # Make the API request
-        data = await safe_house_votes_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
         
         if "error" in data:
             logger.error(f"Error fetching house vote details: {data['error']}")
