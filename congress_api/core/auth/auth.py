@@ -190,8 +190,8 @@ def check_feature_access(feature: str, tier: str) -> bool:
 # --- FastMCP Tier Authorization Decorators ---
 
 from functools import wraps
-from fastmcp import Context
-from fastmcp.exceptions import ToolError
+from mcp.server.fastmcp import Context
+from mcp.server.fastmcp.exceptions import ToolError
 
 def get_user_tier_from_context(ctx: Context) -> str:
     """
@@ -200,7 +200,7 @@ def get_user_tier_from_context(ctx: Context) -> str:
     """
     try:
         # Use FastMCP's dependency system to access HTTP request
-        from fastmcp.server.dependencies import get_http_request
+        from mcp.server.fastmcp.server.dependencies import get_http_request
         try:
             request = get_http_request()
             if hasattr(request, 'scope') and 'user' in request.scope:

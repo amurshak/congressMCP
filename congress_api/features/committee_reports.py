@@ -3,7 +3,7 @@ import logging
 import re
 from typing import Dict, Any, Optional
 import httpx
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 from ..core.client_handler import make_api_request
 from ..core.api_wrapper import safe_committee_reports_request
 from ..core.validators import ParameterValidator

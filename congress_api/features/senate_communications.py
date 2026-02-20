@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, List, Any, Optional
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 from ..core.api_wrapper import safe_senate_communications_request
 from ..core.validators import ParameterValidator

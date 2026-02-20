@@ -5,7 +5,7 @@ Handles fetching and processing House of Representatives roll call vote data fro
 from typing import Dict, List, Any, Optional
 import logging
 import json
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator, ValidationResult

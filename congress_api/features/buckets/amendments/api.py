@@ -7,7 +7,7 @@ helpers, processors, and formatters to create API-faithful functions.
 
 import logging
 from typing import Optional
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 from .processors import AmendmentsDataProcessor
 from .formatters import AmendmentsFormatter
 from ....core.validators import ParameterValidator

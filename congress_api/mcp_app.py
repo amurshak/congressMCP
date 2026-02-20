@@ -1,5 +1,5 @@
 # mcp_app.py
-from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
 from .core.cors import cors_headers
 from .core.client_handler import app_lifespan
 

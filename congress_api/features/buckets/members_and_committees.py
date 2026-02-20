@@ -12,8 +12,8 @@ Access control infrastructure maintained for potential future tier differentiati
 
 import logging
 from typing import Optional, Dict, Any
-from fastmcp import Context
-from fastmcp.exceptions import ToolError
+from mcp.server.fastmcp import Context
+from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
 
 # Import access control utilities

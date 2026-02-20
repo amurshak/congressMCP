@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
 
-from fastmcp import FastMCP, Context
+from mcp.server.fastmcp import FastMCP, Context
 from .api_config import API_KEY, BASE_URL, ENABLE_CACHING, CACHE_TIMEOUT, DEFAULT_REQUEST_PARAMS, ENV
 
 # Configure logger

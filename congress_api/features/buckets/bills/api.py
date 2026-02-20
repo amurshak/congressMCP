@@ -7,7 +7,7 @@ to Congress.gov endpoints while maintaining enhancement capabilities.
 
 from typing import Optional
 import logging
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 
 # Import our modular components
 from .helpers import fetch_bill_data, build_bill_endpoint, validate_api_parameters

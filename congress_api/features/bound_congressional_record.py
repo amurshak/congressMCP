@@ -7,7 +7,7 @@ search functionality and individual record retrieval.
 
 import logging
 from typing import Optional, Dict, Any
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 
 from ..core.client_handler import make_api_request
 from ..core.validators import BoundCongressionalRecordValidator, ParameterValidator

@@ -9,7 +9,7 @@ import asyncio
 import logging
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, replace
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 
 from .client_handler import make_api_request
 from .exceptions import APIErrorResponse, format_error_response
