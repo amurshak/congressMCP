@@ -1,5 +1,5 @@
 # congress_api package
 
-# Import main components for easy access
-# Note: Avoid importing main to prevent circular imports
-from .mcp_app import mcp
+# Main components available as separate imports:
+# - from congress_api.mcp_server import mcp
+# - from congress_api.rest_api import rest_app

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Direct FastMCP ASGI deployment - No mounting, no complexity.
-Uses the FastMCP app directly as the main ASGI app.
+ASGI deployment with separated MCP and REST API apps.
+Mounts FastMCP server and REST API as separate applications.
 """
 import os
 import sys
@@ -28,52 +28,55 @@ logger.info(f"PYTHON_CONCURRENCY: {os.environ.get('PYTHON_CONCURRENCY', 'NOT SET
 # Add the project root to the Python path
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Import server after path setup
-from congress_api.mcp_app import mcp as server
-
-# Configure environment
-from congress_api.core.api_config import get_api_config, ENV
-
 try:
-    logger.info("Creating direct FastMCP HTTP app...")
+    logger.info("Initializing separated MCP server and REST API...")
     
-    # Initialize features BEFORE creating the HTTP app
-    from congress_api.mcp_app import initialize_features
+    # Import separated components
+    from congress_api.mcp_server import mcp as mcp_server, initialize_mcp_features
+    from congress_api.rest_api import rest_app
+    
+    # Initialize MCP features
     logger.info("Initializing MCP features...")
-    initialize_features()
+    initialize_mcp_features()
     
-    # Use FastMCP directly as the main ASGI app
-    # Apply authentication middleware but ensure FastMCP app maintains control
+    # Create the FastMCP HTTP app
+    logger.info("Creating FastMCP HTTP app...")
+    fastmcp_app = mcp_server.http_app()
+    
+    # Apply authentication middleware to FastMCP app
     from congress_api.core.auth.auth_middleware import AuthenticationMiddleware
+    logger.info("Applying authentication middleware to MCP app...")
+    authenticated_mcp_app = AuthenticationMiddleware(fastmcp_app)
     
-    # Get the FastMCP HTTP app - now configured in stateless mode to prevent session conflicts
-    # This prevents the "Received request before initialization was complete" errors
-    # that occur when multiple concurrent requests create conflicting sessions
-    logger.info("Creating FastMCP HTTP app with error handling...")
-    fastmcp_app = server.http_app()
+    # Create the main ASGI app by mounting both applications
+    from starlette.applications import Starlette
+    from starlette.routing import Mount
     
-    # Apply authentication middleware - it properly forwards lifespan events
-    logger.info("Applying authentication middleware...")
-    app = AuthenticationMiddleware(fastmcp_app)
+    logger.info("Mounting MCP server at /mcp/ and REST API at /...")
     
-    logger.info(f"FastMCP app created successfully: {type(app)}")
+    app = Starlette(routes=[
+        Mount("/mcp", authenticated_mcp_app),  # MCP server at /mcp/
+        Mount("/", rest_app),  # REST API at root
+    ])
     
     # Initialize config and log info
+    from congress_api.core.api_config import get_api_config
     config = get_api_config()
     
     tools_count = 0
     resources_count = 0
-    if hasattr(server, '_tool_manager') and hasattr(server._tool_manager, '_tools'):
-        tools_count = len(server._tool_manager._tools)
-    if hasattr(server, '_resource_manager') and hasattr(server._resource_manager, '_resources'):
-        resources_count = len(server._resource_manager._resources)
+    if hasattr(mcp_server, '_tool_manager') and hasattr(mcp_server._tool_manager, '_tools'):
+        tools_count = len(mcp_server._tool_manager._tools)
+    if hasattr(mcp_server, '_resource_manager') and hasattr(mcp_server._resource_manager, '_resources'):
+        resources_count = len(mcp_server._resource_manager._resources)
 
     logger.info(f"Congress MCP server ready with {tools_count} tools and {resources_count} resources")
-    logger.info("MCP endpoint available at /mcp/ (FastMCP default path)")
+    logger.info("MCP endpoint available at /mcp/ - REST API available at /")
+    logger.info(f"Application mounted successfully: {type(app)}")
 
 except Exception as e:
     error_message = str(e)
-    logger.error(f"Failed to create FastMCP app: {error_message}")
+    logger.error(f"Failed to create mounted app: {error_message}")
     import traceback
     traceback.print_exc()
 
@@ -84,7 +87,7 @@ except Exception as e:
     
     async def error_handler(request):
         return JSONResponse({
-            "error": "FastMCP failed to initialize",
+            "error": "Application failed to initialize",
             "details": error_message
         }, status_code=500)
 
@@ -92,4 +95,5 @@ except Exception as e:
         Route("/", error_handler, methods=["GET", "POST"]),
         Route("/mcp", error_handler, methods=["GET", "POST"]),
         Route("/mcp/", error_handler, methods=["GET", "POST"]),
+        Route("/api/health", error_handler, methods=["GET"]),
     ])
