@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 import httpx
 from mcp.server.fastmcp import Context
 from ..core.client_handler import make_api_request
-from ..core.api_wrapper import safe_committee_reports_request
+from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import format_error_response, CommonErrors
 
@@ -81,7 +81,7 @@ async def get_latest_committee_reports(ctx: Context) -> str:
     
     try:
         # Make defensive API request
-        data = await safe_committee_reports_request("/committee-report", ctx, {})
+        data = await safe_congressional_request("/committee-report", ctx, {})
         
         if not data or 'reports' not in data:
             logger.warning("No committee reports data received from API")
@@ -138,7 +138,7 @@ async def get_committee_reports_by_congress(ctx: Context, congress: int) -> str:
     
     try:
         endpoint = f"/committee-report/{congress}"
-        data = await safe_committee_reports_request(endpoint, ctx, {})
+        data = await safe_congressional_request(endpoint, ctx, {})
         
         if not data or 'reports' not in data:
             logger.warning(f"No committee reports data received for Congress {congress}")
@@ -216,7 +216,7 @@ async def get_committee_reports_by_congress_and_type(
     
     try:
         endpoint = f"/committee-report/{congress}/{report_type}"
-        data = await safe_committee_reports_request(endpoint, ctx, {})
+        data = await safe_congressional_request(endpoint, ctx, {})
         
         if not data or 'reports' not in data:
             logger.warning(f"No committee reports data received for Congress {congress}, type {report_type}")
@@ -306,7 +306,7 @@ async def get_committee_report_details(
     
     try:
         endpoint = f"/committee-report/{congress}/{report_type}/{report_number}"
-        data = await safe_committee_reports_request(endpoint, ctx, {})
+        data = await safe_congressional_request(endpoint, ctx, {})
         
         if not data or 'committeeReports' not in data:
             logger.warning(f"No committee report data received for {congress}/{report_type}/{report_number}")
@@ -381,7 +381,7 @@ async def get_committee_report_text_versions(
     
     try:
         endpoint = f"/committee-report/{congress}/{report_type}/{report_number}/text"
-        data = await safe_committee_reports_request(endpoint, ctx, {})
+        data = await safe_congressional_request(endpoint, ctx, {})
         
         if not data or 'text' not in data:
             logger.warning(f"No text versions data received for committee report {congress}/{report_type}/{report_number}")
@@ -495,7 +495,7 @@ async def search_committee_reports(
         params['toDateTime'] = toDateTime
     
     try:
-        data = await safe_committee_reports_request("/committee-report", ctx, params)
+        data = await safe_congressional_request("/committee-report", ctx, params, endpoint_type='committee-reports')
         
         if not data or 'reports' not in data:
             logger.warning("No committee reports data received from search")
@@ -603,7 +603,7 @@ async def get_committee_report_content(
     try:
         # First, get the text versions to find the content URL
         endpoint = f"/committee-report/{congress}/{report_type}/{report_number}/text"
-        data = await safe_committee_reports_request(endpoint, ctx, {})
+        data = await safe_congressional_request(endpoint, ctx, {})
         
         if not data or 'text' not in data:
             logger.warning(f"No text versions data received for committee report {congress}/{report_type}/{report_number}")

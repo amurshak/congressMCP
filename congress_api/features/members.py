@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 from ..core.validators import ParameterValidator
-from ..core.api_wrapper import DefensiveAPIWrapper, safe_members_request
+from ..core.api_wrapper import DefensiveAPIWrapper, safe_congressional_request
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
 import logging
@@ -24,7 +24,7 @@ async def get_current_members(ctx: Context) -> str:
     Returns a sample of 20 current members from both chambers of Congress,
     including their biographical information and contact details.
     """
-    data = await safe_members_request("/member", ctx, {"limit": 20, "currentMember": "true"})
+    data = await safe_congressional_request("/member", ctx, {"limit": 20, "currentMember": "true"}, endpoint_type='members')
     
     if "error" in data:
         return f"Error retrieving members: {data['error']}"
@@ -47,7 +47,7 @@ async def get_all_members(ctx: Context) -> str:
     Returns a list of congressional members with basic information about each,
     including their biographical information and contact details.
     """
-    data = await safe_members_request("/member", ctx, {"limit": 20})
+    data = await safe_congressional_request("/member", ctx, {"limit": 20}, endpoint_type='members')
     
     if "error" in data:
         return f"Error retrieving members: {data['error']}"
@@ -86,7 +86,7 @@ async def get_member_details(ctx: Context, bioguide_id: str) -> str:
                 "bioguide_id", bioguide_id, "Bioguide ID cannot be empty"
             ))
         
-        data = await safe_members_request(f"/member/{bioguide_id}", ctx, {})
+        data = await safe_congressional_request(f"/member/{bioguide_id}", ctx, {}, endpoint_type='members')
         
         if "error" in data:
             if "404" in str(data["error"]):
@@ -190,7 +190,7 @@ async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str) -> st
                 "bioguide_id", bioguide_id, "Bioguide ID cannot be empty"
             ))
         
-        data = await safe_members_request(f"/member/{bioguide_id}/sponsored-legislation", ctx, {"limit": 20})
+        data = await safe_congressional_request(f"/member/{bioguide_id}/sponsored-legislation", ctx, {"limit": 20}, endpoint_type='members')
         
         if "error" in data:
             if "404" in str(data["error"]):
@@ -256,7 +256,7 @@ async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str) -> 
                 "bioguide_id", bioguide_id, "Bioguide ID cannot be empty"
             ))
         
-        data = await safe_members_request(f"/member/{bioguide_id}/cosponsored-legislation", ctx, {"limit": 20})
+        data = await safe_congressional_request(f"/member/{bioguide_id}/cosponsored-legislation", ctx, {"limit": 20}, endpoint_type='members')
         
         if "error" in data:
             if "404" in str(data["error"]):
@@ -364,7 +364,7 @@ async def get_members_by_state(ctx: Context, state_code: str) -> str:
         
         state_code = state_validation.sanitized_value
         
-        data = await safe_members_request(f"/member/{state_code}", ctx, {"currentMember": "true"})
+        data = await safe_congressional_request(f"/member/{state_code}", ctx, {"currentMember": "true"}, endpoint_type='members')
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error retrieving members for state {state_code}: {data['error']}"))
@@ -417,7 +417,7 @@ async def get_members_by_district(ctx: Context, state_code: str, district: int) 
                 "district", district, "District must be a positive integer (e.g., 1, 2, 10)"
             ))
         
-        data = await safe_members_request(f"/member/{state_code}/{district}", ctx, {"currentMember": "true"})
+        data = await safe_congressional_request(f"/member/{state_code}/{district}", ctx, {"currentMember": "true"}, endpoint_type='members')
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error retrieving members for {state_code}-{district}: {data['error']}"))
@@ -587,7 +587,7 @@ async def search_members(
             data = {"members": all_members}
         else:
             # Use single endpoint request for other cases
-            data = await safe_members_request(endpoint, ctx, params)
+            data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='members')
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error searching members: {data['error']}"))
@@ -767,7 +767,7 @@ async def get_members_by_congress_state_district(
             endpoint = f"/member/{state_code}"
         
         # Make the API request
-        data = await safe_members_request(endpoint, ctx, params)
+        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='members')
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error retrieving members: {data['error']}"))
@@ -842,7 +842,7 @@ async def get_all_members_paginated(ctx: Context, endpoint: str, base_params: Di
             
             # Make the API request
             logger.info(f"Fetching members from {endpoint} with offset={offset}, limit={limit}")
-            data = await safe_members_request(endpoint, ctx, params)
+            data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='members')
             
             if "error" in data:
                 if offset == 0:

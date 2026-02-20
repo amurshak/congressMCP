@@ -8,7 +8,7 @@ import logging
 from typing import Dict, Any, List, Optional
 from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
-from ..core.api_wrapper import safe_nominations_request
+from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
@@ -217,7 +217,7 @@ async def get_latest_nominations(ctx: Context) -> str:
     
     # Make safe API request
     endpoint = BASE_ENDPOINT
-    data = await safe_nominations_request(endpoint, ctx, {"sort": "updateDate+desc", "limit": 10})
+    data = await safe_congressional_request(endpoint, ctx, {}, endpoint_type='nominations')
     
     if "error" in data:
         logger.error(f"Error getting latest nominations: {data['error']}")
@@ -262,7 +262,7 @@ async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
     
     # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}"
-    data = await safe_nominations_request(endpoint, ctx, {})
+    data = await safe_congressional_request(endpoint, ctx, {}, endpoint_type='nominations')
     
     if "error" in data:
         logger.error(f"Error getting nominations for Congress {congress}: {data['error']}")
@@ -313,7 +313,7 @@ async def get_nomination_details(ctx: Context, congress: int, nomination_number:
     
     # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}"
-    data = await safe_nominations_request(endpoint, ctx, {})
+    data = await safe_congressional_request(endpoint, ctx, {}, endpoint_type='nominations')
     
     if "error" in data:
         logger.error(f"Error getting nomination details for {nomination_number}, Congress {congress}: {data['error']}")
@@ -359,7 +359,7 @@ async def get_nomination_nominees(ctx: Context, congress: int, nomination_number
     
     # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/{ordinal}"
-    data = await safe_nominations_request(endpoint, ctx, {})
+    data = await safe_congressional_request(endpoint, ctx, {}, endpoint_type='nominations')
     
     if "error" in data:
         logger.error(f"Error getting nominees for nomination {nomination_number}, Congress {congress}, ordinal {ordinal}: {data['error']}")
@@ -407,7 +407,7 @@ async def get_nomination_actions(ctx: Context, congress: int, nomination_number:
     
     # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/actions"
-    data = await safe_nominations_request(endpoint, ctx, {})
+    data = await safe_congressional_request(endpoint, ctx, {}, endpoint_type='nominations')
     
     if "error" in data:
         logger.error(f"Error getting actions for nomination {nomination_number}, Congress {congress}: {data['error']}")
@@ -458,7 +458,7 @@ async def get_nomination_committees(ctx: Context, congress: int, nomination_numb
     
     # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/committees"
-    data = await safe_nominations_request(endpoint, ctx, {})
+    data = await safe_congressional_request(endpoint, ctx, {}, endpoint_type='nominations')
     
     if "error" in data:
         logger.error(f"Error getting committees for nomination {nomination_number}, Congress {congress}: {data['error']}")
@@ -509,7 +509,7 @@ async def get_nomination_hearings(ctx: Context, congress: int, nomination_number
     
     # Make safe API request
     endpoint = f"{BASE_ENDPOINT}/{congress}/{nomination_number}/hearings"
-    data = await safe_nominations_request(endpoint, ctx, {})
+    data = await safe_congressional_request(endpoint, ctx, {}, endpoint_type='nominations')
     
     if "error" in data:
         logger.error(f"Error getting hearings for nomination {nomination_number}, Congress {congress}: {data['error']}")
@@ -607,7 +607,7 @@ async def search_nominations(
         endpoint = f"{BASE_ENDPOINT}/{congress}"
     
     # Make safe API request
-    data = await safe_nominations_request(endpoint, ctx, params)
+    data = await safe_congressional_request(endpoint, ctx, params)
     
     if "error" in data:
         logger.error(f"Error searching for nominations: {data['error']}")

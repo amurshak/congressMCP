@@ -4,7 +4,7 @@ from typing import Dict, List, Any, Optional
 from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
-from ..core.api_wrapper import safe_treaties_request
+from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import TreatiesProcessor, clean_treaties_response
@@ -211,7 +211,7 @@ async def get_latest_treaties(ctx: Context) -> str:
         }
         
         # Make the defensive API request
-        data = await safe_treaties_request(
+        data = await safe_congressional_request(
             endpoint="/treaty",
             ctx=ctx,
             params=params
@@ -268,7 +268,7 @@ async def get_treaties_by_congress(ctx: Context, congress: int) -> str:
         }
         
         # Make the defensive API request
-        data = await safe_treaties_request(
+        data = await safe_congressional_request(
             endpoint=f"/treaty/{congress}",
             ctx=ctx,
             params=params
@@ -307,7 +307,7 @@ async def get_treaty_detail(ctx: Context, congress: int, treaty_number: int) -> 
         # Make API request
         endpoint = f"/treaty/{congress}/{treaty_number}"
         params = {'format': 'json'}
-        response = await safe_treaties_request(endpoint, ctx, params)
+        response = await safe_congressional_request(endpoint, ctx, params, endpoint_type='treaties')
         
         if not response or 'treaty' not in response:
             error_response = CommonErrors.not_found(
@@ -346,7 +346,7 @@ async def get_treaty_detail_with_suffix(ctx: Context, congress: int, treaty_numb
         # Make API request
         endpoint = f"/treaty/{congress}/{treaty_number}/{treaty_suffix}"
         params = {'format': 'json'}
-        response = await safe_treaties_request(endpoint, ctx, params)
+        response = await safe_congressional_request(endpoint, ctx, params, endpoint_type='treaties')
         
         if not response or 'treaty' not in response:
             error_response = CommonErrors.not_found(
@@ -440,7 +440,7 @@ async def get_treaty_actions(
             endpoint = f"/treaty/{congress}/{treaty_number}/actions"
         
         # Make the defensive API request
-        data = await safe_treaties_request(
+        data = await safe_congressional_request(
             endpoint=endpoint,
             ctx=ctx,
             params=params
@@ -563,7 +563,7 @@ async def get_treaty_text(
         params = {'format': 'json'}
         
         # Make API request
-        response = await safe_treaties_request(endpoint, ctx, params)
+        response = await safe_congressional_request(endpoint, ctx, params, endpoint_type='treaties')
         
         if not response or 'treaty' not in response:
             return CommonErrors.not_found(
