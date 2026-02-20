@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/amurshak-congressmcp-badge.png)](https://mseep.ai/app/amurshak-congressmcp)
+
 # CongressMCP
 
 **Give your AI assistant access to comprehensive U.S. Congressional data**
