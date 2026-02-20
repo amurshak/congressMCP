@@ -17,11 +17,86 @@ from typing import Optional, Dict, Any
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
+from ...models.responses import ResearchProfessionalResponse, ErrorResponse, ResearchSummary
 
 # Import access control utilities
 from ...core.auth import get_user_tier_from_context, SubscriptionTier
 
 logger = logging.getLogger(__name__)
+
+def _convert_to_structured_response(raw_response: str, operation: str) -> ResearchProfessionalResponse:
+    """Convert raw string response to structured ResearchProfessionalResponse."""
+    import json
+    
+    try:
+        if isinstance(raw_response, str):
+            import re
+            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+            else:
+                return ResearchProfessionalResponse(
+                    success=True,
+                    operation=operation,
+                    results_count=0,
+                    research_materials=[],
+                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response,
+                    recommended_reading=[]
+                )
+        else:
+            data = raw_response
+        
+        research_materials = []
+        results_count = 0
+        
+        if isinstance(data, dict):
+            # Handle research materials (CRS reports, committee reports, etc.)
+            if 'reports' in data:
+                for report_data in data.get('reports', []):
+                    if isinstance(report_data, dict):
+                        research_materials.append(ResearchSummary(
+                            title=report_data.get('title', ''),
+                            type=report_data.get('reportType', 'Research Document'),
+                            date=report_data.get('date'),
+                            summary=report_data.get('summary'),
+                            topics=report_data.get('policyArea', []),
+                            url=report_data.get('url')
+                        ))
+            
+            # Handle other research document types
+            if 'crsReports' in data:
+                for crs_data in data.get('crsReports', []):
+                    if isinstance(crs_data, dict):
+                        research_materials.append(ResearchSummary(
+                            title=crs_data.get('title', ''),
+                            type='CRS Report',
+                            date=crs_data.get('date'),
+                            summary=crs_data.get('summary'),
+                            topics=crs_data.get('topics', []),
+                            url=crs_data.get('url')
+                        ))
+            
+            results_count = len(research_materials)
+            
+        return ResearchProfessionalResponse(
+            success=True,
+            operation=operation,
+            results_count=results_count,
+            research_materials=research_materials,
+            summary=f"Found {len(research_materials)} research materials",
+            recommended_reading=[]
+        )
+        
+    except Exception as e:
+        logger.error(f"Error converting response to structured format: {e}")
+        return ResearchProfessionalResponse(
+            success=False,
+            operation=operation,
+            results_count=0,
+            research_materials=[],
+            summary=f"Error processing response: {str(e)}",
+            recommended_reading=[]
+        )
 
 # Define operation access levels
 # Note: Both FREE_OPERATIONS and PAID_OPERATIONS currently contain the same operations,
@@ -77,27 +152,31 @@ def check_operation_access(ctx: Context, operation: str) -> None:
                 f"Please upgrade your subscription to access this feature."
             )
 
-async def route_research_and_professional_operation(ctx: Context, operation: str, **kwargs) -> str:
+async def route_research_and_professional_operation(ctx: Context, operation: str, **kwargs) -> ResearchProfessionalResponse:
     """Route operation to appropriate internal function."""
     
     # Congress information operations
     if operation == "get_congress_info":
         from ..congress_info import get_congress_info
-        return await get_congress_info(ctx, **kwargs)
+        raw_response = await get_congress_info(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_congresses":
         from ..congress_info import search_congresses
-        return await search_congresses(ctx, **kwargs)
+        raw_response = await search_congresses(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_congress_info_enhanced":
         # Enhanced version with additional analytics
         from ..congress_info import get_congress_info
         # Add detailed=True for enhanced mode
         kwargs['detailed'] = True
-        return await get_congress_info(ctx, **kwargs)
+        raw_response = await get_congress_info(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Professional research operations
     elif operation == "search_crs_reports":
         from ..crs_reports import search_crs_reports
-        return await search_crs_reports(ctx, **kwargs)
+        raw_response = await search_crs_reports(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Future professional analytics operations
     elif operation == "get_congress_statistics":
@@ -228,7 +307,8 @@ async def research_and_professional(
                 operation_kwargs[param_name] = param_value
         
         # Route to appropriate internal function
-        return await route_research_and_professional_operation(ctx, operation, **operation_kwargs)
+        raw_response = await route_research_and_professional_operation(ctx, operation, **operation_kwargs)
+        return _convert_to_structured_response(raw_response, operation)
         
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)

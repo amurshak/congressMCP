@@ -25,6 +25,88 @@ from ...core.auth import get_user_tier_from_context, SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
+def _convert_to_structured_response(raw_response: str, operation: str) -> LegislationHubResponse:
+    """Convert raw string response to structured LegislationHubResponse."""
+    import json
+    
+    try:
+        if isinstance(raw_response, str):
+            import re
+            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+            else:
+                return LegislationHubResponse(
+                    success=True,
+                    operation=operation,
+                    results_count=0,
+                    bills=[],
+                    amendments=[],
+                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response,
+                    next_steps=[]
+                )
+        else:
+            data = raw_response
+        
+        bills = []
+        amendments = []
+        results_count = 0
+        
+        if isinstance(data, dict):
+            # Handle bills
+            if 'bills' in data:
+                for bill_data in data.get('bills', []):
+                    if isinstance(bill_data, dict):
+                        bills.append(BillSummary(
+                            congress=bill_data.get('congress', 0),
+                            bill_type=bill_data.get('type', ''),
+                            bill_number=bill_data.get('number', 0),
+                            title=bill_data.get('title', ''),
+                            sponsor=bill_data.get('sponsor'),
+                            introduced_date=bill_data.get('introducedDate'),
+                            latest_action=bill_data.get('latestAction'),
+                            url=bill_data.get('url')
+                        ))
+                        
+            # Handle amendments
+            if 'amendments' in data:
+                for amend_data in data.get('amendments', []):
+                    if isinstance(amend_data, dict):
+                        amendments.append(AmendmentSummary(
+                            congress=amend_data.get('congress', 0),
+                            amendment_type=amend_data.get('type', ''),
+                            amendment_number=amend_data.get('number', 0),
+                            purpose=amend_data.get('purpose'),
+                            sponsor=amend_data.get('sponsor'),
+                            submitted_date=amend_data.get('submittedDate'),
+                            bill_number=amend_data.get('billNumber'),
+                            url=amend_data.get('url')
+                        ))
+            
+            results_count = len(bills) + len(amendments)
+            
+        return LegislationHubResponse(
+            success=True,
+            operation=operation,
+            results_count=results_count,
+            bills=bills,
+            amendments=amendments,
+            summary=f"Found {len(bills)} bills and {len(amendments)} amendments",
+            next_steps=[]
+        )
+        
+    except Exception as e:
+        logger.error(f"Error converting response to structured format: {e}")
+        return LegislationHubResponse(
+            success=False,
+            operation=operation,
+            results_count=0,
+            bills=[],
+            amendments=[],
+            summary=f"Error processing response: {str(e)}",
+            next_steps=[]
+        )
+
 # Define operation access levels - CURRENTLY ALL OPERATIONS AVAILABLE TO ALL TIERS
 # Note: Both FREE_OPERATIONS and PAID_OPERATIONS contain the same operations
 # This reflects the current universal access model while preserving infrastructure for future changes
@@ -107,94 +189,122 @@ async def route_legislation_operation(ctx: Context, operation: str, **kwargs) ->
     # Bills operations - using new bills module
     if operation == "search_bills":
         from .bills import search_bills
-        return await search_bills(ctx, **kwargs)
+        raw_response = await search_bills(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bills":  # NEW: Core missing function
         from .bills import get_bills
-        return await get_bills(ctx, **kwargs)
+        raw_response = await get_bills(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_details":
         from .bills import get_bill_details
-        return await get_bill_details(ctx, **kwargs)
+        raw_response = await get_bill_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_text":
         from .bills import get_bill_text
-        return await get_bill_text(ctx, **kwargs)
+        raw_response = await get_bill_text(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_actions":
         from .bills import get_bill_actions
-        return await get_bill_actions(ctx, **kwargs)
+        raw_response = await get_bill_actions(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_amendments":
         from .bills import get_bill_amendments
-        return await get_bill_amendments(ctx, **kwargs)
+        raw_response = await get_bill_amendments(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_committees":
         from .bills import get_bill_committees
-        return await get_bill_committees(ctx, **kwargs)
+        raw_response = await get_bill_committees(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_cosponsors":
         from .bills import get_bill_cosponsors
-        return await get_bill_cosponsors(ctx, **kwargs)
+        raw_response = await get_bill_cosponsors(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_related_bills":
         from .bills import get_bill_related_bills
-        return await get_bill_related_bills(ctx, **kwargs)
+        raw_response = await get_bill_related_bills(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_subjects":
         from .bills import get_bill_subjects
-        return await get_bill_subjects(ctx, **kwargs)
+        raw_response = await get_bill_subjects(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_summaries":
         from .bills import get_bill_summaries
-        return await get_bill_summaries(ctx, **kwargs)
+        raw_response = await get_bill_summaries(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_text_versions":
         from .bills import get_bill_text_versions
-        return await get_bill_text_versions(ctx, **kwargs)
+        raw_response = await get_bill_text_versions(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_titles":
         from .bills import get_bill_titles
-        return await get_bill_titles(ctx, **kwargs)
+        raw_response = await get_bill_titles(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bill_content":
         from .bills import get_bill_content
-        return await get_bill_content(ctx, **kwargs)
+        raw_response = await get_bill_content(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_recent_bills":
         from .bills import get_recent_bills
-        return await get_recent_bills(ctx, **kwargs)
+        raw_response = await get_recent_bills(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_bills_by_date_range":
         from .bills import get_bills_by_date_range
-        return await get_bills_by_date_range(ctx, **kwargs)
+        raw_response = await get_bills_by_date_range(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Amendment operations
     elif operation == "get_amendments":  # NEW: Core missing function
         from .amendments import get_amendments
-        return await get_amendments(ctx, **kwargs)
+        raw_response = await get_amendments(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_amendments":
         from .amendments import search_amendments
-        return await search_amendments(ctx, **kwargs)
+        raw_response = await search_amendments(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_amendment_details":
         from .amendments import get_amendment_details
-        return await get_amendment_details(ctx, **kwargs)
+        raw_response = await get_amendment_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_amendment_actions":
         from .amendments import get_amendment_actions
-        return await get_amendment_actions(ctx, **kwargs)
+        raw_response = await get_amendment_actions(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_amendment_sponsors":
         from .amendments import get_amendment_sponsors
-        return await get_amendment_sponsors(ctx, **kwargs)
+        raw_response = await get_amendment_sponsors(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_amendment_amendments":
         from .amendments import get_amendment_amendments
-        return await get_amendment_amendments(ctx, **kwargs)
+        raw_response = await get_amendment_amendments(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_amendment_text":
         from .amendments import get_amendment_text
-        return await get_amendment_text(ctx, **kwargs)
+        raw_response = await get_amendment_text(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Summary operations
     elif operation == "search_summaries":
         from ..summaries import search_summaries
-        return await search_summaries(ctx, **kwargs)
+        raw_response = await search_summaries(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Treaty operations
     elif operation == "search_treaties":
         from ..treaties import search_treaties
-        return await search_treaties(ctx, **kwargs)
+        raw_response = await search_treaties(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_treaty_actions":
         from ..treaties import get_treaty_actions
-        return await get_treaty_actions(ctx, **kwargs)
+        raw_response = await get_treaty_actions(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_treaty_committees":
         from ..treaties import get_treaty_committees
-        return await get_treaty_committees(ctx, **kwargs)
+        raw_response = await get_treaty_committees(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_treaty_text":
         from ..treaties import get_treaty_text
-        return await get_treaty_text(ctx, **kwargs)
+        raw_response = await get_treaty_text(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     else:
         raise ToolError(f"Unknown operation: {operation}")
@@ -373,7 +483,8 @@ async def legislation_hub(
                 operation_kwargs[param_name] = param_value
         
         # Route to appropriate internal function
-        return await route_legislation_operation(ctx, operation, **operation_kwargs)
+        raw_response = await route_legislation_operation(ctx, operation, **operation_kwargs)
+        return _convert_to_structured_response(raw_response, operation)
         
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)
