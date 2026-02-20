@@ -32,8 +32,8 @@ user_service = UserService()
 def verify_stripe_signature(payload: bytes, sig_header: str) -> bool:
     """Verify that the webhook came from Stripe."""
     if not STRIPE_WEBHOOK_SECRET:
-        logger.warning("Stripe webhook secret not configured - skipping signature verification")
-        return True  # Allow through for testing when secret not set
+        logger.error("Stripe webhook secret not configured - rejecting webhook")
+        return False  # SECURITY: Never allow unverified webhooks
     
     try:
         # Extract timestamp and signature
