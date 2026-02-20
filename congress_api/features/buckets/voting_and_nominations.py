@@ -15,11 +15,90 @@ from typing import Optional, Dict, Any
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
+from ...models.responses import VotingNominationsResponse, ErrorResponse, VoteSummary, NominationSummary
 
 # Import access control utilities
 from ...core.auth import get_user_tier_from_context, SubscriptionTier
 
 logger = logging.getLogger(__name__)
+
+def _convert_to_structured_response(raw_response: str, operation: str) -> VotingNominationsResponse:
+    """Convert raw string response to structured VotingNominationsResponse."""
+    import json
+    
+    try:
+        # Parse the raw response
+        if isinstance(raw_response, str):
+            import re
+            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+            else:
+                return VotingNominationsResponse(
+                    success=True,
+                    operation=operation,
+                    results_count=0,
+                    votes=[],
+                    nominations=[],
+                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                )
+        else:
+            data = raw_response
+        
+        votes = []
+        nominations = []
+        results_count = 0
+        
+        if isinstance(data, dict):
+            # Handle votes
+            if 'votes' in data:
+                for vote_data in data.get('votes', []):
+                    if isinstance(vote_data, dict):
+                        votes.append(VoteSummary(
+                            vote_number=vote_data.get('voteNumber', 0),
+                            chamber=vote_data.get('chamber', ''),
+                            date=vote_data.get('date', ''),
+                            description=vote_data.get('question', ''),
+                            result=vote_data.get('result', ''),
+                            vote_counts=vote_data.get('totals', {}),
+                            url=vote_data.get('url')
+                        ))
+                        
+            # Handle nominations
+            if 'nominations' in data:
+                for nom_data in data.get('nominations', []):
+                    if isinstance(nom_data, dict):
+                        nominations.append(NominationSummary(
+                            nomination_number=nom_data.get('nominationNumber', ''),
+                            nominee=nom_data.get('nominee', ''),
+                            position=nom_data.get('position', ''),
+                            organization=nom_data.get('organization', ''),
+                            received_date=nom_data.get('receivedDate'),
+                            status=nom_data.get('latestAction'),
+                            url=nom_data.get('url')
+                        ))
+            
+            results_count = len(votes) + len(nominations)
+            
+        return VotingNominationsResponse(
+            success=True,
+            operation=operation,
+            results_count=results_count,
+            votes=votes,
+            nominations=nominations,
+            summary=f"Found {len(votes)} votes and {len(nominations)} nominations"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error converting response to structured format: {e}")
+        return VotingNominationsResponse(
+            success=False,
+            operation=operation,
+            results_count=0,
+            votes=[],
+            nominations=[],
+            summary=f"Error processing response: {str(e)}"
+        )
 
 # Define operation access levels
 FREE_OPERATIONS = {
@@ -90,54 +169,68 @@ def check_operation_access(ctx: Context, operation: str) -> None:
                 f"Please upgrade your subscription to access this feature."
             )
 
-async def route_voting_and_nominations_operation(ctx: Context, operation: str, **kwargs) -> str:
+async def route_voting_and_nominations_operation(ctx: Context, operation: str, **kwargs) -> VotingNominationsResponse:
     """Route operation to appropriate internal function."""
     
     # House voting operations  
     if operation == "get_house_votes_by_congress":
         from ..house_votes import get_house_votes_by_congress
-        return await get_house_votes_by_congress(ctx, **kwargs)
+        raw_response = await get_house_votes_by_congress(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_votes_by_session":
         from ..house_votes import get_house_votes_by_session
-        return await get_house_votes_by_session(ctx, **kwargs)
+        raw_response = await get_house_votes_by_session(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_vote_details":
         from ..house_votes import get_house_vote_details
-        return await get_house_vote_details(ctx, **kwargs)
+        raw_response = await get_house_vote_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_vote_details_enhanced":
         from ..house_votes import get_house_vote_details_enhanced
-        return await get_house_vote_details_enhanced(ctx, **kwargs)
+        raw_response = await get_house_vote_details_enhanced(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_vote_member_votes":
         from ..house_votes import get_house_vote_member_votes
-        return await get_house_vote_member_votes(ctx, **kwargs)
+        raw_response = await get_house_vote_member_votes(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_vote_member_votes_xml":
         from ..house_votes import get_house_vote_member_votes_xml
-        return await get_house_vote_member_votes_xml(ctx, **kwargs)
+        raw_response = await get_house_vote_member_votes_xml(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Nomination operations
     elif operation == "search_nominations":
         from ..nominations import search_nominations
-        return await search_nominations(ctx, **kwargs)
+        raw_response = await search_nominations(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_latest_nominations":
         from ..nominations import get_latest_nominations
-        return await get_latest_nominations(ctx, **kwargs)
+        raw_response = await get_latest_nominations(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_details":
         from ..nominations import get_nomination_details
-        return await get_nomination_details(ctx, **kwargs)
+        raw_response = await get_nomination_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_actions":
         from ..nominations import get_nomination_actions
-        return await get_nomination_actions(ctx, **kwargs)
+        raw_response = await get_nomination_actions(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_committees":
         from ..nominations import get_nomination_committees
-        return await get_nomination_committees(ctx, **kwargs)
+        raw_response = await get_nomination_committees(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_hearings":
         from ..nominations import get_nomination_hearings
-        return await get_nomination_hearings(ctx, **kwargs)
+        raw_response = await get_nomination_hearings(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_nominees":
         from ..nominations import get_nomination_nominees
-        return await get_nomination_nominees(ctx, **kwargs)
+        raw_response = await get_nomination_nominees(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nominations_by_congress":
         from ..nominations import get_nominations_by_congress
-        return await get_nominations_by_congress(ctx, **kwargs)
+        raw_response = await get_nominations_by_congress(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     else:
         raise ToolError(f"Unknown operation: {operation}")
@@ -267,7 +360,8 @@ async def voting_and_nominations(
                 operation_kwargs[param_name] = param_value
         
         # Route to appropriate internal function
-        return await route_voting_and_nominations_operation(ctx, operation, **operation_kwargs)
+        raw_response = await route_voting_and_nominations_operation(ctx, operation, **operation_kwargs)
+        return _convert_to_structured_response(raw_response, operation)
         
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)

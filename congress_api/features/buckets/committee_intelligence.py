@@ -17,11 +17,86 @@ from typing import Optional, Dict, Any
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
+from ...models.responses import CommitteeIntelligenceResponse, ErrorResponse, CommitteeActivitySummary
 
 # Import access control utilities
 from ...core.auth import get_user_tier_from_context, SubscriptionTier
 
 logger = logging.getLogger(__name__)
+
+def _convert_to_structured_response(raw_response: str, operation: str) -> CommitteeIntelligenceResponse:
+    """Convert raw string response to structured CommitteeIntelligenceResponse."""
+    import json
+    
+    try:
+        if isinstance(raw_response, str):
+            import re
+            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+            else:
+                return CommitteeIntelligenceResponse(
+                    success=True,
+                    operation=operation,
+                    results_count=0,
+                    activities=[],
+                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response,
+                    insights=[]
+                )
+        else:
+            data = raw_response
+        
+        activities = []
+        results_count = 0
+        
+        if isinstance(data, dict):
+            # Handle committee activities
+            if 'activities' in data:
+                for activity_data in data.get('activities', []):
+                    if isinstance(activity_data, dict):
+                        activities.append(CommitteeActivitySummary(
+                            committee_name=activity_data.get('committee', ''),
+                            activity_type=activity_data.get('activityType', ''),
+                            title=activity_data.get('title', ''),
+                            date=activity_data.get('date'),
+                            status=activity_data.get('status', ''),
+                            url=activity_data.get('url')
+                        ))
+            
+            # Handle meetings as activities
+            if 'meetings' in data:
+                for meeting_data in data.get('meetings', []):
+                    if isinstance(meeting_data, dict):
+                        activities.append(CommitteeActivitySummary(
+                            committee_name=meeting_data.get('committee', ''),
+                            activity_type='meeting',
+                            title=meeting_data.get('title', ''),
+                            date=meeting_data.get('date'),
+                            status=meeting_data.get('status', ''),
+                            url=meeting_data.get('url')
+                        ))
+            
+            results_count = len(activities)
+            
+        return CommitteeIntelligenceResponse(
+            success=True,
+            operation=operation,
+            results_count=results_count,
+            activities=activities,
+            summary=f"Found {len(activities)} committee activities",
+            insights=[]
+        )
+        
+    except Exception as e:
+        logger.error(f"Error converting response to structured format: {e}")
+        return CommitteeIntelligenceResponse(
+            success=False,
+            operation=operation,
+            results_count=0,
+            activities=[],
+            summary=f"Error processing response: {str(e)}",
+            insights=[]
+        )
 
 # Define operation access levels
 # Note: Both FREE_OPERATIONS and PAID_OPERATIONS currently contain the same operations,
@@ -110,71 +185,90 @@ def check_operation_access(ctx: Context, operation: str) -> None:
                 f"Please upgrade your subscription to access this feature."
             )
 
-async def route_committee_intelligence_operation(ctx: Context, operation: str, **kwargs) -> str:
+async def route_committee_intelligence_operation(ctx: Context, operation: str, **kwargs) -> CommitteeIntelligenceResponse:
     """Route operation to appropriate internal function."""
     
     # Committee report operations
     if operation == "get_latest_committee_reports":
         from ..committee_reports import get_latest_committee_reports
-        return await get_latest_committee_reports(ctx, **kwargs)
+        raw_response = await get_latest_committee_reports(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_reports_by_congress":
         from ..committee_reports import get_committee_reports_by_congress
-        return await get_committee_reports_by_congress(ctx, **kwargs)
+        raw_response = await get_committee_reports_by_congress(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_reports_by_congress_and_type":
         from ..committee_reports import get_committee_reports_by_congress_and_type
-        return await get_committee_reports_by_congress_and_type(ctx, **kwargs)
+        raw_response = await get_committee_reports_by_congress_and_type(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_report_details":
         from ..committee_reports import get_committee_report_details
-        return await get_committee_report_details(ctx, **kwargs)
+        raw_response = await get_committee_report_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_report_text_versions":
         from ..committee_reports import get_committee_report_text_versions
-        return await get_committee_report_text_versions(ctx, **kwargs)
+        raw_response = await get_committee_report_text_versions(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_report_content":
         from ..committee_reports import get_committee_report_content
-        return await get_committee_report_content(ctx, **kwargs)
+        raw_response = await get_committee_report_content(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_committee_reports":
         from ..committee_reports import search_committee_reports
-        return await search_committee_reports(ctx, **kwargs)
+        raw_response = await search_committee_reports(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Committee print operations
     elif operation == "get_latest_committee_prints":
         from ..committee_prints import get_latest_committee_prints
-        return await get_latest_committee_prints(ctx, **kwargs)
+        raw_response = await get_latest_committee_prints(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_prints_by_congress":
         from ..committee_prints import get_committee_prints_by_congress
-        return await get_committee_prints_by_congress(ctx, **kwargs)
+        raw_response = await get_committee_prints_by_congress(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_prints_by_congress_and_chamber":
         from ..committee_prints import get_committee_prints_by_congress_and_chamber
-        return await get_committee_prints_by_congress_and_chamber(ctx, **kwargs)
+        raw_response = await get_committee_prints_by_congress_and_chamber(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_print_details":
         from ..committee_prints import get_committee_print_details
-        return await get_committee_print_details(ctx, **kwargs)
+        raw_response = await get_committee_print_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_print_text_versions":
         from ..committee_prints import get_committee_print_text_versions
-        return await get_committee_print_text_versions(ctx, **kwargs)
+        raw_response = await get_committee_print_text_versions(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_committee_prints":
         from ..committee_prints import search_committee_prints
-        return await search_committee_prints(ctx, **kwargs)
+        raw_response = await search_committee_prints(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Committee meeting operations
     elif operation == "get_latest_committee_meetings":
         from ..committee_meetings import get_latest_committee_meetings
-        return await get_latest_committee_meetings(ctx, **kwargs)
+        raw_response = await get_latest_committee_meetings(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_meetings_by_congress":
         from ..committee_meetings import get_committee_meetings_by_congress
-        return await get_committee_meetings_by_congress(ctx, **kwargs)
+        raw_response = await get_committee_meetings_by_congress(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_meetings_by_congress_and_chamber":
         from ..committee_meetings import get_committee_meetings_by_congress_and_chamber
-        return await get_committee_meetings_by_congress_and_chamber(ctx, **kwargs)
+        raw_response = await get_committee_meetings_by_congress_and_chamber(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_meetings_by_committee":
         from ..committee_meetings import get_committee_meetings_by_committee
-        return await get_committee_meetings_by_committee(ctx, **kwargs)
+        raw_response = await get_committee_meetings_by_committee(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_meeting_details":
         from ..committee_meetings import get_committee_meeting_details
-        return await get_committee_meeting_details(ctx, **kwargs)
+        raw_response = await get_committee_meeting_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_committee_meetings":
         from ..committee_meetings import search_committee_meetings
-        return await search_committee_meetings(ctx, **kwargs)
+        raw_response = await search_committee_meetings(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     else:
         raise ToolError(f"Unknown operation: {operation}")
@@ -346,7 +440,8 @@ async def committee_intelligence(
                 operation_kwargs[param_name] = param_value
         
         # Route to appropriate internal function
-        return await route_committee_intelligence_operation(ctx, operation, **operation_kwargs)
+        raw_response = await route_committee_intelligence_operation(ctx, operation, **operation_kwargs)
+        return _convert_to_structured_response(raw_response, operation)
         
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)

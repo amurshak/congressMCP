@@ -17,11 +17,88 @@ from typing import Optional, Dict, Any
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
+from ...models.responses import RecordsHearingsResponse, ErrorResponse, HearingSummary, RecordSummary
 
 # Import access control utilities
 from ...core.auth import get_user_tier_from_context, SubscriptionTier
 
 logger = logging.getLogger(__name__)
+
+def _convert_to_structured_response(raw_response: str, operation: str) -> RecordsHearingsResponse:
+    """Convert raw string response to structured RecordsHearingsResponse."""
+    import json
+    
+    try:
+        if isinstance(raw_response, str):
+            import re
+            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+            else:
+                return RecordsHearingsResponse(
+                    success=True,
+                    operation=operation,
+                    results_count=0,
+                    hearings=[],
+                    records=[],
+                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                )
+        else:
+            data = raw_response
+        
+        hearings = []
+        records = []
+        results_count = 0
+        
+        if isinstance(data, dict):
+            # Handle hearings
+            if 'hearings' in data:
+                for hearing_data in data.get('hearings', []):
+                    if isinstance(hearing_data, dict):
+                        hearings.append(HearingSummary(
+                            congress=hearing_data.get('congress', 0),
+                            chamber=hearing_data.get('chamber', ''),
+                            jacket_number=hearing_data.get('jacketNumber', ''),
+                            title=hearing_data.get('title', ''),
+                            committee=hearing_data.get('committee', ''),
+                            date=hearing_data.get('date'),
+                            url=hearing_data.get('url')
+                        ))
+                        
+            # Handle congressional records
+            if 'records' in data:
+                for record_data in data.get('records', []):
+                    if isinstance(record_data, dict):
+                        records.append(RecordSummary(
+                            volume=record_data.get('volume', 0),
+                            issue=record_data.get('issue', 0),
+                            date=record_data.get('date', ''),
+                            section=record_data.get('section', ''),
+                            title=record_data.get('title', ''),
+                            url=record_data.get('url')
+                        ))
+            
+            results_count = len(hearings) + len(records)
+            
+        return RecordsHearingsResponse(
+            success=True,
+            operation=operation,
+            results_count=results_count,
+            hearings=hearings,
+            records=records,
+            summary=f"Found {len(hearings)} hearings and {len(records)} records"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error converting response to structured format: {e}")
+        return RecordsHearingsResponse(
+            success=False,
+            operation=operation,
+            results_count=0,
+            hearings=[],
+            records=[],
+            summary=f"Error processing response: {str(e)}"
+        )
 
 # Define operation access levels
 # Note: Both FREE_OPERATIONS and PAID_OPERATIONS currently contain the same operations,
@@ -107,68 +184,84 @@ def check_operation_access(ctx: Context, operation: str) -> None:
                 f"Please upgrade your subscription to access this feature."
             )
 
-async def route_records_and_hearings_operation(ctx: Context, operation: str, **kwargs) -> str:
+async def route_records_and_hearings_operation(ctx: Context, operation: str, **kwargs) -> RecordsHearingsResponse:
     """Route operation to appropriate internal function."""
     
     # Congressional Record operations
     if operation == "search_congressional_record":
         from ..congressional_record import search_congressional_record
-        return await search_congressional_record(ctx, **kwargs)
+        raw_response = await search_congressional_record(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_daily_congressional_record":
         from ..daily_congressional_record import search_daily_congressional_record
-        return await search_daily_congressional_record(ctx, **kwargs)
+        raw_response = await search_daily_congressional_record(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_bound_congressional_record":
         from ..bound_congressional_record import search_bound_congressional_record
-        return await search_bound_congressional_record(ctx, **kwargs)
+        raw_response = await search_bound_congressional_record(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # House communication operations
     elif operation == "search_house_communications":
         from ..house_communications import search_house_communications
-        return await search_house_communications(ctx, **kwargs)
+        raw_response = await search_house_communications(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_communication_details":
         from ..house_communications import get_house_communication_details
-        return await get_house_communication_details(ctx, **kwargs)
+        raw_response = await get_house_communication_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # House requirements operations
     elif operation == "search_house_requirements":
         from ..house_requirements import search_house_requirements
-        return await search_house_requirements(ctx, **kwargs)
+        raw_response = await search_house_requirements(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_requirement_details":
         from ..house_requirements import get_house_requirement_details
-        return await get_house_requirement_details(ctx, **kwargs)
+        raw_response = await get_house_requirement_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_requirement_matching_communications":
         from ..house_requirements import get_house_requirement_matching_communications
-        return await get_house_requirement_matching_communications(ctx, **kwargs)
+        raw_response = await get_house_requirement_matching_communications(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Senate communication operations
     elif operation == "search_senate_communications":
         from ..senate_communications import search_senate_communications
-        return await search_senate_communications(ctx, **kwargs)
+        raw_response = await search_senate_communications(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_senate_communication_details":
         from ..senate_communications import get_senate_communication_details
-        return await get_senate_communication_details(ctx, **kwargs)
+        raw_response = await get_senate_communication_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Committee communication operations
     elif operation == "get_committee_communication_details":
         from ..committees import get_committee_communication_details
-        return await get_committee_communication_details(ctx, **kwargs)
+        raw_response = await get_committee_communication_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     # Hearing operations
     elif operation == "search_hearings":
         from ..hearings import search_hearings
-        return await search_hearings(ctx, **kwargs)
+        raw_response = await search_hearings(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_hearings_by_congress":
         from ..hearings import get_hearings_by_congress
-        return await get_hearings_by_congress(ctx, **kwargs)
+        raw_response = await get_hearings_by_congress(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_hearings_by_congress_and_chamber":
         from ..hearings import get_hearings_by_congress_and_chamber
-        return await get_hearings_by_congress_and_chamber(ctx, **kwargs)
+        raw_response = await get_hearings_by_congress_and_chamber(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_hearing_details":
         from ..hearings import get_hearing_details
-        return await get_hearing_details(ctx, **kwargs)
+        raw_response = await get_hearing_details(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_hearing_content":
         from ..hearings import get_hearing_content
-        return await get_hearing_content(ctx, **kwargs)
+        raw_response = await get_hearing_content(ctx, **kwargs)
+        return _convert_to_structured_response(raw_response, operation)
     
     else:
         raise ToolError(f"Unknown operation: {operation}")
@@ -326,7 +419,8 @@ async def records_and_hearings(
                 operation_kwargs[param_name] = param_value
         
         # Route to appropriate internal function
-        return await route_records_and_hearings_operation(ctx, operation, **operation_kwargs)
+        raw_response = await route_records_and_hearings_operation(ctx, operation, **operation_kwargs)
+        return _convert_to_structured_response(raw_response, operation)
         
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)
