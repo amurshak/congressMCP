@@ -1,13 +1,12 @@
 """
-Congressional Legislation Hub - Consolidated MCP bucket tool for all legislation-related operations.
+Congressional Legislation Hub - DEPRECATED
 
-This bucket consolidates 25+ individual tools into a single interface with operation-based routing.
-ALL operations are available to ALL users regardless of tier - only usage limits differ by subscription:
-- FREE Tier: All operations, 500 calls/month
-- PRO Tier: All operations, 5,000 calls/month  
-- ENTERPRISE Tier: All operations, 100,000 calls/month
+⚠️  DEPRECATION NOTICE ⚠️
+This bucket system has been replaced by individual MCP tools in congress_api/features/legislation_tools.py
+Each operation is now its own @mcp.tool() with proper typing and structured Pydantic responses.
 
-Universal access model provides competitive advantage through generous freemium offering.
+This file is kept for backward compatibility but should not be used for new development.
+Individual tools provide better discoverability and type safety for AI agents.
 """
 
 import logging
