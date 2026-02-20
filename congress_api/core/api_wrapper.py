@@ -8,7 +8,7 @@ parameter sanitization, and standardized error responses.
 import asyncio
 import logging
 from typing import Dict, Any, Optional, List
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fastmcp import Context
 
 from .client_handler import make_api_request
@@ -226,13 +226,13 @@ class DefensiveAPIWrapper:
         if params is None:
             params = {}
         
-        # Get endpoint configuration
+        # Get endpoint configuration (copy to avoid mutating shared ENDPOINT_CONFIGS)
         if endpoint_type:
-            config = DefensiveAPIWrapper.ENDPOINT_CONFIGS.get(endpoint_type, DefensiveAPIWrapper.ENDPOINT_CONFIGS['default'])
+            config = replace(DefensiveAPIWrapper.ENDPOINT_CONFIGS.get(endpoint_type, DefensiveAPIWrapper.ENDPOINT_CONFIGS['default']))
         else:
-            config = DefensiveAPIWrapper._get_endpoint_config(endpoint)
+            config = replace(DefensiveAPIWrapper._get_endpoint_config(endpoint))
         
-        # Apply overrides
+        # Apply overrides (safe — config is a copy)
         if timeout_override:
             config.timeout = timeout_override
         if retry_count_override is not None:
