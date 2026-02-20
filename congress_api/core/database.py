@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from dateutil import parser as dateutil_parser
 from supabase import create_client, Client
 from .api_config import load_environment_config
+from .auth.auth import SubscriptionTier
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -36,11 +37,7 @@ def _cleanup_thread_pool():
 
 atexit.register(_cleanup_thread_pool)
 
-# Subscription tiers (matching auth.py)
-class SubscriptionTier(str, Enum):
-    FREE = "free"
-    PRO = "pro"
-    ENTERPRISE = "enterprise"
+# SubscriptionTier imported from auth.auth - single source of truth
 
 @dataclass
 class User:
