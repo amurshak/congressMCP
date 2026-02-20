@@ -1,13 +1,12 @@
 """
-Congressional Members and Committees - Consolidated MCP bucket tool for members and committees.
+Congressional Members and Committees - DEPRECATED
 
-This bucket consolidates 13+ individual tools into a single interface with operation-based routing.
-ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
-- FREE Tier: All operations, 500 calls/month
-- PRO Tier: All operations, 5,000 calls/month  
-- ENTERPRISE Tier: All operations
+⚠️  DEPRECATION NOTICE ⚠️
+This bucket system has been replaced by individual MCP tools in congress_api/features/members_committees_tools.py
+Each operation is now its own @mcp.tool() with proper typing and structured Pydantic responses.
 
-Access control infrastructure maintained for potential future tier differentiation.
+This file is kept for backward compatibility but should not be used for new development.
+Individual tools provide better discoverability and type safety for AI agents.
 """
 
 import logging
@@ -122,55 +121,12 @@ FREE_OPERATIONS = {
     # Committee operations
     "get_committee_bills",
     "get_committee_reports",
-    "get_committee_communications", 
+    "get_committee_communications",
     "get_committee_nominations"
 }
 
-PAID_OPERATIONS = {
-    # Advanced member features
-    "get_member_sponsored_legislation",
-    "get_member_cosponsored_legislation",
-    "get_members_by_congress",
-    "get_members_by_state",
-    "get_members_by_district", 
-    "get_members_by_congress_state_district",
-    
-    # Committee operations (all paid)
-    "get_committee_bills",
-    "get_committee_reports",
-    "get_committee_communications", 
-    "get_committee_nominations"
-}
-
-ALL_OPERATIONS = FREE_OPERATIONS | PAID_OPERATIONS
-
-def check_operation_access(ctx: Context, operation: str) -> None:
-    """Check if user has access to the requested operation based on tier."""
-    if operation not in ALL_OPERATIONS:
-        raise ToolError(f"Unknown operation: {operation}")
-    
-    if operation in FREE_OPERATIONS:
-        # Free operations - all users have access
-        return
-    
-    if operation in PAID_OPERATIONS:
-        # Paid operations - check user tier
-        user_tier = get_user_tier_from_context(ctx)
-        
-        # Handle both enum and string tier values
-        if isinstance(user_tier, SubscriptionTier):
-            is_paid = user_tier in [SubscriptionTier.PRO, SubscriptionTier.ENTERPRISE]
-        else:
-            tier_value = str(user_tier).lower()
-            is_paid = tier_value in ['pro', 'enterprise']
-        
-        if not is_paid:
-            tier_name = user_tier.value if isinstance(user_tier, SubscriptionTier) else str(user_tier).title()
-            raise ToolError(
-                f"Access denied: Operation '{operation}' requires a paid subscription (Pro or Enterprise). "
-                f"Your current tier: {tier_name}. "
-                f"Please upgrade your subscription to access this feature."
-            )
+# Copy all operations to paid tier (universal access model)
+PAID_OPERATIONS = FREE_OPERATIONS.copy()
 
 async def route_members_and_committees_operation(ctx: Context, operation: str, **kwargs) -> MembersCommitteesResponse:
     """Route operation to appropriate internal function."""
@@ -234,6 +190,7 @@ async def route_members_and_committees_operation(ctx: Context, operation: str, *
     else:
         raise ToolError(f"Unknown operation: {operation}")
 
+# DEPRECATED BUCKET TOOL - Kept for backward compatibility only
 @mcp.tool("members_and_committees")
 async def members_and_committees(
     ctx: Context,
@@ -246,103 +203,33 @@ async def members_and_committees(
     party: Optional[str] = None,
     chamber: Optional[str] = None,
     congress: Optional[int] = None,
-    district: Optional[int] = None,
     current_member: Optional[bool] = None,
+    district: Optional[int] = None,
     limit: Optional[int] = None,
     # Committee parameters
-    keywords: Optional[str] = None,
-    committee_code: Optional[str] = None
-) -> str:
+    committee_code: Optional[str] = None,
+    committee_type: Optional[str] = None
+) -> MembersCommitteesResponse:
     """
-    Congressional Members and Committees - Unified access to members and committees.
+    DEPRECATED: Use individual member/committee tools instead.
     
-    ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE (500), PRO (5,000), ENTERPRISE (100,000) calls/month
-    
-    AVAILABLE OPERATIONS:
-    Basic Member Operations:
-    - search_members: Search for members by name, state, party, chamber
-    - get_member_details: Get detailed member information
-    - search_committees: Search committees by keywords
-    
-    Member Legislation:
-    - get_member_sponsored_legislation: Get legislation sponsored by member
-    - get_member_cosponsored_legislation: Get legislation cosponsored by member
-    
-    Advanced Member Searches:
-    - get_members_by_congress: Get all members from specific Congress
-    - get_members_by_state: Get members from specific state
-    - get_members_by_district: Get members from specific district
-    - get_members_by_congress_state_district: Get members by Congress, state, and district
-    
-    Committee Operations:
-    - get_committee_bills: Get bills referred to committee
-    - get_committee_reports: Get reports from committee
-    - get_committee_communications: Get committee communications
-    - get_committee_nominations: Get nominations referred to committee
-    
-    Args:
-        operation: The specific operation to perform
-        **kwargs: Operation-specific parameters:
-        
-        Member Parameters:
-        - name: Member name to search for
-        - bioguide_id: Member's Bioguide ID
-        - state: State name or abbreviation
-        - state_code: Two-letter state code
-        - party: Party affiliation ('D', 'R', 'I')
-        - chamber: Chamber ('house' or 'senate')
-        - congress: Congress number
-        - district: District number
-        - current_member: Filter to current members only
-        - limit: Maximum results to return
-        
-        Committee Parameters:
-        - keywords: Keywords to search committees
-        - committee_code: Specific committee code
-        - chamber: Committee chamber
-    
-    Returns:
-        Operation results as formatted string
-        
-    Raises:
-        ToolError: If operation is unknown or user lacks required access
-    
-    Examples:
-        Search for members by name:
-        {
-            "operation": "search_members",
-            "name": "Pelosi",
-            "limit": 5
-        }
-        
-        Get member details:
-        {
-            "operation": "get_member_details",
-            "bioguide_id": "P000197"
-        }
-        
-        Search committees:
-        {
-            "operation": "search_committees",
-            "keywords": "intelligence"
-        }
-        
-        Get member's sponsored legislation:
-        {
-            "operation": "get_member_sponsored_legislation",
-            "bioguide_id": "S000033"
-        }
-        
-        Note: All parameters are provided at the same level. The 'operation' 
-        parameter determines which function to call, and other parameters are 
-        passed to that function.
+    This bucket tool consolidates member and committee operations but has been 
+    replaced by individual tools for better discoverability and type safety.
     """
+    
     try:
-        # Check operation access based on user tier
-        check_operation_access(ctx, operation)
+        # Check tier access
+        user_tier = get_user_tier_from_context(ctx)
         
-        # Build kwargs dict from all provided parameters
+        logger.info(f"Members and committees operation '{operation}' requested by {user_tier.value} tier")
+        
+        # Check if operation is allowed for user tier
+        allowed_operations = FREE_OPERATIONS if user_tier == SubscriptionTier.FREE else PAID_OPERATIONS
+        
+        if operation not in allowed_operations:
+            raise ToolError(f"Operation '{operation}' not available for {user_tier.value} tier")
+        
+        # Build operation kwargs from provided parameters
         operation_kwargs = {}
         for param_name, param_value in {
             'name': name,
@@ -352,18 +239,17 @@ async def members_and_committees(
             'party': party,
             'chamber': chamber,
             'congress': congress,
-            'district': district,
             'current_member': current_member,
+            'district': district,
             'limit': limit,
-            'keywords': keywords,
-            'committee_code': committee_code
+            'committee_code': committee_code,
+            'committee_type': committee_type
         }.items():
             if param_value is not None:
                 operation_kwargs[param_name] = param_value
         
         # Route to appropriate internal function
-        raw_response = await route_members_and_committees_operation(ctx, operation, **operation_kwargs)
-        return _convert_to_structured_response(raw_response, operation)
+        return await route_members_and_committees_operation(ctx, operation, **operation_kwargs)
         
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)
