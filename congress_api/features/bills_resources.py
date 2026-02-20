@@ -6,7 +6,7 @@ including bill types, Congress ranges, status definitions, and usage guides.
 All operational bill functions have been moved to the bills/ module.
 """
 
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 
 # --- MCP Resources ---

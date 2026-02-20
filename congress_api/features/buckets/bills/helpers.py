@@ -7,7 +7,7 @@ without any business logic or formatting concerns.
 
 from typing import Dict, Optional, Any
 import logging
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 
 # Import existing validation and API infrastructure
 from ....core.validators import ParameterValidator

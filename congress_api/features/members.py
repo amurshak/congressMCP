@@ -1,6 +1,6 @@
 # members.py
 from typing import Dict, Any, Optional
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper, safe_members_request

@@ -1,7 +1,7 @@
 # congress_api/features/treaties.py
 import logging
 from typing import Dict, List, Any, Optional
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.api_wrapper import safe_treaties_request

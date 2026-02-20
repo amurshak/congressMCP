@@ -1,7 +1,7 @@
 # congress_api/features/crs_reports.py
 import logging
 from typing import Dict, List, Any, Optional
-from fastmcp import Context
+from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator
