@@ -15,6 +15,7 @@ from typing import Optional, Dict, Any
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
+from ...models.responses import LegislationHubResponse, ErrorResponse, BillSummary, AmendmentSummary
 
 # Import existing tool functions - we'll import them directly to convert to internal callables
 # Note: We'll need to refactor these imports after we modify the original files
@@ -97,7 +98,7 @@ def check_operation_access(ctx: Context, operation: str) -> None:
                 f"Please upgrade your subscription to access this feature."
             )
 
-async def route_legislation_operation(ctx: Context, operation: str, **kwargs) -> str:
+async def route_legislation_operation(ctx: Context, operation: str, **kwargs) -> LegislationHubResponse:
     """Route operation to appropriate internal function."""
     
     # For now, we'll import and call the original functions directly

@@ -1,0 +1,1 @@
+# Congressional MCP Response Models - Structured, typed responses for AI agents
