@@ -15,12 +15,17 @@ mcp = FastMCP(
 
 def initialize_mcp_features():
     """Initialize all MCP tool features - called after server setup to avoid circular imports"""
-    # Initialize individual tools (replaces bucket system)
-    from .features import legislation_tools, members_committees_tools
+    # Initialize new focused legislation tools (replaces legislation_hub bucket)
+    from .features import (
+        bills_tool,
+        amendments_tool, 
+        treaties_and_summaries_tool,
+        members_committees_tools
+    )
     
     # Initialize remaining bucket tools (to be converted in future tasks)
     from .features.buckets import (
-        # legislation_hub,  # DEPRECATED: Replaced by individual tools in legislation_tools.py
+        # legislation_hub,  # DEPRECATED: Replaced by focused tools (bills_tool, amendments_tool, treaties_and_summaries_tool)
         # members_and_committees,  # DEPRECATED: Replaced by individual tools in members_committees_tools.py
         voting_and_nominations, 
         records_and_hearings,

@@ -1,12 +1,20 @@
 """
 Congressional Legislation Hub - DEPRECATED
 
-⚠️  DEPRECATION NOTICE ⚠️
-This bucket system has been replaced by individual MCP tools in congress_api/features/legislation_tools.py
-Each operation is now its own @mcp.tool() with proper typing and structured Pydantic responses.
+⚠️  DEPRECATION NOTICE - REPLACED BY FOCUSED TOOLS ⚠️
+This bucket system has been fully replaced by 3 focused MCP tools:
+• bills_tool.py - All bill-related operations (~16 operations)
+• amendments_tool.py - All amendment-related operations (~7 operations)  
+• treaties_and_summaries_tool.py - Treaties and summaries operations (~4 operations)
 
-This file is kept for backward compatibility but should not be used for new development.
-Individual tools provide better discoverability and type safety for AI agents.
+Each focused tool provides:
+- Clean, structured docstrings optimized for AI agent tool selection
+- Better discoverability with focused operation sets
+- Proper typing and structured Pydantic responses
+- Under 15 lines of documentation per tool
+
+This file should no longer be imported or used. The legislation_hub tool has been
+removed from MCP server registration.
 """
 
 import logging
