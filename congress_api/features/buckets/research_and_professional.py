@@ -207,84 +207,21 @@ async def research_and_professional(
     report_number: Optional[str] = None
 ) -> str:
     """
-    Congressional Research and Professional - Professional research and analytics.
-    
-    This specialized bucket provides access to professional research services and 
-    enhanced congressional analytics.
-    
-    ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE (500), PRO (5,000), ENTERPRISE (100,000) calls/month
-    
-    AVAILABLE OPERATIONS:
-    Basic Congress Operations:
-    - get_congress_info: Basic Congress information
-    
-    Professional Research Services:
-    - search_crs_reports: Search Congressional Research Service reports
-    - get_congress_info_enhanced: Enhanced Congress analytics with detailed metadata
-    - search_congresses: Advanced Congress search with historical analysis
-    - get_congress_statistics: Statistical analysis across Congresses (coming soon)
-    - get_legislative_analysis: Advanced legislative trend analysis (coming soon)
-    
-    Args:
-        operation: The specific operation to perform
-        **kwargs: Operation-specific parameters:
-        
-        Congress Information Parameters:
-        - congress: Congress number (e.g., 118)
-        - current: Get current Congress information
-        - limit: Maximum results for Congress lists
-        - detailed: Include detailed analytics and metadata
-        - format_type: Output format ('markdown' or 'table')
-        
-        Congress Search Parameters:
-        - keywords: Keywords for Congress search
-        - start_year: Start year for historical search
-        - end_year: End year for historical search
-        
-        CRS Report Parameters:
-        - report_number: Specific CRS report number
-        - keywords: Keywords for CRS report search
-    
-    Returns:
-        Operation results as formatted string with professional-grade analysis
-        
-    Raises:
-        ToolError: If operation is unknown or user lacks required access
-    
-    Examples:
-        Get basic Congress information:
-        {
-            "operation": "get_congress_info",
-            "congress": 118
-        }
-        
-        Search CRS reports:
-        {
-            "operation": "search_crs_reports",
-            "keywords": "climate policy",
-            "limit": 10
-        }
-        
-        Get enhanced Congress analytics:
-        {
-            "operation": "get_congress_info_enhanced",
-            "congress": 118,
-            "detailed": true,
-            "format_type": "markdown"
-        }
-        
-        Search historical Congresses:
-        {
-            "operation": "search_congresses",
-            "start_year": 2000,
-            "end_year": 2024,
-            "keywords": "healthcare reform"
-        }
-        
-        Note: All parameters are provided at the same level. The 'operation' 
-        parameter determines which function to call, and other parameters are 
-        passed to that function.
+    Congressional Research and Professional - Access CRS reports and enhanced Congress analytics.
+
+    CONGRESS INFORMATION (3 operations):
+    • get_congress_info - Basic Congress information and metadata
+    • get_congress_info_enhanced - Advanced analytics with detailed insights
+    • search_congresses - Historical Congress search with trend analysis
+
+    PROFESSIONAL RESEARCH (3 operations):
+    • search_crs_reports - Congressional Research Service report search
+    • get_congress_statistics - Statistical analysis across Congresses
+    • get_legislative_analysis - Advanced legislative trend analysis
+
+    Key params: operation, congress, keywords, report_number, start_year, end_year
+    All operations available to all tiers (FREE: 500/mo, PRO: 5K/mo, ENTERPRISE: unlimited)
+    Returns professional-grade research data with enhanced analytics and historical insights.
     """
     try:
         # Check operation access based on user tier
