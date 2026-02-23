@@ -266,7 +266,11 @@ async def route_records_and_hearings_operation(ctx: Context, operation: str, **k
     else:
         raise ToolError(f"Unknown operation: {operation}")
 
-@mcp.tool("records_and_hearings")
+@mcp.tool(
+    "records_and_hearings",
+    title="Congressional Records and Hearings - Legislative records, communications, and hearings",
+    outputSchema=RecordsHearingsResponse
+)
 async def records_and_hearings(
     ctx: Context,
     operation: str,
