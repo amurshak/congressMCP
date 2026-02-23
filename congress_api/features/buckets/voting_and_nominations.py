@@ -253,90 +253,19 @@ async def voting_and_nominations(
     to_date: Optional[str] = None
 ) -> str:
     """
-    Congressional Voting and Nominations - Unified access to voting and nominations.
-    
-    ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE (500), PRO (5,000), ENTERPRISE (100,000) calls/month
-    
-    AVAILABLE OPERATIONS:
-    Basic Voting Operations:
-    - get_house_votes_by_congress: Get House votes for specific Congress
-    - search_nominations: Search nominations by keywords
-    
-    Advanced House Voting:
-    - get_house_votes_by_session: Get votes by Congress and session
-    - get_house_vote_details: Get detailed vote information
-    - get_house_vote_details_enhanced: Get enhanced vote details with metadata
-    - get_house_vote_member_votes: Get individual member votes
-    - get_house_vote_member_votes_xml: Get raw XML member vote data
-    
-    Nomination Operations:
-    - get_latest_nominations: Get most recent nominations
-    - get_nomination_details: Get detailed nomination information
-    - get_nomination_actions: Get actions taken on nomination
-    - get_nomination_committees: Get committees handling nomination
-    - get_nomination_hearings: Get hearings for nomination
-    - get_nomination_nominees: Get nominees within nomination
-    - get_nominations_by_congress: Get nominations by Congress
-    
-    Args:
-        operation: The specific operation to perform
-        **kwargs: Operation-specific parameters:
-        
-        Voting Parameters:
-        - congress: Congress number (e.g., 118)
-        - session: Session number (1 or 2)
-        - vote_number: Roll call vote number
-        - limit: Maximum results to return
-        
-        Nomination Parameters:
-        - keywords: Keywords for nomination search
-        - nomination_number: Specific nomination number
-        - ordinal: Ordinal number for nominee position
-        - sort: Sort order for results
-        - from_date: Start date filter (YYYY-MM-DDT00:00:00Z)
-        - to_date: End date filter (YYYY-MM-DDT00:00:00Z)
-    
-    Returns:
-        Operation results as formatted string
-        
-    Raises:
-        ToolError: If operation is unknown or user lacks required access
-    
-    Examples:
-        Get House votes by Congress:
-        {
-            "operation": "get_house_votes_by_congress",
-            "congress": 118,
-            "limit": 20
-        }
-        
-        Search nominations:
-        {
-            "operation": "search_nominations",
-            "keywords": "judge",
-            "from_date": "2024-01-01T00:00:00Z",
-            "to_date": "2024-12-31T00:00:00Z"
-        }
-        
-        Get vote details:
-        {
-            "operation": "get_house_vote_details",
-            "congress": 118,
-            "session": 1,
-            "vote_number": 150
-        }
-        
-        Get nomination details:
-        {
-            "operation": "get_nomination_details",
-            "congress": 118,
-            "nomination_number": 123
-        }
-        
-        Note: All parameters are provided at the same level. The 'operation' 
-        parameter determines which function to call, and other parameters are 
-        passed to that function.
+    Congressional Voting and Nominations - Access House votes and presidential nominations.
+
+    HOUSE VOTING (6 operations):
+    • get_house_votes_by_congress/session, get_house_vote_details/enhanced
+    • get_house_vote_member_votes/xml - Individual member vote records
+
+    NOMINATIONS (7 operations):
+    • search_nominations, get_latest_nominations, get_nomination_details
+    • get_nomination_actions/committees/hearings/nominees, get_nominations_by_congress
+
+    Key params: operation, congress, session, vote_number, keywords, nomination_number
+    All operations available to all tiers (FREE: 500/mo, PRO: 5K/mo, ENTERPRISE: unlimited)
+    Returns structured vote/nomination data with member details and legislative actions.
     """
     try:
         # Check operation access based on user tier

@@ -291,105 +291,22 @@ async def records_and_hearings(
     sort: Optional[str] = None
 ) -> str:
     """
-    Congressional Records and Hearings - Unified access to records and communications.
-    
-    This bucket provides access to congressional records, communications, and hearings.
-    
-    ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE (500), PRO (5,000), ENTERPRISE (100,000) calls/month
-    
-    AVAILABLE OPERATIONS:
-    Congressional Records:
-    - search_congressional_record: Search congressional record issues
-    - search_daily_congressional_record: Search daily record issues
-    - search_bound_congressional_record: Search bound record volumes
-    
-    House Communications:
-    - search_house_communications: Search House communications
-    - get_house_communication_details: Get detailed communication info
-    - search_house_requirements: Search House requirements
-    - get_house_requirement_details: Get requirement details
-    - get_house_requirement_matching_communications: Get matching communications
-    
-    Senate Communications:
-    - search_senate_communications: Search Senate communications
-    - get_senate_communication_details: Get Senate communication details
-    
-    Committee Communications:
-    - get_committee_communication_details: Get committee communication details
-    
-    Hearing Operations:
-    - search_hearings: Search committee hearings
-    - get_hearings_by_congress: Get hearings by Congress
-    - get_hearings_by_congress_and_chamber: Get hearings by Congress and chamber
-    - get_hearing_details: Get detailed hearing information
-    - get_hearing_content: Get full hearing content/text
-    
-    Args:
-        operation: The specific operation to perform
-        **kwargs: Operation-specific parameters:
-        
-        Congressional Record Parameters:
-        - year: Year of record issue
-        - month: Month of record issue
-        - day: Day of record issue
-        - congress: Congress number
-        - volume_number: Volume number for bound records
-        - issue_number: Issue number for daily records
-        - limit: Maximum results to return
-        
-        Communication Parameters:
-        - communication_type: Type of communication (e.g., 'ec', 'pm', 'pom')
-        - communication_number: Communication number
-        - chamber: Chamber ('house' or 'senate')
-        - requirement_number: House requirement number
-        
-        Hearing Parameters:
-        - keywords: Keywords for hearing search
-        - jacket_number: Hearing jacket number
-        - from_date_time: Start date filter (YYYY-MM-DDT00:00:00Z)
-        - to_date_time: End date filter (YYYY-MM-DDT00:00:00Z)
-        - sort: Sort order for results
-    
-    Returns:
-        Operation results as formatted string
-        
-    Raises:
-        ToolError: If operation is unknown or user lacks required access
-    
-    Examples:
-        Search congressional record:
-        {
-            "operation": "search_congressional_record",
-            "year": 2024,
-            "month": 3,
-            "limit": 10
-        }
-        
-        Search hearings:
-        {
-            "operation": "search_hearings",
-            "keywords": "climate change",
-            "from_date_time": "2024-01-01T00:00:00Z",
-            "to_date_time": "2024-12-31T00:00:00Z"
-        }
-        
-        Get hearing details:
-        {
-            "operation": "get_hearing_details",
-            "jacket_number": 12345
-        }
-        
-        Search House communications:
-        {
-            "operation": "search_house_communications",
-            "communication_type": "ec",
-            "limit": 5
-        }
-        
-        Note: All parameters are provided at the same level. The 'operation' 
-        parameter determines which function to call, and other parameters are 
-        passed to that function.
+    Congressional Records and Hearings - Access legislative records, communications, and hearings.
+
+    CONGRESSIONAL RECORDS (3 operations):
+    • search_congressional_record/daily/bound - Search legislative records by date/volume
+
+    COMMUNICATIONS (8 operations):  
+    • House: search_house_communications/requirements, get_details/matching
+    • Senate: search_senate_communications, get_senate_communication_details
+    • Committee: get_committee_communication_details
+
+    HEARINGS (5 operations):
+    • search_hearings, get_hearings_by_congress/chamber, get_hearing_details/content
+
+    Key params: operation, year/month/day, keywords, congress, chamber, jacket_number
+    All operations available to all tiers (FREE: 500/mo, PRO: 5K/mo, ENTERPRISE: unlimited)
+    Returns structured record/hearing data with full text content and metadata.
     """
     try:
         # Check operation access based on user tier

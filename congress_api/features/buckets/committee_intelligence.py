@@ -302,113 +302,23 @@ async def committee_intelligence(
     to_date_time: Optional[str] = None
 ) -> str:
     """
-    Congressional Committee Intelligence - Professional committee document access.
-    
-    This premium bucket provides comprehensive access to committee documents, reports, 
-    and meeting intelligence with advanced analysis capabilities.
-    
-    ALL operations are available to ALL users regardless of tier - only usage limits differ:
-    - FREE tier: All operations, 500 calls/month
-    - PRO tier: All operations, 5,000 calls/month 
-    - ENTERPRISE tier: All operatios, 
-    
-    AVAILABLE OPERATIONS:
-    Committee Reports (Advanced Analytics):
-    - get_latest_committee_reports: Get most recent committee reports
-    - get_committee_reports_by_congress: Get reports by Congress number
-    - get_committee_reports_by_congress_and_type: Get reports by Congress and type
-    - get_committee_report_details: Get detailed report information
-    - get_committee_report_text_versions: Get available text versions
-    - get_committee_report_content: Get full report content with chunking
-    - search_committee_reports: Advanced report search with filters
-    
-    Committee Prints (Document Intelligence):
-    - get_latest_committee_prints: Get most recent committee prints
-    - get_committee_prints_by_congress: Get prints by Congress
-    - get_committee_prints_by_congress_and_chamber: Get prints by Congress and chamber
-    - get_committee_print_details: Get detailed print information
-    - get_committee_print_text_versions: Get available text versions
-    - search_committee_prints: Advanced print search
-    
-    Committee Meetings (Process Intelligence):
-    - get_latest_committee_meetings: Get most recent meetings
-    - get_committee_meetings_by_congress: Get meetings by Congress
-    - get_committee_meetings_by_congress_and_chamber: Get meetings by Congress and chamber
-    - get_committee_meetings_by_committee: Get meetings for specific committee
-    - get_committee_meeting_details: Get detailed meeting information
-    - search_committee_meetings: Advanced meeting search with filters
-    
-    Args:
-        operation: The specific operation to perform
-        **kwargs: Operation-specific parameters:
-        
-        General Parameters:
-        - congress: Congress number (e.g., 118)
-        - chamber: Chamber ('house', 'senate')
-        - committee_code: Committee system code (e.g., 'hsag00')
-        - limit: Maximum results to return
-        
-        Report Parameters:
-        - report_type: Report type ('hrpt', 'srpt', 'erpt')
-        - report_number: Report number
-        - conference: Filter by conference reports
-        - chunk_number: Chunk number for content retrieval
-        - chunk_size: Size of content chunks
-        
-        Print Parameters:
-        - jacket_number: Print jacket number
-        
-        Meeting Parameters:
-        - event_id: Meeting event ID
-        - keywords: Keywords for meeting search
-        - scheduled_from: Start date filter (YYYY-MM-DDT00:00:00Z)
-        - scheduled_to: End date filter (YYYY-MM-DDT00:00:00Z)
-        - sort: Sort order for results
-        
-        Search Parameters:
-        - offset: Pagination offset
-        - from_date_time: Start date filter (YYYY-MM-DDT00:00:00Z)
-        - to_date_time: End date filter (YYYY-MM-DDT00:00:00Z)
-    
-    Returns:
-        Operation results as formatted string with enhanced metadata
-        
-    Raises:
-        ToolError: If operation is unknown or user lacks required access
-    
-    Examples:
-        Get latest committee reports:
-        {
-            "operation": "get_latest_committee_reports",
-            "limit": 10
-        }
-        
-        Search committee meetings:
-        {
-            "operation": "search_committee_meetings",
-            "keywords": "infrastructure",
-            "scheduled_from": "2024-01-01T00:00:00Z",
-            "scheduled_to": "2024-12-31T00:00:00Z"
-        }
-        
-        Get committee report details:
-        {
-            "operation": "get_committee_report_details",
-            "congress": 118,
-            "report_type": "hrpt",
-            "report_number": 100
-        }
-        
-        Get committee print details:
-        {
-            "operation": "get_committee_print_details",
-            "congress": 118,
-            "jacket_number": 12345
-        }
-        
-        Note: All parameters are provided at the same level. The 'operation' 
-        parameter determines which function to call, and other parameters are 
-        passed to that function.
+    Congressional Committee Intelligence - Professional access to committee documents and activities.
+
+    COMMITTEE REPORTS (7 operations):
+    • get_latest/by_congress/by_type, get_report_details/text_versions/content
+    • search_committee_reports - Advanced analytics with chunking support
+
+    COMMITTEE PRINTS (6 operations):
+    • get_latest/by_congress/by_chamber, get_print_details/text_versions
+    • search_committee_prints - Document intelligence with filtering
+
+    COMMITTEE MEETINGS (6 operations):
+    • get_latest/by_congress/by_chamber/by_committee, get_meeting_details
+    • search_committee_meetings - Process intelligence with scheduling data
+
+    Key params: operation, congress, chamber, committee_code, report_type, event_id
+    All operations available to all tiers (FREE: 500/mo, PRO: 5K/mo, ENTERPRISE: unlimited)
+    Returns structured committee data with enhanced metadata and content chunking.
     """
     try:
         # Check operation access based on user tier
