@@ -12,6 +12,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 from ..mcp_app import mcp
 from ..models.responses import LegislationHubResponse
 from ..core.auth import get_user_tier_from_context, SubscriptionTier
+from ..utils.bill_parser import parse_bill_reference, validate_bill_params
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,8 @@ async def route_bills_operation(ctx: Context, operation: str, **kwargs) -> str:
 async def bills(
     ctx: Context,
     operation: str,
+    # Flexible bill identification (NEW)
+    bill_id: Optional[str] = None,
     # Core bill identification
     keywords: Optional[str] = None,
     congress: Optional[int] = None,
@@ -104,6 +107,10 @@ async def bills(
     """
     Comprehensive Bills Tool - All bill operations in one focused interface.
     
+    FLEXIBLE BILL IDENTIFICATION (NEW):
+    Use bill_id for natural language references like 'HR 1234', 'H.R. 1234, 118th Congress', 
+    'hr1234-118', 'S 456', etc. Automatically parses to congress/bill_type/bill_number.
+    
     CORE OPERATIONS:
     • Search & Discovery: search_bills, get_bills, get_recent_bills
     • Details & Metadata: get_bill_details, get_bill_titles, get_bill_subjects
@@ -113,32 +120,10 @@ async def bills(
     • Legislative Process: get_bill_actions, get_bill_committees, get_bill_cosponsors
     • Date-Based: get_bills_by_date_range
     
-    SEARCH OPERATIONS:
-    - search_bills: Find bills by keywords and filters
-    - get_bills: Core API access with flexible filtering
-    - get_recent_bills: Recently active bills without keywords
-    - get_bills_by_date_range: Bills within specific date range
-    
-    DETAILS OPERATIONS:
-    - get_bill_details: Complete bill information and status
-    - get_bill_titles: Official and short titles
-    - get_bill_subjects: Policy areas and legislative subjects
-    
-    CONTENT OPERATIONS:
-    - get_bill_text: Full bill text with version control
-    - get_bill_text_versions: Available text versions
-    - get_bill_content: Actual content with chunking support
-    - get_bill_summaries: Professional summaries
-    
-    RELATIONSHIP OPERATIONS:
-    - get_bill_related_bills: Companion and related legislation
-    - get_bill_amendments: Amendments to this bill
-    - get_bill_committees: Committee assignments and activity
-    - get_bill_cosponsors: Sponsors and cosponsors
-    - get_bill_actions: Complete legislative history
-    
     Args:
         operation: Specific operation to perform (see list above)
+        bill_id: Flexible bill reference (e.g., 'HR 1234', 'H.R. 1234, 118th Congress', 'hr1234-118')
+                 Automatically parsed to populate congress, bill_type, bill_number
         keywords: Search keywords for content and metadata
         congress: Congress number (118 for current, 119 for next)
         bill_type: hr, s, hjres, sjres, hconres, sconres, hres, sres
@@ -150,16 +135,66 @@ async def bills(
         
     Returns:
         Formatted results specific to requested operation
+        
+    Examples:
+        Using flexible bill_id:
+        {"operation": "get_bill_details", "bill_id": "HR 1234"}
+        {"operation": "get_bill_details", "bill_id": "H.R. 1234, 118th Congress"}  
+        {"operation": "get_bill_details", "bill_id": "hr1234-118"}
+        
+        Traditional parameters still work:
+        {"operation": "get_bill_details", "congress": 118, "bill_type": "hr", "bill_number": 1234}
     """
     try:
         # Check operation access based on user tier
         check_operation_access(ctx, operation)
         
-        # Build kwargs dict from all provided parameters
-        operation_kwargs = {
-            k: v for k, v in locals().items() 
-            if k not in ['ctx', 'operation'] and v is not None
-        }
+        # Handle flexible bill_id parsing
+        parsed_congress = congress
+        parsed_bill_type = bill_type
+        parsed_bill_number = bill_number
+        
+        if bill_id:
+            # Parse the flexible bill reference
+            parse_result = parse_bill_reference(bill_id, default_congress=congress)
+            
+            if not parse_result['parse_success']:
+                raise ToolError(f"Bill ID parsing failed: {parse_result['error_message']}")
+            
+            # Use parsed values if the explicit parameters weren't provided
+            if parsed_congress is None and parse_result['congress'] is not None:
+                parsed_congress = parse_result['congress']
+            if parsed_bill_type is None and parse_result['bill_type'] is not None:
+                parsed_bill_type = parse_result['bill_type']
+            if parsed_bill_number is None and parse_result['bill_number'] is not None:
+                parsed_bill_number = parse_result['bill_number']
+            
+            # Validate parsed parameters
+            if parsed_bill_type and parsed_bill_number:
+                is_valid, error_msg = validate_bill_params(parsed_bill_type, parsed_bill_number, parsed_congress)
+                if not is_valid:
+                    raise ToolError(f"Invalid bill parameters from '{bill_id}': {error_msg}")
+        
+        # Build kwargs dict from all provided parameters, using parsed values where appropriate
+        operation_kwargs = {}
+        for param_name, param_value in {
+            'keywords': keywords,
+            'congress': parsed_congress,
+            'bill_type': parsed_bill_type,
+            'bill_number': parsed_bill_number,
+            'limit': limit,
+            'sort': sort,
+            'format': format,
+            'offset': offset,
+            'fromDateTime': fromDateTime,
+            'toDateTime': toDateTime,
+            'days_back': days_back,
+            'version': version,
+            'chunk_number': chunk_number,
+            'chunk_size': chunk_size
+        }.items():
+            if param_value is not None:
+                operation_kwargs[param_name] = param_value
         
         # Route to appropriate internal function
         raw_response = await route_bills_operation(ctx, operation, **operation_kwargs)
