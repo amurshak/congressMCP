@@ -273,7 +273,11 @@ async def route_committee_intelligence_operation(ctx: Context, operation: str, *
     else:
         raise ToolError(f"Unknown operation: {operation}")
 
-@mcp.tool("committee_intelligence")
+@mcp.tool(
+    "committee_intelligence",
+    title="Congressional Committee Intelligence - Committee documents and activities", 
+    outputSchema=CommitteeIntelligenceResponse
+)
 async def committee_intelligence(
     ctx: Context,
     operation: str,

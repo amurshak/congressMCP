@@ -235,7 +235,11 @@ async def route_voting_and_nominations_operation(ctx: Context, operation: str, *
     else:
         raise ToolError(f"Unknown operation: {operation}")
 
-@mcp.tool("voting_and_nominations")
+@mcp.tool(
+    "voting_and_nominations",
+    title="Congressional Voting and Nominations - House votes and presidential nominations", 
+    outputSchema=VotingNominationsResponse
+)
 async def voting_and_nominations(
     ctx: Context,
     operation: str,

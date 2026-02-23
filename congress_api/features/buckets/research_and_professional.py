@@ -189,7 +189,11 @@ async def route_research_and_professional_operation(ctx: Context, operation: str
     else:
         raise ToolError(f"Unknown operation: {operation}")
 
-@mcp.tool("research_and_professional")
+@mcp.tool(
+    "research_and_professional",
+    title="Congressional Research and Professional - CRS reports and Congress analytics",
+    outputSchema=ResearchProfessionalResponse
+)
 async def research_and_professional(
     ctx: Context,
     operation: str,
