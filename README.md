@@ -97,7 +97,7 @@ congressmcp --transport streamable-http --port 8000
 
 ## License
 
-MIT
+Sustainable Use License
 
 ---
 

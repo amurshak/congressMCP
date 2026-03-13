@@ -7,14 +7,14 @@ name = "congressmcp"
 version = "2.0.0"
 description = "Access 91+ congressional data tools via Claude, Cursor, VS Code, and other MCP clients"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "Sustainable Use License"}
 requires-python = ">=3.10"
 authors = [{name = "Alex Murshak"}]
 keywords = ["mcp", "congress", "legislation", "government", "ai", "claude", "llm"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
