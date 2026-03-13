@@ -10,12 +10,9 @@ Individual tools provide better discoverability and type safety for AI agents.
 """
 
 import logging
-from typing import Optional
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
-from ...mcp_app import mcp
 from ...models.responses import MembersCommitteesResponse
-from ...core.auth import get_user_tier_from_context, SubscriptionTier
 from ...utils.response_converters import convert_members_committees_response as _convert_to_structured_response
 
 logger = logging.getLogger(__name__)
@@ -106,71 +103,3 @@ async def route_members_and_committees_operation(ctx: Context, operation: str, *
     
     else:
         raise ToolError(f"Unknown operation: {operation}")
-
-# DEPRECATED BUCKET TOOL - Kept for backward compatibility only
-@mcp.tool("members_and_committees")
-async def members_and_committees(
-    ctx: Context,
-    operation: str,
-    # Member parameters
-    name: Optional[str] = None,
-    bioguide_id: Optional[str] = None,
-    state: Optional[str] = None,
-    state_code: Optional[str] = None,
-    party: Optional[str] = None,
-    chamber: Optional[str] = None,
-    congress: Optional[int] = None,
-    current_member: Optional[bool] = None,
-    district: Optional[int] = None,
-    limit: Optional[int] = None,
-    # Committee parameters
-    committee_code: Optional[str] = None,
-    committee_type: Optional[str] = None
-) -> MembersCommitteesResponse:
-    """
-    DEPRECATED: Use individual member/committee tools instead.
-    
-    This bucket tool consolidates member and committee operations but has been 
-    replaced by individual tools for better discoverability and type safety.
-    """
-    
-    try:
-        # Check tier access
-        user_tier = get_user_tier_from_context(ctx)
-        
-        logger.info(f"Members and committees operation '{operation}' requested by {user_tier.value} tier")
-        
-        # Check if operation is allowed for user tier
-        allowed_operations = FREE_OPERATIONS if user_tier == SubscriptionTier.FREE else PAID_OPERATIONS
-        
-        if operation not in allowed_operations:
-            raise ToolError(f"Operation '{operation}' not available for {user_tier.value} tier")
-        
-        # Build operation kwargs from provided parameters
-        operation_kwargs = {}
-        for param_name, param_value in {
-            'name': name,
-            'bioguide_id': bioguide_id,
-            'state': state,
-            'state_code': state_code,
-            'party': party,
-            'chamber': chamber,
-            'congress': congress,
-            'current_member': current_member,
-            'district': district,
-            'limit': limit,
-            'committee_code': committee_code,
-            'committee_type': committee_type
-        }.items():
-            if param_value is not None:
-                operation_kwargs[param_name] = param_value
-        
-        # Route to appropriate internal function
-        return await route_members_and_committees_operation(ctx, operation, **operation_kwargs)
-        
-    except ToolError:
-        # Re-raise ToolError as-is (preserves access control messages)
-        raise
-    except Exception as e:
-        logger.error(f"Error in members_and_committees operation '{operation}': {str(e)}")
-        raise ToolError(f"Error executing operation '{operation}': {str(e)}")

@@ -1,13 +1,12 @@
 # client_handler.py
-import sys
 import json
 import httpx
 import logging
 import time
-from typing import Dict, List, Any, Optional, AsyncIterator, Tuple
+from typing import Dict, Any, Optional, AsyncIterator, Tuple
 from dataclasses import dataclass, field
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from mcp.server.fastmcp import FastMCP, Context
 from .api_config import API_KEY, BASE_URL, ENABLE_CACHING, CACHE_TIMEOUT, DEFAULT_REQUEST_PARAMS, ENV
@@ -82,27 +81,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
             limits=limits,
             follow_redirects=True
         ) as client:
-            # Test connection if API key is available - TEMPORARILY DISABLED FOR PRODUCTION
-            # The external API call during startup can cause hangs in production
-            if False:  # Disabled: API_KEY:
-                try:
-                    logger.info("Testing API connection")
-                    response = await client.get("/congress", params={"api_key": API_KEY})
-                    response.raise_for_status()
-                    logger.info("API connection successful")
-                except httpx.HTTPStatusError as e:
-                    # Don't log the full error details which might contain sensitive info
-                    logger.error(f"API connection failed with status code: {e.response.status_code}")
-                    logger.warning("The server will start, but API requests may fail")
-                except httpx.RequestError as e:
-                    # Log generic error without specific connection details
-                    logger.error("Network error when connecting to API")
-                    logger.warning("The server will start, but API requests may fail")
+            if API_KEY:
+                logger.info("API key configured - skipping startup connection test")
             else:
-                if API_KEY:
-                    logger.info("API key configured - skipping startup connection test")
-                else:
-                    logger.error("No API key provided. The server will start, but API requests will fail")
+                logger.error("No API key provided. The server will start, but API requests will fail")
             
             # Initialize and yield context to server
             context = AppContext(api_key=API_KEY or "MISSING_API_KEY", client=client)
@@ -178,7 +160,7 @@ async def make_api_request(endpoint: str, ctx: Context, params: Optional[Dict[st
         # Parse the response
         try:
             data = response.json()
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             error_message = f"API returned non-JSON response for endpoint {endpoint}: {response.text[:100]}..."
             logger.error(error_message)
             ctx.error(error_message)

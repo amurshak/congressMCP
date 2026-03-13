@@ -3,11 +3,13 @@ import os
 import secrets
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 from urllib.parse import urlencode
 
 from ..services.email_service import EmailService, email_service
-from .auth import SubscriptionTier
+from .auth import JWT_SECRET
+
+import jwt
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -224,7 +226,7 @@ class MagicLinkService:
                 "api_key_created_at": api_key_data.get("created_at"),
                 "api_key_last_used": api_key_data.get("last_used_at"),
                 "usage": usage_stats,
-                "session_token": self._generate_session_token(user.id, token)
+                "session_token": self._generate_session_token(user.id, token, email)
             }
             
         except Exception as e:
@@ -431,16 +433,31 @@ class MagicLinkService:
         
         return f"{self.frontend_base_url}{base_path}?{urlencode(params)}"
     
-    def _generate_session_token(self, user_id: str, magic_token: str) -> str:
-        """Generate a session token (simplified - could use JWT)"""
-        session_data = f"{user_id}:{magic_token}:{datetime.now(timezone.utc).isoformat()}"
-        return secrets.token_urlsafe(32)  # Simplified - real implementation would encode session_data
-    
+    def _generate_session_token(self, user_id: str, magic_token: str, email: str) -> str:
+        """Generate a JWT session token for authenticated users."""
+        payload = {
+            "email": email,
+            "user_id": user_id,
+            "purpose": "session",
+            "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+        }
+        return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
     def _verify_session_token(self, session_token: str, email: str) -> bool:
-        """Verify session token (simplified implementation)"""
-        # This is a simplified implementation
-        # In production, you'd want to use JWT or store sessions in database
-        return bool(session_token and len(session_token) > 20)
+        """Verify a JWT session token: check signature, expiry, and email match."""
+        try:
+            payload = jwt.decode(session_token, JWT_SECRET, algorithms=["HS256"])
+            if payload.get("purpose") != "session":
+                return False
+            if payload.get("email", "").lower() != email.lower():
+                return False
+            return True
+        except jwt.ExpiredSignatureError:
+            logger.warning(f"Session token expired for {email}")
+            return False
+        except jwt.PyJWTError as e:
+            logger.warning(f"Session token verification failed for {email}: {e}")
+            return False
     
     async def _cleanup_expired_links(self, email: str) -> None:
         """Clean up expired links for specific email"""
@@ -471,7 +488,6 @@ class MagicLinkService:
             
             # Send email using the existing email service
             from resend import Emails
-            import resend
             
             if not self.email_service.enabled:
                 logger.warning("Email service disabled - cannot send magic link")

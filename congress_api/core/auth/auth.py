@@ -3,19 +3,21 @@ import os
 import time
 import logging
 import jwt
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Tuple
 from enum import Enum
 from datetime import datetime, timedelta
-from fastapi import Request, HTTPException, Depends
+from functools import wraps
+from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from mcp.server.fastmcp import Context
+from mcp.server.fastmcp.exceptions import ToolError
+
+from ..database import validate_api_key as db_validate_api_key, track_usage as db_track_usage
 
 # Custom exception for rate limiting that doesn't interfere with ASGI
 class RateLimitExceeded(Exception):
     """Custom exception for rate limit errors that can be safely handled in ASGI middleware"""
     pass
-
-# Import database functionality
-from ..database import validate_api_key as db_validate_api_key, track_usage as db_track_usage
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -151,19 +153,20 @@ async def check_rate_limit(user_id: str, tier: str, feature: str = "general", en
         return
     
     if ENABLE_DATABASE:
-        # Track usage in database
-        await db_track_usage(user_id, feature, endpoint)
-        
-        # Get monthly usage from database
+        # Check monthly usage from database BEFORE tracking
         from ..database import db_client
         monthly_usage = await db_client.get_monthly_usage(user_id)
-        
+
         # Add debug logging for rate limit checks
         logger.debug(f"Rate limit check for user {user_id}: usage={monthly_usage}, limit={rate_limit}, tier={tier}")
-        
+
         if monthly_usage >= rate_limit:
             # Use custom exception instead of HTTPException for ASGI compatibility
             raise RateLimitExceeded(f"Monthly rate limit ({rate_limit}) exceeded. Usage: {monthly_usage}")
+
+        # Only track usage after confirming under limit
+        await db_track_usage(user_id, feature, endpoint)
+        return
     else:
         # Use in-memory rate limiting (daily subset of monthly limit)
         count, reset_time = rate_limit_storage.get_user_requests(user_id)
@@ -188,10 +191,6 @@ def check_feature_access(feature: str, tier: str) -> bool:
     return feature in tier_features
 
 # --- FastMCP Tier Authorization Decorators ---
-
-from functools import wraps
-from mcp.server.fastmcp import Context
-from mcp.server.fastmcp.exceptions import ToolError
 
 def get_user_tier_from_context(ctx: Context) -> str:
     """
@@ -262,8 +261,8 @@ def require_paid_access(func):
             logger.error(f"Error in tier authorization for {func.__name__}: {str(e)}")
             # Still show upgrade message for any auth-related errors
             error_msg = (
-                f"Access denied: This tool requires a paid subscription (Pro or Enterprise). "
-                f"Please upgrade your subscription to access this feature."
+                "Access denied: This tool requires a paid subscription (Pro or Enterprise). "
+                "Please upgrade your subscription to access this feature."
             )
             raise ToolError(error_msg)
     
