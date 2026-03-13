@@ -1,4 +1,4 @@
-"""More actions
+"""
 Main application setup for the Congressional MCP server.
 Handles FastMCP server creation, routing, and middleware configuration.
 """
@@ -9,30 +9,15 @@ from congress_api.core.api_config import ENV
 import logging
 import sys
 import os
-import datetime
 import re
 
 # Add the parent directory to sys.path to enable absolute imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Import the MCP app - using absolute imports instead of relative
-from congress_api.mcp_app import mcp
-
-#DEPRECATED Import all features to register them with the MCP server
-# from congress_api.features import bills, members, committees, congress_info, amendments, summaries, committee_reports, committee_prints, committee_meetings, hearings, congressional_record, daily_congressional_record, bound_congressional_record, house_communications, house_requirements, senate_communications, nominations, crs_reports, treaties
-
-# Import bucket hub tools to register them with the MCP server
-from congress_api.features.buckets import (
-    legislation_hub, 
-    members_and_committees, 
-    voting_and_nominations, 
-    records_and_hearings,
-    committee_intelligence,
-    research_and_professional
-)
+# Import the MCP server and feature initializer
+from congress_api.mcp_server import mcp, initialize_mcp_features
 
 # Import prompts
-from congress_api import prompts_module
 
 class SensitiveInfoFilter(logging.Filter):
     """Filter to redact sensitive information from logs."""
@@ -53,8 +38,6 @@ class SensitiveInfoFilter(logging.Filter):
 
 def setup_logging():
     """Configure logging for the application based on environment with security considerations."""
-    from congress_api.core.api_config import ENV
-    import re
 
     # Determine log level based on environment
     if ENV == "production":
@@ -121,7 +104,7 @@ def main():
     logger.info("Starting Congress.gov API MCP server")
 
     # Log server health at startup
-    from congress_api.core.api_config import get_api_config, ENV
+    from congress_api.core.api_config import get_api_config
     config = get_api_config()
 
     # Log minimal server health information
@@ -134,38 +117,11 @@ def main():
         logger.info(f"API key configured: {config['api_key_configured']}")
         logger.info(f"Caching enabled: {config['caching_enabled']}")
 
-    # Note: For production monitoring, implement health checks at the infrastructure level
-    # such as in the Docker container or using a separate HTTP endpoint in a wrapper application
-
-
-
-
-
-
-
-
-
+    # Initialize all MCP features (tools, resources, prompts)
+    initialize_mcp_features()
 
     logger.info("Server is ready")
     return mcp
 
 # This is the object that MCP will look for
 server = main()
-
-if __name__ == "__main__":
-    import argparse
-    import uvicorn
-
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Run the Congress.gov API MCP server')
-    parser.add_argument('--port', type=int, default=8000, help='Port to run the server on')
-    parser.add_argument('--host', type=str, default='0.0.0.0', help='Host to run the server on')
-    args = parser.parse_args()
-
-    # Use the FastMCP server's http_app() method directly - keep it pure
-    app = server.http_app()
-
-    # Run the server
-    print(f"Starting FastMCP server on {args.host}:{args.port}")
-    print("Note: For webhook support, use the asgi.py deployment")
-    uvicorn.run(app, host=args.host, port=args.port)

@@ -1,12 +1,9 @@
-# mcp_app.py - DEPRECATED: Split into mcp_server.py and rest_api.py
-# This file is kept minimal for backward compatibility only
+# mcp_app.py - Backward compatibility shim
+# All 30+ feature files import `mcp` from here. Delegates to mcp_server.py.
 
-# Import the separated components
 from .mcp_server import mcp, initialize_mcp_features
-from .rest_api import rest_app
 
-# Legacy alias for backward compatibility
+# Legacy alias
 initialize_features = initialize_mcp_features
 
-# Export the main components for existing imports
-__all__ = ['mcp', 'initialize_features', 'rest_app']
+__all__ = ['mcp', 'initialize_features']

@@ -12,7 +12,6 @@ from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import safe_congressional_request
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
-from ..core.auth.auth import require_paid_access
 
 logger = logging.getLogger(__name__)
 

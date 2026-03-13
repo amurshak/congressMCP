@@ -1,34 +1,34 @@
 # mcp_server.py - Pure MCP server with tool registrations only
+import os
+
 from mcp.server.fastmcp import FastMCP
 from .core.client_handler import app_lifespan
 
-# Create the MCP server with metadata and stateless HTTP transport
+# Transport is configurable: "stdio" (default, local) or "streamable-http" (hosted)
+TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio")
+
 mcp = FastMCP(
     "Congress MCP",
-    description="Access legislative data from the Congress.gov API",
-    version="1.1.0",
+    instructions="Access 91+ congressional data tools via the Congress.gov API",
     dependencies=["httpx", "python-dotenv"],
     lifespan=app_lifespan,
-    transport="streamable-http",  # Use streamable HTTP transport (correct per FastMCP docs)
-    stateless_http=True  # Enable stateless mode to handle concurrent requests properly
+    stateless_http=(TRANSPORT == "streamable-http"),
 )
 
 def initialize_mcp_features():
     """Initialize all MCP tool features - called after server setup to avoid circular imports"""
-    # Initialize new focused legislation tools (replaces legislation_hub bucket)
-    from .features import (
+    # Importing these modules triggers @mcp.tool() decorator registration.
+    # ruff: noqa: F401
+    from .features import (  # noqa: F401
         bills_tool,
-        amendments_tool, 
+        amendments_tool,
         treaties_and_summaries_tool,
-        members_committees_tools
+        members_committees_tools,
     )
-    
-    # Initialize remaining bucket tools (to be converted in future tasks)
-    from .features.buckets import (
-        # legislation_hub,  # DEPRECATED: Replaced by focused tools (bills_tool, amendments_tool, treaties_and_summaries_tool)
-        # members_and_committees,  # DEPRECATED: Replaced by individual tools in members_committees_tools.py
-        voting_and_nominations, 
+
+    from .features.buckets import (  # noqa: F401
+        voting_and_nominations,
         records_and_hearings,
         committee_intelligence,
-        research_and_professional
+        research_and_professional,
     )

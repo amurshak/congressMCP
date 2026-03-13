@@ -10,19 +10,18 @@ from typing import Optional
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ..mcp_app import mcp
-from ..models.responses import LegislationHubResponse
 
 logger = logging.getLogger(__name__)
 
 
 async def route_treaties_summaries_operation(ctx: Context, operation: str, **kwargs) -> str:
     """Route operation to appropriate treaties or summaries function."""
-    
+
     # Summary operations
     if operation == "search_summaries":
         from .summaries import search_summaries
         return await search_summaries(ctx, **kwargs)
-    
+
     # Treaty operations
     elif operation == "search_treaties":
         from .treaties import search_treaties
@@ -36,14 +35,13 @@ async def route_treaties_summaries_operation(ctx: Context, operation: str, **kwa
     elif operation == "get_treaty_text":
         from .treaties import get_treaty_text
         return await get_treaty_text(ctx, **kwargs)
-    
+
     else:
         raise ToolError(f"Unknown treaties/summaries operation: {operation}")
 
 @mcp.tool(
-    "treaties_and_summaries", 
+    "treaties_and_summaries",
     title="Treaties and Summaries - Legislative treaties and bill summaries",
-    outputSchema=LegislationHubResponse
 )
 async def treaties_and_summaries(
     ctx: Context,
@@ -119,7 +117,7 @@ async def treaties_and_summaries(
         # Route to appropriate internal function
         raw_response = await route_treaties_summaries_operation(ctx, operation, **operation_kwargs)
         return raw_response
-        
+
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)
         raise

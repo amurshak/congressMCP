@@ -10,14 +10,13 @@ from typing import Optional
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ..mcp_app import mcp
-from ..models.responses import LegislationHubResponse
 
 logger = logging.getLogger(__name__)
 
 
 async def route_amendments_operation(ctx: Context, operation: str, **kwargs) -> str:
     """Route operation to appropriate amendments function."""
-    
+
     if operation == "get_amendments":
         from .buckets.amendments import get_amendments
         return await get_amendments(ctx, **kwargs)
@@ -45,7 +44,6 @@ async def route_amendments_operation(ctx: Context, operation: str, **kwargs) -> 
 @mcp.tool(
     "amendments",
     title="Congressional Amendments - Comprehensive amendment operations",
-    outputSchema=LegislationHubResponse
 )
 async def amendments(
     ctx: Context,
@@ -122,7 +120,7 @@ async def amendments(
         # Route to appropriate internal function
         raw_response = await route_amendments_operation(ctx, operation, **operation_kwargs)
         return raw_response
-        
+
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)
         raise

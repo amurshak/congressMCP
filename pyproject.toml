@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "congressmcp"
+version = "2.0.0"
+description = "Access 91+ congressional data tools via Claude, Cursor, VS Code, and other MCP clients"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{name = "Alex Murshak"}]
+keywords = ["mcp", "congress", "legislation", "government", "ai", "claude", "llm"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
+
+dependencies = [
+    "mcp>=1.26.0",
+    "httpx>=0.28.1",
+    "pydantic>=2.11.5",
+    "pydantic-settings>=2.9.1",
+    "python-dotenv>=1.1.0",
+    "requests>=2.32.3",
+    "python-dateutil>=2.9.0",
+    "starlette>=0.46.0",
+    "uvicorn>=0.34.0",
+    "rich>=14.0.0",
+]
+
+[project.scripts]
+congressmcp = "congress_api.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/amurshak/congressMCP"
+Repository = "https://github.com/amurshak/congressMCP"
+Issues = "https://github.com/amurshak/congressMCP/issues"
+
+[tool.setuptools.packages.find]
+include = ["congress_api*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E402"]

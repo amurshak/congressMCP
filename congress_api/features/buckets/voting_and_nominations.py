@@ -2,30 +2,22 @@
 Congressional Voting and Nominations - Consolidated MCP bucket tool for voting and nominations.
 
 This bucket consolidates 13+ individual tools into a single interface with operation-based routing.
-ALL operations are currently available to ALL users regardless of tier - only usage limits differ:
-- FREE Tier: All operations, 500 calls/month
-- PRO Tier: All operations, 5,000 calls/month  
-- ENTERPRISE Tier: All operations
-
-Access control infrastructure maintained for potential future tier differentiation.
+All operations are available to all users.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
-from ...models.responses import VotingNominationsResponse, ErrorResponse, VoteSummary, NominationSummary
-
-# Import access control utilities
-from ...core.auth import get_user_tier_from_context, SubscriptionTier
+from ...models.responses import VotingNominationsResponse, VoteSummary, NominationSummary
 
 logger = logging.getLogger(__name__)
 
 def _convert_to_structured_response(raw_response: str, operation: str) -> VotingNominationsResponse:
     """Convert raw string response to structured VotingNominationsResponse."""
     import json
-    
+
     try:
         # Parse the raw response
         if isinstance(raw_response, str):
@@ -44,11 +36,11 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Voting
                 )
         else:
             data = raw_response
-        
+
         votes = []
         nominations = []
         results_count = 0
-        
+
         if isinstance(data, dict):
             # Handle votes
             if 'votes' in data:
@@ -63,7 +55,7 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Voting
                             vote_counts=vote_data.get('totals', {}),
                             url=vote_data.get('url')
                         ))
-                        
+
             # Handle nominations
             if 'nominations' in data:
                 for nom_data in data.get('nominations', []):
@@ -77,9 +69,9 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Voting
                             status=nom_data.get('latestAction'),
                             url=nom_data.get('url')
                         ))
-            
+
             results_count = len(votes) + len(nominations)
-            
+
         return VotingNominationsResponse(
             success=True,
             operation=operation,
@@ -88,7 +80,7 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Voting
             nominations=nominations,
             summary=f"Found {len(votes)} votes and {len(nominations)} nominations"
         )
-        
+
     except Exception as e:
         logger.error(f"Error converting response to structured format: {e}")
         return VotingNominationsResponse(
@@ -100,79 +92,10 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Voting
             summary=f"Error processing response: {str(e)}"
         )
 
-# Define operation access levels
-FREE_OPERATIONS = {
-    # All voting and nomination operations now available for free tier
-    "get_house_votes_by_congress",
-    "search_nominations",
-    # Advanced voting operations
-    "get_house_votes_by_session", 
-    "get_house_vote_details",
-    "get_house_vote_details_enhanced",
-    "get_house_vote_member_votes",
-    "get_house_vote_member_votes_xml",
-    # Nomination operations
-    "get_latest_nominations",
-    "get_nomination_details",
-    "get_nomination_actions",
-    "get_nomination_committees", 
-    "get_nomination_hearings",
-    "get_nomination_nominees",
-    "get_nominations_by_congress"
-}
-
-PAID_OPERATIONS = {
-    # Advanced voting operations
-    "get_house_votes_by_session", 
-    "get_house_vote_details",
-    "get_house_vote_details_enhanced",
-    "get_house_vote_member_votes",
-    "get_house_vote_member_votes_xml",
-    
-    # Nomination operations (all paid)
-    "get_latest_nominations",
-    "get_nomination_details",
-    "get_nomination_actions",
-    "get_nomination_committees", 
-    "get_nomination_hearings",
-    "get_nomination_nominees",
-    "get_nominations_by_congress"
-}
-
-ALL_OPERATIONS = FREE_OPERATIONS | PAID_OPERATIONS
-
-def check_operation_access(ctx: Context, operation: str) -> None:
-    """Check if user has access to the requested operation based on tier."""
-    if operation not in ALL_OPERATIONS:
-        raise ToolError(f"Unknown operation: {operation}")
-    
-    if operation in FREE_OPERATIONS:
-        # Free operations - all users have access
-        return
-    
-    if operation in PAID_OPERATIONS:
-        # Paid operations - check user tier
-        user_tier = get_user_tier_from_context(ctx)
-        
-        # Handle both enum and string tier values
-        if isinstance(user_tier, SubscriptionTier):
-            is_paid = user_tier in [SubscriptionTier.PRO, SubscriptionTier.ENTERPRISE]
-        else:
-            tier_value = str(user_tier).lower()
-            is_paid = tier_value in ['pro', 'enterprise']
-        
-        if not is_paid:
-            tier_name = user_tier.value if isinstance(user_tier, SubscriptionTier) else str(user_tier).title()
-            raise ToolError(
-                f"Access denied: Operation '{operation}' requires a paid subscription (Pro or Enterprise). "
-                f"Your current tier: {tier_name}. "
-                f"Please upgrade your subscription to access this feature."
-            )
-
 async def route_voting_and_nominations_operation(ctx: Context, operation: str, **kwargs) -> VotingNominationsResponse:
     """Route operation to appropriate internal function."""
-    
-    # House voting operations  
+
+    # House voting operations
     if operation == "get_house_votes_by_congress":
         from ..house_votes import get_house_votes_by_congress
         raw_response = await get_house_votes_by_congress(ctx, **kwargs)
@@ -197,7 +120,7 @@ async def route_voting_and_nominations_operation(ctx: Context, operation: str, *
         from ..house_votes import get_house_vote_member_votes_xml
         raw_response = await get_house_vote_member_votes_xml(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
-    
+
     # Nomination operations
     elif operation == "search_nominations":
         from ..nominations import search_nominations
@@ -231,14 +154,13 @@ async def route_voting_and_nominations_operation(ctx: Context, operation: str, *
         from ..nominations import get_nominations_by_congress
         raw_response = await get_nominations_by_congress(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
-    
+
     else:
         raise ToolError(f"Unknown operation: {operation}")
 
 @mcp.tool(
     "voting_and_nominations",
-    title="Congressional Voting and Nominations - House votes and presidential nominations", 
-    outputSchema=VotingNominationsResponse
+    title="Congressional Voting and Nominations - House votes and presidential nominations",
 )
 async def voting_and_nominations(
     ctx: Context,
@@ -268,13 +190,9 @@ async def voting_and_nominations(
     • get_nomination_actions/committees/hearings/nominees, get_nominations_by_congress
 
     Key params: operation, congress, session, vote_number, keywords, nomination_number
-    All operations available to all tiers (FREE: 500/mo, PRO: 5K/mo, ENTERPRISE: unlimited)
     Returns structured vote/nomination data with member details and legislative actions.
     """
     try:
-        # Check operation access based on user tier
-        check_operation_access(ctx, operation)
-        
         # Build kwargs dict from all provided parameters
         operation_kwargs = {}
         for param_name, param_value in {
@@ -291,13 +209,12 @@ async def voting_and_nominations(
         }.items():
             if param_value is not None:
                 operation_kwargs[param_name] = param_value
-        
+
         # Route to appropriate internal function
         raw_response = await route_voting_and_nominations_operation(ctx, operation, **operation_kwargs)
         return _convert_to_structured_response(raw_response, operation)
-        
+
     except ToolError:
-        # Re-raise ToolError as-is (preserves access control messages)
         raise
     except Exception as e:
         logger.error(f"Error in voting_and_nominations operation '{operation}': {str(e)}")

@@ -10,7 +10,6 @@ from typing import Optional
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ..mcp_app import mcp
-from ..models.responses import LegislationHubResponse
 from ..utils.bill_parser import parse_bill_reference, validate_bill_params
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 async def route_bills_operation(ctx: Context, operation: str, **kwargs) -> str:
     """Route operation to appropriate bills function."""
-    
+
     if operation == "search_bills":
         from .buckets.bills import search_bills
         return await search_bills(ctx, **kwargs)
@@ -73,7 +72,6 @@ async def route_bills_operation(ctx: Context, operation: str, **kwargs) -> str:
 @mcp.tool(
     "bills",
     title="Congressional Bills - Comprehensive bill operations",
-    outputSchema=LegislationHubResponse
 )
 async def bills(
     ctx: Context,
@@ -145,14 +143,14 @@ async def bills(
         parsed_congress = congress
         parsed_bill_type = bill_type
         parsed_bill_number = bill_number
-        
+
         if bill_id:
             # Parse the flexible bill reference
             parse_result = parse_bill_reference(bill_id, default_congress=congress)
-            
+
             if not parse_result['parse_success']:
                 raise ToolError(f"Bill ID parsing failed: {parse_result['error_message']}")
-            
+
             # Use parsed values if the explicit parameters weren't provided
             if parsed_congress is None and parse_result['congress'] is not None:
                 parsed_congress = parse_result['congress']
@@ -160,13 +158,13 @@ async def bills(
                 parsed_bill_type = parse_result['bill_type']
             if parsed_bill_number is None and parse_result['bill_number'] is not None:
                 parsed_bill_number = parse_result['bill_number']
-            
+
             # Validate parsed parameters
             if parsed_bill_type and parsed_bill_number:
                 is_valid, error_msg = validate_bill_params(parsed_bill_type, parsed_bill_number, parsed_congress)
                 if not is_valid:
                     raise ToolError(f"Invalid bill parameters from '{bill_id}': {error_msg}")
-        
+
         # Build kwargs dict from all provided parameters, using parsed values where appropriate
         operation_kwargs = {}
         for param_name, param_value in {
@@ -187,11 +185,11 @@ async def bills(
         }.items():
             if param_value is not None:
                 operation_kwargs[param_name] = param_value
-        
+
         # Route to appropriate internal function
         raw_response = await route_bills_operation(ctx, operation, **operation_kwargs)
         return raw_response
-        
+
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)
         raise

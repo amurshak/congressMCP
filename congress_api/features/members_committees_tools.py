@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 @mcp.tool(
     "search_members",
     title="Search Members of Congress - Find representatives and senators by criteria",
-    outputSchema=MembersCommitteesResponse
 )
 async def search_members(
     ctx: Context,
@@ -72,7 +71,6 @@ async def search_members(
 @mcp.tool(
     "get_member_details",
     title="Get Member Details - Detailed information about a specific member of Congress",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_member_details(
     ctx: Context,
@@ -107,7 +105,6 @@ async def get_member_details(
 @mcp.tool(
     "get_member_sponsored_legislation",
     title="Get Member Sponsored Legislation - Bills and resolutions sponsored by a member",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_member_sponsored_legislation(
     ctx: Context,
@@ -128,7 +125,7 @@ async def get_member_sponsored_legislation(
     try:
         from .members import get_member_sponsored_legislation as _get_member_sponsored_legislation
         raw_response = await _get_member_sponsored_legislation(
-            ctx, 
+            ctx,
             bioguide_id=bioguide_id,
             limit=limit
         )
@@ -146,9 +143,8 @@ async def get_member_sponsored_legislation(
         )
 
 @mcp.tool(
-    "get_member_cosponsored_legislation", 
+    "get_member_cosponsored_legislation",
     title="Get Member Cosponsored Legislation - Bills and resolutions cosponsored by a member",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_member_cosponsored_legislation(
     ctx: Context,
@@ -178,7 +174,7 @@ async def get_member_cosponsored_legislation(
         logger.error(f"Error in get_member_cosponsored_legislation: {e}")
         return MembersCommitteesResponse(
             success=False,
-            operation="get_member_cosponsored_legislation", 
+            operation="get_member_cosponsored_legislation",
             results_count=0,
             members=[],
             committees=[],
@@ -189,7 +185,6 @@ async def get_member_cosponsored_legislation(
 @mcp.tool(
     "get_members_by_congress",
     title="Get Members by Congress - All members who served in a specific Congress",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_members_by_congress(
     ctx: Context,
@@ -233,7 +228,6 @@ async def get_members_by_congress(
 @mcp.tool(
     "get_members_by_state",
     title="Get Members by State - Current or historical representatives from a specific state",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_members_by_state(
     ctx: Context,
@@ -277,7 +271,6 @@ async def get_members_by_state(
 @mcp.tool(
     "get_members_by_district",
     title="Get Members by District - Representatives who served a specific congressional district",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_members_by_district(
     ctx: Context,
@@ -321,7 +314,6 @@ async def get_members_by_district(
 @mcp.tool(
     "get_members_by_congress_state_district",
     title="Get Member by Congress/State/District - Specific representative for a district in a Congress",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_members_by_congress_state_district(
     ctx: Context,
@@ -367,7 +359,6 @@ async def get_members_by_congress_state_district(
 @mcp.tool(
     "search_committees",
     title="Search Committees - Find congressional committees by chamber and type",
-    outputSchema=MembersCommitteesResponse
 )
 async def search_committees(
     ctx: Context,
@@ -411,7 +402,6 @@ async def search_committees(
 @mcp.tool(
     "get_committee_bills",
     title="Get Committee Bills - Bills referred to or reported by a specific committee",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_committee_bills(
     ctx: Context,
@@ -452,7 +442,6 @@ async def get_committee_bills(
 @mcp.tool(
     "get_committee_reports",
     title="Get Committee Reports - Reports published by a specific committee",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_committee_reports(
     ctx: Context,
@@ -493,7 +482,6 @@ async def get_committee_reports(
 @mcp.tool(
     "get_committee_communications",
     title="Get Committee Communications - Communications received by a specific committee",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_committee_communications(
     ctx: Context,
@@ -534,7 +522,6 @@ async def get_committee_communications(
 @mcp.tool(
     "get_committee_nominations",
     title="Get Committee Nominations - Nominations referred to a specific committee",
-    outputSchema=MembersCommitteesResponse
 )
 async def get_committee_nominations(
     ctx: Context,
