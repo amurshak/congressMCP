@@ -10,98 +10,15 @@ Individual tools provide better discoverability and type safety for AI agents.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
-from ...models.responses import MembersCommitteesResponse, ErrorResponse, MemberSummary, CommitteeSummary
-
-# Import access control utilities
+from ...models.responses import MembersCommitteesResponse
 from ...core.auth import get_user_tier_from_context, SubscriptionTier
+from ...utils.response_converters import convert_members_committees_response as _convert_to_structured_response
 
 logger = logging.getLogger(__name__)
-
-def _convert_to_structured_response(raw_response: str, operation: str) -> MembersCommitteesResponse:
-    """Convert raw string response to structured MembersCommitteesResponse."""
-    import json
-    
-    try:
-        # Parse the raw response
-        if isinstance(raw_response, str):
-            # Try to extract JSON from the response if it's formatted text
-            import re
-            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
-            else:
-                # If no JSON found, create a simple response
-                return MembersCommitteesResponse(
-                    success=True,
-                    operation=operation,
-                    results_count=0,
-                    members=[],
-                    committees=[],
-                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response,
-                    context=f"Performed {operation} operation"
-                )
-        else:
-            data = raw_response
-        
-        # Extract members and committees from the data
-        members = []
-        committees = []
-        results_count = 0
-        
-        if isinstance(data, dict):
-            # Handle different response structures
-            if 'members' in data:
-                for member_data in data.get('members', []):
-                    if isinstance(member_data, dict):
-                        members.append(MemberSummary(
-                            bioguide_id=member_data.get('bioguideId', ''),
-                            name=member_data.get('name', ''),
-                            party=member_data.get('partyName'),
-                            state=member_data.get('state'),
-                            district=member_data.get('district'),
-                            chamber=member_data.get('chamber', ''),
-                            current_member=member_data.get('currentMember', False),
-                            url=member_data.get('url')
-                        ))
-                        
-            if 'committees' in data:
-                for committee_data in data.get('committees', []):
-                    if isinstance(committee_data, dict):
-                        committees.append(CommitteeSummary(
-                            committee_code=committee_data.get('systemCode', ''),
-                            name=committee_data.get('name', ''),
-                            chamber=committee_data.get('chamber', ''),
-                            committee_type=committee_data.get('committeeTypeCode', ''),
-                            url=committee_data.get('url')
-                        ))
-            
-            results_count = len(members) + len(committees)
-            
-        return MembersCommitteesResponse(
-            success=True,
-            operation=operation,
-            results_count=results_count,
-            members=members,
-            committees=committees,
-            summary=f"Found {len(members)} members and {len(committees)} committees",
-            context=f"Performed {operation} operation"
-        )
-        
-    except Exception as e:
-        logger.error(f"Error converting response to structured format: {e}")
-        return MembersCommitteesResponse(
-            success=False,
-            operation=operation,
-            results_count=0,
-            members=[],
-            committees=[],
-            summary=f"Error processing response: {str(e)}",
-            context=f"Failed {operation} operation"
-        )
 
 # Define operation access levels - CURRENTLY ALL OPERATIONS AVAILABLE TO ALL TIERS
 # Note: Both FREE_OPERATIONS and PAID_OPERATIONS contain the same operations

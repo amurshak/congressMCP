@@ -11,14 +11,9 @@ from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ..mcp_app import mcp
 from ..models.responses import LegislationHubResponse
-from ..core.auth import get_user_tier_from_context, SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
-def check_operation_access(ctx: Context, operation: str) -> None:
-    """Check if user has access to the requested operation based on tier."""
-    # All operations available to all tiers for now
-    return
 
 async def route_amendments_operation(ctx: Context, operation: str, **kwargs) -> str:
     """Route operation to appropriate amendments function."""
@@ -107,15 +102,23 @@ async def amendments(
         Formatted results specific to requested operation
     """
     try:
-        # Check operation access based on user tier
-        check_operation_access(ctx, operation)
-        
         # Build kwargs dict from all provided parameters
-        operation_kwargs = {
-            k: v for k, v in locals().items() 
-            if k not in ['ctx', 'operation'] and v is not None
-        }
-        
+        operation_kwargs = {}
+        for param_name, param_value in {
+            'congress': congress,
+            'amendment_type': amendment_type,
+            'amendment_number': amendment_number,
+            'keywords': keywords,
+            'limit': limit,
+            'sort': sort,
+            'format': format,
+            'offset': offset,
+            'fromDateTime': fromDateTime,
+            'toDateTime': toDateTime,
+        }.items():
+            if param_value is not None:
+                operation_kwargs[param_name] = param_value
+
         # Route to appropriate internal function
         raw_response = await route_amendments_operation(ctx, operation, **operation_kwargs)
         return raw_response

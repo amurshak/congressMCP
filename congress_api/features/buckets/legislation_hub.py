@@ -18,101 +18,15 @@ removed from MCP server registration.
 """
 
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
-from ...models.responses import LegislationHubResponse, ErrorResponse, BillSummary, AmendmentSummary
-
-# Import existing tool functions - we'll import them directly to convert to internal callables
-# Note: We'll need to refactor these imports after we modify the original files
-
-# Import access control utilities
+from ...models.responses import LegislationHubResponse
 from ...core.auth import get_user_tier_from_context, SubscriptionTier
+from ...utils.response_converters import convert_legislation_response as _convert_to_structured_response
 
 logger = logging.getLogger(__name__)
-
-def _convert_to_structured_response(raw_response: str, operation: str) -> LegislationHubResponse:
-    """Convert raw string response to structured LegislationHubResponse."""
-    import json
-    
-    try:
-        if isinstance(raw_response, str):
-            import re
-            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
-            else:
-                return LegislationHubResponse(
-                    success=True,
-                    operation=operation,
-                    results_count=0,
-                    bills=[],
-                    amendments=[],
-                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response,
-                    next_steps=[]
-                )
-        else:
-            data = raw_response
-        
-        bills = []
-        amendments = []
-        results_count = 0
-        
-        if isinstance(data, dict):
-            # Handle bills
-            if 'bills' in data:
-                for bill_data in data.get('bills', []):
-                    if isinstance(bill_data, dict):
-                        bills.append(BillSummary(
-                            congress=bill_data.get('congress', 0),
-                            bill_type=bill_data.get('type', ''),
-                            bill_number=bill_data.get('number', 0),
-                            title=bill_data.get('title', ''),
-                            sponsor=bill_data.get('sponsor'),
-                            introduced_date=bill_data.get('introducedDate'),
-                            latest_action=bill_data.get('latestAction'),
-                            url=bill_data.get('url')
-                        ))
-                        
-            # Handle amendments
-            if 'amendments' in data:
-                for amend_data in data.get('amendments', []):
-                    if isinstance(amend_data, dict):
-                        amendments.append(AmendmentSummary(
-                            congress=amend_data.get('congress', 0),
-                            amendment_type=amend_data.get('type', ''),
-                            amendment_number=amend_data.get('number', 0),
-                            purpose=amend_data.get('purpose'),
-                            sponsor=amend_data.get('sponsor'),
-                            submitted_date=amend_data.get('submittedDate'),
-                            bill_number=amend_data.get('billNumber'),
-                            url=amend_data.get('url')
-                        ))
-            
-            results_count = len(bills) + len(amendments)
-            
-        return LegislationHubResponse(
-            success=True,
-            operation=operation,
-            results_count=results_count,
-            bills=bills,
-            amendments=amendments,
-            summary=f"Found {len(bills)} bills and {len(amendments)} amendments",
-            next_steps=[]
-        )
-        
-    except Exception as e:
-        logger.error(f"Error converting response to structured format: {e}")
-        return LegislationHubResponse(
-            success=False,
-            operation=operation,
-            results_count=0,
-            bills=[],
-            amendments=[],
-            summary=f"Error processing response: {str(e)}",
-            next_steps=[]
-        )
 
 # Define operation access levels - CURRENTLY ALL OPERATIONS AVAILABLE TO ALL TIERS
 # Note: Both FREE_OPERATIONS and PAID_OPERATIONS contain the same operations
@@ -489,9 +403,8 @@ async def legislation_hub(
             if param_value is not None:
                 operation_kwargs[param_name] = param_value
         
-        # Route to appropriate internal function
-        raw_response = await route_legislation_operation(ctx, operation, **operation_kwargs)
-        return _convert_to_structured_response(raw_response, operation)
+        # Route to appropriate internal function (already returns LegislationHubResponse)
+        return await route_legislation_operation(ctx, operation, **operation_kwargs)
         
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)

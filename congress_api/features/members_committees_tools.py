@@ -9,7 +9,8 @@ import logging
 from typing import Optional
 from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
-from ..models.responses import MembersCommitteesResponse, MemberSummary, CommitteeSummary
+from ..models.responses import MembersCommitteesResponse
+from ..utils.response_converters import convert_members_committees_response
 
 logger = logging.getLogger(__name__)
 
@@ -46,8 +47,6 @@ async def search_members(
     """
     try:
         from .members import search_members as _search_members
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _search_members(
             ctx,
             name=name,
@@ -57,7 +56,7 @@ async def search_members(
             current_member=current_member,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "search_members")
+        return convert_members_committees_response(raw_response, "search_members")
     except Exception as e:
         logger.error(f"Error in search_members: {e}")
         return MembersCommitteesResponse(
@@ -91,10 +90,8 @@ async def get_member_details(
     """
     try:
         from .members import get_member_details as _get_member_details
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_member_details(ctx, bioguide_id=bioguide_id)
-        return _convert_to_structured_response(raw_response, "get_member_details")
+        return convert_members_committees_response(raw_response, "get_member_details")
     except Exception as e:
         logger.error(f"Error in get_member_details: {e}")
         return MembersCommitteesResponse(
@@ -130,14 +127,12 @@ async def get_member_sponsored_legislation(
     """
     try:
         from .members import get_member_sponsored_legislation as _get_member_sponsored_legislation
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_member_sponsored_legislation(
             ctx, 
             bioguide_id=bioguide_id,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "get_member_sponsored_legislation")
+        return convert_members_committees_response(raw_response, "get_member_sponsored_legislation")
     except Exception as e:
         logger.error(f"Error in get_member_sponsored_legislation: {e}")
         return MembersCommitteesResponse(
@@ -173,14 +168,12 @@ async def get_member_cosponsored_legislation(
     """
     try:
         from .members import get_member_cosponsored_legislation as _get_member_cosponsored_legislation
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_member_cosponsored_legislation(
             ctx,
             bioguide_id=bioguide_id,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "get_member_cosponsored_legislation")
+        return convert_members_committees_response(raw_response, "get_member_cosponsored_legislation")
     except Exception as e:
         logger.error(f"Error in get_member_cosponsored_legislation: {e}")
         return MembersCommitteesResponse(
@@ -218,15 +211,13 @@ async def get_members_by_congress(
     """
     try:
         from .members import get_members_by_congress as _get_members_by_congress
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_members_by_congress(
             ctx,
             congress=congress,
             current_member=current_member,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "get_members_by_congress")
+        return convert_members_committees_response(raw_response, "get_members_by_congress")
     except Exception as e:
         logger.error(f"Error in get_members_by_congress: {e}")
         return MembersCommitteesResponse(
@@ -264,15 +255,13 @@ async def get_members_by_state(
     """
     try:
         from .members import get_members_by_state as _get_members_by_state
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_members_by_state(
             ctx,
             state_code=state_code,
             current_member=current_member,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "get_members_by_state")
+        return convert_members_committees_response(raw_response, "get_members_by_state")
     except Exception as e:
         logger.error(f"Error in get_members_by_state: {e}")
         return MembersCommitteesResponse(
@@ -310,15 +299,13 @@ async def get_members_by_district(
     """
     try:
         from .members import get_members_by_district as _get_members_by_district
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_members_by_district(
             ctx,
             state_code=state_code,
             district=district,
             current_member=current_member
         )
-        return _convert_to_structured_response(raw_response, "get_members_by_district")
+        return convert_members_committees_response(raw_response, "get_members_by_district")
     except Exception as e:
         logger.error(f"Error in get_members_by_district: {e}")
         return MembersCommitteesResponse(
@@ -356,15 +343,13 @@ async def get_members_by_congress_state_district(
     """
     try:
         from .members import get_members_by_congress_state_district as _get_members_by_congress_state_district
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_members_by_congress_state_district(
             ctx,
             congress=congress,
             state_code=state_code,
             district=district
         )
-        return _convert_to_structured_response(raw_response, "get_members_by_congress_state_district")
+        return convert_members_committees_response(raw_response, "get_members_by_congress_state_district")
     except Exception as e:
         logger.error(f"Error in get_members_by_congress_state_district: {e}")
         return MembersCommitteesResponse(
@@ -404,15 +389,13 @@ async def search_committees(
     """
     try:
         from .committees import search_committees as _search_committees
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _search_committees(
             ctx,
             chamber=chamber,
             committee_type=committee_type,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "search_committees")
+        return convert_members_committees_response(raw_response, "search_committees")
     except Exception as e:
         logger.error(f"Error in search_committees: {e}")
         return MembersCommitteesResponse(
@@ -448,14 +431,12 @@ async def get_committee_bills(
     """
     try:
         from .committees import get_committee_bills as _get_committee_bills
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_committee_bills(
             ctx,
             committee_code=committee_code,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "get_committee_bills")
+        return convert_members_committees_response(raw_response, "get_committee_bills")
     except Exception as e:
         logger.error(f"Error in get_committee_bills: {e}")
         return MembersCommitteesResponse(
@@ -491,14 +472,12 @@ async def get_committee_reports(
     """
     try:
         from .committees import get_committee_reports as _get_committee_reports
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_committee_reports(
             ctx,
             committee_code=committee_code,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "get_committee_reports")
+        return convert_members_committees_response(raw_response, "get_committee_reports")
     except Exception as e:
         logger.error(f"Error in get_committee_reports: {e}")
         return MembersCommitteesResponse(
@@ -534,14 +513,12 @@ async def get_committee_communications(
     """
     try:
         from .committees import get_committee_communications as _get_committee_communications
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_committee_communications(
             ctx,
             committee_code=committee_code,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "get_committee_communications")
+        return convert_members_committees_response(raw_response, "get_committee_communications")
     except Exception as e:
         logger.error(f"Error in get_committee_communications: {e}")
         return MembersCommitteesResponse(
@@ -577,14 +554,12 @@ async def get_committee_nominations(
     """
     try:
         from .committees import get_committee_nominations as _get_committee_nominations
-        from .buckets.members_and_committees import _convert_to_structured_response
-        
         raw_response = await _get_committee_nominations(
             ctx,
             committee_code=committee_code,
             limit=limit
         )
-        return _convert_to_structured_response(raw_response, "get_committee_nominations")
+        return convert_members_committees_response(raw_response, "get_committee_nominations")
     except Exception as e:
         logger.error(f"Error in get_committee_nominations: {e}")
         return MembersCommitteesResponse(

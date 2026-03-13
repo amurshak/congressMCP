@@ -11,15 +11,10 @@ from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ..mcp_app import mcp
 from ..models.responses import LegislationHubResponse
-from ..core.auth import get_user_tier_from_context, SubscriptionTier
 from ..utils.bill_parser import parse_bill_reference, validate_bill_params
 
 logger = logging.getLogger(__name__)
 
-def check_operation_access(ctx: Context, operation: str) -> None:
-    """Check if user has access to the requested operation based on tier."""
-    # All operations available to all tiers for now
-    return
 
 async def route_bills_operation(ctx: Context, operation: str, **kwargs) -> str:
     """Route operation to appropriate bills function."""
@@ -146,9 +141,6 @@ async def bills(
         {"operation": "get_bill_details", "congress": 118, "bill_type": "hr", "bill_number": 1234}
     """
     try:
-        # Check operation access based on user tier
-        check_operation_access(ctx, operation)
-        
         # Handle flexible bill_id parsing
         parsed_congress = congress
         parsed_bill_type = bill_type
