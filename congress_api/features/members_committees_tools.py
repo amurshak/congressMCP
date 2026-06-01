@@ -405,17 +405,19 @@ async def search_committees(
 )
 async def get_committee_bills(
     ctx: Context,
+    chamber: str,
     committee_code: str,
     limit: int = 20
 ) -> MembersCommitteesResponse:
     """
     Get bills referred to or reported by a specific committee.
-    
+
     Args:
         ctx: Context for API requests
+        chamber: Chamber of Congress ("house", "senate", or "joint")
         committee_code: Official committee code (e.g., 'HSJU', 'SSJU')
         limit: Maximum number of bills to return
-    
+
     Returns:
         List of bills associated with the committee
     """
@@ -423,6 +425,7 @@ async def get_committee_bills(
         from .committees import get_committee_bills as _get_committee_bills
         raw_response = await _get_committee_bills(
             ctx,
+            chamber=chamber,
             committee_code=committee_code,
             limit=limit
         )
@@ -445,17 +448,19 @@ async def get_committee_bills(
 )
 async def get_committee_reports(
     ctx: Context,
+    chamber: str,
     committee_code: str,
     limit: int = 20
 ) -> MembersCommitteesResponse:
     """
     Get reports issued by a specific committee.
-    
+
     Args:
         ctx: Context for API requests
+        chamber: Chamber of Congress ("house", "senate", or "joint")
         committee_code: Official committee code (e.g., 'HSJU', 'SSJU')
         limit: Maximum number of reports to return
-    
+
     Returns:
         List of reports issued by the committee
     """
@@ -463,6 +468,7 @@ async def get_committee_reports(
         from .committees import get_committee_reports as _get_committee_reports
         raw_response = await _get_committee_reports(
             ctx,
+            chamber=chamber,
             committee_code=committee_code,
             limit=limit
         )
@@ -485,17 +491,19 @@ async def get_committee_reports(
 )
 async def get_committee_communications(
     ctx: Context,
+    chamber: str,
     committee_code: str,
     limit: int = 20
 ) -> MembersCommitteesResponse:
     """
     Get communications (letters, statements) from a specific committee.
-    
+
     Args:
         ctx: Context for API requests
+        chamber: Chamber of Congress ("house", "senate", or "joint")
         committee_code: Official committee code (e.g., 'HSJU', 'SSJU')
         limit: Maximum number of communications to return
-    
+
     Returns:
         List of communications from the committee
     """
@@ -503,6 +511,7 @@ async def get_committee_communications(
         from .committees import get_committee_communications as _get_committee_communications
         raw_response = await _get_committee_communications(
             ctx,
+            chamber=chamber,
             committee_code=committee_code,
             limit=limit
         )
