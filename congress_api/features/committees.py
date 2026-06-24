@@ -189,21 +189,49 @@ async def get_committee_details(ctx: Context, chamber: str, committee_code: str)
 # - get_committee_communications: Communications with limit parameter
 # - search_committees: Search functionality
 
+def _infer_chamber_from_code(committee_code: str) -> str | None:
+    """
+    Infer chamber from committee code prefix.
+    House codes start with 'hs', Senate with 'ss' or 's', Joint with 'j'.
+    Returns None if the prefix is unrecognized.
+    """
+    code = committee_code.lower()
+    if code.startswith("hs"):
+        return "house"
+    elif code.startswith("ss"):
+        return "senate"
+    elif code.startswith("j"):
+        return "joint"
+    elif code.startswith("s"):
+        return "senate"
+    elif code.startswith("h"):
+        return "house"
+    return None
+
+
 async def get_committee_bills(
     ctx: Context,
-    chamber: str,
     committee_code: str,
+    chamber: str | None = None,
     limit: int = 10
 ) -> str:
     """
     Get bills referred to a specific committee.
-    
+
     Args:
-        chamber: The chamber of Congress ("house" or "senate")
         committee_code: The committee code (e.g., "hsag", "ssap")
+        chamber: The chamber of Congress ("house", "senate", or "joint").
+                 If omitted, inferred from the committee code prefix.
         limit: Maximum number of bills to return (default: 10)
     """
     try:
+        # Auto-derive chamber from committee code if not provided
+        if not chamber:
+            chamber = _infer_chamber_from_code(committee_code)
+            if not chamber:
+                return f"Could not infer chamber from committee code '{committee_code}'. Please provide chamber explicitly ('house', 'senate', or 'joint')."
+            logger.info(f"Inferred chamber '{chamber}' from committee code '{committee_code}'")
+
         # Validate parameters
         chamber_validation = ParameterValidator.validate_chamber(chamber)
         if not chamber_validation.is_valid:
@@ -265,19 +293,27 @@ async def get_committee_bills(
 
 async def get_committee_reports(
     ctx: Context,
-    chamber: str,
     committee_code: str,
+    chamber: str | None = None,
     limit: int = 10
 ) -> str:
     """
     Get reports for a specific committee.
-    
+
     Args:
-        chamber: The chamber of Congress ("house" or "senate")
         committee_code: The committee code (e.g., "hspw00", "ssas00")
+        chamber: The chamber of Congress ("house", "senate", or "joint").
+                 If omitted, inferred from the committee code prefix.
         limit: Maximum number of reports to return (default: 10)
     """
     try:
+        # Auto-derive chamber from committee code if not provided
+        if not chamber:
+            chamber = _infer_chamber_from_code(committee_code)
+            if not chamber:
+                return f"Could not infer chamber from committee code '{committee_code}'. Please provide chamber explicitly ('house', 'senate', or 'joint')."
+            logger.info(f"Inferred chamber '{chamber}' from committee code '{committee_code}'")
+
         # Validate parameters
         chamber_validation = ParameterValidator.validate_chamber(chamber)
         if not chamber_validation.is_valid:
@@ -408,19 +444,27 @@ async def get_committee_nominations(
 
 async def get_committee_communications(
     ctx: Context,
-    chamber: str,
     committee_code: str,
+    chamber: str | None = None,
     limit: int = 10
 ) -> str:
     """
     Get communications for a specific committee.
-    
+
     Args:
-        chamber: The chamber of Congress ("house" or "senate")
         committee_code: The committee code (e.g., "hspw00", "ssas00")
+        chamber: The chamber of Congress ("house", "senate", or "joint").
+                 If omitted, inferred from the committee code prefix.
         limit: Maximum number of communications to return (default: 10)
     """
     try:
+        # Auto-derive chamber from committee code if not provided
+        if not chamber:
+            chamber = _infer_chamber_from_code(committee_code)
+            if not chamber:
+                return f"Could not infer chamber from committee code '{committee_code}'. Please provide chamber explicitly ('house', 'senate', or 'joint')."
+            logger.info(f"Inferred chamber '{chamber}' from committee code '{committee_code}'")
+
         # Validate parameters
         chamber_validation = ParameterValidator.validate_chamber(chamber)
         if not chamber_validation.is_valid:

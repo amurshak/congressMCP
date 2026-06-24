@@ -405,8 +405,8 @@ async def search_committees(
 )
 async def get_committee_bills(
     ctx: Context,
-    chamber: str,
     committee_code: str,
+    chamber: Optional[str] = None,
     limit: int = 20
 ) -> MembersCommitteesResponse:
     """
@@ -414,8 +414,9 @@ async def get_committee_bills(
 
     Args:
         ctx: Context for API requests
-        chamber: Chamber of Congress ("house", "senate", or "joint")
-        committee_code: Official committee code (e.g., 'HSJU', 'SSJU')
+        committee_code: Official committee code (e.g., 'hsju', 'ssju')
+        chamber: Chamber of Congress ("house", "senate", or "joint").
+                 If omitted, inferred automatically from the committee code prefix.
         limit: Maximum number of bills to return
 
     Returns:
@@ -425,8 +426,8 @@ async def get_committee_bills(
         from .committees import get_committee_bills as _get_committee_bills
         raw_response = await _get_committee_bills(
             ctx,
-            chamber=chamber,
             committee_code=committee_code,
+            chamber=chamber,
             limit=limit
         )
         return convert_members_committees_response(raw_response, "get_committee_bills")
@@ -448,8 +449,8 @@ async def get_committee_bills(
 )
 async def get_committee_reports(
     ctx: Context,
-    chamber: str,
     committee_code: str,
+    chamber: Optional[str] = None,
     limit: int = 20
 ) -> MembersCommitteesResponse:
     """
@@ -457,8 +458,9 @@ async def get_committee_reports(
 
     Args:
         ctx: Context for API requests
-        chamber: Chamber of Congress ("house", "senate", or "joint")
-        committee_code: Official committee code (e.g., 'HSJU', 'SSJU')
+        committee_code: Official committee code (e.g., 'hsju', 'ssju')
+        chamber: Chamber of Congress ("house", "senate", or "joint").
+                 If omitted, inferred automatically from the committee code prefix.
         limit: Maximum number of reports to return
 
     Returns:
@@ -468,8 +470,8 @@ async def get_committee_reports(
         from .committees import get_committee_reports as _get_committee_reports
         raw_response = await _get_committee_reports(
             ctx,
-            chamber=chamber,
             committee_code=committee_code,
+            chamber=chamber,
             limit=limit
         )
         return convert_members_committees_response(raw_response, "get_committee_reports")
@@ -491,8 +493,8 @@ async def get_committee_reports(
 )
 async def get_committee_communications(
     ctx: Context,
-    chamber: str,
     committee_code: str,
+    chamber: Optional[str] = None,
     limit: int = 20
 ) -> MembersCommitteesResponse:
     """
@@ -500,8 +502,9 @@ async def get_committee_communications(
 
     Args:
         ctx: Context for API requests
-        chamber: Chamber of Congress ("house", "senate", or "joint")
-        committee_code: Official committee code (e.g., 'HSJU', 'SSJU')
+        committee_code: Official committee code (e.g., 'hsju', 'ssju')
+        chamber: Chamber of Congress ("house", "senate", or "joint").
+                 If omitted, inferred automatically from the committee code prefix.
         limit: Maximum number of communications to return
 
     Returns:
@@ -511,8 +514,8 @@ async def get_committee_communications(
         from .committees import get_committee_communications as _get_committee_communications
         raw_response = await _get_committee_communications(
             ctx,
-            chamber=chamber,
             committee_code=committee_code,
+            chamber=chamber,
             limit=limit
         )
         return convert_members_committees_response(raw_response, "get_committee_communications")
