@@ -253,7 +253,7 @@ async def get_committee_bills(
             logger.warning(f"API error for committee bills: {response['error']}")
             return response["error"]
         
-        bills = response.get("bills", [])
+        bills = response.get("committee-bills", {}).get("bills", [])
         if not bills:
             return f"No bills found for committee {committee_code} in the {chamber.capitalize()}."
         
@@ -266,20 +266,15 @@ async def get_committee_bills(
         # Format results
         result = [f"Bills referred to {chamber.capitalize()} Committee {committee_code}:"]
         for bill in bills[:limit]:
-            title = bill.get("title", "No title available")
             bill_type = bill.get("type", "Unknown")
             number = bill.get("number", "Unknown")
             congress = bill.get("congress", "Unknown")
             url = bill.get("url", "No URL available")
-            
-            # Get latest action
-            latest_action = bill.get("latestAction", {})
-            action_date = latest_action.get("actionDate", "Unknown")
-            action_text = latest_action.get("text", "No action text")
-            
+            relationship = bill.get("relationshipType", "Unknown")
+            action_date = bill.get("actionDate", "Unknown")
+
             result.append(f"\n**{bill_type.upper()} {number}** (Congress {congress})")
-            result.append(f"Title: {title}")
-            result.append(f"Latest Action ({action_date}): {action_text}")
+            result.append(f"Relationship: {relationship} ({action_date})")
             result.append(f"URL: {url}")
         
         logger.info(f"Successfully retrieved {len(bills)} bills for committee {committee_code}")
