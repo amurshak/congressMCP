@@ -168,13 +168,16 @@ async def get_member_details(ctx: Context, bioguide_id: str) -> str:
         logger.error(f"Error in get_member_details: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str) -> str:
+async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str, limit: int = 20, offset: int = 0) -> str:
     """
     Get legislation sponsored by a specific member of Congress.
-    
+
     Args:
         bioguide_id: The Bioguide ID for the member (e.g., "L000174")
-        
+        limit: Maximum number of results to return (default: 20, max: 250).
+               Note: returns a single page only; no date or congress filter applied.
+        offset: Zero-based offset for pagination (default: 0)
+
     Returns a list of legislation sponsored by the specified member.
     """
     try:
@@ -183,14 +186,21 @@ async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str) -> st
             return format_error_response(CommonErrors.invalid_parameter(
                 "bioguide_id", bioguide_id, "Bioguide ID must be a non-empty string"
             ))
-        
+
         bioguide_id = bioguide_id.strip().upper()
         if not bioguide_id:
             return format_error_response(CommonErrors.invalid_parameter(
                 "bioguide_id", bioguide_id, "Bioguide ID cannot be empty"
             ))
-        
-        data = await safe_congressional_request(f"/member/{bioguide_id}/sponsored-legislation", ctx, {"limit": 20}, endpoint_type='members')
+
+        # Validate limit parameter
+        limit_validation = validator.validate_limit_range(limit, 250)
+        if not limit_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "limit", limit, limit_validation.error_message
+            ))
+
+        data = await safe_congressional_request(f"/member/{bioguide_id}/sponsored-legislation", ctx, {"limit": limit, "offset": offset}, endpoint_type='members')
         
         if "error" in data:
             if "404" in str(data["error"]):
@@ -234,13 +244,16 @@ async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str) -> st
         logger.error(f"Error in get_member_sponsored_legislation: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str) -> str:
+async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str, limit: int = 20, offset: int = 0) -> str:
     """
     Get legislation cosponsored by a specific member of Congress.
-    
+
     Args:
         bioguide_id: The Bioguide ID for the member (e.g., "L000174")
-        
+        limit: Maximum number of results to return (default: 20, max: 250).
+               Note: returns a single page only; no date or congress filter applied.
+        offset: Zero-based offset for pagination (default: 0)
+
     Returns a list of legislation cosponsored by the specified member.
     """
     try:
@@ -249,14 +262,21 @@ async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str) -> 
             return format_error_response(CommonErrors.invalid_parameter(
                 "bioguide_id", bioguide_id, "Bioguide ID must be a non-empty string"
             ))
-        
+
         bioguide_id = bioguide_id.strip().upper()
         if not bioguide_id:
             return format_error_response(CommonErrors.invalid_parameter(
                 "bioguide_id", bioguide_id, "Bioguide ID cannot be empty"
             ))
-        
-        data = await safe_congressional_request(f"/member/{bioguide_id}/cosponsored-legislation", ctx, {"limit": 20}, endpoint_type='members')
+
+        # Validate limit parameter
+        limit_validation = validator.validate_limit_range(limit, 250)
+        if not limit_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "limit", limit, limit_validation.error_message
+            ))
+
+        data = await safe_congressional_request(f"/member/{bioguide_id}/cosponsored-legislation", ctx, {"limit": limit, "offset": offset}, endpoint_type='members')
         
         if "error" in data:
             if "404" in str(data["error"]):
@@ -300,13 +320,16 @@ async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str) -> 
         logger.error(f"Error in get_member_cosponsored_legislation: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-async def get_members_by_congress(ctx: Context, congress: int) -> str:
+async def get_members_by_congress(ctx: Context, congress: int, current_member: Optional[bool] = None, limit: int = 50) -> str:
     """
     Get members of a specific Congress.
-    
+
     Args:
         congress: The Congress number (e.g., 118)
-        
+        current_member: If True, only return current members; if False, only non-current;
+                        if None (default), return all members.
+        limit: Maximum number of members to return (default: 50, max: 250)
+
     Returns a list of members who served in the specified Congress.
     """
     try:
@@ -316,9 +339,21 @@ async def get_members_by_congress(ctx: Context, congress: int) -> str:
             return format_error_response(CommonErrors.invalid_parameter(
                 "congress", congress, congress_validation.error_message
             ))
-        
+
+        # Validate limit parameter
+        limit_validation = validator.validate_limit_range(limit, 250)
+        if not limit_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "limit", limit, limit_validation.error_message
+            ))
+
+        # Build base params
+        base_params: Dict[str, Any] = {}
+        if current_member is not None:
+            base_params["currentMember"] = "true" if current_member else "false"
+
         # Use pagination to get all members of the congress
-        data = await get_all_members_paginated(ctx, f"/member/congress/{congress}", {})
+        data = await get_all_members_paginated(ctx, f"/member/congress/{congress}", base_params)
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error retrieving members for Congress {congress}: {data['error']}"))
@@ -329,29 +364,36 @@ async def get_members_by_congress(ctx: Context, congress: int) -> str:
         
         # Process and deduplicate results
         members = response_processor.deduplicate_results(
-            members, 
+            members,
             key_fields=["bioguideId"]
         )
-        
+
+        # Apply limit
+        if len(members) > limit:
+            members = members[:limit]
+
         result = [f"# Members of the {congress}th Congress"]
         result.append(f"Found {len(members)} members:")
-        
+
         for member in members:
             result.append("\n" + format_member_summary(member))
-        
+
         return "\n".join(result)
-        
+
     except Exception as e:
         logger.error(f"Error in get_members_by_congress: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-async def get_members_by_state(ctx: Context, state_code: str) -> str:
+async def get_members_by_state(ctx: Context, state_code: str, current_member: Optional[bool] = True, limit: int = 20) -> str:
     """
     Get members from a specific state.
-    
+
     Args:
         state_code: The two-letter state code (e.g., "MI" for Michigan)
-        
+        current_member: If True (default), only return current members; if False, only
+                        non-current; if None, return all members.
+        limit: Maximum number of members to return (default: 20, max: 250)
+
     Returns a list of members who represent the specified state.
     """
     try:
@@ -361,10 +403,22 @@ async def get_members_by_state(ctx: Context, state_code: str) -> str:
             return format_error_response(CommonErrors.invalid_parameter(
                 "state_code", state_code, state_validation.error_message
             ))
-        
+
         state_code = state_validation.sanitized_value
-        
-        data = await safe_congressional_request(f"/member/{state_code}", ctx, {"currentMember": "true"}, endpoint_type='members')
+
+        # Validate limit parameter
+        limit_validation = validator.validate_limit_range(limit, 250)
+        if not limit_validation.is_valid:
+            return format_error_response(CommonErrors.invalid_parameter(
+                "limit", limit, limit_validation.error_message
+            ))
+
+        # Build request params
+        params: Dict[str, Any] = {"limit": limit}
+        if current_member is not None:
+            params["currentMember"] = "true" if current_member else "false"
+
+        data = await safe_congressional_request(f"/member/{state_code}", ctx, params, endpoint_type='members')
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error retrieving members for state {state_code}: {data['error']}"))
@@ -391,14 +445,16 @@ async def get_members_by_state(ctx: Context, state_code: str) -> str:
         logger.error(f"Error in get_members_by_state: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
 
-async def get_members_by_district(ctx: Context, state_code: str, district: int) -> str:
+async def get_members_by_district(ctx: Context, state_code: str, district: int, current_member: Optional[bool] = True) -> str:
     """
     Get members from a specific congressional district.
-    
+
     Args:
         state_code: The two-letter state code (e.g., "MI" for Michigan)
         district: The district number (e.g., 10)
-        
+        current_member: If True (default), only return current members; if False, only
+                        non-current; if None, return all members.
+
     Returns a list of members who represent the specified district.
     """
     try:
@@ -408,16 +464,21 @@ async def get_members_by_district(ctx: Context, state_code: str, district: int) 
             return format_error_response(CommonErrors.invalid_parameter(
                 "state_code", state_code, state_validation.error_message
             ))
-        
+
         state_code = state_validation.sanitized_value
-        
+
         # Validate district parameter
         if not isinstance(district, int) or district < 1:
             return format_error_response(CommonErrors.invalid_parameter(
                 "district", district, "District must be a positive integer (e.g., 1, 2, 10)"
             ))
-        
-        data = await safe_congressional_request(f"/member/{state_code}/{district}", ctx, {"currentMember": "true"}, endpoint_type='members')
+
+        # Build request params
+        params: Dict[str, Any] = {}
+        if current_member is not None:
+            params["currentMember"] = "true" if current_member else "false"
+
+        data = await safe_congressional_request(f"/member/{state_code}/{district}", ctx, params, endpoint_type='members')
         
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error retrieving members for {state_code}-{district}: {data['error']}"))
