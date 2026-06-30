@@ -625,7 +625,9 @@ async def get_bill_subjects(
         if "error" in response:
             return str(response["error"])
 
-        subjects = response.get('subjects', [])
+        # The API returns subjects as a dict {legislativeSubjects, policyArea};
+        # the formatter handles that shape (and a legacy list) directly.
+        subjects = response.get('subjects', {})
         return BillsFormatter.format_bill_subjects(subjects)
 
     except Exception as e:
