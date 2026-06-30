@@ -705,6 +705,49 @@ GET /amendment/117/hamdt/287/text?api\_key=\[INSERT\_KEY\]
 
 ---
 
+## **Law API**
+
+Enacted laws. These endpoints return the same shapes as `/bill` (a `bills` list
+for listings, a `bill` object for detail); each law carries a
+`laws: [{ "number": "119-100", "type": "Public Law" }]` field. Exposed by the
+`laws` MCP tool (`get_laws`, `get_law_details`).
+
+### **GET `/law/{congress}`**
+
+Returns the list of laws (public and private) for the specified congress.
+
+```
+https://api.congress.gov/v3/law/119?api_key=[INSERT_KEY]
+```
+
+### **GET `/law/{congress}/{lawType}`**
+
+Returns laws filtered by type. `lawType` is `pub` (public) or `priv` (private).
+
+```
+https://api.congress.gov/v3/law/119/pub?api_key=[INSERT_KEY]
+```
+
+### **GET `/law/{congress}/{lawType}/{lawNumber}`**
+
+Returns detail for a specific law (response shape mirrors `/bill/.../{billNumber}`,
+top-level key `bill`).
+
+```
+https://api.congress.gov/v3/law/119/pub/1?api_key=[INSERT_KEY]
+```
+
+| Parameter | Description |
+| :---- | :---- |
+| congress * | The congress number. For example, 119. |
+| lawType | Law type — `pub` (public) or `priv` (private). |
+| lawNumber | The law's sequential number. For example, 1. |
+| format | The data format. Value can be xml or json. |
+| offset | The starting record returned. 0 is the first record. |
+| limit | The number of records returned. The maximum limit is 250. |
+
+---
+
 ## **Congress API**
 
 ### **GET `/congress`**

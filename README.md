@@ -55,14 +55,15 @@ Sign up at **[api.congress.gov/sign-up](https://api.congress.gov/sign-up/)** (ta
 
 ## Tools
 
-**6 toolsets, 91+ operations** covering all Congress.gov API endpoints:
+**7 toolsets, 90+ operations** covering the Congress.gov API:
 
 | Toolset | Operations | What it does |
 |---------|-----------|--------------|
 | **Bills** | 16 | Search, details, text, actions, amendments, cosponsors, subjects |
+| **Laws** | 2 | Enacted public/private laws by congress (`get_laws`, `get_law_details`) |
 | **Amendments** | 7 | Search, details, actions, sponsors, text |
 | **Treaties & Summaries** | 5 | Treaty search, actions, committees, text; bill summaries |
-| **Members & Committees** | 13 | Member search by name/state/district, sponsored legislation, committee bills/reports |
+| **Members & Committees** | 13 | Member search by name/state/district, sponsored legislation, committee bills/reports/communications |
 | **Voting & Nominations** | 13 | House/Senate votes, nominations, roll calls |
 | **Records & Hearings** | 10+ | Congressional Record, hearings, CRS reports, committee prints |
 
