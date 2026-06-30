@@ -19,6 +19,24 @@ async def safe_committees_request(endpoint: str, ctx: Context, params: Dict[str,
     """Safe API request wrapper for committees endpoints."""
     return await DefensiveAPIWrapper.safe_api_request(endpoint, ctx, params, endpoint_type="committees")
 
+async def _resolve_recent_offset(endpoint: str, ctx: Context, limit: int) -> tuple[int, Optional[int]]:
+    """Return (offset, total_count) for the LAST page of a committee sub-resource.
+
+    The committee bills/reports/communications/nominations endpoints return
+    oldest-first with no sort param, so the most recent items live at the end.
+    We probe ``pagination.count`` and compute the offset of the final page so a
+    caller can fetch newest items directly. Returns (0, None) if the count is
+    unavailable. ``pagination.count`` is present on all four endpoints.
+    """
+    probe = await safe_committees_request(endpoint, ctx, {"limit": 1})
+    if isinstance(probe, dict) and "error" not in probe:
+        count = (probe.get("pagination") or {}).get("count")
+        if isinstance(count, int) and count > limit:
+            return max(0, count - limit), count
+        if isinstance(count, int):
+            return 0, count
+    return 0, None
+
 # Formatting helpers
 def format_committee_summary(committee: Dict[str, Any]) -> str:
     """Format a committee into a readable summary."""
@@ -213,7 +231,9 @@ async def get_committee_bills(
     ctx: Context,
     committee_code: str,
     chamber: str | None = None,
-    limit: int = 10
+    limit: int = 10,
+    offset: Optional[int] = None,
+    most_recent: bool = True
 ) -> str:
     """
     Get bills referred to a specific committee.
@@ -223,6 +243,12 @@ async def get_committee_bills(
         chamber: The chamber of Congress ("house", "senate", or "joint").
                  If omitted, inferred from the committee code prefix.
         limit: Maximum number of bills to return (default: 10)
+        offset: Starting record (0-based). When set, paging is explicit and
+                most_recent is ignored.
+        most_recent: When True (default), return the newest referrals first.
+                     The endpoint is oldest-first with no sort, so this probes
+                     the total count and fetches the final page. Set False to
+                     get the oldest records (offset 0).
     """
     try:
         # Auto-derive chamber from committee code if not provided
@@ -245,26 +271,42 @@ async def get_committee_bills(
         
         # Build endpoint
         endpoint = f"/committee/{chamber.lower()}/{committee_code}/bills"
-        
+
+        # Resolve paging: explicit offset wins; else jump to the newest page.
+        total_count = None
+        if offset is None and most_recent:
+            offset, total_count = await _resolve_recent_offset(endpoint, ctx, limit)
+        params = {"limit": limit}
+        if offset:
+            params["offset"] = offset
+
         # Make API request
-        response = await safe_committees_request(endpoint, ctx, {"limit": limit})
-        
+        response = await safe_committees_request(endpoint, ctx, params)
+
         if "error" in response:
             logger.warning(f"API error for committee bills: {response['error']}")
             return response["error"]
-        
+
         bills = response.get("committee-bills", {}).get("bills", [])
         if not bills:
             return f"No bills found for committee {committee_code} in the {chamber.capitalize()}."
-        
+
+        # The endpoint is oldest-first; when showing the most-recent page, reverse
+        # so the newest referral is at the top.
+        if most_recent and offset:
+            bills = list(reversed(bills))
+
         # Deduplicate bills
         bills = ResponseProcessor.deduplicate_results(
-            bills, 
+            bills,
             key_fields=["congress", "number", "type"]
         )
-        
+
         # Format results
-        result = [f"Bills referred to {chamber.capitalize()} Committee {committee_code}:"]
+        header = f"Bills referred to {chamber.capitalize()} Committee {committee_code}"
+        if total_count is not None:
+            header += f" (showing {'newest ' if most_recent else ''}{min(limit, len(bills))} of {total_count} total)"
+        result = [header + ":"]
         for bill in bills[:limit]:
             bill_type = bill.get("type", "Unknown")
             number = bill.get("number", "Unknown")
@@ -290,7 +332,9 @@ async def get_committee_reports(
     ctx: Context,
     committee_code: str,
     chamber: str | None = None,
-    limit: int = 10
+    limit: int = 10,
+    offset: Optional[int] = None,
+    most_recent: bool = True
 ) -> str:
     """
     Get reports for a specific committee.
@@ -300,6 +344,10 @@ async def get_committee_reports(
         chamber: The chamber of Congress ("house", "senate", or "joint").
                  If omitted, inferred from the committee code prefix.
         limit: Maximum number of reports to return (default: 10)
+        offset: Starting record (0-based). When set, paging is explicit and
+                most_recent is ignored.
+        most_recent: When True (default), return the newest reports first
+                     (the endpoint is oldest-first with no sort).
     """
     try:
         # Auto-derive chamber from committee code if not provided
@@ -322,26 +370,40 @@ async def get_committee_reports(
         
         # Build endpoint
         endpoint = f"/committee/{chamber.lower()}/{committee_code}/reports"
-        
+
+        # Resolve paging: explicit offset wins; else jump to the newest page.
+        total_count = None
+        if offset is None and most_recent:
+            offset, total_count = await _resolve_recent_offset(endpoint, ctx, limit)
+        params = {"limit": limit}
+        if offset:
+            params["offset"] = offset
+
         # Make API request
-        response = await safe_committees_request(endpoint, ctx, {"limit": limit})
-        
+        response = await safe_committees_request(endpoint, ctx, params)
+
         if "error" in response:
             logger.warning(f"API error for committee reports: {response['error']}")
             return response["error"]
-        
+
         reports = response.get("reports", [])
         if not reports:
             return f"No reports found for committee {committee_code} in the {chamber.capitalize()}."
-        
+
+        if most_recent and offset:
+            reports = list(reversed(reports))
+
         # Deduplicate reports
         reports = ResponseProcessor.deduplicate_results(
-            reports, 
+            reports,
             key_fields=["congress", "number", "type"]
         )
-        
+
         # Format results
-        result = [f"Reports from {chamber.capitalize()} Committee {committee_code}:"]
+        header = f"Reports from {chamber.capitalize()} Committee {committee_code}"
+        if total_count is not None:
+            header += f" (showing {'newest ' if most_recent else ''}{min(limit, len(reports))} of {total_count} total)"
+        result = [header + ":"]
         for report in reports[:limit]:
             title = report.get("title", "No title available")
             report_type = report.get("type", "Unknown")
@@ -367,14 +429,20 @@ async def get_committee_reports(
 async def get_committee_nominations(
     ctx: Context,
     committee_code: str,
-    limit: int = 10
+    limit: int = 10,
+    offset: Optional[int] = None,
+    most_recent: bool = True
 ) -> str:
     """
     Get nominations for a specific Senate committee.
-    
+
     Args:
         committee_code: The committee code (e.g., "ssas00")
         limit: Maximum number of nominations to return (default: 10)
+        offset: Starting record (0-based) for explicit paging.
+        most_recent: Accepted for signature consistency with the other committee
+                     tools; the nominations endpoint is already newest-first, so
+                     the default page is the most recent.
     """
     try:
         # Validate parameters
@@ -382,29 +450,40 @@ async def get_committee_nominations(
         if not limit_validation.is_valid:
             logger.warning(f"Invalid limit: {limit}")
             return limit_validation.error_message
-        
-        # Build endpoint (nominations are Senate-only)
+
+        # Build endpoint (nominations are Senate-only). Unlike the bills/reports/
+        # communications sub-resources, the nominations endpoint is NEWEST-first,
+        # so most_recent is already the natural order — no jump-to-end needed.
         endpoint = f"/committee/senate/{committee_code}/nominations"
-        
+
+        params = {"limit": limit}
+        if offset:
+            params["offset"] = offset
+
         # Make API request
-        response = await safe_committees_request(endpoint, ctx, {"limit": limit})
-        
+        response = await safe_committees_request(endpoint, ctx, params)
+
         if "error" in response:
             logger.warning(f"API error for committee nominations: {response['error']}")
             return response["error"]
-        
+
         nominations = response.get("nominations", [])
         if not nominations:
             return f"No nominations found for Senate committee {committee_code}."
-        
+
+        total_count = (response.get("pagination") or {}).get("count")
+
         # Deduplicate nominations
         nominations = ResponseProcessor.deduplicate_results(
-            nominations, 
+            nominations,
             key_fields=["congress", "number"]
         )
-        
+
         # Format results
-        result = [f"Nominations for Senate Committee {committee_code}:"]
+        header = f"Nominations for Senate Committee {committee_code}"
+        if total_count is not None and offset is None:
+            header += f" (showing newest {min(limit, len(nominations))} of {total_count} total)"
+        result = [header + ":"]
         for nomination in nominations[:limit]:
             number = nomination.get("number", "Unknown")
             congress = nomination.get("congress", "Unknown")
@@ -441,7 +520,9 @@ async def get_committee_communications(
     ctx: Context,
     committee_code: str,
     chamber: str | None = None,
-    limit: int = 10
+    limit: int = 10,
+    offset: Optional[int] = None,
+    most_recent: bool = True
 ) -> str:
     """
     Get communications for a specific committee.
@@ -451,6 +532,10 @@ async def get_committee_communications(
         chamber: The chamber of Congress ("house", "senate", or "joint").
                  If omitted, inferred from the committee code prefix.
         limit: Maximum number of communications to return (default: 10)
+        offset: Starting record (0-based). When set, paging is explicit and
+                most_recent is ignored.
+        most_recent: When True (default), return the newest communications first
+                     (the endpoint is oldest-first with no sort).
     """
     try:
         # Auto-derive chamber from committee code if not provided
@@ -485,8 +570,16 @@ async def get_committee_communications(
 
         endpoint = f"/committee/{chamber_l}/{committee_code}/{sub_resource}"
 
+        # Resolve paging: explicit offset wins; else jump to the newest page.
+        total_count = None
+        if offset is None and most_recent:
+            offset, total_count = await _resolve_recent_offset(endpoint, ctx, limit)
+        params = {"limit": limit}
+        if offset:
+            params["offset"] = offset
+
         # Make API request
-        response = await safe_committees_request(endpoint, ctx, {"limit": limit})
+        response = await safe_committees_request(endpoint, ctx, params)
 
         if "error" in response:
             logger.warning(f"API error for committee communications: {response['error']}")
@@ -496,6 +589,9 @@ async def get_committee_communications(
         if not communications:
             return f"No communications found for committee {committee_code} in the {chamber.capitalize()}."
 
+        if most_recent and offset:
+            communications = list(reversed(communications))
+
         # Deduplicate communications
         communications = ResponseProcessor.deduplicate_results(
             communications,
@@ -503,7 +599,10 @@ async def get_committee_communications(
         )
 
         # Format results
-        result = [f"Communications for {chamber.capitalize()} Committee {committee_code}:"]
+        header = f"Communications for {chamber.capitalize()} Committee {committee_code}"
+        if total_count is not None:
+            header += f" (showing {'newest ' if most_recent else ''}{min(limit, len(communications))} of {total_count} total)"
+        result = [header + ":"]
         for comm in communications[:limit]:
             number = comm.get("number", "Unknown")
             congress = comm.get("congress", "Unknown")

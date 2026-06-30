@@ -414,7 +414,9 @@ async def get_committee_bills(
     ctx: Context,
     committee_code: str,
     chamber: Optional[str] = None,
-    limit: int = 20
+    limit: int = 20,
+    offset: Optional[int] = None,
+    most_recent: bool = True
 ) -> MembersCommitteesResponse:
     """
     Get bills referred to or reported by a specific committee.
@@ -425,6 +427,9 @@ async def get_committee_bills(
         chamber: Chamber of Congress ("house", "senate", or "joint").
                  If omitted, inferred automatically from the committee code prefix.
         limit: Maximum number of bills to return
+        offset: Starting record (0-based) for explicit paging.
+        most_recent: When True (default), return the newest referrals first.
+                     The endpoint is oldest-first, so this fetches the final page.
 
     Returns:
         List of bills associated with the committee
@@ -435,7 +440,9 @@ async def get_committee_bills(
             ctx,
             committee_code=committee_code,
             chamber=chamber,
-            limit=limit
+            limit=limit,
+            offset=offset,
+            most_recent=most_recent
         )
         return convert_members_committees_response(raw_response, "get_committee_bills")
     except Exception as e:
@@ -458,7 +465,9 @@ async def get_committee_reports(
     ctx: Context,
     committee_code: str,
     chamber: Optional[str] = None,
-    limit: int = 20
+    limit: int = 20,
+    offset: Optional[int] = None,
+    most_recent: bool = True
 ) -> MembersCommitteesResponse:
     """
     Get reports issued by a specific committee.
@@ -469,6 +478,8 @@ async def get_committee_reports(
         chamber: Chamber of Congress ("house", "senate", or "joint").
                  If omitted, inferred automatically from the committee code prefix.
         limit: Maximum number of reports to return
+        offset: Starting record (0-based) for explicit paging.
+        most_recent: When True (default), return the newest reports first.
 
     Returns:
         List of reports issued by the committee
@@ -479,7 +490,9 @@ async def get_committee_reports(
             ctx,
             committee_code=committee_code,
             chamber=chamber,
-            limit=limit
+            limit=limit,
+            offset=offset,
+            most_recent=most_recent
         )
         return convert_members_committees_response(raw_response, "get_committee_reports")
     except Exception as e:
@@ -502,7 +515,9 @@ async def get_committee_communications(
     ctx: Context,
     committee_code: str,
     chamber: Optional[str] = None,
-    limit: int = 20
+    limit: int = 20,
+    offset: Optional[int] = None,
+    most_recent: bool = True
 ) -> MembersCommitteesResponse:
     """
     Get communications (letters, statements) from a specific committee.
@@ -513,6 +528,8 @@ async def get_committee_communications(
         chamber: Chamber of Congress ("house", "senate", or "joint").
                  If omitted, inferred automatically from the committee code prefix.
         limit: Maximum number of communications to return
+        offset: Starting record (0-based) for explicit paging.
+        most_recent: When True (default), return the newest communications first.
 
     Returns:
         List of communications from the committee
@@ -523,7 +540,9 @@ async def get_committee_communications(
             ctx,
             committee_code=committee_code,
             chamber=chamber,
-            limit=limit
+            limit=limit,
+            offset=offset,
+            most_recent=most_recent
         )
         return convert_members_committees_response(raw_response, "get_committee_communications")
     except Exception as e:
@@ -545,16 +564,20 @@ async def get_committee_communications(
 async def get_committee_nominations(
     ctx: Context,
     committee_code: str,
-    limit: int = 20
+    limit: int = 20,
+    offset: Optional[int] = None,
+    most_recent: bool = True
 ) -> MembersCommitteesResponse:
     """
     Get nominations referred to a specific committee.
-    
+
     Args:
         ctx: Context for API requests
         committee_code: Official committee code (e.g., 'HSJU', 'SSJU')
         limit: Maximum number of nominations to return
-    
+        offset: Starting record (0-based) for explicit paging.
+        most_recent: When True (default), return the newest nominations first.
+
     Returns:
         List of nominations referred to the committee
     """
@@ -563,7 +586,9 @@ async def get_committee_nominations(
         raw_response = await _get_committee_nominations(
             ctx,
             committee_code=committee_code,
-            limit=limit
+            limit=limit,
+            offset=offset,
+            most_recent=most_recent
         )
         return convert_members_committees_response(raw_response, "get_committee_nominations")
     except Exception as e:
