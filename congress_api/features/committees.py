@@ -471,43 +471,51 @@ async def get_committee_communications(
             logger.warning(f"Invalid limit: {limit}")
             return limit_validation.error_message
         
-        # Build endpoint
-        endpoint = f"/committee/{chamber.lower()}/{committee_code}/communications"
-        
+        # Build endpoint. The committee communications sub-resource is chamber-
+        # specific: /committee/{chamber}/{code}/house-communication (House) or
+        # /senate-communication (Senate). There is no /communications path, and
+        # Joint committees have no communications resource.
+        chamber_l = chamber.lower()
+        if chamber_l == "house":
+            sub_resource, response_key = "house-communication", "houseCommunications"
+        elif chamber_l == "senate":
+            sub_resource, response_key = "senate-communication", "senateCommunications"
+        else:
+            return f"Committee communications are not available for {chamber.capitalize()} committees (House and Senate only)."
+
+        endpoint = f"/committee/{chamber_l}/{committee_code}/{sub_resource}"
+
         # Make API request
         response = await safe_committees_request(endpoint, ctx, {"limit": limit})
-        
+
         if "error" in response:
             logger.warning(f"API error for committee communications: {response['error']}")
             return response["error"]
-        
-        communications = response.get("communications", [])
+
+        communications = response.get(response_key, [])
         if not communications:
             return f"No communications found for committee {committee_code} in the {chamber.capitalize()}."
-        
+
         # Deduplicate communications
         communications = ResponseProcessor.deduplicate_results(
-            communications, 
+            communications,
             key_fields=["congress", "number"]
         )
-        
+
         # Format results
         result = [f"Communications for {chamber.capitalize()} Committee {committee_code}:"]
         for comm in communications[:limit]:
             number = comm.get("number", "Unknown")
             congress = comm.get("congress", "Unknown")
             url = comm.get("url", "No URL available")
-            
+
             # Get communication type
             comm_type = comm.get("communicationType", {})
-            type_name = comm_type.get("name", "Unknown")
-            
-            # Get committee referral info
-            committees = comm.get("committees", [])
-            referral_date = "Unknown"
-            if committees:
-                referral_date = committees[0].get("referralDate", "Unknown")
-            
+            type_name = comm_type.get("name", "Unknown") if isinstance(comm_type, dict) else "Unknown"
+
+            # referralDate is a top-level field on each communication
+            referral_date = comm.get("referralDate", "Unknown")
+
             result.append(f"\n**{type_name} {number}** (Congress {congress})")
             result.append(f"Referral Date: {referral_date}")
             result.append(f"URL: {url}")
