@@ -362,19 +362,24 @@ async def get_members_by_congress_state_district(
 )
 async def search_committees(
     ctx: Context,
+    keywords: Optional[str] = None,
     chamber: Optional[str] = None,
     committee_type: Optional[str] = None,
+    congress: Optional[int] = None,
     limit: int = 20
 ) -> MembersCommitteesResponse:
     """
-    Search for congressional committees.
-    
+    Search for / browse congressional committees.
+
     Args:
         ctx: Context for API requests
+        keywords: Optional keywords to search committee information. When omitted,
+                  lists committees (optionally filtered by chamber/type).
         chamber: Chamber ('House', 'Senate', or 'Joint')
         committee_type: Type of committee ('Standing', 'Select', etc.)
+        congress: Optional Congress number (e.g., 119)
         limit: Maximum number of committees to return
-    
+
     Returns:
         List of matching committees with basic information
     """
@@ -382,7 +387,9 @@ async def search_committees(
         from .committees import search_committees as _search_committees
         raw_response = await _search_committees(
             ctx,
+            keywords=keywords,
             chamber=chamber,
+            congress=congress,
             committee_type=committee_type,
             limit=limit
         )

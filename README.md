@@ -66,6 +66,9 @@ Sign up at **[api.congress.gov/sign-up](https://api.congress.gov/sign-up/)** (ta
 | **Voting & Nominations** | 13 | House/Senate votes, nominations, roll calls |
 | **Records & Hearings** | 10+ | Congressional Record, hearings, CRS reports, committee prints |
 
+`search_committees` and `search_summaries` take an **optional** `keywords` argument —
+omit it to browse/list (committees can also be filtered by `chamber`/`committee_type`).
+
 ## Running from source
 
 ```bash

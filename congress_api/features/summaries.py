@@ -466,8 +466,8 @@ async def get_summaries_api_info(ctx: Context) -> str:
 # @require_paid_access
 async def search_summaries(
     ctx: Context,
-    keywords: str, 
-    congress: Optional[int] = None, 
+    keywords: Optional[str] = None,
+    congress: Optional[int] = None,
     bill_type: Optional[str] = None,
     limit: int = 10,
     sort: str = "updateDate+desc",
@@ -489,12 +489,9 @@ async def search_summaries(
     logger.info(f"Searching for summaries with keywords: {keywords}")
     
     try:
-        # Parameter validation
-        if not keywords or not keywords.strip():
-            return format_error_response(
-                CommonErrors.invalid_parameter("keywords", keywords, "Keywords cannot be empty", ["climate change", "healthcare", "defense"])
-            )
-        
+        # keywords is optional: when omitted, browse recent summaries unfiltered.
+        keywords = keywords.strip() if isinstance(keywords, str) else None
+
         # Validate limit
         limit_validation = ParameterValidator.validate_limit_range(limit, 250)
         if not limit_validation.is_valid:
@@ -567,18 +564,26 @@ async def search_summaries(
         
         if not summaries:
             return f"No summaries found for the specified criteria."
-        
-        # Client-side filtering based on keywords using processor
-        filtered_summaries = SummariesProcessor.filter_by_keywords(summaries, keywords)
-        
+
+        # Client-side keyword filtering only when a keyword was supplied; otherwise
+        # browse the recent summaries list as-is.
+        if keywords:
+            filtered_summaries = SummariesProcessor.filter_by_keywords(summaries, keywords)
+            title = f"Bill Summaries Matching '{keywords}'"
+            empty_msg = f"No summaries found matching '{keywords}'."
+        else:
+            filtered_summaries = summaries
+            title = "Recent Bill Summaries"
+            empty_msg = "No summaries found for the specified criteria."
+
         # Limit the results to the requested number
         filtered_summaries = filtered_summaries[:limit]
-        
+
         if not filtered_summaries:
-            return f"No summaries found matching '{keywords}'."
-        
-        logger.info(f"Found {len(filtered_summaries)} summaries matching '{keywords}'")
-        return format_summaries_list(filtered_summaries, f"Bill Summaries Matching '{keywords}'")
+            return empty_msg
+
+        logger.info(f"Found {len(filtered_summaries)} summaries ({'keyword' if keywords else 'browse'} mode)")
+        return format_summaries_list(filtered_summaries, title)
         
     except Exception as e:
         logger.error(f"Error searching summaries with keywords '{keywords}': {str(e)}")
