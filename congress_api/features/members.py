@@ -821,40 +821,48 @@ async def get_members_by_congress_state_district(
         if current_member:
             params["currentMember"] = "true"
         
-        # Determine endpoint based on whether district is provided
+        # Determine endpoint. When a district is given, use the dedicated
+        # congress-scoped endpoint /member/congress/{congress}/{state}/{district},
+        # which filters by congress server-side. The API has no congress+state-only
+        # endpoint, so the state-only case falls back to /member/{state} plus a
+        # client-side congress filter.
         if district is not None:
-            endpoint = f"/member/{state_code}/{district}"
+            endpoint = f"/member/congress/{congress}/{state_code}/{district}"
+            server_filtered_by_congress = True
         else:
             endpoint = f"/member/{state_code}"
-        
+            server_filtered_by_congress = False
+
         # Make the API request
         data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='members')
-        
+
         if "error" in data:
             return format_error_response(CommonErrors.api_server_error(f"Error retrieving members: {data['error']}"))
-        
+
         members = data.get("members", [])
         if not members:
             district_str = f" district {district}" if district else ""
             return f"No members found for {state_code}{district_str} in Congress {congress}."
-        
-        # Filter by congress if the API doesn't handle it directly
-        filtered_members = []
-        for member in members:
-            # Check if member served in the specified congress
-            if "terms" in member:
-                terms = member["terms"]
-                # Handle case where terms might be wrapped in an object with 'item' key
-                if isinstance(terms, dict) and "item" in terms:
-                    terms = terms["item"]
-                
-                if terms and isinstance(terms, list):
-                    # Check if any term matches the specified congress
-                    for term in terms:
-                        if isinstance(term, dict) and term.get("congress") == congress:
-                            filtered_members.append(member)
-                            break
-        
+
+        if server_filtered_by_congress:
+            # The API already filtered by congress; no client-side term filtering.
+            filtered_members = members
+        else:
+            # Client-side congress filter via each member's terms (state-only path).
+            filtered_members = []
+            for member in members:
+                if "terms" in member:
+                    terms = member["terms"]
+                    # terms may be wrapped in an object with an 'item' key
+                    if isinstance(terms, dict) and "item" in terms:
+                        terms = terms["item"]
+
+                    if terms and isinstance(terms, list):
+                        for term in terms:
+                            if isinstance(term, dict) and term.get("congress") == congress:
+                                filtered_members.append(member)
+                                break
+
         # Process and deduplicate results
         filtered_members = response_processor.deduplicate_results(
             filtered_members, 

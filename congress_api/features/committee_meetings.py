@@ -399,15 +399,19 @@ async def search_committee_meetings(
         if scheduled_to:
             params["scheduledTo"] = scheduled_to
         
-        # Determine the endpoint based on provided parameters
+        # Determine the endpoint. The committee-meeting endpoint only supports
+        # /{congress}/{chamber} filtering; the 4th path segment is {eventId}, NOT a
+        # committee code, so appending committee_code 404s. The meeting LIST items
+        # also carry no committee code, so committee-level filtering isn't available
+        # here — surface that instead of silently dropping it.
         endpoint = "/committee-meeting"
         if congress:
             endpoint = f"{endpoint}/{congress}"
             if chamber:
                 endpoint = f"{endpoint}/{chamber}"
-                if committee_code:
-                    endpoint = f"{endpoint}/{committee_code}"
-        
+        if committee_code:
+            logger.info(f"committee_code '{committee_code}' is not filterable on the committee-meeting search endpoint; ignoring")
+
         logger.debug(f"Searching committee meetings with endpoint: {endpoint}, params: {params}")
         data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='committee-meetings')
         
@@ -425,6 +429,8 @@ async def search_committee_meetings(
         
         logger.info(f"Found {len(meetings)} committee meetings matching the search criteria")
         lines = ["Search Results - Committee Meetings:"]
+        if committee_code:
+            lines.append(f"(Note: committee-level filtering by '{committee_code}' is not supported by this endpoint; showing all {chamber or 'chamber'} meetings.)")
         for meeting_item in meetings:
             lines.append("")
             lines.append(format_committee_meeting_item(meeting_item))
