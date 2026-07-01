@@ -19,18 +19,28 @@ from ..models.responses import (
 
 logger = logging.getLogger(__name__)
 
-_COUNT_LINE_RE = re.compile(r"Found\s+(\d+)", re.IGNORECASE)
+# Impls across the codebase report their count in prose rather than a
+# structured field, since these converters receive pre-formatted markdown
+# rather than raw JSON (see _extract_json). Two phrasings are common:
+# "Found 191 bills:" (members.py, committees.py, ...) and
+# "(10 found)" (committee_reports.py, hearings.py, ...).
+_COUNT_PATTERNS = (
+    re.compile(r"Found\s+(\d+)", re.IGNORECASE),
+    re.compile(r"\((\d+)\s+found\)", re.IGNORECASE),
+)
 
 
 def _extract_result_count(text: str) -> int:
-    """Best-effort recovery of a result count from a 'Found N ...' summary line.
+    """Best-effort recovery of a result count from a summary's count phrase.
 
-    The impls report their count in prose (e.g. "Found 191 bills:"), not as a
-    structured field, since these converters receive pre-formatted markdown
-    rather than raw JSON (see _extract_json). Returns 0 if no such line exists.
+    Returns 0 if no recognized count phrase is found — a limitation, not a
+    regression: results_count was unconditionally 0 before this helper existed.
     """
-    match = _COUNT_LINE_RE.search(text)
-    return int(match.group(1)) if match else 0
+    for pattern in _COUNT_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return int(match.group(1))
+    return 0
 
 
 def _extract_json(raw_response: str) -> dict | None:
