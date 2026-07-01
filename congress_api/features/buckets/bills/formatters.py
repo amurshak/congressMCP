@@ -75,9 +75,9 @@ class BillsFormatter:
             if "title" in bill:
                 result.append(f"**Title:** {bill['title']}")
 
-            # Latest action
-            if "latestAction" in bill:
-                action = bill["latestAction"]
+            # Latest action (the API may return latestAction as null for some bills)
+            action = bill.get("latestAction")
+            if isinstance(action, dict):
                 result.append(f"**Latest Action:** {action.get('text', 'Unknown')} ({action.get('actionDate', 'Unknown date')})")
 
             # URL
@@ -119,29 +119,29 @@ class BillsFormatter:
                 sponsor_names = [s.get("fullName", "Unknown") for s in sponsors]
                 result.append(f"**Sponsor{'s' if len(sponsor_names) > 1 else ''}:** {', '.join(sponsor_names)}")
 
-            # Cosponsors
-            if "cosponsors" in bill and "count" in bill["cosponsors"]:
+            # Cosponsors (dict-valued fields can be null in the API response)
+            if isinstance(bill.get("cosponsors"), dict) and "count" in bill["cosponsors"]:
                 result.append(f"**Cosponsors:** {bill['cosponsors']['count']}")
 
             # Latest Action
-            if "latestAction" in bill:
-                action = bill["latestAction"]
+            action = bill.get("latestAction")
+            if isinstance(action, dict):
                 result.append(f"**Latest Action:** {action.get('text', 'Unknown')} ({action.get('actionDate', 'Unknown date')})")
 
             # Committees
-            if "committees" in bill and "count" in bill["committees"]:
+            if isinstance(bill.get("committees"), dict) and "count" in bill["committees"]:
                 result.append(f"**Committees:** {bill['committees']['count']}")
 
             # Policy Area
-            if "policyArea" in bill and "name" in bill["policyArea"]:
+            if isinstance(bill.get("policyArea"), dict) and "name" in bill["policyArea"]:
                 result.append(f"**Policy Area:** {bill['policyArea']['name']}")
 
             # Subjects
-            if "subjects" in bill and "count" in bill["subjects"]:
+            if isinstance(bill.get("subjects"), dict) and "count" in bill["subjects"]:
                 result.append(f"**Subjects:** {bill['subjects']['count']}")
 
             # Text Versions
-            if "textVersions" in bill and "count" in bill["textVersions"] and bill["textVersions"]["count"] > 0:
+            if isinstance(bill.get("textVersions"), dict) and "count" in bill["textVersions"] and bill["textVersions"]["count"] > 0:
                 result.append("**Text Versions Available:** Use get_bill_text_versions tool for text versions.")
 
             # URL
@@ -294,25 +294,37 @@ class BillsFormatter:
             return f"Error formatting cosponsors: {str(e)}"
 
     @staticmethod
-    def format_bill_subjects(subjects: List[Dict[str, Any]]) -> str:
+    def format_bill_subjects(subjects: Any) -> str:
         """
         Format bill subjects into a readable list.
 
         Args:
-            subjects: List of subject dictionaries
+            subjects: The API `subjects` value — a dict of the form
+                ``{"legislativeSubjects": [...], "policyArea": {...}}`` (current
+                live shape), or a plain list of subject dicts (legacy).
 
         Returns:
             Formatted subjects list
         """
         try:
-            if not subjects:
+            policy_area = None
+            if isinstance(subjects, dict):
+                policy_area = subjects.get("policyArea")
+                subjects = subjects.get("legislativeSubjects", [])
+            if not isinstance(subjects, list):
+                subjects = []
+
+            if not subjects and not isinstance(policy_area, dict):
                 return "No subjects found."
 
             result = ["## Bill Subjects", ""]
+            if isinstance(policy_area, dict) and policy_area.get("name"):
+                result.append(f"**Policy Area:** {policy_area['name']}")
+                result.append("")
 
             for subject in subjects:
-                name = subject.get('name', 'Unknown subject')
-                result.append(f"- {name}")
+                if isinstance(subject, dict):
+                    result.append(f"- {subject.get('name', 'Unknown subject')}")
 
             return "\n".join(result)
 
