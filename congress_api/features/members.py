@@ -213,13 +213,18 @@ async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str, limit
         if not legislation:
             return f"No sponsored legislation found for member {bioguide_id}."
         
-        # Process and deduplicate results
+        # Process and deduplicate results. Include "url" in the key: sponsored/
+        # cosponsored legislation mixes bills and amendments, and amendment
+        # entries have type=None, number=None (they carry "amendmentNumber"
+        # instead) — deduping on (congress, type, number) alone collapsed every
+        # amendment in a given congress onto one colliding key, silently
+        # dropping distinct items. "url" is unique per item and fixes this.
         if isinstance(legislation, list):
             legislation = response_processor.deduplicate_results(
-                legislation, 
-                key_fields=["congress", "type", "number"]
+                legislation,
+                key_fields=["congress", "type", "number", "url"]
             )
-        
+
         result = [f"# Sponsored Legislation for Member {bioguide_id}"]
         result.append(f"Found {len(legislation)} bills:")
         
@@ -289,13 +294,15 @@ async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str, lim
         if not legislation:
             return f"No cosponsored legislation found for member {bioguide_id}."
         
-        # Process and deduplicate results
+        # Process and deduplicate results. See get_member_sponsored_legislation
+        # above: amendment entries have type=None/number=None, so "url" must be
+        # in the key or every amendment in a congress collides onto one entry.
         if isinstance(legislation, list):
             legislation = response_processor.deduplicate_results(
-                legislation, 
-                key_fields=["congress", "type", "number"]
+                legislation,
+                key_fields=["congress", "type", "number", "url"]
             )
-        
+
         result = [f"# Cosponsored Legislation for Member {bioguide_id}"]
         result.append(f"Found {len(legislation)} bills:")
         

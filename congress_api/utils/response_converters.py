@@ -6,6 +6,7 @@ Centralizes the conversion logic previously duplicated across deprecated bucket 
 
 import json
 import logging
+import re
 
 from ..models.responses import (
     AmendmentSummary,
@@ -17,6 +18,19 @@ from ..models.responses import (
 )
 
 logger = logging.getLogger(__name__)
+
+_COUNT_LINE_RE = re.compile(r"Found\s+(\d+)", re.IGNORECASE)
+
+
+def _extract_result_count(text: str) -> int:
+    """Best-effort recovery of a result count from a 'Found N ...' summary line.
+
+    The impls report their count in prose (e.g. "Found 191 bills:"), not as a
+    structured field, since these converters receive pre-formatted markdown
+    rather than raw JSON (see _extract_json). Returns 0 if no such line exists.
+    """
+    match = _COUNT_LINE_RE.search(text)
+    return int(match.group(1)) if match else 0
 
 
 def _extract_json(raw_response: str) -> dict | None:
@@ -146,13 +160,21 @@ def convert_members_committees_response(raw_response: str, operation: str) -> Me
         if isinstance(raw_response, str):
             data = _extract_json(raw_response)
             if data is None:
+                # All members/committees impls return pre-formatted human-readable
+                # markdown, not JSON, so this "no JSON found" branch is the NORMAL
+                # path for every one of these tools, not a fallback for malformed
+                # data. It must therefore preserve the full response: a prior bug
+                # here truncated it to raw_response[:500], which for any member or
+                # committee with more than a handful of results cut the summary off
+                # mid-word (and always reported results_count=0 regardless of how
+                # much data was actually returned).
                 return MembersCommitteesResponse(
                     success=True,
                     operation=operation,
-                    results_count=0,
+                    results_count=_extract_result_count(raw_response),
                     members=[],
                     committees=[],
-                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response,
+                    summary=raw_response,
                     context=f"Performed {operation} operation",
                 )
         else:
