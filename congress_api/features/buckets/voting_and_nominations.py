@@ -11,6 +11,7 @@ from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from ...mcp_app import mcp
 from ...models.responses import VotingNominationsResponse, VoteSummary, NominationSummary
+from ...utils.response_converters import _extract_result_count
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +27,16 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Voting
             if json_match:
                 data = json.loads(json_match.group())
             else:
+                # The underlying impls return pre-formatted markdown, not JSON, so this
+                # is the normal path for every operation, not a fallback for malformed
+                # data — it must preserve the full response, not truncate it.
                 return VotingNominationsResponse(
                     success=True,
                     operation=operation,
-                    results_count=0,
+                    results_count=_extract_result_count(raw_response),
                     votes=[],
                     nominations=[],
-                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response
+                    summary=raw_response
                 )
         else:
             data = raw_response
@@ -210,9 +214,12 @@ async def voting_and_nominations(
             if param_value is not None:
                 operation_kwargs[param_name] = param_value
 
-        # Route to appropriate internal function
-        raw_response = await route_voting_and_nominations_operation(ctx, operation, **operation_kwargs)
-        return _convert_to_structured_response(raw_response, operation)
+        # Route to appropriate internal function. route_voting_and_nominations_operation
+        # already returns a fully-converted VotingNominationsResponse (it calls
+        # _convert_to_structured_response internally) — re-converting it here fails the
+        # isinstance(raw_response, str) check and silently discards all data, always
+        # returning empty/zero results regardless of what the API actually returned.
+        return await route_voting_and_nominations_operation(ctx, operation, **operation_kwargs)
 
     except ToolError:
         raise

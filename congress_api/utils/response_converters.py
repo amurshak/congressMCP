@@ -6,6 +6,7 @@ Centralizes the conversion logic previously duplicated across deprecated bucket 
 
 import json
 import logging
+import re
 
 from ..models.responses import (
     AmendmentSummary,
@@ -17,6 +18,29 @@ from ..models.responses import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Impls across the codebase report their count in prose rather than a
+# structured field, since these converters receive pre-formatted markdown
+# rather than raw JSON (see _extract_json). Two phrasings are common:
+# "Found 191 bills:" (members.py, committees.py, ...) and
+# "(10 found)" (committee_reports.py, hearings.py, ...).
+_COUNT_PATTERNS = (
+    re.compile(r"Found\s+(\d+)", re.IGNORECASE),
+    re.compile(r"\((\d+)\s+found\)", re.IGNORECASE),
+)
+
+
+def _extract_result_count(text: str) -> int:
+    """Best-effort recovery of a result count from a summary's count phrase.
+
+    Returns 0 if no recognized count phrase is found — a limitation, not a
+    regression: results_count was unconditionally 0 before this helper existed.
+    """
+    for pattern in _COUNT_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            return int(match.group(1))
+    return 0
 
 
 def _extract_json(raw_response: str) -> dict | None:
@@ -146,13 +170,21 @@ def convert_members_committees_response(raw_response: str, operation: str) -> Me
         if isinstance(raw_response, str):
             data = _extract_json(raw_response)
             if data is None:
+                # All members/committees impls return pre-formatted human-readable
+                # markdown, not JSON, so this "no JSON found" branch is the NORMAL
+                # path for every one of these tools, not a fallback for malformed
+                # data. It must therefore preserve the full response: a prior bug
+                # here truncated it to raw_response[:500], which for any member or
+                # committee with more than a handful of results cut the summary off
+                # mid-word (and always reported results_count=0 regardless of how
+                # much data was actually returned).
                 return MembersCommitteesResponse(
                     success=True,
                     operation=operation,
-                    results_count=0,
+                    results_count=_extract_result_count(raw_response),
                     members=[],
                     committees=[],
-                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response,
+                    summary=raw_response,
                     context=f"Performed {operation} operation",
                 )
         else:
