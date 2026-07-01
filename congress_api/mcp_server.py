@@ -31,4 +31,5 @@ def initialize_mcp_features():
         records_and_hearings,
         committee_intelligence,
         research_and_professional,
+        laws,
     )
