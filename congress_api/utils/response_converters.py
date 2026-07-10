@@ -9,10 +9,7 @@ import logging
 import re
 
 from ..models.responses import (
-    AmendmentSummary,
-    BillSummary,
     CommitteeSummary,
-    LegislationHubResponse,
     MemberSummary,
     MembersCommitteesResponse,
 )
@@ -80,88 +77,6 @@ def _extract_json(raw_response: str) -> dict | None:
                 except json.JSONDecodeError:
                     return None
     return None
-
-
-def convert_legislation_response(raw_response: str, operation: str) -> LegislationHubResponse:
-    """Convert raw string response to structured LegislationHubResponse."""
-    try:
-        if isinstance(raw_response, str):
-            data = _extract_json(raw_response)
-            if data is None:
-                return LegislationHubResponse(
-                    success=True,
-                    operation=operation,
-                    results_count=0,
-                    bills=[],
-                    amendments=[],
-                    summary=raw_response[:500] + "..." if len(raw_response) > 500 else raw_response,
-                    total_available=None,
-                    next_steps=[],
-                )
-        else:
-            data = raw_response
-
-        bills = []
-        amendments = []
-
-        if isinstance(data, dict):
-            if "bills" in data:
-                for bill_data in data.get("bills", []):
-                    if isinstance(bill_data, dict):
-                        bills.append(
-                            BillSummary(
-                                congress=bill_data.get("congress", 0),
-                                bill_type=bill_data.get("type", ""),
-                                bill_number=bill_data.get("number", 0),
-                                title=bill_data.get("title", ""),
-                                sponsor=bill_data.get("sponsor"),
-                                introduced_date=bill_data.get("introducedDate"),
-                                latest_action=bill_data.get("latestAction"),
-                                url=bill_data.get("url"),
-                            )
-                        )
-
-            if "amendments" in data:
-                for amend_data in data.get("amendments", []):
-                    if isinstance(amend_data, dict):
-                        amendments.append(
-                            AmendmentSummary(
-                                congress=amend_data.get("congress", 0),
-                                amendment_type=amend_data.get("type", ""),
-                                amendment_number=amend_data.get("number", 0),
-                                purpose=amend_data.get("purpose"),
-                                sponsor=amend_data.get("sponsor"),
-                                submitted_date=amend_data.get("submittedDate"),
-                                bill_number=amend_data.get("billNumber"),
-                                url=amend_data.get("url"),
-                            )
-                        )
-
-        results_count = len(bills) + len(amendments)
-
-        return LegislationHubResponse(
-            success=True,
-            operation=operation,
-            results_count=results_count,
-            bills=bills,
-            amendments=amendments,
-            summary=f"Found {len(bills)} bills and {len(amendments)} amendments",
-            total_available=None,
-            next_steps=[],
-        )
-
-    except Exception as e:
-        logger.error(f"Error converting response to structured format: {e}")
-        return LegislationHubResponse(
-            success=False,
-            operation=operation,
-            results_count=0,
-            bills=[],
-            amendments=[],
-            summary=f"Error processing response: {str(e)}",
-            total_available=None,
-            next_steps=[],
-        )
 
 
 def convert_members_committees_response(raw_response: str, operation: str) -> MembersCommitteesResponse:

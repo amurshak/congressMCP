@@ -188,16 +188,7 @@ class ResponseProcessor:
 # Convenience classes for specific API types
 class BoundCongressionalRecordProcessor:
     """Specialized processor for Bound Congressional Record responses."""
-    
-    @staticmethod
-    def deduplicate_issues(issues: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Deduplicate bound congressional record issues."""
-        return ResponseProcessor.deduplicate_results(
-            issues, 
-            key_fields=['congress', 'volumeNumber', 'date'],
-            preserve_order=True
-        )
-    
+
     @staticmethod
     def sort_by_date(issues: List[Dict[str, Any]], newest_first: bool = True) -> List[Dict[str, Any]]:
         """Sort issues by date."""
@@ -247,38 +238,11 @@ class BillsProcessor:
         )
     
     @staticmethod
-    def deduplicate_titles(titles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Deduplicate bill titles."""
-        return ResponseProcessor.deduplicate_results(
-            titles,
-            key_fields=['titleType', 'title'],
-            preserve_order=True
-        )
-    
-    @staticmethod
-    def deduplicate_related_bills(related_bills: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Deduplicate related bills."""
-        return ResponseProcessor.deduplicate_results(
-            related_bills,
-            key_fields=['congress', 'type', 'number'],
-            preserve_order=True
-        )
-    
-    @staticmethod
     def deduplicate_summaries(summaries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Deduplicate bill summaries."""
         return ResponseProcessor.deduplicate_results(
             summaries,
             key_fields=['actionDesc', 'actionDate'],
-            preserve_order=True
-        )
-    
-    @staticmethod
-    def deduplicate_committees(committees: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Deduplicate bill committees."""
-        return ResponseProcessor.deduplicate_results(
-            committees,
-            key_fields=['name', 'chamber'],
             preserve_order=True
         )
 
