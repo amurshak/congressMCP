@@ -109,3 +109,39 @@ def test_extract_result_count_handles_n_found_suffix():
 def test_extract_result_count_returns_zero_when_absent():
     from congress_api.utils.response_converters import _extract_result_count
     assert _extract_result_count("Search Results - Hearings:\n\nChamber: House") == 0
+
+
+# --- return-type annotation regression ---
+#
+# The double-conversion fix above made each top-level @mcp.tool function return
+# route_X_operation's result directly (already a Pydantic Response object), but
+# the function signatures were still declared "-> str" from the old
+# _convert_to_structured_response(...) call. FastMCP validates a tool's actual
+# return value against its declared return type to build/check the output
+# schema — a plain Python-level test (calling the function directly and reading
+# .summary/.results_count off the result) does NOT exercise that validation, so
+# this regression shipped once already and only surfaced through a real MCP
+# tool call. This test catches it statically, without needing a live server.
+
+import inspect
+
+
+@pytest.mark.parametrize("tool_name,module_path,expected_type_name", [
+    ("committee_intelligence", "congress_api.features.buckets.committee_intelligence", "CommitteeIntelligenceResponse"),
+    ("records_and_hearings", "congress_api.features.buckets.records_and_hearings", "RecordsHearingsResponse"),
+    ("research_and_professional", "congress_api.features.buckets.research_and_professional", "ResearchProfessionalResponse"),
+    ("voting_and_nominations", "congress_api.features.buckets.voting_and_nominations", "VotingNominationsResponse"),
+])
+def test_bucket_tool_return_annotation_matches_actual_return_type(tool_name, module_path, expected_type_name):
+    import importlib
+    mod = importlib.import_module(module_path)
+    tool_fn = getattr(mod, tool_name)
+    annotation = inspect.signature(tool_fn).return_annotation
+    assert annotation is not str, (
+        f"{tool_name} declares '-> str' but returns route_{tool_name}_operation's "
+        f"already-structured Pydantic response — FastMCP will reject the real "
+        f"output as invalid (str expected, Pydantic model given)."
+    )
+    assert getattr(annotation, "__name__", None) == expected_type_name, (
+        f"{tool_name}'s return annotation is {annotation!r}, expected {expected_type_name}"
+    )

@@ -210,7 +210,7 @@ async def committee_intelligence(
     offset: Optional[int] = None,
     from_date_time: Optional[str] = None,
     to_date_time: Optional[str] = None
-) -> str:
+) -> CommitteeIntelligenceResponse:
     """
     Congressional Committee Intelligence - Professional access to committee documents and activities.
 

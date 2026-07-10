@@ -148,7 +148,7 @@ async def research_and_professional(
     end_year: Optional[int] = None,
     # CRS report parameters
     report_number: Optional[str] = None
-) -> str:
+) -> ResearchProfessionalResponse:
     """
     Congressional Research and Professional - Access CRS reports and enhanced Congress analytics.
 

@@ -202,7 +202,7 @@ async def records_and_hearings(
     from_date_time: Optional[str] = None,
     to_date_time: Optional[str] = None,
     sort: Optional[str] = None
-) -> str:
+) -> RecordsHearingsResponse:
     """
     Congressional Records and Hearings - Access legislative records, communications, and hearings.
 

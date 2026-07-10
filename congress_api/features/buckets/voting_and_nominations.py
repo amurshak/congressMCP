@@ -181,7 +181,7 @@ async def voting_and_nominations(
     sort: Optional[str] = None,
     from_date: Optional[str] = None,
     to_date: Optional[str] = None
-) -> str:
+) -> VotingNominationsResponse:
     """
     Congressional Voting and Nominations - Access House votes and presidential nominations.
 
