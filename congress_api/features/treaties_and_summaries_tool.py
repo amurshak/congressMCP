@@ -7,8 +7,8 @@ all treaty and summary-related operations through a clean, structured interface.
 
 import logging
 from typing import Optional
-from mcp.server.fastmcp import Context
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from ..mcp_app import mcp
 
 logger = logging.getLogger(__name__)

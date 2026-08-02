@@ -1,7 +1,7 @@
 # congress_api/features/daily_congressional_record.py
 import logging
 from typing import Dict, List, Any, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator
@@ -15,14 +15,14 @@ logger.setLevel(logging.DEBUG)
 
 # --- Defensive API Wrapper ---
 
-async def safe_daily_congressional_record_request(endpoint: str, params: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+async def safe_daily_congressional_record_request(endpoint: str, params: Dict[str, Any], ctx: Optional[Context]) -> Dict[str, Any]:
     """
     Safe API request wrapper for Daily Congressional Record with timeout and retry logic.
     
     Args:
         endpoint: API endpoint to call
         params: Parameters for the API request
-        ctx: FastMCP context
+        ctx: MCP server context
         
     Returns:
         API response data
@@ -128,7 +128,7 @@ def format_daily_record_articles(articles_data: Dict[str, Any]) -> str:
 
 # @require_paid_access
 @mcp.resource("congress://daily-congressional-record/latest")
-async def get_latest_daily_congressional_record(ctx: Context) -> str:
+async def get_latest_daily_congressional_record() -> str:
     """
     Get the most recent daily congressional record issues.
     Returns the 10 most recently published issues by default.
@@ -140,7 +140,7 @@ async def get_latest_daily_congressional_record(ctx: Context) -> str:
         data = await safe_daily_congressional_record_request(
             endpoint="/daily-congressional-record",
             params={"limit": 10},
-            ctx=ctx
+            ctx=None
         )
         
         # Check for error response from API

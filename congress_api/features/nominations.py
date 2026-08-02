@@ -6,7 +6,7 @@ This module provides access to nomination data from the Congress.gov API.
 
 import logging
 from typing import Dict, Any, List, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator

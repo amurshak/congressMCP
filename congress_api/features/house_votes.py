@@ -5,7 +5,7 @@ Handles fetching and processing House of Representatives roll call vote data fro
 from typing import Dict, List, Any, Optional
 import logging
 import json
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator, ValidationResult
@@ -349,16 +349,16 @@ def format_house_vote_xml_content(xml_content: str, source_url: str) -> str:
 
 # @require_paid_access
 @mcp.resource("congress://house-votes/latest")
-async def get_latest_house_votes(ctx: Context) -> str:
+async def get_latest_house_votes() -> str:
     """Get the latest House of Representatives roll call votes."""
     try:
         endpoint = "house-vote"
         params = {"format": "json", "limit": 10, "sort": "updateDate+desc"}
-        
+
         logger.debug("Fetching latest house votes")
-        
+
         # Make the API request
-        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
+        data = await safe_congressional_request(endpoint, None, params, endpoint_type='house-votes')
         
         if "error" in data:
             logger.error(f"Error fetching latest house votes: {data['error']}")

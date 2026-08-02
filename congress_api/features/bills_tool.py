@@ -7,8 +7,8 @@ that handles all bill-related operations through a clean, structured interface.
 
 import logging
 from typing import Optional
-from mcp.server.fastmcp import Context
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from ..mcp_app import mcp
 from ..utils.bill_parser import parse_bill_reference, validate_bill_params
 

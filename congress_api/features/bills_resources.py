@@ -6,13 +6,12 @@ including bill types, Congress ranges, status definitions, and usage guides.
 All operational bill functions have been moved to the bills/ module.
 """
 
-from mcp.server.fastmcp import Context
 from ..mcp_app import mcp
 
 # --- MCP Resources ---
 
 @mcp.resource("congress://bills/types")
-async def get_bill_types_reference(ctx: Context) -> str:
+async def get_bill_types_reference() -> str:
     """
     Get reference information about Congressional bill types.
     
@@ -94,7 +93,7 @@ When using the Bills API tools, specify bill types using these exact codes:
 """
 
 @mcp.resource("congress://bills/congress-ranges")
-async def get_congress_ranges_reference(ctx: Context) -> str:
+async def get_congress_ranges_reference() -> str:
     """
     Get reference information about Congress number ranges and coverage.
     
@@ -164,7 +163,7 @@ async def get_congress_ranges_reference(ctx: Context) -> str:
 """
 
 @mcp.resource("congress://bills/status-definitions")
-async def get_bill_status_definitions(ctx: Context) -> str:
+async def get_bill_status_definitions() -> str:
     """
     Get reference definitions for bill statuses and legislative process stages.
     
@@ -281,7 +280,7 @@ async def get_bill_status_definitions(ctx: Context) -> str:
 """
 
 @mcp.resource("congress://bills/usage-guide")
-async def get_bills_api_usage_guide(ctx: Context) -> str:
+async def get_bills_api_usage_guide() -> str:
     """
     Get usage guidelines and best practices for the Bills API.
     

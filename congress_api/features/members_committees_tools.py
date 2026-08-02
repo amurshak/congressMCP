@@ -7,7 +7,7 @@ structured Pydantic responses, and clear documentation.
 
 import logging
 from typing import Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..models.responses import MembersCommitteesResponse
 from ..utils.response_converters import convert_members_committees_response

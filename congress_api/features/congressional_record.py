@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # Defensive API wrapper for Congressional Record endpoints
-async def safe_congressional_record_request(endpoint: str, ctx: Context, params: Dict[str, Any] = None) -> Dict[str, Any]:
+async def safe_congressional_record_request(endpoint: str, ctx: Optional[Context], params: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Makes a defensive API request to Congressional Record endpoints with timeout handling,
     retry logic, and standardized error responses.
@@ -118,7 +118,7 @@ def format_record_detail(record_data: Dict[str, Any]) -> str:
 
 # @require_paid_access
 @mcp.resource("congress://congressional-record/latest")
-async def get_latest_congressional_record(ctx: Context) -> str:
+async def get_latest_congressional_record() -> str:
     """
     Get the most recent congressional record issues.
     Returns the 10 most recently published issues by default.
@@ -129,8 +129,8 @@ async def get_latest_congressional_record(ctx: Context) -> str:
             "limit": 10,
             "format": "json"
         }
-        
-        data = await safe_congressional_record_request("/congressional-record", ctx, params=params)
+
+        data = await safe_congressional_record_request("/congressional-record", ctx=None, params=params)
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")
         
         if "error" in data:

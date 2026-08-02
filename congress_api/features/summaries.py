@@ -2,7 +2,7 @@
 from typing import Dict, Any, Optional, List
 import json
 import logging
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -91,17 +91,17 @@ def format_summaries_list(summaries: List[Dict[str, Any]], title: str) -> str:
 
 # Resources
 @mcp.resource("congress://summaries/latest")
-async def get_latest_summaries(ctx: Context) -> str:
+async def get_latest_summaries() -> str:
     """
     Get the most recent bill summaries.
-    
+
     Returns a list of the 10 most recently updated summaries across all
     Congresses, sorted by update date in descending order.
     """
     logger.info("Accessing latest summaries resource")
     try:
         # Use defensive API wrapper
-        data = await safe_congressional_request("/summaries", ctx, {"limit": 10, "sort": "updateDate+desc"}, endpoint_type='summaries')
+        data = await safe_congressional_request("/summaries", None, {"limit": 10, "sort": "updateDate+desc"}, endpoint_type='summaries')
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")  
         
         if "error" in data:
@@ -234,7 +234,7 @@ async def get_summaries_by_type(ctx: Context, congress: str, bill_type: str) -> 
         )
 
 @mcp.resource("congress://summaries/help")
-async def get_summaries_help(ctx: Context) -> str:
+async def get_summaries_help() -> str:
     """
     Get usage guide and examples for the summaries API.
     
@@ -331,7 +331,7 @@ Resource: congress://summaries/118/sres
 """
 
 @mcp.resource("congress://summaries/api-info")
-async def get_summaries_api_info(ctx: Context) -> str:
+async def get_summaries_api_info() -> str:
     """
     Get technical information about the summaries API including limits and capabilities.
     

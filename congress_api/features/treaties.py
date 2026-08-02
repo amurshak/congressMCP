@@ -1,7 +1,7 @@
 # congress_api/features/treaties.py
 import logging
 from typing import Dict, List, Any, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.api_wrapper import safe_congressional_request
@@ -195,24 +195,24 @@ def format_treaties_list(data: Dict[str, Any]) -> str:
 
 @mcp.resource("congress://treaties/latest")
 # @require_paid_access
-async def get_latest_treaties(ctx: Context) -> str:
+async def get_latest_treaties() -> str:
     """
     Get the most recent treaties.
     Returns the 10 most recently published treaties by default.
     """
     logger.debug("Getting latest treaties")
-    
+
     try:
         # Set up parameters for the API request
         params = {
             'format': 'json',
             'limit': 10
         }
-        
+
         # Make the defensive API request
         data = await safe_congressional_request(
             endpoint="/treaty",
-            ctx=ctx,
+            ctx=None,
             params=params
         )
         
@@ -809,7 +809,7 @@ async def search_treaties(
 
 @mcp.resource("congress://treaties/help")
 # @require_paid_access
-async def get_treaties_help(ctx: Context) -> str:
+async def get_treaties_help() -> str:
     """
     Get comprehensive help and usage guide for the Treaties API.
     """
@@ -970,7 +970,7 @@ For additional help or to report issues:
 
 @mcp.resource("congress://treaties/api-info")
 # @require_paid_access
-async def get_treaties_api_info(ctx: Context) -> str:
+async def get_treaties_api_info() -> str:
     """
     Get technical API information for the Treaties API.
     """

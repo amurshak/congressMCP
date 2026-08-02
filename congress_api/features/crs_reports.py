@@ -1,7 +1,7 @@
 # congress_api/features/crs_reports.py
 import logging
 from typing import Dict, List, Any, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator
@@ -15,14 +15,14 @@ logger.setLevel(logging.DEBUG)
 
 # --- Defensive API Wrapper ---
 
-async def safe_crs_reports_request(endpoint: str, params: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+async def safe_crs_reports_request(endpoint: str, params: Dict[str, Any], ctx: Optional[Context]) -> Dict[str, Any]:
     """
     Safe API request wrapper for CRS Reports with timeout and retry logic.
     
     Args:
         endpoint: API endpoint to call
         params: Parameters for the API request
-        ctx: FastMCP context
+        ctx: MCP server context
         
     Returns:
         API response data
@@ -149,25 +149,25 @@ def format_crs_reports_list(data: Dict[str, Any]) -> str:
 
 # @require_paid_access
 @mcp.resource("congress://crs-reports/latest")
-async def get_latest_crs_reports(ctx: Context) -> str:
+async def get_latest_crs_reports() -> str:
     """
     Get the most recent CRS reports.
     Returns the 10 most recently published reports by default.
     """
     try:
         logger.debug("Getting latest CRS reports")
-        
+
         # Set up parameters for the API request
         params = {
             'format': 'json',
             'limit': 10
         }
-        
+
         # Make the API request
         data = await safe_crs_reports_request(
             endpoint="/crsreport",
             params=params,
-            ctx=ctx
+            ctx=None
         )
         
         # Check if there was an error in the response

@@ -1,18 +1,11 @@
 # mcp_server.py - Pure MCP server with tool registrations only
-import os
-
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from .core.client_handler import app_lifespan
 
-# Transport is configurable: "stdio" (default, local) or "streamable-http" (hosted)
-TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio")
-
-mcp = FastMCP(
+mcp = MCPServer(
     "Congress MCP",
     instructions="Access 91+ congressional data tools via the Congress.gov API",
-    dependencies=["httpx", "python-dotenv"],
     lifespan=app_lifespan,
-    stateless_http=(TRANSPORT == "streamable-http"),
 )
 
 def initialize_mcp_features():

@@ -1,35 +1,36 @@
 # Core MCP dependencies
-mcp>=1.26.0
+mcp>=2.0.0,<3
 httpx==0.28.1
-pydantic==2.11.5
-pydantic-settings==2.9.1
+pydantic>=2.12.0
+pydantic-settings>=2.9.1
 python-dotenv==1.1.0
 requests==2.32.3
 python-dateutil==2.9.0.post0
-starlette==0.46.2
-uvicorn==0.34.3
+starlette>=0.48.0
+uvicorn>=0.34.3
 rich==14.0.0
 
-# Transitive dependencies (pinned for reproducibility)
-annotated-types==0.7.0
-anyio==4.9.0
-certifi==2025.4.26
-charset-normalizer==3.4.2
-click==8.2.1
-exceptiongroup==1.3.0
-h11==0.16.0
-httpcore==1.0.9
-httpx-sse==0.4.0
-idna==3.10
-markdown-it-py==3.0.0
-mdurl==0.1.2
-packaging==25.0
-pydantic_core==2.33.2
-Pygments==2.19.1
-shellingham==1.5.4
-sniffio==1.3.1
-sse-starlette==2.3.6
-typing-inspection==0.4.1
-typing_extensions==4.13.2
-urllib3==2.4.0
-websockets==14.1
+# Transitive dependencies (floors only below this line — mcp v2 pulls in
+# several of these transitively at versions newer than the old mcp v1 tree
+# required; re-pin exact versions via `pip freeze` after installing)
+annotated-types>=0.7.0
+anyio>=4.10
+certifi>=2025.4.26
+charset-normalizer>=3.4.2
+click>=8.2.1
+exceptiongroup>=1.3.0
+h11>=0.16.0
+httpcore>=1.0.9
+idna>=3.10
+markdown-it-py>=3.0.0
+mdurl>=0.1.2
+packaging>=25.0
+pydantic_core>=2.33.2
+Pygments>=2.19.1
+shellingham>=1.5.4
+sniffio>=1.3.1
+sse-starlette>=3.0.0
+typing-inspection>=0.4.1
+typing_extensions>=4.14.1
+urllib3>=2.4.0
+websockets>=14.1
