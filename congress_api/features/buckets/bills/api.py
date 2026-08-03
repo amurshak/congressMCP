@@ -681,8 +681,13 @@ async def get_bill_content(
 ) -> str:
     """Get content for a specific bill with chunking support."""
     try:
-        # For now, delegate to get_bill_text_versions
-        # This can be enhanced with actual content processing later
+        # Real content-chunking (fetching a specific `version`'s full text and
+        # paging it via chunk_number/chunk_size) isn't implemented yet, so this
+        # delegates to get_bill_text_versions and ignores chunk_number/chunk_size
+        # entirely. `version` isn't even accepted here (schema/impl audit
+        # allowlist: scripts/audit_tool_schemas.py) -- accepting it and then
+        # ignoring it would be worse than the current hard rejection. Follow-up:
+        # implement real chunked content fetching and wire all three through.
         return await get_bill_text_versions(ctx, congress, bill_type, bill_number)
 
     except Exception as e:

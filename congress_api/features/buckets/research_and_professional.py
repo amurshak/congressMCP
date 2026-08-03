@@ -10,6 +10,7 @@ from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from ...mcp_app import mcp
+from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import ResearchProfessionalResponse, ResearchSummary
 from ...utils.response_converters import _extract_result_count
 
@@ -98,10 +99,12 @@ async def route_research_and_professional_operation(ctx: Context, operation: str
     # Congress information operations
     if operation == "get_congress_info":
         from ..congress_info import get_congress_info
+        validate_operation_kwargs(get_congress_info, kwargs, operation)
         raw_response = await get_congress_info(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_congresses":
         from ..congress_info import search_congresses
+        validate_operation_kwargs(search_congresses, kwargs, operation)
         raw_response = await search_congresses(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_congress_info_enhanced":
@@ -109,12 +112,14 @@ async def route_research_and_professional_operation(ctx: Context, operation: str
         from ..congress_info import get_congress_info
         # Add detailed=True for enhanced mode
         kwargs['detailed'] = True
+        validate_operation_kwargs(get_congress_info, kwargs, operation)
         raw_response = await get_congress_info(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
     # Professional research operations
     elif operation == "search_crs_reports":
         from ..crs_reports import search_crs_reports
+        validate_operation_kwargs(search_crs_reports, kwargs, operation)
         raw_response = await search_crs_reports(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 

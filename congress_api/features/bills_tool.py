@@ -10,6 +10,7 @@ from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from ..mcp_app import mcp
+from ..core.operation_routing import validate_operation_kwargs
 from ..utils.bill_parser import parse_bill_reference, validate_bill_params
 
 logger = logging.getLogger(__name__)
@@ -20,51 +21,67 @@ async def route_bills_operation(ctx: Context, operation: str, **kwargs) -> str:
 
     if operation == "search_bills":
         from .buckets.bills import search_bills
+        validate_operation_kwargs(search_bills, kwargs, operation)
         return await search_bills(ctx, **kwargs)
     elif operation == "get_bills":
         from .buckets.bills import get_bills
+        validate_operation_kwargs(get_bills, kwargs, operation)
         return await get_bills(ctx, **kwargs)
     elif operation == "get_bill_details":
         from .buckets.bills import get_bill_details
+        validate_operation_kwargs(get_bill_details, kwargs, operation)
         return await get_bill_details(ctx, **kwargs)
     elif operation == "get_bill_text":
         from .buckets.bills import get_bill_text
+        validate_operation_kwargs(get_bill_text, kwargs, operation)
         return await get_bill_text(ctx, **kwargs)
     elif operation == "get_bill_text_versions":
         from .buckets.bills import get_bill_text_versions
+        validate_operation_kwargs(get_bill_text_versions, kwargs, operation)
         return await get_bill_text_versions(ctx, **kwargs)
     elif operation == "get_bill_titles":
         from .buckets.bills import get_bill_titles
+        validate_operation_kwargs(get_bill_titles, kwargs, operation)
         return await get_bill_titles(ctx, **kwargs)
     elif operation == "get_bill_content":
         from .buckets.bills import get_bill_content
+        validate_operation_kwargs(get_bill_content, kwargs, operation)
         return await get_bill_content(ctx, **kwargs)
     elif operation == "get_bill_summaries":
         from .buckets.bills import get_bill_summaries
+        validate_operation_kwargs(get_bill_summaries, kwargs, operation)
         return await get_bill_summaries(ctx, **kwargs)
     elif operation == "get_recent_bills":
         from .buckets.bills import get_recent_bills
+        validate_operation_kwargs(get_recent_bills, kwargs, operation)
         return await get_recent_bills(ctx, **kwargs)
     elif operation == "get_bills_by_date_range":
         from .buckets.bills import get_bills_by_date_range
+        validate_operation_kwargs(get_bills_by_date_range, kwargs, operation)
         return await get_bills_by_date_range(ctx, **kwargs)
     elif operation == "get_bill_actions":
         from .buckets.bills import get_bill_actions
+        validate_operation_kwargs(get_bill_actions, kwargs, operation)
         return await get_bill_actions(ctx, **kwargs)
     elif operation == "get_bill_amendments":
         from .buckets.bills import get_bill_amendments
+        validate_operation_kwargs(get_bill_amendments, kwargs, operation)
         return await get_bill_amendments(ctx, **kwargs)
     elif operation == "get_bill_committees":
         from .buckets.bills import get_bill_committees
+        validate_operation_kwargs(get_bill_committees, kwargs, operation)
         return await get_bill_committees(ctx, **kwargs)
     elif operation == "get_bill_cosponsors":
         from .buckets.bills import get_bill_cosponsors
+        validate_operation_kwargs(get_bill_cosponsors, kwargs, operation)
         return await get_bill_cosponsors(ctx, **kwargs)
     elif operation == "get_bill_related_bills":
         from .buckets.bills import get_bill_related_bills
+        validate_operation_kwargs(get_bill_related_bills, kwargs, operation)
         return await get_bill_related_bills(ctx, **kwargs)
     elif operation == "get_bill_subjects":
         from .buckets.bills import get_bill_subjects
+        validate_operation_kwargs(get_bill_subjects, kwargs, operation)
         return await get_bill_subjects(ctx, **kwargs)
     else:
         raise ToolError(f"Unknown bills operation: {operation}")

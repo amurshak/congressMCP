@@ -10,6 +10,7 @@ from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from ...mcp_app import mcp
+from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import RecordsHearingsResponse, HearingSummary, RecordSummary
 from ...utils.response_converters import _extract_result_count
 
@@ -100,76 +101,92 @@ async def route_records_and_hearings_operation(ctx: Context, operation: str, **k
     # Congressional Record operations
     if operation == "search_congressional_record":
         from ..congressional_record import search_congressional_record
+        validate_operation_kwargs(search_congressional_record, kwargs, operation)
         raw_response = await search_congressional_record(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_daily_congressional_record":
         from ..daily_congressional_record import search_daily_congressional_record
+        validate_operation_kwargs(search_daily_congressional_record, kwargs, operation)
         raw_response = await search_daily_congressional_record(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_bound_congressional_record":
         from ..bound_congressional_record import search_bound_congressional_record
+        validate_operation_kwargs(search_bound_congressional_record, kwargs, operation)
         raw_response = await search_bound_congressional_record(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
     # House communication operations
     elif operation == "search_house_communications":
         from ..house_communications import search_house_communications
+        validate_operation_kwargs(search_house_communications, kwargs, operation)
         raw_response = await search_house_communications(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_communication_details":
         from ..house_communications import get_house_communication_details
+        validate_operation_kwargs(get_house_communication_details, kwargs, operation)
         raw_response = await get_house_communication_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
     # House requirements operations
     elif operation == "search_house_requirements":
         from ..house_requirements import search_house_requirements
+        validate_operation_kwargs(search_house_requirements, kwargs, operation)
         raw_response = await search_house_requirements(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_requirement_details":
         from ..house_requirements import get_house_requirement_details
+        validate_operation_kwargs(get_house_requirement_details, kwargs, operation)
         raw_response = await get_house_requirement_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_requirement_matching_communications":
         from ..house_requirements import get_house_requirement_matching_communications
+        validate_operation_kwargs(get_house_requirement_matching_communications, kwargs, operation)
         raw_response = await get_house_requirement_matching_communications(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
     # Senate communication operations
     elif operation == "search_senate_communications":
         from ..senate_communications import search_senate_communications
+        validate_operation_kwargs(search_senate_communications, kwargs, operation)
         raw_response = await search_senate_communications(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_senate_communication_details":
         from ..senate_communications import get_senate_communication_details
+        validate_operation_kwargs(get_senate_communication_details, kwargs, operation)
         raw_response = await get_senate_communication_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
     # Committee communication operations
     elif operation == "get_committee_communication_details":
         from ..committees import get_committee_communication_details
+        validate_operation_kwargs(get_committee_communication_details, kwargs, operation)
         raw_response = await get_committee_communication_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
     # Hearing operations
     elif operation == "search_hearings":
         from ..hearings import search_hearings
+        validate_operation_kwargs(search_hearings, kwargs, operation)
         raw_response = await search_hearings(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_hearings_by_congress":
         from ..hearings import get_hearings_by_congress
+        validate_operation_kwargs(get_hearings_by_congress, kwargs, operation)
         raw_response = await get_hearings_by_congress(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_hearings_by_congress_and_chamber":
         from ..hearings import get_hearings_by_congress_and_chamber
+        validate_operation_kwargs(get_hearings_by_congress_and_chamber, kwargs, operation)
         raw_response = await get_hearings_by_congress_and_chamber(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_hearing_details":
         from ..hearings import get_hearing_details
+        validate_operation_kwargs(get_hearing_details, kwargs, operation)
         raw_response = await get_hearing_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_hearing_content":
         from ..hearings import get_hearing_content
+        validate_operation_kwargs(get_hearing_content, kwargs, operation)
         raw_response = await get_hearing_content(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 

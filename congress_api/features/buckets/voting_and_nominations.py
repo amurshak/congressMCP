@@ -10,6 +10,7 @@ from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from ...mcp_app import mcp
+from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import VotingNominationsResponse, VoteSummary, NominationSummary
 from ...utils.response_converters import _extract_result_count
 
@@ -102,60 +103,74 @@ async def route_voting_and_nominations_operation(ctx: Context, operation: str, *
     # House voting operations
     if operation == "get_house_votes_by_congress":
         from ..house_votes import get_house_votes_by_congress
+        validate_operation_kwargs(get_house_votes_by_congress, kwargs, operation)
         raw_response = await get_house_votes_by_congress(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_votes_by_session":
         from ..house_votes import get_house_votes_by_session
+        validate_operation_kwargs(get_house_votes_by_session, kwargs, operation)
         raw_response = await get_house_votes_by_session(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_vote_details":
         from ..house_votes import get_house_vote_details
+        validate_operation_kwargs(get_house_vote_details, kwargs, operation)
         raw_response = await get_house_vote_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_vote_details_enhanced":
         from ..house_votes import get_house_vote_details_enhanced
+        validate_operation_kwargs(get_house_vote_details_enhanced, kwargs, operation)
         raw_response = await get_house_vote_details_enhanced(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_vote_member_votes":
         from ..house_votes import get_house_vote_member_votes
+        validate_operation_kwargs(get_house_vote_member_votes, kwargs, operation)
         raw_response = await get_house_vote_member_votes(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_house_vote_member_votes_xml":
         from ..house_votes import get_house_vote_member_votes_xml
+        validate_operation_kwargs(get_house_vote_member_votes_xml, kwargs, operation)
         raw_response = await get_house_vote_member_votes_xml(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
     # Nomination operations
     elif operation == "search_nominations":
         from ..nominations import search_nominations
+        validate_operation_kwargs(search_nominations, kwargs, operation)
         raw_response = await search_nominations(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_latest_nominations":
         from ..nominations import get_latest_nominations
+        validate_operation_kwargs(get_latest_nominations, kwargs, operation)
         raw_response = await get_latest_nominations(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_details":
         from ..nominations import get_nomination_details
+        validate_operation_kwargs(get_nomination_details, kwargs, operation)
         raw_response = await get_nomination_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_actions":
         from ..nominations import get_nomination_actions
+        validate_operation_kwargs(get_nomination_actions, kwargs, operation)
         raw_response = await get_nomination_actions(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_committees":
         from ..nominations import get_nomination_committees
+        validate_operation_kwargs(get_nomination_committees, kwargs, operation)
         raw_response = await get_nomination_committees(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_hearings":
         from ..nominations import get_nomination_hearings
+        validate_operation_kwargs(get_nomination_hearings, kwargs, operation)
         raw_response = await get_nomination_hearings(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nomination_nominees":
         from ..nominations import get_nomination_nominees
+        validate_operation_kwargs(get_nomination_nominees, kwargs, operation)
         raw_response = await get_nomination_nominees(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_nominations_by_congress":
         from ..nominations import get_nominations_by_congress
+        validate_operation_kwargs(get_nominations_by_congress, kwargs, operation)
         raw_response = await get_nominations_by_congress(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 

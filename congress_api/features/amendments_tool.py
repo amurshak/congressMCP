@@ -10,6 +10,7 @@ from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from ..mcp_app import mcp
+from ..core.operation_routing import validate_operation_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -19,24 +20,31 @@ async def route_amendments_operation(ctx: Context, operation: str, **kwargs) -> 
 
     if operation == "get_amendments":
         from .buckets.amendments import get_amendments
+        validate_operation_kwargs(get_amendments, kwargs, operation)
         return await get_amendments(ctx, **kwargs)
     elif operation == "search_amendments":
         from .buckets.amendments import search_amendments
+        validate_operation_kwargs(search_amendments, kwargs, operation)
         return await search_amendments(ctx, **kwargs)
     elif operation == "get_amendment_details":
         from .buckets.amendments import get_amendment_details
+        validate_operation_kwargs(get_amendment_details, kwargs, operation)
         return await get_amendment_details(ctx, **kwargs)
     elif operation == "get_amendment_actions":
         from .buckets.amendments import get_amendment_actions
+        validate_operation_kwargs(get_amendment_actions, kwargs, operation)
         return await get_amendment_actions(ctx, **kwargs)
     elif operation == "get_amendment_sponsors":
         from .buckets.amendments import get_amendment_sponsors
+        validate_operation_kwargs(get_amendment_sponsors, kwargs, operation)
         return await get_amendment_sponsors(ctx, **kwargs)
     elif operation == "get_amendment_amendments":
         from .buckets.amendments import get_amendment_amendments
+        validate_operation_kwargs(get_amendment_amendments, kwargs, operation)
         return await get_amendment_amendments(ctx, **kwargs)
     elif operation == "get_amendment_text":
         from .buckets.amendments import get_amendment_text
+        validate_operation_kwargs(get_amendment_text, kwargs, operation)
         return await get_amendment_text(ctx, **kwargs)
     else:
         raise ToolError(f"Unknown amendments operation: {operation}")
