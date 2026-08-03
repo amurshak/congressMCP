@@ -66,7 +66,17 @@ import inspect
 import sys
 import textwrap
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set, Tuple
+
+# Run as `python scripts/audit_tool_schemas.py`, Python puts this file's own
+# directory (scripts/) on sys.path[0], not the repo root -- so `congress_api`
+# isn't importable unless the package happens to be pip-installed. Add the
+# repo root explicitly so this works from a plain checkout, matching how
+# pytest resolves the same import in the test suite.
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 
 IGNORED_PARAMS = {"ctx", "self"}
 
