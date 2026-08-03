@@ -1,6 +1,6 @@
 """
 Main application setup for the Congressional MCP server.
-Handles FastMCP server creation, routing, and middleware configuration.
+Handles MCP server creation, routing, and middleware configuration.
 """
 
 # Load environment configuration first

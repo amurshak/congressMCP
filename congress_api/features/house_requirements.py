@@ -2,7 +2,7 @@
 
 import logging
 from typing import Dict, List, Any, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator
@@ -48,7 +48,7 @@ class HouseRequirementsProcessor(ResponseProcessor):
 
 # --- API Wrapper ---
 
-async def safe_house_requirements_request(endpoint: str, params: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+async def safe_house_requirements_request(endpoint: str, params: Dict[str, Any], ctx: Optional[Context]) -> Dict[str, Any]:
     """Safe API request wrapper for house requirements endpoints."""
     return await DefensiveAPIWrapper.safe_api_request(
         endpoint=endpoint,
@@ -154,7 +154,7 @@ def format_matching_communications(comms_data: Dict[str, Any]) -> str:
 
 # @require_paid_access
 @mcp.resource("congress://house-requirements/latest")
-async def get_latest_house_requirements(ctx: Context) -> str:
+async def get_latest_house_requirements() -> str:
     """
     Get the most recent house requirements.
     Returns the 10 most recently updated requirements by default.
@@ -164,11 +164,11 @@ async def get_latest_house_requirements(ctx: Context) -> str:
             "format": "json",
             "limit": 10
         }
-        
+
         logger.debug("Fetching latest house requirements")
-        
+
         # Make the API request
-        data = await safe_house_requirements_request("/house-requirement", params, ctx)
+        data = await safe_house_requirements_request("/house-requirement", params, ctx=None)
         
         if "error" in data:
             logger.error(f"Error fetching latest house requirements: {data['error']}")

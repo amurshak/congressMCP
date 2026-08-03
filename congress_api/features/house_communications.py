@@ -1,7 +1,7 @@
 # congress_api/features/house_communications.py
 import logging
 from typing import Dict, List, Any, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 
@@ -18,7 +18,7 @@ logger.setLevel(logging.DEBUG)
 # Initialize defensive API wrapper for house communications
 defensive_wrapper = DefensiveAPIWrapper()
 
-async def safe_house_communications_request(endpoint: str, params: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+async def safe_house_communications_request(endpoint: str, params: Dict[str, Any], ctx: Optional[Context]) -> Dict[str, Any]:
     """Make a safe API request for house communications with defensive wrapper."""
     return await defensive_wrapper.safe_api_request(
         endpoint=endpoint,
@@ -142,7 +142,7 @@ def format_house_communication_detail(comm_data: Dict[str, Any]) -> str:
 
 # --- Helper Functions ---
 
-async def get_latest_house_communications(ctx: Context, limit: int = 10) -> List[Dict[str, Any]]:
+async def get_latest_house_communications(ctx: Optional[Context] = None, limit: int = 10) -> List[Dict[str, Any]]:
     """Helper function to get latest house communications."""
     try:
         params = {
@@ -181,10 +181,10 @@ async def get_latest_house_communications(ctx: Context, limit: int = 10) -> List
 
 # @require_paid_access
 @mcp.resource("congress://house-communications/latest")
-async def latest_house_communications_resource(ctx: Context) -> str:
+async def latest_house_communications_resource() -> str:
     """Static resource providing the 10 most recent house communications."""
     try:
-        communications = await get_latest_house_communications(ctx, limit=10)
+        communications = await get_latest_house_communications(limit=10)
         
         if not communications:
             return "No recent house communications available."

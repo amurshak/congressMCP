@@ -1,6 +1,6 @@
 # members.py
 from typing import Dict, Any, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper, safe_congressional_request
@@ -17,14 +17,14 @@ response_processor = ResponseProcessor()
 
 # Resources (Static data only - no user parameters)
 @mcp.resource("congress://members/current")
-async def get_current_members(ctx: Context) -> str:
+async def get_current_members() -> str:
     """
     Get a list of current members of Congress.
-    
+
     Returns a sample of 20 current members from both chambers of Congress,
     including their biographical information and contact details.
     """
-    data = await safe_congressional_request("/member", ctx, {"limit": 20, "currentMember": "true"}, endpoint_type='members')
+    data = await safe_congressional_request("/member", None, {"limit": 20, "currentMember": "true"}, endpoint_type='members')
     
     if "error" in data:
         return f"Error retrieving members: {data['error']}"
@@ -40,14 +40,14 @@ async def get_current_members(ctx: Context) -> str:
     return "\n".join(result)
 
 @mcp.resource("congress://members/all")
-async def get_all_members(ctx: Context) -> str:
+async def get_all_members() -> str:
     """
     Get a list of congressional members.
-    
+
     Returns a list of congressional members with basic information about each,
     including their biographical information and contact details.
     """
-    data = await safe_congressional_request("/member", ctx, {"limit": 20}, endpoint_type='members')
+    data = await safe_congressional_request("/member", None, {"limit": 20}, endpoint_type='members')
     
     if "error" in data:
         return f"Error retrieving members: {data['error']}"

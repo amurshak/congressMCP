@@ -7,7 +7,7 @@ search functionality and individual record retrieval.
 
 import logging
 from typing import Optional, Dict, Any
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 
 from ..core.client_handler import make_api_request
 from ..core.validators import BoundCongressionalRecordValidator, ParameterValidator
@@ -87,7 +87,7 @@ def format_bound_record_detail(record_data: Dict[str, Any]) -> str:
 
 # @require_paid_access
 @mcp.resource("congress://bound-congressional-record/latest")
-async def get_latest_bound_congressional_record(ctx: Context) -> str:
+async def get_latest_bound_congressional_record() -> str:
     """
     Get the most recent bound congressional record issues.
     Returns the 10 most recently published issues by default.
@@ -96,9 +96,9 @@ async def get_latest_bound_congressional_record(ctx: Context) -> str:
         "limit": 10,
         "format": "json"
     }
-    
+
     logger.debug("Fetching latest bound congressional record issues")
-    data = await make_api_request("/bound-congressional-record", ctx, params=params)
+    data = await make_api_request("/bound-congressional-record", ctx=None, params=params)
     
     if "error" in data:
         logger.error(f"Error retrieving latest bound congressional record issues: {data['error']}")

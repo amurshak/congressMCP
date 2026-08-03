@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from contextlib import asynccontextmanager
 from datetime import datetime
 
-from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.mcpserver import MCPServer, Context
 from .api_config import API_KEY, BASE_URL, ENABLE_CACHING, CACHE_TIMEOUT, DEFAULT_REQUEST_PARAMS, ENV
 
 # Configure logger
@@ -65,19 +65,35 @@ class AppContext:
     request_count: int = 0
     start_time: datetime = field(default_factory=datetime.now)
 
+# MCP SDK v2 disallows Context injection on static (non-templated) resources,
+# so static resource handlers can't reach ctx.request_context.lifespan_context.
+# This module-level reference lets them reach the same AppContext directly.
+_current_app_context: Optional[AppContext] = None
+
+def get_app_context() -> AppContext:
+    """Access the running server's AppContext without a Context parameter.
+
+    For use by static resource handlers, which MCP SDK v2 does not permit
+    to declare a `ctx: Context` parameter.
+    """
+    if _current_app_context is None:
+        raise RuntimeError("Server not properly initialized - lifespan context unavailable")
+    return _current_app_context
+
 @asynccontextmanager
-async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+async def app_lifespan(server: MCPServer) -> AsyncIterator[AppContext]:
     """Manage API client lifecycle with proper error handling and connection testing."""
+    global _current_app_context
     logger.info("Initializing Congress.gov API client...")
-    
+
     # Configure httpx client with timeouts and limits for production use
     timeout = httpx.Timeout(10.0, connect=5.0)  # 10s timeout, 5s connect timeout
     limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
-    
+
     try:
         async with httpx.AsyncClient(
-            base_url=BASE_URL, 
-            timeout=timeout, 
+            base_url=BASE_URL,
+            timeout=timeout,
             limits=limits,
             follow_redirects=True
         ) as client:
@@ -85,9 +101,10 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
                 logger.info("API key configured - skipping startup connection test")
             else:
                 logger.error("No API key provided. The server will start, but API requests will fail")
-            
+
             # Initialize and yield context to server
             context = AppContext(api_key=API_KEY or "MISSING_API_KEY", client=client)
+            _current_app_context = context
             logger.info("Server context initialized successfully")
             yield context
     except Exception as e:
@@ -95,6 +112,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
         # Re-raise to prevent server from starting with a broken client
         raise
     finally:
+        _current_app_context = None
         # Ensure clean shutdown even if there are errors
         try:
             logger.info("Cleaning up HTTP client resources...")
@@ -111,21 +129,29 @@ def generate_cache_key(endpoint: str, params: Dict[str, Any]) -> str:
     return f"{endpoint}?{param_str}"
 
 # Helper function for API requests
-async def make_api_request(endpoint: str, ctx: Context, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Make a request to the Congress.gov API with caching and proper error handling."""
+async def make_api_request(endpoint: str, ctx: Optional[Context] = None, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Make a request to the Congress.gov API with caching and proper error handling.
+
+    `ctx` is the request's MCP Context, used by tools and templated resources.
+    Static resource handlers can't declare a Context parameter under MCP SDK v2,
+    so they pass `ctx=None` and the AppContext is pulled from `get_app_context()` instead.
+    """
     start_time = time.time()
-    
+
     try:
         logger.debug(f"Starting make_api_request for endpoint: {endpoint}")
         # Access the lifespan context to get the HTTP client with error handling
-        try:
-            app_ctx = ctx.request_context.lifespan_context
-            if app_ctx is None:
-                raise ValueError("Lifespan context is None - server may not be fully initialized")
-        except AttributeError as e:
-            logger.error(f"Failed to access lifespan context: {e}")
-            raise RuntimeError("Server not properly initialized - lifespan context unavailable") from e
-        
+        if ctx is None:
+            app_ctx = get_app_context()
+        else:
+            try:
+                app_ctx = ctx.request_context.lifespan_context
+                if app_ctx is None:
+                    raise ValueError("Lifespan context is None - server may not be fully initialized")
+            except AttributeError as e:
+                logger.error(f"Failed to access lifespan context: {e}")
+                raise RuntimeError("Server not properly initialized - lifespan context unavailable") from e
+
         client = app_ctx.client
         api_key = app_ctx.api_key
         
@@ -163,7 +189,8 @@ async def make_api_request(endpoint: str, ctx: Context, params: Optional[Dict[st
         except json.JSONDecodeError:
             error_message = f"API returned non-JSON response for endpoint {endpoint}: {response.text[:100]}..."
             logger.error(error_message)
-            ctx.error(error_message)
+            if ctx is not None:
+                ctx.error(error_message)
             return {"error": error_message}
         
         # Cache the successful response if caching is enabled
@@ -191,9 +218,10 @@ async def make_api_request(endpoint: str, ctx: Context, params: Optional[Dict[st
             ctx_error_message += f" - {e.response.text[:100]}"
             if len(e.response.text) > 100:
                 ctx_error_message += "..."
-        
-        ctx.error(ctx_error_message)
-        
+
+        if ctx is not None:
+            ctx.error(ctx_error_message)
+
         # Return an error response with enough detail for clients
         # We'll keep the original error message but sanitize it for logging
         return {
@@ -212,9 +240,10 @@ async def make_api_request(endpoint: str, ctx: Context, params: Optional[Dict[st
         ctx_error_message = f"Request failed after {request_time:.2f}s"
         if ENV != "production":
             ctx_error_message += f": {str(e)}"
-        
-        ctx.error(ctx_error_message)
-        
+
+        if ctx is not None:
+            ctx.error(ctx_error_message)
+
         return {
             "error": "Network error during API request to Congress.gov API",
             "request_time": request_time
@@ -230,9 +259,10 @@ async def make_api_request(endpoint: str, ctx: Context, params: Optional[Dict[st
         ctx_error_message = f"An unexpected error occurred during API request after {request_time:.2f}s"
         if ENV != "production":
             ctx_error_message += f": {str(e)}"
-        
-        ctx.error(ctx_error_message)
-        
+
+        if ctx is not None:
+            ctx.error(ctx_error_message)
+
         return {
             "error": f"Unexpected error during API request to endpoint: {endpoint}",
             "request_time": request_time

@@ -1,7 +1,7 @@
 # congress_api/features/committee_meetings.py
 import logging
 from typing import Dict, Any, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator

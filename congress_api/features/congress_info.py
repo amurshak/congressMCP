@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional, Union
 import json
 import logging
 import datetime
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator
@@ -15,7 +15,7 @@ from ..core.response_utils import ResponseProcessor
 logger = logging.getLogger(__name__)
 
 # Defensive API wrapper for Congress Info requests
-async def safe_congress_request(endpoint: str, ctx: Context, params: Dict[str, Any] = None) -> Dict[str, Any]:
+async def safe_congress_request(endpoint: str, ctx: Optional[Context], params: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Defensive wrapper for Congress Info API requests with:
     - Parameter sanitization
@@ -181,16 +181,16 @@ def handle_api_error(data: Dict[str, Any], error_message: str) -> str:
 
 # Resources (Static/Reference Data Only)
 @mcp.resource("congress://all")
-async def get_all_congresses(ctx: Context) -> str:
+async def get_all_congresses() -> str:
     """
     Get a list of all congresses.
-    
+
     Returns a list of all congresses with basic information about each,
     including session dates and chamber information.
     """
     logger.info("Accessing all congresses resource")
     try:
-        data = await safe_congress_request("/congress", ctx, {"limit": 20})
+        data = await safe_congress_request("/congress", ctx=None, params={"limit": 20})
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")
         
         if "error" in data:

@@ -1,7 +1,7 @@
 # committees.py
 from typing import Dict, List, Any, Optional
 import logging
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator, ValidationResult
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Initialize defensive API wrapper
 defensive_api = DefensiveAPIWrapper()
 
-async def safe_committees_request(endpoint: str, ctx: Context, params: Dict[str, Any] = {}) -> Dict[str, Any]:
+async def safe_committees_request(endpoint: str, ctx: Optional[Context], params: Dict[str, Any] = {}) -> Dict[str, Any]:
     """Safe API request wrapper for committees endpoints."""
     return await DefensiveAPIWrapper.safe_api_request(endpoint, ctx, params, endpoint_type="committees")
 
@@ -53,14 +53,14 @@ def format_committee_summary(committee: Dict[str, Any]) -> str:
 # - get_committee_details: Specific committee details
 
 @mcp.resource("congress://committees")
-async def get_committees(ctx: Context) -> str:
+async def get_committees() -> str:
     """
     Get a list of congressional committees.
-    
+
     Returns a comprehensive list of committees in the House and Senate,
     including their names, chambers, and system codes.
     """
-    data = await make_api_request("/committee", ctx)
+    data = await make_api_request("/committee", ctx=None)
     
     if "error" in data:
         return f"Error retrieving committees: {data['error']}"

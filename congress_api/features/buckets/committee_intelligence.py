@@ -7,8 +7,8 @@ All operations are available to all users.
 
 import logging
 from typing import Optional
-from mcp.server.fastmcp import Context
-from mcp.server.fastmcp.exceptions import ToolError
+from mcp.server.mcpserver import Context
+from mcp.server.mcpserver.exceptions import ToolError
 from ...mcp_app import mcp
 from ...models.responses import CommitteeIntelligenceResponse, CommitteeActivitySummary
 from ...utils.response_converters import _extract_result_count

@@ -1,7 +1,7 @@
 # congress_api/features/hearings.py
 import logging
 from typing import Dict, List, Any, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator, ValidationResult
@@ -67,7 +67,7 @@ def format_hearing_detail(hearing_item: Dict[str, Any]) -> str:
 
 # --- Defensive API Wrapper ---
 
-async def safe_hearings_request(endpoint: str, params: Dict[str, Any], ctx: Context) -> Dict[str, Any]:
+async def safe_hearings_request(endpoint: str, params: Dict[str, Any], ctx: Optional[Context]) -> Dict[str, Any]:
     """
     Safe API request wrapper for hearings endpoints with retry logic and error handling.
     
@@ -88,7 +88,7 @@ async def safe_hearings_request(endpoint: str, params: Dict[str, Any], ctx: Cont
 
 # --- Helper Functions ---
 
-async def get_latest_hearings(ctx: Context) -> str:
+async def get_latest_hearings(ctx: Optional[Context] = None) -> str:
     """
     Get a list of the most recent hearings.
     Returns the 10 most recently updated hearings by default.
@@ -166,9 +166,9 @@ class HearingsProcessor:
 
 # @require_paid_access
 @mcp.resource("congress://hearings/latest")
-async def latest_hearings_resource(ctx: Context) -> str:
+async def latest_hearings_resource() -> str:
     """Static resource providing the latest hearings."""
-    return await get_latest_hearings(ctx)
+    return await get_latest_hearings()
 
 # --- MCP Tools ---
 

@@ -2,7 +2,7 @@
 from typing import Dict, Any
 import json
 import logging
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.api_wrapper import DefensiveAPIWrapper
 
@@ -29,7 +29,7 @@ def format_amendment_summary(amendment: Dict[str, Any]) -> str:
 
 # Resources
 @mcp.resource("congress://amendments/latest")
-async def get_latest_amendments(ctx: Context) -> str:
+async def get_latest_amendments() -> str:
     """
     Get the most recent amendments introduced in Congress.
 
@@ -38,7 +38,7 @@ async def get_latest_amendments(ctx: Context) -> str:
     """
     logger.info("Accessing latest amendments resource")
     try:
-        data = await DefensiveAPIWrapper.safe_api_request("/amendment", ctx, {"limit": 10, "sort": "updateDate+desc"}, timeout_override=10.0)
+        data = await DefensiveAPIWrapper.safe_api_request("/amendment", None, {"limit": 10, "sort": "updateDate+desc"}, timeout_override=10.0)
         logger.info(f"API response received: {data.keys() if isinstance(data, dict) else 'not a dict'}")
 
         if "error" in data:

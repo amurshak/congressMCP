@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, List, Any, Optional
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
@@ -108,7 +108,7 @@ def format_senate_communications_list(communications: List[Dict[str, Any]], titl
 
 # @require_paid_access
 @mcp.resource("congress://senate-communications/latest")
-async def get_latest_senate_communications(ctx: Context) -> str:
+async def get_latest_senate_communications() -> str:
     """
     Get the most recent senate communications.
     Returns the 10 most recently published communications by default.
@@ -118,9 +118,9 @@ async def get_latest_senate_communications(ctx: Context) -> str:
             "limit": 10,
             "format": "json"
         }
-        
+
         logger.debug("Fetching latest senate communications")
-        data = await safe_congressional_request("/senate-communication", ctx, params, endpoint_type='senate_communications')
+        data = await safe_congressional_request("/senate-communication", None, params, endpoint_type='senate_communications')
         
         # Process response using reliability framework
         processed_communications = clean_senate_communications_response(data, limit=10)

@@ -4,7 +4,7 @@ import asyncio
 import logging
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, replace
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 from .client_handler import make_api_request
 from .exceptions import APIErrorResponse
 
@@ -49,7 +49,7 @@ class DefensiveAPIWrapper:
         return DefensiveAPIWrapper.ENDPOINT_CONFIGS['default']
     
     @staticmethod
-    async def safe_api_request(endpoint: str, ctx: Context, params: Optional[Dict[str, Any]] = None,
+    async def safe_api_request(endpoint: str, ctx: Optional[Context], params: Optional[Dict[str, Any]] = None,
                               timeout_override: Optional[float] = None, retry_count_override: Optional[int] = None,
                               endpoint_type: Optional[str] = None) -> Dict[str, Any]:
         if params is None: params = {}
@@ -89,6 +89,6 @@ class DefensiveAPIWrapper:
         elif "500" in error_str: return APIErrorResponse("server_error", "API issues.", ["Try later"], "SERVER_ERROR")
         else: return APIErrorResponse("api_failure", f"Failed after {retry_count + 1} attempts: {error}", ["Try later"], "GENERAL_API_FAILURE")
 
-async def safe_congressional_request(endpoint: str, ctx: Context, params: Optional[Dict[str, Any]] = None, endpoint_type: Optional[str] = None) -> Dict[str, Any]:
+async def safe_congressional_request(endpoint: str, ctx: Optional[Context], params: Optional[Dict[str, Any]] = None, endpoint_type: Optional[str] = None) -> Dict[str, Any]:
     """Generic convenience function for all Congressional API requests."""
     return await DefensiveAPIWrapper.safe_api_request(endpoint, ctx, params or {}, endpoint_type=endpoint_type)
