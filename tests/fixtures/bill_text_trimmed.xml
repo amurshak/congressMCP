@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bill>
+  <toc>
+    <toc-entry>Icebreaker table of contents entry should not be indexed</toc-entry>
+  </toc>
+  <legis-body>
+    <division>
+      <enum>A</enum>
+      <header>Coast Guard Authorization Act</header>
+      <title>
+        <enum>I</enum>
+        <header>Authorizations</header>
+        <section>
+          <enum>101</enum>
+          <header>Polar security cutter program</header>
+          <text>Section 5601 of title 14, United States Code, is amended by striking <quote>icebreaker</quote> and inserting <quote>polar security cutter</quote>.</text>
+          <subsection>
+            <enum>(a)</enum>
+            <header>Procurement</header>
+            <text>The Commandant shall acquire icebreaking capabilities for Arctic operations.</text>
+          </subsection>
+        </section>
+      </title>
+    </division>
+    <division>
+      <enum>B</enum>
+      <header>Maritime Administration</header>
+      <title>
+        <enum>I</enum>
+        <header>Separate Title</header>
+        <section>
+          <enum>101</enum>
+          <header>Duplicate enum section</header>
+          <text>This separate section discusses port infrastructure.</text>
+        </section>
+        <section>
+          <enum>102</enum>
+          <header>Quoted block example</header>
+          <text>The Act is amended by adding the following:</text>
+          <quoted-block>
+            <text>Only quoted needle language appears here.</text>
+          </quoted-block>
+        </section>
+        <section>
+          <enum>103</enum>
+          <header>Long section with paragraph fallback</header>
+          <text>Introductory text for a large section.</text>
+          <paragraph>
+            <enum>(1)</enum>
+            <text>alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha alpha</text>
+          </paragraph>
+          <paragraph>
+            <enum>(2)</enum>
+            <text>beta beta beta beta beta beta beta beta beta beta beta beta beta beta beta beta beta beta beta beta</text>
+          </paragraph>
+        </section>
+      </title>
+    </division>
+  </legis-body>
+</bill>

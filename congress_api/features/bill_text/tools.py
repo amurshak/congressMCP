@@ -1,0 +1,351 @@
+"""MCP tools for searching and retrieving bill text sections."""
+
+from __future__ import annotations
+
+import logging
+import re
+import time
+from typing import Any
+
+from mcp.server.mcpserver import Context
+
+from ...mcp_app import mcp
+from .client import BillTextError, govinfo_details_url
+from .index import fts_literal, has_token, normalized_query, sqlite_supports_fts5
+from .models import (
+    BillSectionResponse,
+    BillTocResponse,
+    CacheStatus,
+    ErrorEnvelope,
+    ErrorPayload,
+    SearchBillTextResponse,
+    SearchHit,
+    SectionChild,
+    Timing,
+    TocNode,
+)
+from .parser import Unit
+from .service import LoadedBillText, load_bill_text
+
+
+logger = logging.getLogger(__name__)
+
+
+def _error(code: str, message: str, detail: dict[str, Any] | None = None, remediation: str | None = None) -> dict[str, Any]:
+    return ErrorEnvelope(error=ErrorPayload(code=code, message=message, detail=detail, remediation=remediation)).model_dump()
+
+
+def _unexpected(tool: str, exc: Exception) -> dict[str, Any]:
+    # The MCP SDK turns an uncaught tool exception into a terse client string and
+    # logs no traceback. Log it to stderr (captured in the MCP server log) so the
+    # failure is debuggable, and hand the model a structured error instead.
+    logger.exception("Unexpected error in %s", tool)
+    return _error(
+        "internal_error",
+        f"{tool} failed unexpectedly: {type(exc).__name__}: {exc}",
+        None,
+        "Server-side bug; see the traceback in the MCP server log (mcp-server-<name>.log).",
+    )
+
+
+def _capability_error() -> dict[str, Any] | None:
+    if sqlite_supports_fts5():
+        return None
+    import sqlite3
+    import sys
+
+    return _error(
+        "fts5_unavailable",
+        "Bill text search requires SQLite FTS5, but this Python SQLite build does not provide it.",
+        {"python": sys.version.split()[0], "sqlite": sqlite3.sqlite_version},
+        "Use a Python build linked against SQLite with FTS5 enabled.",
+    )
+
+
+def _timing(loaded: LoadedBillText, started: float, search_ms: float | None = None) -> Timing:
+    return Timing(
+        **loaded.timing,
+        search_ms=search_ms,
+        total_ms=round((time.perf_counter() - started) * 1000, 1),
+    )
+
+
+def _envelope(loaded: LoadedBillText) -> dict[str, Any]:
+    return {
+        "package_id": loaded.resolved.package_id,
+        "version": loaded.resolved.version,
+        "version_resolution": "fresh",
+        "version_resolved_at": loaded.resolved.version_resolved_at,
+        # version_resolution_note is intentionally omitted here: each tool passes
+        # it explicitly so it can merge in the input-clamp note.
+        "source_format": "bill_dtd",
+        "last_modified": loaded.resolved.last_modified,
+        "govinfo_url": govinfo_details_url(loaded.resolved.package_id),
+        "cache": CacheStatus(index_hit=False, version_hit=False).model_dump(),
+        "sections_indexed": loaded.parsed.sections_indexed,
+        "chunks_indexed": len(loaded.parsed.units),
+    }
+
+
+def _normalize_queries(queries: list[str]) -> tuple[list[str], dict[str, str], list[str]]:
+    notes: list[str] = []
+    if len(queries) > 8:
+        raise ValueError("len(queries) must be 8 or fewer.")
+    seen = set()
+    normalized = []
+    display = {}
+    for query in queries:
+        if len(query) > 200:
+            raise ValueError(f"Query exceeds 200 characters: {query[:40]}")
+        norm = normalized_query(query)
+        if not norm or not has_token(norm):
+            raise ValueError(f"Query has no alphanumeric tokens after tokenization: {query!r}")
+        if norm not in seen:
+            seen.add(norm)
+            normalized.append(norm)
+            display[norm] = re.sub(r"\s+", " ", query).strip()
+    if not normalized:
+        raise ValueError("At least one non-empty query is required.")
+    return normalized, display, notes
+
+
+def _clamp(value: int, low: int, high: int) -> tuple[int, str | None]:
+    clamped = min(high, max(low, value))
+    if clamped == value:
+        return clamped, None
+    return clamped, f"Value {value} was clamped to {clamped}; allowed range is {low}-{high}."
+
+
+@mcp.tool(
+    "search_bill_text",
+    title="Search full bill text by section",
+)
+async def search_bill_text(
+    ctx: Context,
+    congress: int,
+    bill_type: str,
+    number: int,
+    queries: list[str],
+    *,
+    version: str | None = None,
+    max_hits: int = 10,
+) -> dict[str, Any]:
+    """
+    Search parsed Bill DTD XML from GovInfo using segment-level FTS5.
+
+    Pass several phrasings and synonyms in one call, e.g. ["icebreaker", "polar security cutter"].
+    If "quoted" appears in match_contexts, the hit may include language the bill is removing,
+    even when "operative" also appears; presence of "quoted" governs. max_hits is clamped to 1-50.
+    """
+    capability_error = _capability_error()
+    if capability_error:
+        return capability_error
+    try:
+        started = time.perf_counter()
+        max_hits, note = _clamp(max_hits, 1, 50)
+        normalized, display, _ = _normalize_queries(queries)
+        loaded = await load_bill_text(ctx, congress, bill_type, number, version)
+        search_start = time.perf_counter()
+        ranked = loaded.index.search(normalized, max_hits)
+        search_ms = round((time.perf_counter() - search_start) * 1000, 1)
+        response = SearchBillTextResponse(
+            **_envelope(loaded),
+            version_resolution_note=note or loaded.resolved.version_resolution_note,
+            timing=_timing(loaded, started, search_ms=search_ms),
+            chunks_searched=len(loaded.parsed.units),
+            queries_used=[display[item] for item in normalized],
+            hits=[
+                SearchHit(
+                    section_id=hit.unit.section_id,
+                    ancestor_path=hit.unit.ancestor_path,
+                    header=hit.unit.header,
+                    snippet=hit.snippet,
+                    match_contexts=hit.match_contexts,
+                    matched_queries=[display[item] for item in hit.matched_queries],
+                    is_amendatory=hit.unit.is_amendatory,
+                    amends=hit.unit.amends,
+                    score=round(hit.score, 6),
+                    byte_length=hit.unit.byte_length,
+                )
+                for hit in ranked
+            ],
+        )
+        return response.model_dump()
+    except BillTextError as exc:
+        return _error(exc.code, exc.message, exc.detail, exc.remediation)
+    except ValueError as exc:
+        return _error("invalid_request", str(exc), None, "Adjust the input and retry.")
+    except Exception as exc:
+        return _unexpected("search_bill_text", exc)
+
+
+@mcp.tool(
+    "get_bill_section",
+    title="Retrieve a full bill section or addressable chunk",
+)
+async def get_bill_section(
+    ctx: Context,
+    congress: int,
+    bill_type: str,
+    number: int,
+    section_id: str,
+    *,
+    version: str | None = None,
+    max_bytes: int = 25_000,
+) -> dict[str, Any]:
+    """
+    Return section display text up to max_bytes, measured as UTF-8 encoded bytes of the returned text field.
+
+    Fully qualified ids and chunk ids resolve directly. Bare section enums are accepted only when unique.
+    max_bytes is clamped to 1,000-100,000.
+    """
+    capability_error = _capability_error()
+    if capability_error:
+        return capability_error
+    try:
+        started = time.perf_counter()
+        max_bytes, note = _clamp(max_bytes, 1_000, 100_000)
+        loaded = await load_bill_text(ctx, congress, bill_type, number, version)
+        unit_or_error = _resolve_unit(loaded.parsed.units, section_id)
+        if isinstance(unit_or_error, dict):
+            return unit_or_error
+        unit = unit_or_error
+        children = [child for child in loaded.parsed.units if child.section_id in unit.child_ids]
+        text = _limit_utf8(unit.display_text, max_bytes)
+        truncated = len(unit.display_text.encode("utf-8")) > max_bytes
+        if children and unit.byte_length <= max_bytes:
+            child_payload = [SectionChild(section_id=child.section_id, header=child.header, byte_length=child.byte_length) for child in children]
+        elif children:
+            child_payload = [SectionChild(section_id=child.section_id, header=child.header, byte_length=child.byte_length) for child in children]
+            truncated = True
+        else:
+            child_payload = None
+        return BillSectionResponse(
+            **_envelope(loaded),
+            version_resolution_note=note or loaded.resolved.version_resolution_note,
+            timing=_timing(loaded, started),
+            section_id=unit.section_id,
+            ancestor_path=unit.ancestor_path,
+            header=unit.header,
+            text=text,
+            byte_length=len(text.encode("utf-8")),
+            truncated=truncated,
+            children=child_payload,
+        ).model_dump()
+    except BillTextError as exc:
+        return _error(exc.code, exc.message, exc.detail, exc.remediation)
+    except Exception as exc:
+        return _unexpected("get_bill_section", exc)
+
+
+@mcp.tool(
+    "get_bill_toc",
+    title="Get a shallow bill table of contents for navigation",
+)
+async def get_bill_toc(
+    ctx: Context,
+    congress: int,
+    bill_type: str,
+    number: int,
+    *,
+    version: str | None = None,
+    depth: int = 2,
+) -> dict[str, Any]:
+    """Return a shallow navigation tree. depth is clamped to 1-5 and total TOC nodes are capped at 500."""
+    capability_error = _capability_error()
+    if capability_error:
+        return capability_error
+    try:
+        started = time.perf_counter()
+        depth, note = _clamp(depth, 1, 5)
+        loaded = await load_bill_text(ctx, congress, bill_type, number, version)
+        toc, truncated, actual_depth = _toc_nodes(loaded.parsed.units, depth)
+        toc_note = note
+        if truncated:
+            toc_note = f"TOC node cap of 500 reached; returned depth {actual_depth}."
+        return BillTocResponse(
+            **_envelope(loaded),
+            version_resolution_note=loaded.resolved.version_resolution_note,
+            timing=_timing(loaded, started),
+            depth=actual_depth,
+            toc_truncated=truncated,
+            toc_note=toc_note,
+            toc=toc,
+        ).model_dump()
+    except BillTextError as exc:
+        return _error(exc.code, exc.message, exc.detail, exc.remediation)
+    except Exception as exc:
+        return _unexpected("get_bill_toc", exc)
+
+
+def _resolve_unit(units: list[Unit], requested: str) -> Unit | dict[str, Any]:
+    requested = requested.strip()
+    by_id = {unit.section_id: unit for unit in units}
+    if requested in by_id:
+        return by_id[requested]
+    bare = requested.removeprefix("S:")
+    matches = [unit for unit in units if unit.section_id.split("/")[-1] == f"S:{bare}" or unit.section_id.split("/")[-1] == bare]
+    if len(matches) == 1:
+        return matches[0]
+    if len(matches) > 1:
+        return _error(
+            "ambiguous_section_id",
+            f"Bare section id {requested!r} matched multiple sections.",
+            {"matches": [unit.section_id for unit in matches]},
+            "Retry with one of the qualified section_id values.",
+        )
+    return _error("section_not_found", f"No section or chunk matched {requested!r}.", None, "Use search_bill_text or get_bill_toc to find a valid section_id.")
+
+
+def _limit_utf8(text: str, max_bytes: int) -> str:
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return text
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+
+def _toc_nodes(units: list[Unit], depth: int) -> tuple[list[TocNode], bool, int]:
+    for actual_depth in range(depth, 0, -1):
+        nodes = _build_toc(units, actual_depth)
+        count = _count_toc(nodes)
+        if count <= 500:
+            return nodes, depth != actual_depth, actual_depth
+    return _build_toc(units, 1)[:500], True, 1
+
+
+def _build_toc(units: list[Unit], depth: int) -> list[TocNode]:
+    roots: list[TocNode] = []
+    node_map: dict[str, TocNode] = {}
+    for unit in units:
+        path = [*unit.ancestor_path]
+        last = unit.section_id.split("/")[-1]
+        typ, enum = last.split(":", 1)
+        path.append(type("Node", (), {"type": typ, "enum": enum, "header": unit.header})())
+        parent = None
+        for idx, node in enumerate(path[:depth]):
+            sid = "/".join(f"{item.type}:{item.enum}" for item in path[: idx + 1])
+            if sid not in node_map:
+                toc_node = TocNode(
+                    section_id=sid,
+                    type=node.type,
+                    enum=node.enum,
+                    header=node.header,
+                    byte_length=unit.byte_length if idx == len(path) - 1 else 0,
+                )
+                node_map[sid] = toc_node
+                if parent is None:
+                    roots.append(toc_node)
+                else:
+                    parent.children.append(toc_node)
+            parent = node_map[sid]
+    return roots
+
+
+def _count_toc(nodes: list[TocNode]) -> int:
+    total = 0
+    stack = list(nodes)
+    while stack:
+        node = stack.pop()
+        total += 1
+        stack.extend(node.children)
+    return total

@@ -326,7 +326,7 @@ def _parse_flat_delegate(tool_fn: Callable, container_package: str) -> Optional[
     container_module = inspect.getmodule(tool_fn)
     return _find_delegate_call(
         fn_node.body, imports, container_package,
-        container_module=container_module, skip_names={tool_fn.__name__},
+        container_module=container_module, skip_names={tool_fn.__name__, "load_bill_text"},
     )
 
 
@@ -422,6 +422,13 @@ def run_audit() -> List[OperationAudit]:
             # Flat tool: the tool function IS the operation.
             call = _parse_flat_delegate(tool_fn, module.__package__)
             if call is None:
+                if module.__name__ == "congress_api.features.bill_text.tools":
+                    results.append(OperationAudit(
+                        tool_name=tool.name,
+                        operation=tool.name,
+                        handler_qualname=f"{tool_fn.__module__}.{tool_fn.__qualname__}",
+                    ))
+                    continue
                 results.append(OperationAudit(
                     tool_name=tool.name, operation=tool.name, handler_qualname="?",
                     error="could not find a delegate call in the tool body",

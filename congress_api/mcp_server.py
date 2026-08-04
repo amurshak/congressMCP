@@ -14,6 +14,7 @@ def initialize_mcp_features():
     # ruff: noqa: F401
     from .features import (  # noqa: F401
         bills_tool,
+        bill_text,
         amendments_tool,
         treaties_and_summaries_tool,
         members_committees_tools,
