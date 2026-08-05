@@ -118,7 +118,7 @@ def _clamp(value: int, low: int, high: int) -> tuple[int, str | None]:
 
 @mcp.tool(
     "search_bill_text",
-    title="Search full bill text by section",
+    title="Search a bill's full statutory text by section (GovInfo)",
 )
 async def search_bill_text(
     ctx: Context,
@@ -131,8 +131,11 @@ async def search_bill_text(
     max_hits: int = 10,
 ) -> dict[str, Any]:
     """
-    Search parsed Bill DTD XML from GovInfo using segment-level FTS5.
+    Full-text search of a bill's statutory text (bill text / legislative text), parsed from
+    GovInfo Bill DTD XML with segment-level FTS5, returning matching sections with the
+    United States Code citations they amend.
 
+    Use this to answer "what does bill X say about Y" without reading the whole bill.
     Pass several phrasings and synonyms in one call, e.g. ["icebreaker", "polar security cutter"].
     If "quoted" appears in match_contexts, the hit may include language the bill is removing,
     even when "operative" also appears; presence of "quoted" governs. max_hits is clamped to 1-50.
@@ -181,7 +184,7 @@ async def search_bill_text(
 
 @mcp.tool(
     "get_bill_section",
-    title="Retrieve a full bill section or addressable chunk",
+    title="Retrieve the full statutory text of a bill section (GovInfo)",
 )
 async def get_bill_section(
     ctx: Context,
@@ -194,10 +197,15 @@ async def get_bill_section(
     max_bytes: int = 25_000,
 ) -> dict[str, Any]:
     """
-    Return section display text up to max_bytes, measured as UTF-8 encoded bytes of the returned text field.
+    Retrieve the full statutory text of a single bill section -- or an addressable sub-section
+    chunk -- parsed from the bill's GovInfo Bill DTD XML.
 
-    Fully qualified ids and chunk ids resolve directly. Bare section enums are accepted only when unique.
-    max_bytes is clamped to 1,000-100,000.
+    Call this after search_bill_text or get_bill_toc to read a specific section by its section_id
+    (e.g. "D:H/T:I/S:3501"). Fully-qualified section ids and chunk ids resolve directly; a bare
+    section number (e.g. "101") resolves only when it is unique across the bill. The returned text
+    carries operative and quoted (amendatory) language in reading order; when the section is
+    subdivided, child chunk descriptors are included. Text is capped at max_bytes, measured as
+    UTF-8 encoded bytes of the returned text field, clamped to 1,000-100,000.
     """
     capability_error = _capability_error()
     if capability_error:
@@ -240,7 +248,7 @@ async def get_bill_section(
 
 @mcp.tool(
     "get_bill_toc",
-    title="Get a shallow bill table of contents for navigation",
+    title="Bill statutory-text table of contents for section navigation (GovInfo)",
 )
 async def get_bill_toc(
     ctx: Context,
@@ -251,7 +259,16 @@ async def get_bill_toc(
     version: str | None = None,
     depth: int = 2,
 ) -> dict[str, Any]:
-    """Return a shallow navigation tree. depth is clamped to 1-5 and total TOC nodes are capped at 500."""
+    """
+    Get a shallow table of contents -- divisions, titles, subtitles, and sections -- for a bill's
+    statutory text from GovInfo, as a navigation aid for discovering the section_id values to pass
+    to get_bill_section or search_bill_text.
+
+    This is a navigation aid, not the answer path: it returns structure and headers, never the
+    statutory text itself. depth is clamped to 1-5 (default 2) and total nodes are capped at 500.
+    toc_truncated is true when the node cap forced a shallower tree OR sections nest below the
+    returned depth (toc_note then gives the depth needed to reveal them).
+    """
     capability_error = _capability_error()
     if capability_error:
         return capability_error
@@ -259,17 +276,32 @@ async def get_bill_toc(
         started = time.perf_counter()
         depth, note = _clamp(depth, 1, 5)
         loaded = await load_bill_text(ctx, congress, bill_type, number, version)
-        toc, truncated, actual_depth = _toc_nodes(loaded.parsed.units, depth)
-        toc_note = note
-        if truncated:
-            toc_note = f"TOC node cap of 500 reached; returned depth {actual_depth}."
+        toc, node_capped, actual_depth = _toc_nodes(loaded.parsed.units, depth)
+        # A node showing children:[] at the depth boundary is indistinguishable
+        # from a genuinely empty one, so a consumer reads "this subtitle has no
+        # sections" and stops. Detect sections that nest below the returned depth
+        # and disclose them rather than letting toc_truncated=false assert
+        # completeness that isn't there.
+        hidden = _hidden_section_count(loaded.parsed.units, actual_depth)
+        notes: list[str] = []
+        if note:
+            notes.append(note)
+        if node_capped:
+            notes.append(f"TOC node cap of 500 reached; returned depth {actual_depth}.")
+        if hidden:
+            required = _max_section_depth(loaded.parsed.units)
+            notes.append(
+                f"{hidden} section(s) nest below the returned depth {actual_depth} and are "
+                f"collapsed into their parent nodes; call with depth={required} to see them, "
+                f"or use search_bill_text."
+            )
         return BillTocResponse(
             **_envelope(loaded),
             version_resolution_note=loaded.resolved.version_resolution_note,
             timing=_timing(loaded, started),
             depth=actual_depth,
-            toc_truncated=truncated,
-            toc_note=toc_note,
+            toc_truncated=node_capped or bool(hidden),
+            toc_note=" ".join(notes) or None,
             toc=toc,
         ).model_dump()
     except BillTextError as exc:
@@ -349,3 +381,28 @@ def _count_toc(nodes: list[TocNode]) -> int:
         total += 1
         stack.extend(node.children)
     return total
+
+
+# Section-level unit types (real addressable sections) as opposed to the
+# sub-section chunk types (SS/PARA/SUBPARAGRAPH/CLAUSE) produced by subdivision.
+# Only the former should drive "sections hidden below this depth"; advertising
+# a deeper depth just to expose byte-split chunks would be navigation noise.
+_SECTION_TYPES = {"S", "PRE", "RC", "U"}
+
+
+def _section_unit_depth(unit: Unit) -> int:
+    return len(unit.ancestor_path) + 1
+
+
+def _is_section_level(unit: Unit) -> bool:
+    typ = unit.section_id.split("/")[-1].split(":", 1)[0]
+    return typ in _SECTION_TYPES
+
+
+def _max_section_depth(units: list[Unit]) -> int:
+    depths = [_section_unit_depth(unit) for unit in units if _is_section_level(unit)]
+    return max(depths) if depths else 1
+
+
+def _hidden_section_count(units: list[Unit], shown_depth: int) -> int:
+    return sum(1 for unit in units if _is_section_level(unit) and _section_unit_depth(unit) > shown_depth)

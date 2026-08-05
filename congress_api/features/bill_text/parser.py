@@ -38,6 +38,26 @@ BLOCK_NAMES = {
     "resolving-clause",
 }
 SKIP_NAMES = {"toc", "page-break"}
+# Inline/typographic elements whose text flows into the surrounding run rather
+# than forming a block of its own. Emitting them as separate segments turns e.g.
+# "Coast Guard cutter <italic>Mackinaw</italic> (WLBB-30)" into three fake blocks
+# that read as headings to a naive consumer and wreck downstream chunking.
+# `quote`/`quoted-block` are inline in position too, but they change segment
+# context, so they stay on the block/recursion path and are handled separately.
+INLINE_NAMES = {
+    "italic",
+    "bold",
+    "i",
+    "b",
+    "sup",
+    "sub",
+    "superscript",
+    "subscript",
+    "term",
+    "external-xref",
+    "internal-xref",
+    "fraction",
+}
 AMENDATORY_RE = re.compile(
     r"\b(is|are) amended\b|\bby striking\b|\bby inserting\b|\bby adding\b|"
     r"\bredesignat(e|ing|ed)\b|\bis repealed\b",
@@ -45,19 +65,29 @@ AMENDATORY_RE = re.compile(
 )
 # Two accepted citation forms for `amends`, both resolving to a U.S. Code target
 # (never a named-Act title -- that generalization stays out of scope):
-#   1. Longhand: "Section {sec} of title {title}, United States Code"
-#   2. Shorthand "{title} U.S.C. {sec}", but only in an amendatory construction
-#      (an "is/are amended/repealed" verb follows within a citation-only window).
-#      Reconciliation bills amend named Acts cited this way -- e.g.
-#      "Section 3 of the Food and Nutrition Act of 2008 (7 U.S.C. 2012) is
-#      amended" -- which the longhand form never captures. The verb proximity
-#      keeps bare cross-references and definitional citations out.
+#   1. Longhand: "Section {sec} of title {title}, United States Code". Self-
+#      anchored (it names the target), so it needs no amendatory verb.
+#   2. Shorthand "{title} U.S.C. {sec}", accepted only when the amendatory verb
+#      "is/are [further/hereby] amended|repealed" *hugs* the citation -- nothing
+#      but closing parens, commas, and whitespace may sit between the section
+#      number and the verb. That hug is the whole gate: reconciliation bills
+#      amend named Acts cited as "...(7 U.S.C. 2012) is amended", which the
+#      longhand form never captures, while an incidental cross-reference like
+#      "under 5 U.S.C. 553, ensure that ... is amended" is rejected because prose
+#      (not just closers/whitespace) separates it from the verb. An earlier
+#      loose window (`[0-9A-Za-z().,\s]*?`) let a stray cite bridge across a whole
+#      sentence to a distant verb, both mis-attributing the target and swallowing
+#      the real one inside the over-wide match.
 AMENDS_RE = re.compile(
     r"Section\s+([0-9A-Za-z().-]+)\s+of\s+title\s+([0-9A-Za-z]+),\s+United States Code",
     re.IGNORECASE,
 )
 AMENDS_USC_RE = re.compile(
-    r"\b(\d+)\s+U\.?\s?S\.?\s?C\.?\s+(\d+)[0-9A-Za-z().,\s]*?\b(?:is|are)\s+(?:amended|repealed)\b",
+    r"\b(\d+)\s+U\.?\s?S\.?\s?C\.?\s+"          # title N U.S.C.
+    r"(\d+[A-Za-z]*(?:-\d+)?)"                   # section: 823, 1395ww, 1395w-4
+    r"(?:\([0-9A-Za-z]+\))*"                     # optional subsection designators, e.g. (a)(1)
+    r"[)\s,]*"                                   # only closers/commas/space may hug the verb
+    r"(?:is|are)\s+(?:further\s+|hereby\s+)?(?:amended|repealed)\b",
     re.IGNORECASE,
 )
 
@@ -92,10 +122,16 @@ class Unit:
 
     @property
     def amends(self) -> list[str]:
+        # Scan operative text only: a U.S. Code cite inside a quoted segment is
+        # part of the language being *inserted*, not the target being amended
+        # (spec §6 -- exclude quoted material structurally, not by proximity).
         found = set()
-        for match in AMENDS_RE.finditer(self.display_text):
+        operative_text = "\n\n".join(
+            segment.text for segment in self.segments if segment.context == "operative"
+        )
+        for match in AMENDS_RE.finditer(operative_text):
             found.add(f"{match.group(2)} U.S.C. {match.group(1)}")
-        for match in AMENDS_USC_RE.finditer(self.display_text):
+        for match in AMENDS_USC_RE.finditer(operative_text):
             found.add(f"{match.group(1)} U.S.C. {match.group(2)}")
         return sorted(found)
 
@@ -333,26 +369,50 @@ def extract_segments(elem: ET.Element, unit_header: str | None, in_quote: bool =
         if text and name not in {"enum"}:
             return [Segment("operative", text)]
         return []
+    context = "quoted" if quote_now else "operative"
+    # `run` accumulates the current inline text flow (own text + inline children +
+    # tails). It is flushed to a segment only at a real block boundary, so inline
+    # elements never split a sentence into separate blocks.
+    run = ""
     if elem.text and elem.text.strip() and name not in {"bill", "legis-body", "resolution-body"}:
-        segments.append(Segment("quoted" if quote_now else "operative", normalize_text(elem.text)))
+        run = normalize_text(elem.text)
     for child in list(elem):
         child_name = local_name(child)
-        if child_name == "toc":
+        if child_name in SKIP_NAMES or child_name == "toc":
+            if child.tail and child.tail.strip():
+                run = _join_inline(run, normalize_text(child.tail))
             continue
         if child_name == "footnote":
+            if run:
+                segments.append(Segment(context, run))
+                run = ""
             text = element_text(child)
             if text:
                 segments.append(Segment("operative", f"[footnote] {text}"))
             if child.tail and child.tail.strip():
-                segments.append(Segment("quoted" if quote_now else "operative", normalize_text(child.tail)))
+                run = _join_inline(run, normalize_text(child.tail))
             continue
+        if child_name in INLINE_NAMES:
+            text = element_text(child)
+            if text:
+                run = _join_inline(run, text)
+            if child.tail and child.tail.strip():
+                run = _join_inline(run, normalize_text(child.tail))
+            continue
+        # Block child, or a context-changing quote/quoted-block: end the current
+        # inline run, emit the child's own segments, then resume with its tail.
+        if run:
+            segments.append(Segment(context, run))
+            run = ""
         segments.extend(extract_segments(child, unit_header, quote_now))
         if child.tail and child.tail.strip():
-            segments.append(Segment("quoted" if quote_now else "operative", normalize_text(child.tail)))
+            run = _join_inline(run, normalize_text(child.tail))
+    if run:
+        segments.append(Segment(context, run))
     if not segments and name not in {"bill", "legis-body", "resolution-body"}:
         text = element_text(elem)
         if text:
-            segments.append(Segment("quoted" if quote_now else "operative", text))
+            segments.append(Segment(context, text))
     return coalesce_segments(segments)
 
 
@@ -396,6 +456,15 @@ def element_text(elem: ET.Element) -> str:
 
 def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
+
+
+def _join_inline(run: str, text: str) -> str:
+    """Join inline text onto the running flow with a single separating space.
+
+    Matches element_text's single-space token joining; the boundary spaces that
+    lived in the source text/tail are already stripped by normalize_text.
+    """
+    return f"{run} {text}" if run else text
 
 
 def local_name(elem: ET.Element) -> str:

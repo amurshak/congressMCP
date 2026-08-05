@@ -13,7 +13,12 @@ from congress_api.features.bill_text.parser import (
     byte_split_unit,
     parse_bill_xml,
 )
-from congress_api.features.bill_text.tools import _resolve_unit, _toc_nodes
+from congress_api.features.bill_text.tools import (
+    _hidden_section_count,
+    _max_section_depth,
+    _resolve_unit,
+    _toc_nodes,
+)
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -78,8 +83,33 @@ def test_toc_depth_and_node_cap_shape():
     parsed = parse_fixture("bill_text_trimmed.xml")
     toc, truncated, depth = _toc_nodes(parsed.units, 2)
     assert depth == 2
-    assert not truncated
+    assert not truncated  # node cap is a separate concern from depth-limiting
     assert toc[0].section_id == "D:A"
+
+
+def test_toc_flags_sections_hidden_below_returned_depth():
+    # Regression (S. 1411): sections nested under a subtitle sit one level below a
+    # default depth-2 TOC. They must not vanish silently -- toc_truncated=false
+    # with children:[] reads as "this subtitle is empty" and a consumer stops.
+    xml = (
+        b"<bill><legis-body>"
+        b"<title><enum>I</enum><header>First</header>"
+        b"<subtitle><enum>A</enum><header>Sub A</header>"
+        b"<section><enum>101</enum><header>Sec 101</header><text>alpha</text></section>"
+        b"<section><enum>102</enum><header>Sec 102</header><text>beta</text></section>"
+        b"</subtitle></title>"
+        b"<title><enum>II</enum><header>Second</header>"
+        b"<section><enum>201</enum><header>Sec 201</header><text>gamma</text></section>"
+        b"</title></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    # The two sections under T:I/ST:A sit at depth 3; T:II/S:201 sits at depth 2.
+    assert _max_section_depth(parsed.units) == 3
+    _, node_capped, actual = _toc_nodes(parsed.units, 2)
+    assert not node_capped  # nothing was cut by the node cap
+    assert _hidden_section_count(parsed.units, actual) == 2  # the two ST:A sections
+    # Requesting the required depth reveals everything; nothing hidden.
+    assert _hidden_section_count(parsed.units, 3) == 0
 
 
 def test_oversized_leaf_byte_fallback_uses_para_ids():
@@ -161,6 +191,71 @@ def test_amends_extracts_longhand_and_amendatory_shorthand_usc():
     assert "42 U.S.C. 1396" not in unit.amends  # bare cross-reference, not amended
 
 
+def test_amends_binds_verb_to_hugging_citation_not_a_distant_one():
+    # Regression (S. 3346): an incidental cite (5 U.S.C. 553, APA rulemaking)
+    # separated from the verb by prose must NOT bind to a distant "is amended",
+    # and the real target (21 U.S.C. 823, which hugs the verb) must not be
+    # swallowed inside an over-wide match. The old loose window returned
+    # ["5 U.S.C. 553"] and dropped 823 entirely.
+    unit = Unit(
+        section_id="S:1",
+        ancestor_path=[],
+        header="Controlled substance rulemaking",
+        segments=[
+            Segment(
+                "operative",
+                "The Attorney General shall, in accordance with the rulemaking "
+                "procedures under 5 U.S.C. 553, ensure that Section 303 of the "
+                "Controlled Substances Act (21 U.S.C. 823) is amended by adding "
+                "at the end the following new subsection.",
+            )
+        ],
+    )
+    assert unit.amends == ["21 U.S.C. 823"]
+
+
+def test_amends_ignores_citations_in_quoted_insertions():
+    # A cite inside quoted (inserted) language is not an amendment target; §6
+    # requires excluding quoted segments structurally. Scanning display_text
+    # (all contexts) would have wrongly reported the inserted title-26 cite.
+    unit = Unit(
+        section_id="S:1",
+        ancestor_path=[],
+        header="Insertion",
+        segments=[
+            Segment(
+                "operative",
+                "Section 5601 of title 14, United States Code, is amended by "
+                "inserting at the end the following:",
+            ),
+            Segment("quoted", "Section 9999 of title 26, United States Code, shall govern."),
+        ],
+    )
+    assert unit.amends == ["14 U.S.C. 5601"]
+    assert "26 U.S.C. 9999" not in unit.amends
+
+
+def test_inline_elements_flow_into_one_operative_block():
+    # Inline/typographic elements (italic vessel names, external-xrefs) must flow
+    # into the surrounding text rather than split it into separate blocks. Before
+    # the fix "Coast Guard cutter <italic>Mackinaw</italic> (WLBB-30)" parsed to
+    # three "\n\n"-joined segments, so Mackinaw read as a heading and wrecked
+    # downstream chunking.
+    xml = (
+        b"<bill><legis-body><section><enum>1</enum><header>Vessels</header>"
+        b"<text>The Coast Guard cutter <italic>Mackinaw</italic> (WLBB-30) shall "
+        b"be maintained under <external-xref>section 5601</external-xref> of the Act.</text>"
+        b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    unit = next(u for u in parsed.units if u.section_id.endswith("S:1"))
+    operative = [seg.text for seg in unit.segments if seg.context == "operative"]
+    assert len(operative) == 1
+    assert "Coast Guard cutter Mackinaw (WLBB-30)" in operative[0]
+    assert "section 5601 of the Act" in operative[0]
+    assert "\n\nMackinaw\n\n" not in unit.display_text
+
+
 @pytest.mark.asyncio
 async def test_tool_wrappers_build_responses_without_network(monkeypatch):
     # Exercises the tools.py envelope + response-model construction for all three
@@ -192,6 +287,10 @@ async def test_tool_wrappers_build_responses_without_network(monkeypatch):
 
     toc = await tools_mod.get_bill_toc(None, 119, "s", 1071, depth=2)
     assert "error" not in toc and toc["toc"]
+    # Fixture sections sit at depth 3, so a depth-2 TOC must disclose the hidden
+    # level rather than assert completeness.
+    assert toc["toc_truncated"] is True
+    assert "depth=3" in toc["toc_note"]
 
     search = await tools_mod.search_bill_text(None, 119, "s", 1071, ["icebreaker"], max_hits=999)
     assert "error" not in search and search["hits"]
