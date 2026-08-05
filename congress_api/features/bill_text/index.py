@@ -121,32 +121,46 @@ class BillTextIndex:
         unit_segments: dict[int, list[sqlite3.Row]] = defaultdict(list)
 
         for query in query_list:
+            # bm25() is an FTS5 auxiliary function usable only in the flat query
+            # that owns the MATCH (in SELECT / ORDER BY -- never inside an
+            # aggregate or a non-flattened subquery), so aggregate to units in
+            # Python instead. Deliberately NO row LIMIT: a flat LIMIT on segment
+            # rows truncated the candidate set before the per-query *unit* limit
+            # could apply -- a common term yields many matching segments inside few
+            # units (spec §7, defect 5e). The row set is one bill's segments.
             rows = self.conn.execute(
                 """
-                SELECT units.id AS unit_id, segments.id AS segment_id, segments.context, segments.text,
-                       units.section_id, bm25(seg_fts) AS rank
+                SELECT units.id AS unit_id, units.section_id AS section_id,
+                       segments.id AS segment_id, segments.context, segments.text,
+                       segments.ordinal, bm25(seg_fts) AS rank
                 FROM seg_fts
                 JOIN segments ON segments.id = seg_fts.rowid
                 JOIN units ON units.id = segments.unit_id
                 WHERE seg_fts MATCH ?
                 ORDER BY bm25(seg_fts) ASC, units.section_id ASC
-                LIMIT 1000
                 """,
                 (fts_literal(query),),
             ).fetchall()
-            seen_units: set[int] = set()
-            rank = 0
+            # Rows are bm25-ordered, so a unit's first appearance is its best rank.
+            # Admit the first `limit` distinct units for THIS query as candidates
+            # (1-based ranks); keep collecting segments for units already candidate
+            # for any query, but never admit a brand-new unit past the cap.
+            ranked_this_query = 0
             for row in rows:
                 unit_id = int(row["unit_id"])
+                existing = unit_rank.get(unit_id)
+                if existing is None or query not in existing:
+                    if ranked_this_query < limit:
+                        ranked_this_query += 1
+                        # Keyed by query string so a duplicate query collapses in
+                        # the RRF sum rather than double-counting.
+                        unit_rank[unit_id][query] = ranked_this_query
+                    elif existing is None:
+                        # New unit beyond the candidate cap and not a candidate for
+                        # any other query -> drop it entirely.
+                        continue
                 unit_contexts[unit_id].add(row["context"])
                 unit_segments[unit_id].append(row)
-                if unit_id in seen_units:
-                    continue
-                rank += 1
-                if rank > limit:
-                    continue
-                unit_rank[unit_id][query] = rank
-                seen_units.add(unit_id)
 
         hits: list[RankedHit] = []
         by_id = {idx: unit for idx, unit in enumerate(self.parsed.units, start=1)}
@@ -184,7 +198,10 @@ class BillTextIndex:
             ).fetchone()
             if prev:
                 prefix = _window(prev["text"], 90) + " "
-        return _window(prefix + chosen["text"], 320)
+        # Wrap a quoted snippet in delimiters (spec §6) so the caution is visible in
+        # the snippet text itself, not only in match_contexts.
+        chosen_text = f'"{chosen["text"]}"' if chosen["context"] == "quoted" else chosen["text"]
+        return _window(prefix + chosen_text, 320)
 
 
 def _window(text: str, max_chars: int) -> str:

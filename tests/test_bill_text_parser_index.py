@@ -4,13 +4,20 @@ from pathlib import Path
 import pytest
 
 from congress_api.features.bill_text.index import BillTextIndex, fts_literal, has_token, normalized_query
-from congress_api.features.bill_text.client import TextVersion, order_versions, _xml_url_from_summary
+from congress_api.features.bill_text.client import (
+    BillTextError,
+    TextVersion,
+    order_versions,
+    _xml_url_from_summary,
+)
 from congress_api.features.bill_text.models import AncestorNode
 from congress_api.features.bill_text.parser import (
     MAX_UNIT_BYTES,
+    SUBDIV_CODE,
     Segment,
     Unit,
     byte_split_unit,
+    node_kind_for,
     parse_bill_xml,
 )
 from congress_api.features.bill_text.tools import (
@@ -41,7 +48,7 @@ def test_parser_skips_toc_and_preserves_quoted_contexts():
     assert "quoted" in first.match_contexts
     assert "is amended by striking" in first.snippet
     assert first.unit.is_amendatory
-    assert first.unit.amends == ["14 U.S.C. 5601"]
+    assert first.unit.amends == [{"kind": "usc", "cite": "14 U.S.C. 5601"}]
 
 
 def test_resolution_body_gets_synthetic_units():
@@ -81,10 +88,13 @@ def test_rrf_dedupes_duplicate_queries():
 
 def test_toc_depth_and_node_cap_shape():
     parsed = parse_fixture("bill_text_trimmed.xml")
-    toc, truncated, depth = _toc_nodes(parsed.units, 2)
+    toc, truncated, depth = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
     assert depth == 2
     assert not truncated  # node cap is a separate concern from depth-limiting
     assert toc[0].section_id == "D:A"
+    # Size-per-branch: a division node aggregates the bytes of everything under it,
+    # so it is never smaller than any single descendant section (spec §9).
+    assert toc[0].subtree_byte_length >= max((c.byte_length for c in toc[0].children), default=0)
 
 
 def test_toc_flags_sections_hidden_below_returned_depth():
@@ -105,14 +115,16 @@ def test_toc_flags_sections_hidden_below_returned_depth():
     parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
     # The two sections under T:I/ST:A sit at depth 3; T:II/S:201 sits at depth 2.
     assert _max_section_depth(parsed.units) == 3
-    _, node_capped, actual = _toc_nodes(parsed.units, 2)
+    _, node_capped, actual = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
     assert not node_capped  # nothing was cut by the node cap
     assert _hidden_section_count(parsed.units, actual) == 2  # the two ST:A sections
     # Requesting the required depth reveals everything; nothing hidden.
     assert _hidden_section_count(parsed.units, 3) == 0
 
 
-def test_oversized_leaf_byte_fallback_uses_para_ids():
+def test_oversized_leaf_byte_fallback_uses_chunk_ids():
+    # A byte cut enumerates nothing, so it is addressed CHUNK:{n}, never PARA:{n}
+    # (which is reserved for a real <paragraph> enum) -- spec §5, decision 1.
     unit = Unit(
         section_id="D:A/T:I/S:999",
         ancestor_path=[AncestorNode(type="D", enum="A", header="Division")],
@@ -120,7 +132,7 @@ def test_oversized_leaf_byte_fallback_uses_para_ids():
         segments=[Segment("operative", "\n\n".join(["needle " * 600, "haystack " * 600]))],
     )
     chunks = byte_split_unit(unit)
-    assert [chunk.section_id for chunk in chunks] == ["D:A/T:I/S:999/PARA:1", "D:A/T:I/S:999/PARA:2"]
+    assert [chunk.section_id for chunk in chunks] == ["D:A/T:I/S:999/CHUNK:1", "D:A/T:I/S:999/CHUNK:2"]
     assert all(chunk.byte_length <= 8_000 for chunk in chunks)
 
 
@@ -154,6 +166,29 @@ def test_order_versions_puts_dateless_enrolled_first():
     assert order_versions(dated)[0].code == "eah"
 
 
+def test_order_versions_precedence_primary_does_not_promote_null_dated_nonterminal():
+    # A3 residual (credential-free counterexample): with NO enrolled version, a
+    # dateless non-terminal entry must NOT float to the top. The prior
+    # null-as-most-recent rule inverted the bug -- it resolved version=None to the
+    # introduced text. Precedence-primary makes an undated introduced (ih=10) lose
+    # to a dated engrossed (eh=40); date never participates in tier selection.
+    versions = [
+        TextVersion(code="ih", date="", type_label="Introduced in House"),
+        TextVersion(code="eh", date="2025-06-01T04:00:00Z", type_label="Engrossed in House"),
+    ]
+    assert order_versions(versions)[0].code == "eh"
+
+
+def test_order_versions_all_unknown_codes_fall_back_to_date_primary():
+    # Every code unknown -> precedence 0 for all -> the date tie-break governs,
+    # i.e. date-primary among them (later date first).
+    versions = [
+        TextVersion(code="zz1", date="2025-01-01", type_label="?"),
+        TextVersion(code="zz2", date="2025-09-09", type_label="?"),
+    ]
+    assert order_versions(versions)[0].code == "zz2"
+
+
 def test_byte_split_enforces_cap_on_unbroken_paragraph():
     # A single paragraph with no blank-line breaks must still be split under cap.
     giant = "word " * 5000  # ~25 KB, no "\n\n"
@@ -166,7 +201,7 @@ def test_byte_split_enforces_cap_on_unbroken_paragraph():
     chunks = byte_split_unit(unit)
     assert len(chunks) > 1
     assert all(chunk.byte_length <= MAX_UNIT_BYTES for chunk in chunks)
-    assert [c.section_id for c in chunks] == [f"D:A/T:I/S:1/SS:(a)/PARA:{i}" for i in range(1, len(chunks) + 1)]
+    assert [c.section_id for c in chunks] == [f"D:A/T:I/S:1/SS:(a)/CHUNK:{i}" for i in range(1, len(chunks) + 1)]
 
 
 def test_amends_extracts_longhand_and_amendatory_shorthand_usc():
@@ -187,8 +222,13 @@ def test_amends_extracts_longhand_and_amendatory_shorthand_usc():
             )
         ],
     )
-    assert unit.amends == ["14 U.S.C. 5601", "7 U.S.C. 2012", "7 U.S.C. 2028"]
-    assert "42 U.S.C. 1396" not in unit.amends  # bare cross-reference, not amended
+    assert unit.amends == [
+        {"kind": "usc", "cite": "14 U.S.C. 5601"},
+        {"kind": "usc", "cite": "7 U.S.C. 2012"},
+        {"kind": "usc", "cite": "7 U.S.C. 2028"},
+    ]
+    cites = {a["cite"] for a in unit.amends}
+    assert "42 U.S.C. 1396" not in cites  # bare cross-reference, not amended
 
 
 def test_amends_binds_verb_to_hugging_citation_not_a_distant_one():
@@ -211,7 +251,7 @@ def test_amends_binds_verb_to_hugging_citation_not_a_distant_one():
             )
         ],
     )
-    assert unit.amends == ["21 U.S.C. 823"]
+    assert unit.amends == [{"kind": "usc", "cite": "21 U.S.C. 823"}]
 
 
 def test_amends_ignores_citations_in_quoted_insertions():
@@ -231,8 +271,207 @@ def test_amends_ignores_citations_in_quoted_insertions():
             Segment("quoted", "Section 9999 of title 26, United States Code, shall govern."),
         ],
     )
-    assert unit.amends == ["14 U.S.C. 5601"]
-    assert "26 U.S.C. 9999" not in unit.amends
+    assert unit.amends == [{"kind": "usc", "cite": "14 U.S.C. 5601"}]
+    assert "26 U.S.C. 9999" not in {a["cite"] for a in unit.amends}
+
+
+def test_amends_extracts_public_law_targets_with_verb_hug_and_prefers_pl_over_stat():
+    # V15-approved: P.L. targets, gated on the same amendatory-verb hug as the USC
+    # shorthand. A same-instance Stat cite is absorbed (one target), a cross-
+    # reference with no verb hug is excluded, and results carry the kind object.
+    unit = Unit(
+        section_id="S:1",
+        ancestor_path=[],
+        header="PL amendments",
+        segments=[
+            Segment(
+                "operative",
+                "Section 5 of Public Law 119-38 (139 Stat. 656) is amended by striking subsection (b). "
+                "Section 3 of Public Law 118-31 is repealed. "
+                "Nothing in Public Law 117-263 shall be construed to limit this authority.",
+            )
+        ],
+    )
+    pairs = {(a["kind"], a["cite"]) for a in unit.amends}
+    assert ("public_law", "P.L. 119-38") in pairs
+    assert ("public_law", "P.L. 118-31") in pairs
+    assert ("public_law", "P.L. 117-263") not in pairs  # cross-ref, no amendatory verb hug
+    # The Statutes-at-Large cite in the same instance is not double-emitted.
+    assert not any(a["cite"].endswith("Stat. 656") for a in unit.amends)
+
+
+def test_amends_excludes_intervening_amender_in_citation_chain():
+    # Repro S:1106: the verb hugs the LAST cite in an "as added by / as most
+    # recently amended by" chain -- an intervening amender, not the target. It must
+    # not be reported (precision-first), or the current-year NDAA looks like the
+    # most-amended act in the corpus (a drafting-style artifact, the V15 failure).
+    unit = Unit(
+        section_id="S:1",
+        ancestor_path=[],
+        header="Chain",
+        segments=[
+            Segment(
+                "operative",
+                "Section 2405(a) of the Act (Public Law 109-234; 120 Stat. 490), as added "
+                "by section 2 of Public Law 110-417, as most recently amended by section "
+                "145(a) of the National Defense Authorization Act for Fiscal Year 2025 "
+                "(Public Law 118-159; 138 Stat. 2000), is amended by striking the second sentence.",
+            )
+        ],
+    )
+    cites = {a["cite"] for a in unit.amends}
+    assert "P.L. 118-159" not in cites   # "most recently amended by" intervener
+    assert "P.L. 110-417" not in cites   # "as added by" intervener
+    # A direct amendment in the same style is still captured (no provenance clause).
+    direct = Unit("S:2", [], None, [Segment("operative",
+        "Section 5 of Public Law 119-38 is amended by striking subsection (b).")])
+    assert {a["cite"] for a in direct.amends} == {"P.L. 119-38"}
+
+
+def test_amends_public_law_handles_unicode_hyphens_and_absorbs_stat():
+    # Repro S:549E: a "Public Law 118‑159" written with U+2011 was missed, then the
+    # Stat fallback mislabeled the page (138 Stat. 1894) as a public_law target.
+    # Every unicode hyphen now resolves to the P.L., which absorbs the Stat.
+    for dash in ("-", "‐", "‑", "–", "—"):
+        unit = Unit("S:1", [], None, [Segment("operative",
+            f"Section 2 of Public Law 118{dash}159 (138 Stat. 1894) is amended by striking.")])
+        assert unit.amends == [{"kind": "public_law", "cite": "P.L. 118-159"}], repr(dash)
+
+
+def test_amends_mixed_usc_and_public_law_sorted_by_kind_then_cite():
+    unit = Unit(
+        section_id="S:1",
+        ancestor_path=[],
+        header="Mixed",
+        segments=[
+            Segment(
+                "operative",
+                "Section 5601 of title 14, United States Code, is amended. "
+                "Section 2 of Public Law 119-38 is amended by striking the second sentence.",
+            )
+        ],
+    )
+    # Sorted by (kind, cite): public_law precedes usc.
+    assert unit.amends == [
+        {"kind": "public_law", "cite": "P.L. 119-38"},
+        {"kind": "usc", "cite": "14 U.S.C. 5601"},
+    ]
+
+
+def test_a5_longhand_cross_references_without_verb_hug_are_not_amends():
+    # A5 (V13): longhand is NOT self-gating. Definitional / "subject to" /
+    # "notwithstanding" cross-references with no amendatory verb hugging the cite
+    # must not populate amends, and a non-amendatory unit reports amends == []
+    # (the amends != [] ⟹ is_amendatory invariant).
+    unit = Unit(
+        section_id="S:1",
+        ancestor_path=[],
+        header="Definitions",
+        segments=[
+            Segment(
+                "operative",
+                "In this section, the term congressional defense committees has the "
+                "meaning given that term in section 101(a)(16) of title 10, United "
+                "States Code. Subject to section 3501 of title 10, United States Code, "
+                "the Secretary shall act notwithstanding section 403 of title 37, "
+                "United States Code.",
+            )
+        ],
+    )
+    assert not unit.is_amendatory
+    assert unit.amends == []
+
+
+def test_a5_longhand_with_verb_hug_still_resolves():
+    unit = Unit(
+        section_id="S:1",
+        ancestor_path=[],
+        header="Real amendment",
+        segments=[Segment("operative", "Section 2391(b)(1) of title 10, United States Code, is amended—")],
+    )
+    assert unit.is_amendatory
+    assert unit.amends == [{"kind": "usc", "cite": "10 U.S.C. 2391(b)(1)"}]
+
+
+def test_a5_amends_nonempty_implies_is_amendatory_invariant():
+    # The guard holds by construction even if a cite pattern would otherwise match:
+    # a unit that is not amendatory returns [] regardless of cite text present.
+    unit = Unit(
+        section_id="S:1",
+        ancestor_path=[],
+        header="Cross-ref only",
+        segments=[Segment("operative", "as provided in 7 U.S.C. 2012 and Public Law 119-38.")],
+    )
+    assert not unit.is_amendatory
+    assert unit.amends == []
+
+
+def test_a5_known_recall_cost_interposed_clause_drops_longhand_cite():
+    # Documented A5 recall cost (V13): an interposed clause between the cite and the
+    # verb -- "as amended by section Z," or a "(article N of the UCMJ)" parenthetical
+    # -- defeats the strict adjacency hug, so the cite is not resolved into amends.
+    # Measured on the NDAA: 12-14 confirmed losses (the distant-verb class was
+    # enumerated exhaustively at 0 further; the no-verb class was sampled 30/388 at
+    # 0, so the upper bound is ~50, not a flat rate), ~0 on hr1. A6 (recovery) is
+    # DEFERRED, not rejected -- see the trap by _HUG in parser.py.
+    #
+    # The is_amendatory assertion below is LOAD-BEARING, not incidental: that
+    # fallback is the entire reason this loss is acceptable (the unit is still
+    # discoverable as amendatory; amends is a convenience, not completeness). Do not
+    # remove it -- a future change to amendatory detection could quietly remove the
+    # justification while amends == [] still passes.
+    for op in (
+        "Section 149 of title 10, United States Code, as amended by section 905 of this Act, is further amended—",
+        "Section 806 of title 10, United States Code (article 6 of the Uniform Code of Military Justice) is amended—",
+    ):
+        unit = Unit("S:1", [], None, [Segment("operative", op)])
+        assert unit.is_amendatory       # LOAD-BEARING: the justification for the loss
+        assert unit.amends == []        # the interposed clause drops the cite
+
+
+def test_a5_is_amendatory_verb_set_is_superset_of_the_gate():
+    # is_amendatory must fire on every verb the gate accepts (are repealed, is
+    # further/hereby amended), or the invariant would hold only by coincidence.
+    for verb in ("is amended", "are amended", "is further amended", "is hereby amended",
+                 "is repealed", "are repealed"):
+        u = Unit("S:1", [], None, [Segment("operative", f"Section 2 of Public Law 119-38 {verb}.")])
+        assert u.is_amendatory, verb
+        assert u.amends == [{"kind": "public_law", "cite": "P.L. 119-38"}], verb
+
+
+def test_render_segments_wraps_quoted_and_hugs_trailing_punctuation():
+    from congress_api.features.bill_text.parser import render_segments
+
+    rendered = render_segments(
+        [
+            Segment("operative", "is amended by striking"),
+            Segment("quoted", "icebreaker"),
+            Segment("operative", ". The vessel is redesignated."),
+        ]
+    )
+    assert '"icebreaker"' in rendered           # quoted span is delimited
+    assert '"icebreaker".' in rendered          # trailing terminator hugs the delimiter
+    assert '"icebreaker" .' not in rendered      # no orphaned terminator
+
+
+def test_source_quote_marks_stripped_so_no_doubled_delimiters():
+    # V16 0.1% class: when the source DOES carry quotation marks in character data,
+    # strip them at extraction so segments.text is clean and rendering does not
+    # double them (spec §6 post-condition).
+    xml = (
+        "<bill><legis-body><section><enum>1</enum><header>H</header>"
+        "<text>is amended by inserting <quote>“new text”</quote> at the end.</text>"
+        "</section></legis-body></bill>"
+    ).encode()
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    unit = next(u for u in parsed.units if u.section_id.endswith("S:1"))
+    quoted = [s for s in unit.segments if s.context == "quoted"]
+    assert quoted and quoted[0].text == "new text"  # curly source delimiters stripped
+    from congress_api.features.bill_text.parser import render_segments
+
+    rendered = render_segments(unit.segments)
+    assert '"new text"' in rendered
+    assert '""' not in rendered and '"“' not in rendered  # no doubled delimiters
 
 
 def test_inline_elements_flow_into_one_operative_block():
@@ -254,6 +493,184 @@ def test_inline_elements_flow_into_one_operative_block():
     assert "Coast Guard cutter Mackinaw (WLBB-30)" in operative[0]
     assert "section 5601 of the Act" in operative[0]
     assert "\n\nMackinaw\n\n" not in unit.display_text
+
+
+def test_node_kind_derives_from_leaf_id_prefix():
+    # node_kind removes the need for a consumer to parse an id string to decide
+    # whether a citation is safe (spec §5). structural = from the document;
+    # synthetic = ours, stable but not a citation; chunk = enumerates nothing.
+    assert node_kind_for("D:H/T:I/S:3501") == "structural"
+    assert node_kind_for("D:H/T:I/S:3501/SS:(a)/PARA:(3)") == "structural"
+    assert node_kind_for("D:H/T:I/S:3501/SS:(a)/CHUNK:3") == "chunk"
+    assert node_kind_for("PRE:1") == "synthetic"
+    assert node_kind_for("RC:2") == "synthetic"
+    assert node_kind_for("U:1") == "synthetic"
+
+
+def test_byte_fallback_preserves_quoted_context_in_chunks():
+    # V14 second assertion: a byte cut of an amendatory section must not flatten
+    # quoted (inserted) language into operative text. A chunk covering a quoted
+    # span must still report a `quoted` segment, or match_contexts lies at chunk
+    # level -- V4 failing on exactly the largest amendatory sections.
+    unit = Unit(
+        section_id="D:A/T:I/S:5",
+        ancestor_path=[AncestorNode(type="D", enum="A", header="Div")],
+        header="Amendment",
+        segments=[
+            Segment("operative", "is amended by inserting the following: " + "op " * 2000),
+            Segment("quoted", "polar security cutter " * 2000),
+            Segment("operative", "after the first place it appears " + "tail " * 2000),
+        ],
+    )
+    chunks = byte_split_unit(unit)
+    assert len(chunks) > 1
+    assert all(c.byte_length <= MAX_UNIT_BYTES for c in chunks)
+    assert all(c.section_id.startswith("D:A/T:I/S:5/CHUNK:") for c in chunks)
+    # The quoted material survives as quoted segments; no chunk containing the
+    # inserted phrase mislabels it operative-only.
+    assert any(seg.context == "quoted" for c in chunks for seg in c.segments)
+    for c in chunks:
+        if "polar security cutter" in c.display_text:
+            assert any(seg.context == "quoted" for seg in c.segments)
+
+
+def _section_xml(enum, header, child_tag, child_enums, filler_bytes=5000):
+    filler = ("word " * (filler_bytes // 5)).strip()
+    children = b"".join(
+        (
+            f"<{child_tag}><enum>{ce}</enum><text>{filler}</text></{child_tag}>"
+        ).encode()
+        for ce in child_enums
+    )
+    return f"<section><enum>{enum}</enum><header>{header}</header>".encode() + children + b"</section>"
+
+
+def test_subdivision_emits_spec_prefix_codes_not_element_names():
+    # The subdivision chain uses the qualified codes SS/PARA/SUBP/CL, not the raw
+    # element names (PARAGRAPH/SUBPARAGRAPH/CLAUSE) the old mapping produced.
+    assert SUBDIV_CODE == {"subsection": "SS", "paragraph": "PARA", "subparagraph": "SUBP", "clause": "CL"}
+    xml = (
+        b"<bill><legis-body>"
+        + _section_xml("1", "Subsections", "subsection", ["(a)", "(b)"])
+        + _section_xml("2", "Paragraphs", "paragraph", ["(1)", "(2)"])
+        + b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    ids = [u.section_id for u in parsed.units]
+    assert "S:1/SS:(a)" in ids and "S:1/SS:(b)" in ids
+    assert "S:2/PARA:(1)" in ids and "S:2/PARA:(2)" in ids
+
+
+def test_no_addressable_unit_emitted_from_inside_quoted_block():
+    # V14 regression fixture: a bill inserting a whole new <section> nests it in a
+    # <quoted-block>. That inner section must NOT become a phantom addressable
+    # unit; its text stays searchable only as a `quoted` segment of the enclosing
+    # real section. Asserts both directions (spec §5, V14 first + second).
+    xml = (
+        b"<bill><legis-body>"
+        b"<section><enum>5</enum><header>Amendment</header>"
+        b"<text>Section 2304 of title 10, United States Code, is amended to read as follows:</text>"
+        b"<quoted-block>"
+        b"<section><enum>2304</enum><header>Phantom</header>"
+        b"<text>polar security cutter procurement authority</text></section>"
+        b"</quoted-block>"
+        # inline <quote> form too -- word/phrase-level strike-and-insert
+        b"<text>and by striking <quote>icebreaker</quote> each place it appears.</text>"
+        b"</section>"
+        b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    ids = [u.section_id for u in parsed.units]
+    # (1) zero units emitted from inside the quoted subtree -- the inner enum 2304
+    # never surfaces as an addressable id.
+    assert all("2304" not in sid for sid in ids)
+    section_units = [u for u in parsed.units if u.section_id.split("/")[-1].startswith("S:")]
+    assert [u.section_id for u in section_units] == ["S:5"]
+    # (2) the quoted text is fully retrievable as a `quoted` segment of S:5, and
+    # both quoting forms are captured.
+    s5 = next(u for u in parsed.units if u.section_id == "S:5")
+    quoted = " ".join(seg.text for seg in s5.segments if seg.context == "quoted")
+    assert "polar security cutter procurement authority" in quoted
+    assert "icebreaker" in quoted
+    index = BillTextIndex(parsed)
+    hits = index.search([normalized_query("polar security cutter")], 10)
+    assert hits and hits[0].unit.section_id == "S:5"
+    assert hits[0].match_contexts == ["quoted"]
+
+
+def test_after_quoted_block_connective_renders_outside_the_quote():
+    # Bill DTD puts the trailing connective ("; and", ".") in an <after-quoted-block>
+    # child of every quoted-block. It must be operative and render OUTSIDE the quote,
+    # not swallowed as '"(D) the Coast Guard. ; and"' (repro; spec §6).
+    xml = (
+        b"<bill><legis-body><section><enum>1</enum><header>H</header>"
+        b"<text>is amended by adding at the end the following:</text>"
+        b"<quoted-block><paragraph><enum>(D)</enum><text>the Coast Guard.</text></paragraph>"
+        b"<after-quoted-block>; and</after-quoted-block></quoted-block>"
+        b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    unit = next(u for u in parsed.units if u.section_id.endswith("S:1"))
+    quoted = " ".join(s.text for s in unit.segments if s.context == "quoted")
+    assert "the Coast Guard" in quoted
+    assert "; and" not in quoted  # connective is not swallowed into the quoted text
+    assert any(s.context == "operative" and "; and" in s.text for s in unit.segments)
+    from congress_api.features.bill_text.parser import render_segments
+
+    rendered = render_segments(unit.segments)
+    assert '; and"' not in rendered        # connective is not inside the closing delimiter
+    assert 'the Coast Guard."' in rendered  # the quote closes before the connective
+
+
+def test_subtree_byte_length_reflects_descendant_chunks():
+    # A subdivided section's own byte_length is only its intro; subtree_byte_length
+    # exposes the real size so a consumer is not misled (decision 2; repro S 204,
+    # 73 B own vs ~60,700 B subtree).
+    xml = (
+        b"<bill><legis-body>"
+        + _section_xml("1", "Big", "subsection", ["(a)", "(b)"])
+        + b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    parent = next(u for u in parsed.units if u.section_id == "S:1")
+    assert parent.child_ids  # it was subdivided
+    subtree = parsed.subtree_bytes
+    # Parent's own bytes are far smaller than the whole subtree.
+    assert subtree["S:1"] > parent.byte_length
+    assert subtree["S:1"] == parent.byte_length + sum(subtree[cid] for cid in parent.child_ids)
+    # A leaf's subtree equals its own byte_length.
+    leaf = next(u for u in parsed.units if u.section_id == "S:1/SS:(a)")
+    assert subtree[leaf.section_id] == leaf.byte_length
+
+
+def test_entity_declaration_is_refused_before_parsing():
+    # Billion-laughs guard (spec §11): any raw <!ENTITY is rejected before the
+    # parser runs. Real GovInfo Bill DTD XML never carries internal entities.
+    xml = (
+        b'<?xml version="1.0"?>'
+        b'<!DOCTYPE bill [ <!ENTITY lol "lololololol"> ]>'
+        b"<bill><legis-body><section><enum>1</enum><text>&lol;</text></section>"
+        b"</legis-body></bill>"
+    )
+    with pytest.raises(BillTextError) as exc:
+        parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    assert exc.value.code == "unsafe_document"
+
+
+def test_search_aggregates_matching_segments_to_one_unit_hit():
+    # Unit-level candidate aggregation (spec §7 / 5e): a term matching several
+    # segments of one unit yields a single hit, with match_contexts unioned across
+    # the matching segments rather than one row per segment.
+    xml = (
+        b"<bill><legis-body><section><enum>1</enum><header>Icebreakers</header>"
+        b"<text>The icebreaker program is amended by striking <quote>icebreaker</quote> "
+        b"and inserting the following.</text></section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    index = BillTextIndex(parsed)
+    hits = index.search([normalized_query("icebreaker")], 10)
+    assert len(hits) == 1
+    assert {"operative", "quoted"} <= set(hits[0].match_contexts)
 
 
 @pytest.mark.asyncio
@@ -300,6 +717,49 @@ async def test_tool_wrappers_build_responses_without_network(monkeypatch):
 
     section = await tools_mod.get_bill_section(None, 119, "s", 1071, search["hits"][0]["section_id"])
     assert "error" not in section and section["text"]
+
+
+@pytest.mark.asyncio
+async def test_get_bill_section_concatenates_subdivided_section_when_it_fits(monkeypatch):
+    # Spec §5/§9: "parent fits max_bytes -> return whole section" is served by
+    # concatenating children at read time (the parent unit stores only its intro).
+    # A tiny max_bytes instead returns the header+intro plus child descriptors.
+    import congress_api.features.bill_text.tools as tools_mod
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    xml = b"<bill><legis-body>" + _section_xml("1", "Big", "subsection", ["(a)", "(b)"]) + b"</legis-body></bill>"
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText("BILLS-119s1071enr", "enr", "2026-08-04T00:00:00Z", None, None, b""),
+        parsed=parsed,
+        index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
+
+    parent = next(u for u in parsed.units if u.section_id == "S:1")
+    assert parent.child_ids and parent.byte_length < 200  # intro only
+
+    # Whole section fits the 25 KB default -> assembled at read time, not truncated.
+    whole = await tools_mod.get_bill_section(None, 119, "s", 1071, "S:1")
+    assert whole["truncated"] is False
+    # byte_length is the unit's own clean size (intro), not the payload (spec §9);
+    # the real content shows up in subtree_byte_length and in text.
+    assert whole["byte_length"] == parent.byte_length
+    assert whole["subtree_byte_length"] == parsed.subtree_bytes["S:1"]
+    assert whole["subtree_byte_length"] >= whole["byte_length"]  # invariant restored
+    assert len(whole["text"]) >= 8000  # both subsections concatenated into the payload
+
+    # A tiny max_bytes forces the header+intro + child-descriptor path.
+    partial = await tools_mod.get_bill_section(None, 119, "s", 1071, "S:1", max_bytes=1000)
+    assert partial["truncated"] is True
+    assert [c["section_id"] for c in partial["children"]] == ["S:1/SS:(a)", "S:1/SS:(b)"]
+    assert partial["byte_length"] <= 1000
 
 
 @pytest.mark.asyncio

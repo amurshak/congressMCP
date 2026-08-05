@@ -13,6 +13,14 @@ class AncestorNode(BaseModel):
     header: str | None = None
 
 
+class AmendsTarget(BaseModel):
+    # `amends` resolves U.S. Code and Public Law citations, never named Acts. The
+    # kind discriminator means a consumer never parses `cite` syntax to know what
+    # kind of target it holds (same reasoning as node_kind in §5).
+    kind: Literal["usc", "public_law"]
+    cite: str
+
+
 class CacheStatus(BaseModel):
     index_hit: bool = False
     version_hit: bool = False
@@ -59,15 +67,20 @@ class BillTextEnvelope(BaseModel):
 
 class SearchHit(BaseModel):
     section_id: str
+    node_kind: Literal["structural", "synthetic", "chunk"]
     ancestor_path: list[AncestorNode]
     header: str | None
     snippet: str
     match_contexts: list[Literal["operative", "quoted", "header"]]
     matched_queries: list[str]
     is_amendatory: bool
-    amends: list[str]
+    amends: list[AmendsTarget]
     score: float
     byte_length: int
+    # Total bytes of this unit plus its descendant chunks; equals byte_length for
+    # a leaf, but exposes the real size of a subdivided section whose own
+    # byte_length is only its intro text.
+    subtree_byte_length: int
 
 
 class SearchBillTextResponse(BillTextEnvelope):
@@ -78,26 +91,32 @@ class SearchBillTextResponse(BillTextEnvelope):
 
 class SectionChild(BaseModel):
     section_id: str
+    node_kind: Literal["structural", "synthetic", "chunk"]
     header: str | None
     byte_length: int
+    subtree_byte_length: int
 
 
 class BillSectionResponse(BillTextEnvelope):
     section_id: str
+    node_kind: Literal["structural", "synthetic", "chunk"]
     ancestor_path: list[AncestorNode]
     header: str | None
     text: str
     byte_length: int
+    subtree_byte_length: int
     truncated: bool
     children: list[SectionChild] | None = None
 
 
 class TocNode(BaseModel):
     section_id: str
+    node_kind: Literal["structural", "synthetic", "chunk"]
     type: str
     enum: str
     header: str | None
     byte_length: int
+    subtree_byte_length: int
     children: list["TocNode"] = Field(default_factory=list)
 
 

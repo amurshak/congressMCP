@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from dataclasses import dataclass, field
 
+from .client import BillTextError
 from .models import AncestorNode
 
 
@@ -20,6 +21,22 @@ STRUCTURE_TYPES = {
     "subsection": "SS",
 }
 FALLBACK_CHAIN = ["subsection", "paragraph", "subparagraph", "clause"]
+# Qualified-id codes for the subdivision chain (spec §5). `PARA`/`SUBP`/`CL` are
+# real document enums; a byte-bounded cut is NOT an enumeration of anything and is
+# addressed `CHUNK:{n}` instead, in a namespace that cannot be mistaken for a bill
+# enum (citing "§204(a)(3)" from a byte cut labelled PARA:3 would be wrong).
+SUBDIV_CODE = {
+    "subsection": "SS",
+    "paragraph": "PARA",
+    "subparagraph": "SUBP",
+    "clause": "CL",
+}
+# node_kind is derivable from the id's leaf prefix; it is surfaced anyway so a
+# consumer (a model) never has to parse an id string to decide whether a citation
+# is safe. `structural` came from the document and may be cited; `synthetic` is
+# ours (stable, not a citation); `chunk` refers to nothing the bill enumerates.
+_STRUCTURAL_PREFIXES = {"D", "T", "ST", "PT", "S", "SS", "PARA", "SUBP", "CL"}
+_SYNTHETIC_PREFIXES = {"PRE", "RC", "U"}
 BLOCK_NAMES = {
     "header",
     "enum",
@@ -58,38 +75,109 @@ INLINE_NAMES = {
     "internal-xref",
     "fraction",
 }
+# The amendatory-verb clause, shared by is_amendatory and the amends verb-hug so
+# the two can never drift (A5). is_amendatory's regex is a strict SUPERSET of the
+# hug verb (it also counts by-striking/inserting/adding/redesignating), which is
+# what lets the `amends != [] ⟹ is_amendatory` invariant hold by construction.
+_AMEND_VERB = r"(?:is|are)\s+(?:further\s+|hereby\s+)?(?:amended|repealed)"
+# The citation-to-verb "hug" (A5): only closing parens, commas, semicolons, and
+# whitespace may sit between a citation and the amendatory verb -- zero prose.
+# This is the SINGLE hug definition for every amends form; there are no per-form
+# windows. General rule for any future form: NO citation form is self-gating. A
+# form that "obviously names its target" has only resolved the cite; whether
+# *this unit* amends it is independent, and only the verb hug establishes that.
+_HUG = r"[)\s,;]*" + _AMEND_VERB + r"\b"
+# A6 (DEFERRED, not rejected). The strict hug drops genuine amendments phrased with
+# an interposed clause -- "Section X of title 10, United States Code, as amended by
+# section Z, is further amended" or "... (article 6 of the UCMJ) is amended". V13
+# measured 12-14 such losses on the NDAA (exhaustive on the distant-verb class),
+# ~0 on hr1; the dropped units stay is_amendatory, so nothing is hidden. The loss
+# is systematic, not random -- "as amended by" marks already-amended (high-traffic)
+# provisions -- so a discovery consumer would feel it on exactly the hottest cites.
+# DO NOT relax this hug without the A6 flip condition: the idiom at a material rate
+# in a THIRD document AND a bounded implementation showing 0 added false positives
+# on a >=30 hand sample that includes interposed-clause citations. Both, not either.
+# THE TRAP: the interposed clause usually carries its OWN citation ("as amended by
+# Public Law 118-31") that this bill does NOT amend. A naive relaxation makes the
+# clause transparent for the outer cite AND pulls that inner cite into hugging range
+# of the same verb -- manufacturing the exact false-positive class V13 just removed,
+# in the freshly-approved public_law form. Any A6 must skip the clause for the OUTER
+# citation only; citations inside the clause stay ineligible.
 AMENDATORY_RE = re.compile(
-    r"\b(is|are) amended\b|\bby striking\b|\bby inserting\b|\bby adding\b|"
-    r"\bredesignat(e|ing|ed)\b|\bis repealed\b",
+    r"\b" + _AMEND_VERB + r"\b|\bby striking\b|\bby inserting\b|\bby adding\b|"
+    r"\bredesignat(?:e|ing|ed)\b",
     re.IGNORECASE,
 )
-# Two accepted citation forms for `amends`, both resolving to a U.S. Code target
-# (never a named-Act title -- that generalization stays out of scope):
-#   1. Longhand: "Section {sec} of title {title}, United States Code". Self-
-#      anchored (it names the target), so it needs no amendatory verb.
-#   2. Shorthand "{title} U.S.C. {sec}", accepted only when the amendatory verb
-#      "is/are [further/hereby] amended|repealed" *hugs* the citation -- nothing
-#      but closing parens, commas, and whitespace may sit between the section
-#      number and the verb. That hug is the whole gate: reconciliation bills
-#      amend named Acts cited as "...(7 U.S.C. 2012) is amended", which the
-#      longhand form never captures, while an incidental cross-reference like
-#      "under 5 U.S.C. 553, ensure that ... is amended" is rejected because prose
-#      (not just closers/whitespace) separates it from the verb. An earlier
-#      loose window (`[0-9A-Za-z().,\s]*?`) let a stray cite bridge across a whole
-#      sentence to a distant verb, both mis-attributing the target and swallowing
-#      the real one inside the over-wide match.
+# Three accepted citation forms for `amends`, resolving to a U.S. Code or Public
+# Law target (never a named Act). ALL THREE share the single `_HUG` gate (A5): the
+# amendatory verb must hug the citation, with only closers/commas/semicolons/
+# whitespace between. Resolution differs per form; the gate does not.
+#   - longhand USC:  "Section {sec} of title {title}, United States Code" + hug.
+#     A5 corrected the original spec claim that longhand is "self-anchored" and
+#     needs no verb: it resolves without context, but whether *this unit amends it*
+#     is a separate property. Un-gated, it fired on definitional / "subject to" /
+#     "notwithstanding" cross-references (NDAA: 411 of 695 matches non-amendments).
+#   - shorthand USC: "{title} U.S.C. {sec}" + hug. Captures "...(7 U.S.C. 2012) is
+#     amended" that longhand misses on reconciliation bills.
+#   - public law:    "(Public Law {c}-{n})" / "{v} Stat. {p}" + hug (V15-approved).
 AMENDS_RE = re.compile(
-    r"Section\s+([0-9A-Za-z().-]+)\s+of\s+title\s+([0-9A-Za-z]+),\s+United States Code",
+    r"Section\s+([0-9A-Za-z().-]+)\s+of\s+title\s+([0-9A-Za-z]+),\s+United States Code"
+    + _HUG,
     re.IGNORECASE,
 )
 AMENDS_USC_RE = re.compile(
     r"\b(\d+)\s+U\.?\s?S\.?\s?C\.?\s+"          # title N U.S.C.
     r"(\d+[A-Za-z]*(?:-\d+)?)"                   # section: 823, 1395ww, 1395w-4
     r"(?:\([0-9A-Za-z]+\))*"                     # optional subsection designators, e.g. (a)(1)
-    r"[)\s,]*"                                   # only closers/commas/space may hug the verb
-    r"(?:is|are)\s+(?:further\s+|hereby\s+)?(?:amended|repealed)\b",
+    + _HUG,
     re.IGNORECASE,
 )
+AMENDS_PL_RE = re.compile(
+    r"\b(?:Public\s+Law|Pub\.?\s*L\.?|P\.?\s*L\.?)\s*\.?\s*"
+    # Congress-number joined by ANY unicode hyphen/dash. The bill mixes them: a
+    # single "Public Law 118‑159" written with U+2011 (non-breaking hyphen) where
+    # the rest uses U+2013 was missed, then mislabeled as a Statutes-at-Large page
+    # via the Stat fallback (repro S:549E). Accept U+2010..U+2015 and hyphen-minus.
+    r"(\d+)[-‐-―](\d+)"
+    r"(?:[\s;(]*\d+\s+Stat\.\s*\d+\)?)?"         # optional same-instance "; 139 Stat. 656"
+    + _HUG,
+    re.IGNORECASE,
+)
+# Standalone Statutes-at-Large cite (emitted only where no P.L. form covers it in
+# the same instance -- see the span check in Unit.amends). Prefer the P.L. form.
+AMENDS_STAT_RE = re.compile(
+    r"\b(\d+)\s+Stat\.\s+(\d+)"
+    + _HUG,
+    re.IGNORECASE,
+)
+# A citation reached via an "as [added|amended] by ..." clause is an intervening
+# amender / provenance note, not the amendment target. Repro S:1106: the verb hugs
+# the LAST cite in a chain -- "(Public Law 109-234), as added by ... (P.L. 110-417),
+# as most recently amended by section 145(a) of the [NDAA] (P.L. 118-159), is
+# amended" -- so the hug binds to the current-year intervener, not the target. Left
+# unchecked this made the FY2025 NDAA look like the most-amended act in the corpus,
+# a drafting-style artifact (exactly the V15 failure mode). Requires the "as"
+# prefix so the operative verb "is/are amended by" is never mistaken for provenance.
+PROVENANCE_RE = re.compile(
+    r"\bas\s+(?:so\s+|most\s+recently\s+|further\s+|previously\s+|originally\s+|subsequently\s+)?"
+    r"(?:added|amended|inserted|redesignated|transferred|enacted|revised)\s+by\b",
+    re.IGNORECASE,
+)
+
+
+def _is_provenance_cite(text: str, start: int) -> bool:
+    """True if the citation at `start` sits inside an "as ... amended/added by"
+    clause within its sentence -- i.e. it is an intervening amender, not the
+    target. Precision-first: a chain target that appears only *before* the clause
+    is dropped rather than mis-attributed to the intervener (a known recall cost,
+    same shape as A5's interposition losses -- the unit stays is_amendatory)."""
+    window = text[max(0, start - 220):start]
+    # Confine to the current sentence; the chain has no period within it, but a
+    # prior sentence's "as amended by" must not bleed across.
+    cut = max(window.rfind(". "), window.rfind("\n\n"))
+    if cut != -1:
+        window = window[cut + 1:]
+    return bool(PROVENANCE_RE.search(window))
 
 
 @dataclass
@@ -121,19 +209,53 @@ class Unit:
         return any(AMENDATORY_RE.search(segment.text) for segment in self.segments if segment.context == "operative")
 
     @property
-    def amends(self) -> list[str]:
-        # Scan operative text only: a U.S. Code cite inside a quoted segment is
-        # part of the language being *inserted*, not the target being amended
-        # (spec §6 -- exclude quoted material structurally, not by proximity).
-        found = set()
+    def amends(self) -> list[dict[str, str]]:
+        # Scan operative text only: a cite inside a quoted segment is part of the
+        # language being *inserted*, not the target being amended (spec §6 --
+        # exclude quoted material structurally, not by proximity). Returns objects
+        # {kind, cite}: kind is "usc" or "public_law", never a named Act. Sorted by
+        # (kind, cite), de-duplicated on the pair.
+        #
+        # A5 structural post-condition: `amends != [] ⟹ is_amendatory == true`.
+        # Enforced here by construction so no citation form -- present or future --
+        # can populate amends on a unit that amends nothing. (One direction only;
+        # the converse is intentionally NOT guaranteed -- named Acts and the IRC
+        # leave amendatory units empty by design.) All amends forms share the same
+        # verb hug as is_amendatory's superset detector, so this guard never drops a
+        # legitimately-matched cite; it only forecloses drift.
+        if not self.is_amendatory:
+            return []
+        found: set[tuple[str, str]] = set()
         operative_text = "\n\n".join(
             segment.text for segment in self.segments if segment.context == "operative"
         )
+        # Skip any cite reached via an "as ... amended/added by" clause: it is an
+        # intervening amender in a citation chain, not the target (repro S:1106).
         for match in AMENDS_RE.finditer(operative_text):
-            found.add(f"{match.group(2)} U.S.C. {match.group(1)}")
+            if _is_provenance_cite(operative_text, match.start()):
+                continue
+            found.add(("usc", f"{match.group(2)} U.S.C. {match.group(1)}"))
         for match in AMENDS_USC_RE.finditer(operative_text):
-            found.add(f"{match.group(1)} U.S.C. {match.group(2)}")
-        return sorted(found)
+            if _is_provenance_cite(operative_text, match.start()):
+                continue
+            found.add(("usc", f"{match.group(1)} U.S.C. {match.group(2)}"))
+        # Public Law targets, preferring the P.L. form. The P.L. pattern absorbs a
+        # same-instance Statutes-at-Large cite; a standalone Stat cite is emitted
+        # only where no P.L. match covers its span (so one enactment cited two ways
+        # -- "P.L. 119-38; 139 Stat. 656" -- yields a single target).
+        pl_spans: list[tuple[int, int]] = []
+        for match in AMENDS_PL_RE.finditer(operative_text):
+            if _is_provenance_cite(operative_text, match.start()):
+                continue
+            found.add(("public_law", f"P.L. {match.group(1)}-{match.group(2)}"))
+            pl_spans.append((match.start(), match.end()))
+        for match in AMENDS_STAT_RE.finditer(operative_text):
+            if any(start <= match.start() < end for start, end in pl_spans):
+                continue
+            if _is_provenance_cite(operative_text, match.start()):
+                continue
+            found.add(("public_law", f"{match.group(1)} Stat. {match.group(2)}"))
+        return [{"kind": kind, "cite": cite} for kind, cite in sorted(found)]
 
 
 @dataclass
@@ -144,9 +266,56 @@ class ParsedBill:
     units: list[Unit]
     sections_indexed: int
     quotes_seen: set[str]
+    # section_id -> total bytes of the unit *and its descendant chunks*. A
+    # subdivided section's own `byte_length` is just its intro (e.g. 73 B), which
+    # reads as a tiny section when the real subtree is tens of KB; this exposes
+    # the true size so a consumer is not misled (spec §5 resolution, decision 2).
+    subtree_bytes: dict[str, int] = field(default_factory=dict)
+
+
+def node_kind_for(section_id: str) -> str:
+    """Derive node_kind from the id's leaf component prefix (spec §5)."""
+    prefix = section_id.split("/")[-1].split(":", 1)[0]
+    if prefix == "CHUNK":
+        return "chunk"
+    if prefix in _SYNTHETIC_PREFIXES:
+        return "synthetic"
+    return "structural"
+
+
+def compute_subtree_bytes(units: list[Unit]) -> dict[str, int]:
+    """Map every section_id *prefix* -> own bytes of it plus all descendants.
+
+    Keyed by prefix, not just by emitted unit id, so TOC container nodes that are
+    never emitted as units (a `<division>`/`<title>`) also get a size-per-branch
+    (spec §9: the highest-value place for this field is get_bill_toc). Because
+    every unit's `byte_length` is own-text only -- a subdivided parent holds just
+    its intro, its children are separate units -- summing own bytes across a
+    prefix double-counts nothing, and `prefix_bytes[unit.section_id]` equals
+    `own + Σ descendants` for an emitted unit (spec §9 containment semantics).
+    """
+    prefix_bytes: dict[str, int] = {}
+    for unit in units:
+        parts = unit.section_id.split("/")
+        for depth in range(1, len(parts) + 1):
+            prefix = "/".join(parts[:depth])
+            prefix_bytes[prefix] = prefix_bytes.get(prefix, 0) + unit.byte_length
+    return prefix_bytes
 
 
 def parse_bill_xml(xml_bytes: bytes, package_id: str, version: str, last_modified: str | None = None) -> ParsedBill:
+    # Billion-laughs guard (spec §11). Stdlib expat does not fetch external DTDs or
+    # expand external entities by default, so XXE is low-risk, but internal general
+    # entities (the billion-laughs vector) ARE expanded. Bill XML has no legitimate
+    # internal entity declarations, so reject any document whose raw bytes carry
+    # one before parsing -- costs nothing, needs no library.
+    if b"<!ENTITY" in xml_bytes:
+        raise BillTextError(
+            "unsafe_document",
+            "The document declares XML entities and was refused before parsing.",
+            {"package_id": package_id},
+            "This is not expected for GovInfo Bill DTD XML; report it if it recurs.",
+        )
     root = ET.fromstring(xml_bytes)
     chunker = _Chunker(package_id, version, last_modified)
     chunker.walk(root, [])
@@ -157,6 +326,7 @@ def parse_bill_xml(xml_bytes: bytes, package_id: str, version: str, last_modifie
         units=chunker.units,
         sections_indexed=chunker.sections_indexed,
         quotes_seen=chunker.quotes_seen,
+        subtree_bytes=compute_subtree_bytes(chunker.units),
     )
 
 
@@ -174,6 +344,16 @@ class _Chunker:
     def walk(self, elem: ET.Element, path: list[AncestorNode]) -> None:
         name = local_name(elem)
         if name in SKIP_NAMES:
+            return
+        if name in {"quote", "quoted-block"}:
+            # V14 carve-out (spec §5): never emit an addressable unit from inside
+            # quoted material. A bill inserting a new <section> produces
+            # <quoted-block><section><enum>…; a generic walk would make that a
+            # phantom unit for text the bill is *inserting*, not enacting -- the
+            # amendatory trap at unit level, where match_contexts cannot help
+            # because the unit itself is spurious. The quoted text stays fully
+            # searchable as `quoted` segments of the enclosing real unit (captured
+            # by extract_segments), never as a unit of its own.
             return
         if name in STRUCTURE_TYPES:
             node = self._node_for(elem, STRUCTURE_TYPES[name], path)
@@ -261,7 +441,7 @@ class _Chunker:
             if not child_elems:
                 continue
             units = []
-            typ = "SS" if child_name == "subsection" else child_name.upper().replace("-", "")
+            typ = SUBDIV_CODE[child_name]
             for idx, child in enumerate(child_elems, start=1):
                 enum = direct_text(child, "enum") or str(idx)
                 node = AncestorNode(type=typ, enum=enum, header=direct_text(child, "header"))
@@ -276,30 +456,55 @@ class _Chunker:
 
 
 def byte_split_unit(unit: Unit) -> list[Unit]:
-    text = unit.display_text
-    if len(text.encode("utf-8")) <= MAX_UNIT_BYTES:
+    """Split an oversized unit into `CHUNK:{n}` cuts each within MAX_UNIT_BYTES,
+    preserving each segment's `context`.
+
+    A byte cut is arbitrary and enumerates nothing, so chunks are addressed
+    `CHUNK:{n}`, never a document enum code. Critically, segments are *clipped* to
+    each chunk's span with their `context` carried through unchanged: a chunk
+    falling inside a <quoted-block> keeps a `quoted` segment, so match_contexts
+    still flags inserted language at chunk level. Flattening a chunk's text to a
+    single `operative` segment (the previous behaviour) silently broke V4 on
+    exactly the largest amendatory sections -- the ones that get chunked (spec §5,
+    §6; V14 second assertion). A segment straddling a cut yields one row on each
+    side with the same context.
+    """
+    if unit.byte_length <= MAX_UNIT_BYTES:
         return [unit]
-    # Split on blank lines first, then guarantee every atom is within the cap:
-    # a single paragraph with no blank-line breaks (e.g. a flattened table) can
-    # itself exceed the cap, and splitting only on "\n\n" would emit it whole.
+    # Flatten segments into (context, atom) pieces, each atom already within the
+    # cap. A single paragraph with no blank-line breaks (e.g. a flattened table)
+    # can itself exceed the cap, so _bound_atom word-packs / hard-cuts it.
+    atoms: list[tuple[str, str]] = []
+    for segment in unit.segments:
+        for piece in _segment_atoms(segment.text):
+            atoms.append((segment.context, piece))
+    chunks: list[Unit] = []
+    buf: list[tuple[str, str]] = []
+    buf_bytes = 0
+    idx = 1
+    for context, atom in atoms:
+        atom_bytes = len(atom.encode("utf-8"))
+        sep = 2 if buf else 0  # segments join with "\n\n" in display_text
+        if buf and buf_bytes + sep + atom_bytes > MAX_UNIT_BYTES:
+            chunks.append(_chunk_unit(unit, idx, buf))
+            idx += 1
+            buf = [(context, atom)]
+            buf_bytes = atom_bytes
+        else:
+            buf.append((context, atom))
+            buf_bytes += sep + atom_bytes
+    if buf:
+        chunks.append(_chunk_unit(unit, idx, buf))
+    return chunks or [unit]
+
+
+def _segment_atoms(text: str) -> list[str]:
     atoms: list[str] = []
     for paragraph in re.split(r"\n\s*\n", text):
-        if paragraph.strip():
-            atoms.extend(_bound_atom(paragraph.strip()))
-    chunks = []
-    buf = ""
-    idx = 1
-    for atom in atoms:
-        candidate = (buf + "\n\n" + atom) if buf else atom
-        if len(candidate.encode("utf-8")) > MAX_UNIT_BYTES and buf:
-            chunks.append(_para_unit(unit, idx, buf))
-            idx += 1
-            buf = atom
-        else:
-            buf = candidate
-    if buf:
-        chunks.append(_para_unit(unit, idx, buf))
-    return chunks or [unit]
+        stripped = paragraph.strip()
+        if stripped:
+            atoms.extend(_bound_atom(stripped))
+    return atoms
 
 
 def _bound_atom(paragraph: str) -> list[str]:
@@ -328,12 +533,18 @@ def _bound_atom(paragraph: str) -> list[str]:
     return pieces
 
 
-def _para_unit(unit: Unit, idx: int, text: str) -> Unit:
+def _chunk_unit(unit: Unit, idx: int, pieces: list[tuple[str, str]]) -> Unit:
+    # Do not synthesize a `header` segment for a byte cut -- it has no header of
+    # its own (spec §5). The parent header rides along only as the display/
+    # breadcrumb `header` field; any real `header` *segment* of the parent is
+    # clipped naturally into the first chunk that covers its span, never copied
+    # into every chunk.
+    segments = coalesce_segments([Segment(context, text) for context, text in pieces])
     return Unit(
-        section_id=f"{unit.section_id}/PARA:{idx}",
+        section_id=f"{unit.section_id}/CHUNK:{idx}",
         ancestor_path=unit.ancestor_path,
         header=unit.header,
-        segments=[Segment("operative", text)],
+        segments=segments,
     )
 
 
@@ -359,8 +570,23 @@ def extract_segments(elem: ET.Element, unit_header: str | None, in_quote: bool =
         return segments
     quote_now = in_quote or name in {"quote", "quoted-block"}
     if quote_now and name in {"quote", "quoted-block"}:
-        segments.append(Segment("quoted", element_text(elem)))
-        return [segment for segment in segments if segment.text]
+        # A quote element becomes one `quoted` segment; strip any source delimiters
+        # so segments.text is clean and rendering wraps without doubling. The Bill
+        # DTD puts the operative connective/terminator that FOLLOWS the inserted
+        # material -- "; and", ";", "." -- in an <after-quoted-block> child (1:1 with
+        # every quoted-block). That belongs OUTSIDE the quote, so exclude it from the
+        # quoted text and emit it as a trailing operative segment; otherwise it reads
+        # as '"(D) the Coast Guard. ; and"' with the connective swallowed (spec §6).
+        out: list[Segment] = []
+        quoted_text = strip_quote_delimiters(element_text(elem, exclude={"after-quoted-block"}))
+        if quoted_text:
+            out.append(Segment("quoted", quoted_text))
+        for child in list(elem):
+            if local_name(child) == "after-quoted-block":
+                connective = element_text(child)
+                if connective:
+                    out.append(Segment("operative", connective))
+        return [segment for segment in out if segment.text]
     if name == "header" and unit_header and not in_quote:
         text = element_text(elem)
         return [Segment("header", text)] if text else []
@@ -419,6 +645,10 @@ def extract_segments(elem: ET.Element, unit_header: str | None, in_quote: bool =
 def coalesce_segments(segments: list[Segment]) -> list[Segment]:
     out: list[Segment] = []
     for segment in segments:
+        # Tighten operative runs assembled by inline-join (element_text output is
+        # already tight); preserves the "\n\n" join since _tighten_punct ignores
+        # newlines. Idempotent, so re-coalescing at each recursion level is safe.
+        segment.text = _tighten_punct(segment.text)
         if not segment.text:
             continue
         if out and out[-1].context == segment.context:
@@ -426,6 +656,53 @@ def coalesce_segments(segments: list[Segment]) -> list[Segment]:
         else:
             out.append(segment)
     return out
+
+
+# Quote delimiters live in the RENDERING of segments, never in storage (spec §6).
+# V16: the source carries no delimiters in 99.9% of cases (the tag is the
+# delimiter), but a 0.1% class does -- strip those at extraction so segments.text
+# is always clean and rendering can wrap unconditionally without doubling.
+_OPEN_QUOTE_CHARS = "\"“‘`"       # " “ ‘ `
+_CLOSE_QUOTE_CHARS = "\"”’'"      # " ” ’ '
+_QUOTE_OPEN = '"'
+_QUOTE_CLOSE = '"'
+# Leading punctuation that hugs the previous piece with no separator, so a
+# terminator after a closing delimiter does not orphan (`" .` / `)"`); spec §6.
+_ATTACH_PUNCT = ".,;:)]}%!?"
+
+
+def strip_quote_delimiters(text: str) -> str:
+    """Remove one leading + one trailing source quote mark (the wrapping pair)."""
+    stripped = text.strip()
+    if stripped[:1] in _OPEN_QUOTE_CHARS:
+        stripped = stripped[1:]
+    if stripped[-1:] in _CLOSE_QUOTE_CHARS:
+        stripped = stripped[:-1]
+    return stripped.strip()
+
+
+def render_segments(segments: list[Segment]) -> str:
+    """Render segments in ordinal order, wrapping `quoted` spans in delimiters.
+
+    This is the serialization-time rendering function (spec §6): `segments.text`
+    stays canonical/clean and FTS indexes it unrendered, while display_text and
+    snippets are produced here. Delimiters make the inserted string and the anchor
+    string distinguishable from each other and from operative prose, which §8
+    relies on when it declines server-side direction inference. Trailing
+    punctuation hugs a closing delimiter rather than orphaning after it.
+    """
+    out = ""
+    for segment in segments:
+        if not segment.text:
+            continue
+        piece = f"{_QUOTE_OPEN}{segment.text}{_QUOTE_CLOSE}" if segment.context == "quoted" else segment.text
+        if not out:
+            out = piece
+        elif piece[:1] in _ATTACH_PUNCT:
+            out += piece
+        else:
+            out += f"\n\n{piece}"
+    return out.strip()
 
 
 def direct_text(elem: ET.Element, child_name: str) -> str | None:
@@ -436,26 +713,36 @@ def direct_text(elem: ET.Element, child_name: str) -> str | None:
     return None
 
 
-def element_text(elem: ET.Element) -> str:
+def element_text(elem: ET.Element, exclude: set[str] | None = None) -> str:
     if local_name(elem) in SKIP_NAMES or local_name(elem) == "toc":
         return ""
     pieces: list[str] = []
     if elem.text:
         pieces.append(elem.text)
     for child in list(elem):
-        if local_name(child) in SKIP_NAMES or local_name(child) == "toc":
+        child_name = local_name(child)
+        if child_name in SKIP_NAMES or child_name == "toc" or (exclude and child_name in exclude):
             if child.tail:
                 pieces.append(child.tail)
             continue
-        pieces.append(element_text(child))
+        pieces.append(element_text(child, exclude))
         if child.tail:
             pieces.append(child.tail)
     text = " ".join(piece for piece in pieces if piece)
-    return re.sub(r"\s+", " ", text).strip()
+    return normalize_text(text)
+
+
+def _tighten_punct(text: str) -> str:
+    # Remove spaces/tabs (never newlines -- they carry the segment join) that the
+    # element_text / inline-join space-joining orphaned around brackets and
+    # terminators: `( Public Law 118-31 ; )` -> `(Public Law 118-31;)`, `counselor
+    # .` -> `counselor.`. Idempotent. Spec §6: punctuation belongs against its word.
+    text = re.sub(r"([(\[])[ \t]+", r"\1", text)
+    return re.sub(r"[ \t]+([.,;:)\]])", r"\1", text)
 
 
 def normalize_text(text: str) -> str:
-    return re.sub(r"\s+", " ", text).strip()
+    return _tighten_punct(re.sub(r"\s+", " ", text).strip())
 
 
 def _join_inline(run: str, text: str) -> str:

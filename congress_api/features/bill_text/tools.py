@@ -24,7 +24,7 @@ from .models import (
     Timing,
     TocNode,
 )
-from .parser import Unit
+from .parser import Unit, node_kind_for, render_segments
 from .service import LoadedBillText, load_bill_text
 
 
@@ -133,12 +133,16 @@ async def search_bill_text(
     """
     Full-text search of a bill's statutory text (bill text / legislative text), parsed from
     GovInfo Bill DTD XML with segment-level FTS5, returning matching sections with the
-    United States Code citations they amend.
+    U.S. Code and Public Law citations they amend.
 
     Use this to answer "what does bill X say about Y" without reading the whole bill.
-    Pass several phrasings and synonyms in one call, e.g. ["icebreaker", "polar security cutter"].
+    Pass several phrasings and synonyms in one call, e.g. ["icebreaker", "polar security cutter"];
+    matched_queries reports which phrasing produced each hit, so you can drop the dead ones next call.
     If "quoted" appears in match_contexts, the hit may include language the bill is removing,
-    even when "operative" also appears; presence of "quoted" governs. max_hits is clamped to 1-50.
+    even when "operative" also appears; presence of "quoted" governs. Each amends entry is
+    {kind: "usc"|"public_law", cite}; amends is a convenience (never named Acts, incl. the IRC by
+    bare section number) -- use is_amendatory and match_contexts to identify amendatory text.
+    max_hits is clamped to 1-50.
     """
     capability_error = _capability_error()
     if capability_error:
@@ -160,6 +164,7 @@ async def search_bill_text(
             hits=[
                 SearchHit(
                     section_id=hit.unit.section_id,
+                    node_kind=node_kind_for(hit.unit.section_id),
                     ancestor_path=hit.unit.ancestor_path,
                     header=hit.unit.header,
                     snippet=hit.snippet,
@@ -169,6 +174,9 @@ async def search_bill_text(
                     amends=hit.unit.amends,
                     score=round(hit.score, 6),
                     byte_length=hit.unit.byte_length,
+                    subtree_byte_length=loaded.parsed.subtree_bytes.get(
+                        hit.unit.section_id, hit.unit.byte_length
+                    ),
                 )
                 for hit in ranked
             ],
@@ -218,25 +226,72 @@ async def get_bill_section(
         if isinstance(unit_or_error, dict):
             return unit_or_error
         unit = unit_or_error
-        children = [child for child in loaded.parsed.units if child.section_id in unit.child_ids]
-        text = _limit_utf8(unit.display_text, max_bytes)
-        truncated = len(unit.display_text.encode("utf-8")) > max_bytes
-        if children and unit.byte_length <= max_bytes:
-            child_payload = [SectionChild(section_id=child.section_id, header=child.header, byte_length=child.byte_length) for child in children]
+        # Preserve document order via child_ids (a subdivided parent lists its
+        # leaves in order); the units list is also in that order, but keying makes
+        # it explicit.
+        child_by_id = {child.section_id: child for child in loaded.parsed.units}
+        children = [child_by_id[cid] for cid in unit.child_ids if cid in child_by_id]
+        subtree = loaded.parsed.subtree_bytes
+        subtree_len = subtree.get(unit.section_id, unit.byte_length)
+        # Render at serialization: quoted spans are wrapped in delimiters here, not
+        # in storage (spec §6). byte machinery (byte_length / subtree / byte_split)
+        # stays on the clean display_text; only the returned `text` is rendered.
+        own_rendered = render_segments(unit.segments)
+        if children and subtree_len <= max_bytes:
+            # Subdivided but the whole section fits: assemble it at read time. The
+            # parent unit stores only its own header+intro (its byte_length is that
+            # intro, e.g. 73 B), so §5's "parent fits max_bytes -> return whole
+            # section" is served by concatenating the children here rather than
+            # reading a single parent field (spec §9).
+            full = "\n\n".join(
+                part
+                for part in (own_rendered, *(render_segments(c.segments) for c in children))
+                if part
+            )
+            text = _limit_utf8(full, max_bytes)
+            truncated = len(full.encode("utf-8")) > max_bytes
         elif children:
-            child_payload = [SectionChild(section_id=child.section_id, header=child.header, byte_length=child.byte_length) for child in children]
+            # Subdivided and too large to inline: own header + intro plus child
+            # descriptors so the caller can fetch a specific chunk. Never silently
+            # return only the first chunk (spec §5).
+            text = _limit_utf8(own_rendered, max_bytes)
             truncated = True
         else:
-            child_payload = None
+            # Leaf: its own text, truncated only if that alone exceeds max_bytes.
+            text = _limit_utf8(own_rendered, max_bytes)
+            truncated = len(own_rendered.encode("utf-8")) > max_bytes
+        child_payload = (
+            [
+                SectionChild(
+                    section_id=child.section_id,
+                    node_kind=node_kind_for(child.section_id),
+                    header=child.header,
+                    byte_length=child.byte_length,
+                    subtree_byte_length=subtree.get(child.section_id, child.byte_length),
+                )
+                for child in children
+            ]
+            if children
+            else None
+        )
         return BillSectionResponse(
             **_envelope(loaded),
             version_resolution_note=note or loaded.resolved.version_resolution_note,
             timing=_timing(loaded, started),
             section_id=unit.section_id,
+            node_kind=node_kind_for(unit.section_id),
             ancestor_path=unit.ancestor_path,
             header=unit.header,
             text=text,
-            byte_length=len(text.encode("utf-8")),
+            # byte_length is the unit's OWN clean text size (spec §9), NOT the
+            # rendered/concatenated payload: rendering adds ~2 bytes per quoted span
+            # and concatenation inflates it, which made section disagree with search
+            # on the same node and made subtree_byte_length read *smaller* than
+            # byte_length on quoted leaves. Reporting the clean own size restores
+            # `subtree_byte_length >= byte_length` and cross-tool agreement; the
+            # returned `text` is still rendered and bounded by max_bytes.
+            byte_length=unit.byte_length,
+            subtree_byte_length=subtree_len,
             truncated=truncated,
             children=child_payload,
         ).model_dump()
@@ -276,7 +331,7 @@ async def get_bill_toc(
         started = time.perf_counter()
         depth, note = _clamp(depth, 1, 5)
         loaded = await load_bill_text(ctx, congress, bill_type, number, version)
-        toc, node_capped, actual_depth = _toc_nodes(loaded.parsed.units, depth)
+        toc, node_capped, actual_depth = _toc_nodes(loaded.parsed.units, depth, loaded.parsed.subtree_bytes)
         # A node showing children:[] at the depth boundary is indistinguishable
         # from a genuinely empty one, so a consumer reads "this subtitle has no
         # sections" and stops. Detect sections that nest below the returned depth
@@ -336,16 +391,16 @@ def _limit_utf8(text: str, max_bytes: int) -> str:
     return encoded[:max_bytes].decode("utf-8", errors="ignore")
 
 
-def _toc_nodes(units: list[Unit], depth: int) -> tuple[list[TocNode], bool, int]:
+def _toc_nodes(units: list[Unit], depth: int, subtree_bytes: dict[str, int]) -> tuple[list[TocNode], bool, int]:
     for actual_depth in range(depth, 0, -1):
-        nodes = _build_toc(units, actual_depth)
+        nodes = _build_toc(units, actual_depth, subtree_bytes)
         count = _count_toc(nodes)
         if count <= 500:
             return nodes, depth != actual_depth, actual_depth
-    return _build_toc(units, 1)[:500], True, 1
+    return _build_toc(units, 1, subtree_bytes)[:500], True, 1
 
 
-def _build_toc(units: list[Unit], depth: int) -> list[TocNode]:
+def _build_toc(units: list[Unit], depth: int, subtree_bytes: dict[str, int]) -> list[TocNode]:
     roots: list[TocNode] = []
     node_map: dict[str, TocNode] = {}
     for unit in units:
@@ -359,10 +414,15 @@ def _build_toc(units: list[Unit], depth: int) -> list[TocNode]:
             if sid not in node_map:
                 toc_node = TocNode(
                     section_id=sid,
+                    node_kind=node_kind_for(sid),
                     type=node.type,
                     enum=node.enum,
                     header=node.header,
                     byte_length=unit.byte_length if idx == len(path) - 1 else 0,
+                    # Size-per-branch: sum of own bytes at-or-under this prefix,
+                    # so a consumer sees which division/title is worth descending
+                    # into (spec §9 -- highest-value place for the field).
+                    subtree_byte_length=subtree_bytes.get(sid, 0),
                 )
                 node_map[sid] = toc_node
                 if parent is None:
