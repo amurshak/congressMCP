@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import random
 import re
@@ -17,6 +18,8 @@ from mcp.server.mcpserver import Context
 from ...core.api_config import API_KEY
 from ...core.client_handler import get_app_context
 
+
+logger = logging.getLogger(__name__)
 
 GOVINFO_BASE_URL = "https://api.govinfo.gov"
 MAX_XML_BYTES = 50 * 1024 * 1024
@@ -109,17 +112,27 @@ async def resolve_and_fetch_bill_text(
         )
 
     candidates = order_versions(versions)
+    # When no code carries a known precedence, order_versions falls back to
+    # date-primary; disclose that the "latest" pick rests on dates alone (spec §3).
+    base_note = None
+    if versions and all(item.code not in VERSION_PRECEDENCE for item in versions):
+        base_note = (
+            "No known version-precedence codes among the listed versions; "
+            "ordered by date alone, so 'latest' may be unreliable. Pass an explicit "
+            "version= to bypass."
+        )
     errors = []
     for candidate in candidates:
         package_id = package_id_for(congress, bill_type, number, candidate.code)
         try:
             fetched = await fetch_govinfo_package(package_id)
-            note = None
+            note = base_note
             if candidate != candidates[0]:
-                note = (
+                substitution = (
                     f"Latest listed version {candidates[0].code} was unavailable from GovInfo; "
                     f"fell back to {candidate.code}."
                 )
+                note = f"{base_note} {substitution}" if base_note else substitution
             return ResolvedBillText(package_id, candidate.code, utc_now(), note, fetched[0], fetched[1])
         except BillTextError as exc:
             if exc.code != "govinfo_not_found":
@@ -359,20 +372,35 @@ def _version_code_from_item(congress: int, bill_type: str, number: int, item: di
 
 
 def order_versions(versions: list[TextVersion]) -> list[TextVersion]:
-    """Order text versions latest-first per spec §3.
+    """Order text versions latest-first per spec §3: **precedence-primary**.
 
-    Primary key is the text-version date. Congress.gov returns a null date for
-    the enrolled (and public-law) entries, so a naive date-primary sort buries
-    the enrolled text behind dated earlier versions — e.g. version=None on the
-    NDAA resolves to 'eah' instead of 'enr'. A missing date is therefore treated
-    as most-recent, and precedence (then lexicographic) breaks ties among any
-    dateless versions, which keeps enrolled ahead of an undated earlier stage.
+    Sort key is (precedence DESC, date DESC, version_code ASC). The legislative
+    ordering is intrinsic to the version code (introduced → reported → engrossed →
+    enrolled); the date is the weaker, nullable signal and is used only as a
+    tie-break *within* a precedence tier (e.g. two engrossed versions). This is
+    the fix for A3's residual risk: the prior "null date = most-recent, precedence
+    breaks ties" merely inverted the original bug — it floated any dateless
+    non-terminal entry (an `ih` congress.gov returns with date=null and no
+    enrolled version present) to the top. Making precedence primary makes the null
+    irrelevant rather than special-cased: enrolled (90) always outranks an undated
+    introduced (10), and a missing date simply sorts last within its own tier.
+
+    Unknown codes get precedence 0, lose to any known code, and are logged loudly
+    (a code GPO adds later fails *loud* here, whereas a null date failed silent —
+    detectability is what decides precedence-primary). If *every* code is unknown,
+    the precedence-0 tie means the date tie-break governs, i.e. we fall back to
+    date-primary among them, which resolve_and_fetch_bill_text discloses.
     """
+    unknown = sorted({item.code for item in versions if item.code not in VERSION_PRECEDENCE})
+    if unknown:
+        logger.warning(
+            "Unknown bill text version code(s) with no precedence, sorted last: %s", unknown
+        )
     return sorted(
         versions,
         key=lambda item: (
-            item.date or "9999-12-31",
             VERSION_PRECEDENCE.get(item.code, 0),
+            item.date or "",
             _inverse_lex_key(item.code),
         ),
         reverse=True,
