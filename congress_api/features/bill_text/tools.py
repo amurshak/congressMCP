@@ -337,25 +337,24 @@ async def get_bill_toc(
         # sections" and stops. Detect sections that nest below the returned depth
         # and disclose them rather than letting toc_truncated=false assert
         # completeness that isn't there.
-        hidden = _hidden_section_count(loaded.parsed.units, actual_depth)
+        hidden_note = _hidden_section_note(
+            loaded.parsed.units, actual_depth, depth, loaded.parsed.subtree_bytes
+        )
         notes: list[str] = []
         if note:
             notes.append(note)
-        if node_capped:
+        if hidden_note:
+            notes.append(hidden_note)
+        elif node_capped:
+            # Only when nothing is hidden does the bare cap notice stand alone; when
+            # sections are hidden, hidden_note already explains the cap's effect.
             notes.append(f"TOC node cap of 500 reached; returned depth {actual_depth}.")
-        if hidden:
-            required = _max_section_depth(loaded.parsed.units)
-            notes.append(
-                f"{hidden} section(s) nest below the returned depth {actual_depth} and are "
-                f"collapsed into their parent nodes; call with depth={required} to see them, "
-                f"or use search_bill_text."
-            )
         return BillTocResponse(
             **_envelope(loaded),
             version_resolution_note=loaded.resolved.version_resolution_note,
             timing=_timing(loaded, started),
             depth=actual_depth,
-            toc_truncated=node_capped or bool(hidden),
+            toc_truncated=node_capped or hidden_note is not None,
             toc_note=" ".join(notes) or None,
             toc=toc,
         ).model_dump()
@@ -466,3 +465,36 @@ def _max_section_depth(units: list[Unit]) -> int:
 
 def _hidden_section_count(units: list[Unit], shown_depth: int) -> int:
     return sum(1 for unit in units if _is_section_level(unit) and _section_unit_depth(unit) > shown_depth)
+
+
+def _hidden_section_note(
+    units: list[Unit], actual_depth: int, requested_depth: int, subtree_bytes: dict[str, int]
+) -> str | None:
+    """Disclose sections that nest below the returned depth, with advice that is
+    actually actionable.
+
+    The trap: advising "call with depth={max_section_depth}" is wrong when the 500-node
+    cap -- not the depth argument -- is what hid the sections. That deeper call rebuilds
+    the same over-cap tree and degrades right back to this depth (the request the caller
+    just made). So promise a depth only when the cap can serve it; otherwise the honest
+    remedy is search_bill_text or narrowing to a subtree.
+    """
+    hidden = _hidden_section_count(units, actual_depth)
+    if not hidden:
+        return None
+    required = _max_section_depth(units)
+    # servable = the deepest depth the node cap actually permits (== actual_depth when
+    # the caller already asked for the ceiling, else re-derived at the ceiling).
+    servable = actual_depth if requested_depth >= 5 else _toc_nodes(units, 5, subtree_bytes)[2]
+    if required <= servable:
+        return (
+            f"{hidden} section(s) nest below the returned depth {actual_depth} and are "
+            f"collapsed into their parent nodes; call with depth={required} to see them, "
+            f"or use search_bill_text."
+        )
+    return (
+        f"{hidden} section(s) nest below the returned depth {actual_depth}; the full tree "
+        f"cannot be listed to depth {required} (deepest listable depth is {servable}). Use "
+        f"search_bill_text to find specific sections, or call get_bill_section on a division "
+        f"or title to navigate its subtree."
+    )

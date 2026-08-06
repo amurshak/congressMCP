@@ -22,6 +22,7 @@ from congress_api.features.bill_text.parser import (
 )
 from congress_api.features.bill_text.tools import (
     _hidden_section_count,
+    _hidden_section_note,
     _max_section_depth,
     _resolve_unit,
     _toc_nodes,
@@ -850,3 +851,89 @@ async def test_resolve_versions_falls_back_only_when_congress_unavailable(monkey
 @pytest.mark.skipif(not os.getenv("CONGRESSMCP_LIVE_ACCEPTANCE"), reason="live GovInfo/Congress.gov acceptance is opt-in")
 def test_live_acceptance_placeholder():
     pytest.skip("Run V1-V12 manually with CONGRESSMCP_LIVE_ACCEPTANCE and record findings in the README/PR.")
+
+
+# --------------------------------------------------------------------------- #
+# V5 -- synthetic-unit resolution and toc depth-degradation disclosure.
+# --------------------------------------------------------------------------- #
+def _deep_bill_xml(divs: int, titles: int, secs: int) -> bytes:
+    # divs*titles*secs sections at depth 3; divs + divs*titles container nodes above.
+    body = []
+    for d in range(divs):
+        titles_xml = []
+        for t in range(titles):
+            secs_xml = "".join(
+                f"<section><enum>{s}</enum><header>Sec {d}.{t}.{s}</header><text>x</text></section>"
+                for s in range(secs)
+            )
+            titles_xml.append(f"<title><enum>{t}</enum><header>Title {t}</header>{secs_xml}</title>")
+        body.append(f"<division><enum>{d}</enum><header>Div {d}</header>{''.join(titles_xml)}</division>")
+    return ("<bill><legis-body>" + "".join(body) + "</legis-body></bill>").encode()
+
+
+def test_synthetic_pre_rc_units_resolve_and_navigate():
+    # V5 gap 1: preamble/resolving-clause units carry synthetic ids (PRE:/RC:). They must
+    # be resolvable by get_bill_section's addresser and appear in the toc, or a whereas
+    # clause a search surfaces cannot be retrieved.
+    parsed = parse_fixture("hres_trimmed.xml")  # PRE:1, PRE:2, RC:1
+    ids = [u.section_id for u in parsed.units]
+    assert "PRE:1" in ids and "RC:1" in ids
+    for sid in ("PRE:1", "RC:1"):
+        unit = _resolve_unit(parsed.units, sid)
+        assert not isinstance(unit, dict), f"{sid} failed to resolve: {unit}"
+        assert unit.section_id == sid
+        assert node_kind_for(sid) == "synthetic"
+    root_ids = [n.section_id for n in _toc_nodes(parsed.units, 5, parsed.subtree_bytes)[0]]
+    assert "PRE:1" in root_ids and "RC:1" in root_ids
+
+
+def test_get_bill_section_retrieves_synthetic_unit_end_to_end():
+    # V5 gap 1, through the tool: resolving RC:1 must return its text with node_kind synthetic.
+    import asyncio
+    from unittest.mock import patch
+
+    import congress_api.features.bill_text.tools as tools
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.index import BillTextIndex
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    parsed = parse_fixture("hres_trimmed.xml")
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText("BILLS-119hres463ih", "ih", "t", None, None, b""),
+        parsed=parsed, index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, *a, **k):
+        return loaded
+
+    with patch.object(tools, "load_bill_text", new=fake_load):
+        res = asyncio.run(tools.get_bill_section(
+            object(), congress=119, bill_type="hres", number=463, section_id="RC:1"))
+    assert res.get("section_id") == "RC:1"
+    assert res.get("node_kind") == "synthetic"
+    assert res.get("text", "").strip()
+
+
+def test_toc_hidden_advice_promises_depth_only_when_servable():
+    # V5 gap 2: when the depth ARGUMENT is what hides sections and the full tree still
+    # fits under the node cap, advise the reachable depth.
+    parsed = parse_bill_xml(_deep_bill_xml(2, 2, 2), "BILLS-119s1071enr", "enr", None)  # tiny, 8 sections
+    toc, capped, actual = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
+    assert not capped and actual == 2
+    note = _hidden_section_note(parsed.units, actual, 2, parsed.subtree_bytes)
+    assert note and "call with depth=3" in note  # depth 3 is servable, so promise it
+
+
+def test_toc_hidden_advice_does_not_recommend_a_depth_the_node_cap_blocks():
+    # V5 gap 2, the actual defect: when the 500-NODE CAP (not the depth arg) hides the
+    # sections, advising "call with depth=N" is circular -- that call re-caps to the same
+    # tree. 2*10*30 = 600 sections exceed 500 at depth 3, forcing degradation to depth 2.
+    parsed = parse_bill_xml(_deep_bill_xml(2, 10, 30), "BILLS-119s1071enr", "enr", None)
+    toc, capped, actual = _toc_nodes(parsed.units, 5, parsed.subtree_bytes)
+    assert capped and actual < 3  # the cap forced a depth shallower than the sections
+    note = _hidden_section_note(parsed.units, actual, 5, parsed.subtree_bytes)
+    assert note is not None
+    required = _max_section_depth(parsed.units)
+    assert f"call with depth={required}" not in note   # would be circular
+    assert "search_bill_text" in note and "deepest listable depth" in note
