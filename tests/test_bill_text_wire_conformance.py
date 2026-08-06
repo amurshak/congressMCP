@@ -230,3 +230,46 @@ def test_conformance_fields_are_the_ones_that_matter(missing):
         "toc": _call(tools.get_bill_toc, congress=119, bill_type="s", number=1071, depth=5),
     }
     assert missing in shapes[missing]
+
+
+def test_bill_text_only_env_parsing(monkeypatch):
+    import congress_api.mcp_server as srv
+
+    monkeypatch.delenv("CONGRESSMCP_BILL_TEXT_ONLY", raising=False)
+    assert srv._bill_text_only() is False
+    for val in ("1", "true", "YES", "on"):
+        monkeypatch.setenv("CONGRESSMCP_BILL_TEXT_ONLY", val)
+        assert srv._bill_text_only() is True
+    for val in ("", "0", "false", "no"):
+        monkeypatch.setenv("CONGRESSMCP_BILL_TEXT_ONLY", val)
+        assert srv._bill_text_only() is False
+
+
+def test_bill_text_only_isolation_registers_just_the_three():
+    # The three tools are self-sufficient (version resolution + GovInfo fetch are
+    # internal), so CONGRESSMCP_BILL_TEXT_ONLY yields a standalone bill-text server.
+    # Run in a fresh interpreter: tool registration accumulates on the module singleton,
+    # so isolation can only be asserted from a clean process.
+    import os
+    import subprocess
+    import sys
+    import textwrap
+
+    repo = Path(__file__).resolve().parent.parent
+    script = textwrap.dedent(
+        """
+        import asyncio
+        from congress_api.mcp_server import initialize_mcp_features, mcp
+        initialize_mcp_features()
+        async def main():
+            print("TOOLS:" + ",".join(sorted(t.name for t in await mcp.list_tools())))
+        asyncio.run(main())
+        """
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True, text=True, cwd=str(repo),
+        env={**os.environ, "CONGRESSMCP_BILL_TEXT_ONLY": "1"},
+    )
+    line = next((l for l in result.stdout.splitlines() if l.startswith("TOOLS:")), None)
+    assert line == "TOOLS:get_bill_section,get_bill_toc,search_bill_text", result.stdout + result.stderr
