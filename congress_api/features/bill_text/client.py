@@ -112,14 +112,30 @@ async def resolve_and_fetch_bill_text(
         )
 
     candidates = order_versions(versions)
-    # When no code carries a known precedence, order_versions falls back to
-    # date-primary; disclose that the "latest" pick rests on dates alone (spec §3).
+    # Surface version-resolution uncertainty to the CALLER (a model), not only the
+    # operator log, whenever the list held an unrecognized code (spec §3). The WARNING
+    # in order_versions is the operator signal; this note is the consumer signal --
+    # both, because a model answering from a silently-older version is a wrong answer
+    # inside a success envelope, the worst failure class.
+    unknown_codes = sorted({item.code for item in versions if item.code not in VERSION_PRECEDENCE})
     base_note = None
     if versions and all(item.code not in VERSION_PRECEDENCE for item in versions):
+        # Every code unknown -> order_versions fell back to date-primary; the whole
+        # "latest" pick rests on dates alone.
         base_note = (
             "No known version-precedence codes among the listed versions; "
             "ordered by date alone, so 'latest' may be unreliable. Pass an explicit "
             "version= to bypass."
+        )
+    elif unknown_codes:
+        # Some codes unknown -> they got precedence 0 and sorted LAST. If one denotes a
+        # newer stage than the chosen version, a genuinely older version just won. Unlike
+        # the all-unknown case this otherwise resolves silently, so §3 requires disclosing
+        # it to the caller by name -- this is the more dangerous asymmetry, now closed.
+        base_note = (
+            f"Unrecognized version code(s) {unknown_codes} were listed and sorted last; "
+            f"if one denotes a newer stage than '{candidates[0].code}', this may not be the "
+            "latest version. Pass an explicit version= to override."
         )
     errors = []
     for candidate in candidates:

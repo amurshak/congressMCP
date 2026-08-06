@@ -872,6 +872,48 @@ async def test_resolve_versions_falls_back_only_when_congress_unavailable(monkey
     assert exc.value.code == "bill_not_found" and called["search"] == 1  # unchanged
 
 
+@pytest.mark.asyncio
+async def test_resolve_notes_partial_unknown_code_to_the_caller(monkeypatch):
+    # §3 ruling: an unrecognized code sorts last, so if it marks a newer stage a
+    # genuinely older version wins -- a wrong answer inside a success envelope. The
+    # all-unknown case already noted date-primary; the partial case was silent to the
+    # caller (loud only in the operator log). The note now names the unknown code
+    # whenever version=None and ANY code is unrecognized -- and stays silent otherwise.
+    import congress_api.features.bill_text.client as client_mod
+
+    async def fake_fetch(package_id):
+        return ("2025-01-01T00:00:00Z", b"<bill><legis-body/></bill>")
+
+    monkeypatch.setattr(client_mod, "fetch_govinfo_package", fake_fetch)
+
+    async def with_unknown(ctx, c, t, n):
+        return [
+            TextVersion(code="enr", date="2025-01-01", type_label="Enrolled"),
+            TextVersion(code="zq", date="2099-01-01", type_label="Future GPO code"),
+        ]
+
+    monkeypatch.setattr(client_mod, "congress_text_versions", with_unknown)
+    resolved = await client_mod.resolve_and_fetch_bill_text(None, 119, "s", 1071, None)
+    assert resolved.version == "enr"                              # known beats unknown
+    assert resolved.version_resolution_note is not None
+    assert "zq" in resolved.version_resolution_note              # names the unknown code
+    assert "enr" in resolved.version_resolution_note            # relative to the chosen version
+
+    # all codes known -> no note (no uncertainty to disclose)
+    async def all_known(ctx, c, t, n):
+        return [TextVersion(code="enr", date="2025-01-01", type_label="Enrolled"),
+                TextVersion(code="is", date="2024-01-01", type_label="Introduced")]
+
+    monkeypatch.setattr(client_mod, "congress_text_versions", all_known)
+    r2 = await client_mod.resolve_and_fetch_bill_text(None, 119, "s", 1071, None)
+    assert r2.version == "enr" and r2.version_resolution_note is None
+
+    # caller named a version -> resolution made no choice -> the note would be noise
+    monkeypatch.setattr(client_mod, "congress_text_versions", with_unknown)
+    r3 = await client_mod.resolve_and_fetch_bill_text(None, 119, "s", 1071, "enr")
+    assert r3.version == "enr" and r3.version_resolution_note is None
+
+
 @pytest.mark.skipif(not os.getenv("CONGRESSMCP_LIVE_ACCEPTANCE"), reason="live GovInfo/Congress.gov acceptance is opt-in")
 def test_live_acceptance_placeholder():
     pytest.skip("Run V1-V12 manually with CONGRESSMCP_LIVE_ACCEPTANCE and record findings in the README/PR.")
