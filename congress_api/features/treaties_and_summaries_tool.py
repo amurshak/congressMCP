@@ -10,6 +10,7 @@ from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from ..mcp_app import mcp
+from ..core.operation_routing import validate_operation_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -20,20 +21,25 @@ async def route_treaties_summaries_operation(ctx: Context, operation: str, **kwa
     # Summary operations
     if operation == "search_summaries":
         from .summaries import search_summaries
+        validate_operation_kwargs(search_summaries, kwargs, operation)
         return await search_summaries(ctx, **kwargs)
 
     # Treaty operations
     elif operation == "search_treaties":
         from .treaties import search_treaties
+        validate_operation_kwargs(search_treaties, kwargs, operation)
         return await search_treaties(ctx, **kwargs)
     elif operation == "get_treaty_actions":
         from .treaties import get_treaty_actions
+        validate_operation_kwargs(get_treaty_actions, kwargs, operation)
         return await get_treaty_actions(ctx, **kwargs)
     elif operation == "get_treaty_committees":
         from .treaties import get_treaty_committees
+        validate_operation_kwargs(get_treaty_committees, kwargs, operation)
         return await get_treaty_committees(ctx, **kwargs)
     elif operation == "get_treaty_text":
         from .treaties import get_treaty_text
+        validate_operation_kwargs(get_treaty_text, kwargs, operation)
         return await get_treaty_text(ctx, **kwargs)
 
     else:
@@ -53,6 +59,7 @@ async def treaties_and_summaries(
     # Search and filtering
     keywords: Optional[str] = None,
     topic: Optional[str] = None,
+    bill_type: Optional[str] = None,
     limit: Optional[int] = None,
     sort: Optional[str] = None,
     format: Optional[str] = None,
@@ -88,6 +95,7 @@ async def treaties_and_summaries(
         treaty_suffix: Treaty suffix identifier
         keywords: Search keywords for content
         topic: Topic filter for summaries
+        bill_type: Bill type filter for summaries (e.g., 'hr', 's')
         limit: Results limit (max 250 for API compliance)
         sort: updateDate+desc (newest first) or updateDate+asc
         fromDateTime/toDateTime: Date range (YYYY-MM-DDTHH:MM:SSZ)
@@ -104,6 +112,7 @@ async def treaties_and_summaries(
             'treaty_suffix': treaty_suffix,
             'keywords': keywords,
             'topic': topic,
+            'bill_type': bill_type,
             'limit': limit,
             'sort': sort,
             'format': format,

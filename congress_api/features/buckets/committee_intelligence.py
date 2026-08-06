@@ -10,6 +10,7 @@ from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from ...mcp_app import mcp
+from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import CommitteeIntelligenceResponse, CommitteeActivitySummary
 from ...utils.response_converters import _extract_result_count
 
@@ -98,82 +99,101 @@ async def route_committee_intelligence_operation(ctx: Context, operation: str, *
     # Committee report operations
     if operation == "get_latest_committee_reports":
         from ..committee_reports import get_latest_committee_reports
+        validate_operation_kwargs(get_latest_committee_reports, kwargs, operation)
         raw_response = await get_latest_committee_reports(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_reports_by_congress":
         from ..committee_reports import get_committee_reports_by_congress
+        validate_operation_kwargs(get_committee_reports_by_congress, kwargs, operation)
         raw_response = await get_committee_reports_by_congress(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_reports_by_congress_and_type":
         from ..committee_reports import get_committee_reports_by_congress_and_type
+        validate_operation_kwargs(get_committee_reports_by_congress_and_type, kwargs, operation)
         raw_response = await get_committee_reports_by_congress_and_type(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_report_details":
         from ..committee_reports import get_committee_report_details
+        validate_operation_kwargs(get_committee_report_details, kwargs, operation)
         raw_response = await get_committee_report_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_report_text_versions":
         from ..committee_reports import get_committee_report_text_versions
+        validate_operation_kwargs(get_committee_report_text_versions, kwargs, operation)
         raw_response = await get_committee_report_text_versions(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_report_content":
         from ..committee_reports import get_committee_report_content
+        validate_operation_kwargs(get_committee_report_content, kwargs, operation)
         raw_response = await get_committee_report_content(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_committee_reports":
         from ..committee_reports import search_committee_reports
+        validate_operation_kwargs(search_committee_reports, kwargs, operation)
         raw_response = await search_committee_reports(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
     # Committee print operations
     elif operation == "get_latest_committee_prints":
         from ..committee_prints import get_latest_committee_prints
+        validate_operation_kwargs(get_latest_committee_prints, kwargs, operation)
         raw_response = await get_latest_committee_prints(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_prints_by_congress":
         from ..committee_prints import get_committee_prints_by_congress
+        validate_operation_kwargs(get_committee_prints_by_congress, kwargs, operation)
         raw_response = await get_committee_prints_by_congress(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_prints_by_congress_and_chamber":
         from ..committee_prints import get_committee_prints_by_congress_and_chamber
+        validate_operation_kwargs(get_committee_prints_by_congress_and_chamber, kwargs, operation)
         raw_response = await get_committee_prints_by_congress_and_chamber(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_print_details":
         from ..committee_prints import get_committee_print_details
+        validate_operation_kwargs(get_committee_print_details, kwargs, operation)
         raw_response = await get_committee_print_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_print_text_versions":
         from ..committee_prints import get_committee_print_text_versions
+        validate_operation_kwargs(get_committee_print_text_versions, kwargs, operation)
         raw_response = await get_committee_print_text_versions(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_committee_prints":
         from ..committee_prints import search_committee_prints
+        validate_operation_kwargs(search_committee_prints, kwargs, operation)
         raw_response = await search_committee_prints(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
     # Committee meeting operations
     elif operation == "get_latest_committee_meetings":
         from ..committee_meetings import get_latest_committee_meetings
+        validate_operation_kwargs(get_latest_committee_meetings, kwargs, operation)
         raw_response = await get_latest_committee_meetings(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_meetings_by_congress":
         from ..committee_meetings import get_committee_meetings_by_congress
+        validate_operation_kwargs(get_committee_meetings_by_congress, kwargs, operation)
         raw_response = await get_committee_meetings_by_congress(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_meetings_by_congress_and_chamber":
         from ..committee_meetings import get_committee_meetings_by_congress_and_chamber
+        validate_operation_kwargs(get_committee_meetings_by_congress_and_chamber, kwargs, operation)
         raw_response = await get_committee_meetings_by_congress_and_chamber(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_meetings_by_committee":
         from ..committee_meetings import get_committee_meetings_by_committee
+        validate_operation_kwargs(get_committee_meetings_by_committee, kwargs, operation)
         raw_response = await get_committee_meetings_by_committee(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "get_committee_meeting_details":
         from ..committee_meetings import get_committee_meeting_details
+        validate_operation_kwargs(get_committee_meeting_details, kwargs, operation)
         raw_response = await get_committee_meeting_details(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
     elif operation == "search_committee_meetings":
         from ..committee_meetings import search_committee_meetings
+        validate_operation_kwargs(search_committee_meetings, kwargs, operation)
         raw_response = await search_committee_meetings(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 

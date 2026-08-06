@@ -690,23 +690,23 @@ async def search_treaties(
     ctx: Context,
     congress: Optional[int] = None,
     topic: Optional[str] = None,
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None,
+    fromDateTime: Optional[str] = None,
+    toDateTime: Optional[str] = None,
     limit: int = 10
 ) -> str:
     """
     Search for treaties based on various criteria.
-    
+
     Args:
         congress: Optional Congress number (e.g., 117).
         topic: Optional topic to filter by (e.g., "Maritime Boundaries").
-        from_date: Optional start date for filtering by update date (format: YYYY-MM-DDT00:00:00Z).
-        to_date: Optional end date for filtering by update date (format: YYYY-MM-DDT00:00:00Z).
+        fromDateTime: Optional start date for filtering by update date (format: YYYY-MM-DDT00:00:00Z).
+        toDateTime: Optional end date for filtering by update date (format: YYYY-MM-DDT00:00:00Z).
         limit: Maximum number of results to return (default: 10).
     """
 
-    logger.debug(f"Searching for treaties with congress: {congress}, topic: {topic}, from_date: {from_date}, to_date: {to_date}, limit: {limit}")
-    
+    logger.debug(f"Searching for treaties with congress: {congress}, topic: {topic}, fromDateTime: {fromDateTime}, toDateTime: {toDateTime}, limit: {limit}")
+
     try:
         # Validate parameters
         if congress:
@@ -719,19 +719,19 @@ async def search_treaties(
                     suggestions=congress_validation.suggestions
                 )
                 return format_error_response(error_response)
-        
+
         # Set up parameters for the API request
         params = {
             'format': 'json',
             'limit': limit
         }
-        
+
         # Add optional parameters if provided
-        if from_date:
-            params['fromDateTime'] = from_date
-        
-        if to_date:
-            params['toDateTime'] = to_date
+        if fromDateTime:
+            params['fromDateTime'] = fromDateTime
+
+        if toDateTime:
+            params['toDateTime'] = toDateTime
         
         # Determine the endpoint based on whether a congress is provided
         endpoint = "/treaty"

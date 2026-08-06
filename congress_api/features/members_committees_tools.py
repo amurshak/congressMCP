@@ -26,21 +26,25 @@ async def search_members(
     state: Optional[str] = None,
     party: Optional[str] = None,
     chamber: Optional[str] = None,
+    congress: Optional[int] = None,
     current_member: Optional[bool] = None,
-    limit: int = 20
+    limit: int = 20,
+    district: Optional[int] = None
 ) -> MembersCommitteesResponse:
     """
     Search for members of Congress by various criteria.
-    
+
     Args:
         ctx: Context for API requests
         name: Member name to search for (partial matches supported)
         state: State code (e.g., 'CA', 'NY', 'TX')
         party: Political party ('D', 'R', 'I')
         chamber: Chamber ('House' or 'Senate')
+        congress: Congress number (e.g., 117)
         current_member: Whether to only show current members (True/False)
         limit: Maximum number of results to return
-    
+        district: District number within the state (e.g., 10)
+
     Returns:
         Structured response with member information and metadata
     """
@@ -52,8 +56,10 @@ async def search_members(
             state=state,
             party=party,
             chamber=chamber,
+            congress=congress,
             current_member=current_member,
-            limit=limit
+            limit=limit,
+            district=district
         )
         return convert_members_committees_response(raw_response, "search_members")
     except Exception as e:
@@ -109,16 +115,18 @@ async def get_member_details(
 async def get_member_sponsored_legislation(
     ctx: Context,
     bioguide_id: str,
-    limit: int = 20
+    limit: int = 20,
+    offset: int = 0
 ) -> MembersCommitteesResponse:
     """
     Get legislation sponsored by a specific member of Congress.
-    
+
     Args:
         ctx: Context for API requests
         bioguide_id: Unique bioguide identifier for the member
         limit: Maximum number of sponsored bills to return
-    
+        offset: Zero-based offset for pagination
+
     Returns:
         List of bills and resolutions sponsored by the member
     """
@@ -127,7 +135,8 @@ async def get_member_sponsored_legislation(
         raw_response = await _get_member_sponsored_legislation(
             ctx,
             bioguide_id=bioguide_id,
-            limit=limit
+            limit=limit,
+            offset=offset
         )
         return convert_members_committees_response(raw_response, "get_member_sponsored_legislation")
     except Exception as e:
@@ -149,16 +158,18 @@ async def get_member_sponsored_legislation(
 async def get_member_cosponsored_legislation(
     ctx: Context,
     bioguide_id: str,
-    limit: int = 20
+    limit: int = 20,
+    offset: int = 0
 ) -> MembersCommitteesResponse:
     """
     Get legislation cosponsored by a specific member of Congress.
-    
+
     Args:
         ctx: Context for API requests
         bioguide_id: Unique bioguide identifier for the member
         limit: Maximum number of cosponsored bills to return
-    
+        offset: Zero-based offset for pagination
+
     Returns:
         List of bills and resolutions cosponsored by the member
     """
@@ -167,7 +178,8 @@ async def get_member_cosponsored_legislation(
         raw_response = await _get_member_cosponsored_legislation(
             ctx,
             bioguide_id=bioguide_id,
-            limit=limit
+            limit=limit,
+            offset=offset
         )
         return convert_members_committees_response(raw_response, "get_member_cosponsored_legislation")
     except Exception as e:
@@ -319,17 +331,19 @@ async def get_members_by_congress_state_district(
     ctx: Context,
     congress: int,
     state_code: str,
-    district: int
+    district: int,
+    current_member: bool = True
 ) -> MembersCommitteesResponse:
     """
     Get the member representing a specific congressional district in a specific Congress.
-    
+
     Args:
         ctx: Context for API requests
         congress: Congress number (e.g., 118 for 118th Congress)
         state_code: Two-letter state code (e.g., 'CA', 'TX', 'NY')
         district: Congressional district number within the state
-    
+        current_member: Whether to only include current members (default: True)
+
     Returns:
         Member who represented the specified district in the specified Congress
     """
@@ -339,6 +353,7 @@ async def get_members_by_congress_state_district(
             ctx,
             congress=congress,
             state_code=state_code,
+            current_member=current_member,
             district=district
         )
         return convert_members_committees_response(raw_response, "get_members_by_congress_state_district")

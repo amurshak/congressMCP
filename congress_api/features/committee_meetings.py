@@ -299,14 +299,13 @@ Committee code requested: {committee_code}"""
         return format_error_response(CommonErrors.api_server_error("committee meetings"))
 
 # @require_paid_access
-async def get_committee_meeting_details(ctx: Context, congress: int, chamber: str, committee_code: str, event_id: int) -> str:
+async def get_committee_meeting_details(ctx: Context, congress: int, chamber: str, event_id: int) -> str:
     """
     Get detailed information about a specific committee meeting.
-    
+
     Args:
         congress: The Congress number (e.g., 117).
         chamber: The chamber name (e.g., "house", "senate").
-        committee_code: The committee system code (e.g., "hsag00").
         event_id: The event ID for the meeting.
     """
     try:

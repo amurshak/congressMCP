@@ -421,8 +421,8 @@ async def search_committee_reports(
     conference: Optional[str] = None,
     offset: Optional[int] = None,
     limit: Optional[int] = None,
-    fromDateTime: Optional[str] = None,
-    toDateTime: Optional[str] = None
+    from_date_time: Optional[str] = None,
+    to_date_time: Optional[str] = None
 ) -> str:
     """
     Search for committee reports based on various criteria.
@@ -431,68 +431,69 @@ async def search_committee_reports(
         conference: Filter by conference reports (true or false).
         offset: The starting record for pagination.
         limit: The number of records to return (max 250).
-        fromDateTime: Start date for filtering by update date (YYYY-MM-DDT00:00:00Z).
-        toDateTime: End date for filtering by update date (YYYY-MM-DDT00:00:00Z).
+        from_date_time: Start date for filtering by update date (YYYY-MM-DDT00:00:00Z).
+        to_date_time: End date for filtering by update date (YYYY-MM-DDT00:00:00Z).
     """
     logger.debug(f"Searching committee reports with criteria: conference={conference}, offset={offset}, limit={limit}")
-    
+
     # Validate parameters
     params = {}
-    
+
     if conference is not None:
         conference_validation = ParameterValidator.validate_conference_filter(conference)
         if not conference_validation.is_valid:
             logger.warning(f"Invalid conference parameter: {conference}")
             return format_error_response(CommonErrors.invalid_parameter(
-                "conference", 
-                conference, 
+                "conference",
+                conference,
                 conference_validation.error_message
             ))
         params['conference'] = conference
-    
+
     if offset is not None:
         offset_validation = ParameterValidator.validate_offset(offset)
         if not offset_validation.is_valid:
             logger.warning(f"Invalid offset parameter: {offset}")
             return format_error_response(CommonErrors.invalid_parameter(
-                "offset", 
-                offset, 
+                "offset",
+                offset,
                 offset_validation.error_message
             ))
         params['offset'] = offset
-    
+
     if limit is not None:
         limit_validation = ParameterValidator.validate_limit_range(limit, max_limit=250)
         if not limit_validation.is_valid:
             logger.warning(f"Invalid limit parameter: {limit}")
             return format_error_response(CommonErrors.invalid_parameter(
-                "limit", 
-                limit, 
+                "limit",
+                limit,
                 limit_validation.error_message
             ))
         params['limit'] = limit
-    
-    if fromDateTime is not None:
-        from_date_validation = ParameterValidator.validate_date_format(fromDateTime)
+
+    if from_date_time is not None:
+        from_date_validation = ParameterValidator.validate_date_format(from_date_time)
         if not from_date_validation.is_valid:
-            logger.warning(f"Invalid fromDateTime parameter: {fromDateTime}")
+            logger.warning(f"Invalid from_date_time parameter: {from_date_time}")
             return format_error_response(CommonErrors.invalid_parameter(
-                "fromDateTime", 
-                fromDateTime, 
+                "from_date_time",
+                from_date_time,
                 from_date_validation.error_message
             ))
-        params['fromDateTime'] = fromDateTime
-    
-    if toDateTime is not None:
-        to_date_validation = ParameterValidator.validate_date_format(toDateTime)
+        # fromDateTime is the wire format Congress.gov's API expects.
+        params['fromDateTime'] = from_date_time
+
+    if to_date_time is not None:
+        to_date_validation = ParameterValidator.validate_date_format(to_date_time)
         if not to_date_validation.is_valid:
-            logger.warning(f"Invalid toDateTime parameter: {toDateTime}")
+            logger.warning(f"Invalid to_date_time parameter: {to_date_time}")
             return format_error_response(CommonErrors.invalid_parameter(
-                "toDateTime", 
-                toDateTime, 
+                "to_date_time",
+                to_date_time,
                 to_date_validation.error_message
             ))
-        params['toDateTime'] = toDateTime
+        params['toDateTime'] = to_date_time
     
     try:
         data = await safe_congressional_request("/committee-report", ctx, params, endpoint_type='committee-reports')

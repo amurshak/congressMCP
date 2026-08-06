@@ -471,20 +471,20 @@ async def search_summaries(
     bill_type: Optional[str] = None,
     limit: int = 10,
     sort: str = "updateDate+desc",
-    from_date: Optional[str] = None,
-    to_date: Optional[str] = None
+    fromDateTime: Optional[str] = None,
+    toDateTime: Optional[str] = None
 ) -> str:
     """
     Search for bill summaries based on keywords.
-    
+
     Args:
         keywords: Keywords to search for in bill summaries
         congress: Optional Congress number (e.g., 117 for 117th Congress)
         bill_type: Optional bill type (e.g., 'hr' for House Bill, 's' for Senate Bill)
         limit: Maximum number of results to return (default: 10)
         sort: Sort order (default: "updateDate+desc")
-        from_date: Optional start date for filtering (format: YYYY-MM-DDT00:00:00Z)
-        to_date: Optional end date for filtering (format: YYYY-MM-DDT00:00:00Z)
+        fromDateTime: Optional start date for filtering (format: YYYY-MM-DDT00:00:00Z)
+        toDateTime: Optional end date for filtering (format: YYYY-MM-DDT00:00:00Z)
     """
     logger.info(f"Searching for summaries with keywords: {keywords}")
     
@@ -516,18 +516,18 @@ async def search_summaries(
                 )
         
         # Validate date formats if provided
-        if from_date is not None:
-            date_validation = ParameterValidator.validate_date_format(from_date)
+        if fromDateTime is not None:
+            date_validation = ParameterValidator.validate_date_format(fromDateTime)
             if not date_validation.is_valid:
                 return format_error_response(
-                    CommonErrors.invalid_parameter("from_date", from_date, date_validation.error_message, date_validation.suggestions)
+                    CommonErrors.invalid_parameter("fromDateTime", fromDateTime, date_validation.error_message, date_validation.suggestions)
                 )
-        
-        if to_date is not None:
-            date_validation = ParameterValidator.validate_date_format(to_date)
+
+        if toDateTime is not None:
+            date_validation = ParameterValidator.validate_date_format(toDateTime)
             if not date_validation.is_valid:
                 return format_error_response(
-                    CommonErrors.invalid_parameter("to_date", to_date, date_validation.error_message, date_validation.suggestions)
+                    CommonErrors.invalid_parameter("toDateTime", toDateTime, date_validation.error_message, date_validation.suggestions)
                 )
         
         # Build API request parameters
@@ -538,10 +538,10 @@ async def search_summaries(
         }
         
         # Add optional date filters if provided
-        if from_date:
-            params["fromDateTime"] = from_date
-        if to_date:
-            params["toDateTime"] = to_date
+        if fromDateTime:
+            params["fromDateTime"] = fromDateTime
+        if toDateTime:
+            params["toDateTime"] = toDateTime
         
         # Build endpoint
         endpoint = "/summaries"
