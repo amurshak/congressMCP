@@ -871,6 +871,31 @@ def _deep_bill_xml(divs: int, titles: int, secs: int) -> bytes:
     return ("<bill><legis-body>" + "".join(body) + "</legis-body></bill>").encode()
 
 
+def test_subdivide_disambiguates_colliding_subsection_enums():
+    # V8: 116hr6395 s.1832 really ships two subsection "(e)"s (different content). Without
+    # disambiguation they share an id; _resolve_unit and get_bill_section's child_by_id
+    # dict-overwrite, so the first is unreachable and its text is dropped from the
+    # assembled section. The subdivision path must #-suffix collisions like _node_for.
+    filler = ("word " * 1000).strip().encode()  # ~5KB each -> section subdivides
+    xml = (
+        b"<bill><legis-body><section><enum>1832.</enum><header>Dup</header>"
+        b"<subsection><enum>(e)</enum><header>first e</header><text>" + filler + b"</text></subsection>"
+        b"<subsection><enum>(e)</enum><header>second e</header><text>" + filler + b"</text></subsection>"
+        b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    ids = [u.section_id for u in parsed.units]
+    assert len(ids) == len(set(ids)), f"duplicate ids: {ids}"
+    assert "S:1832./SS:(e)" in ids and "S:1832./SS:(e)#2" in ids
+    first = _resolve_unit(parsed.units, "S:1832./SS:(e)")
+    second = _resolve_unit(parsed.units, "S:1832./SS:(e)#2")
+    assert not isinstance(first, dict) and not isinstance(second, dict)
+    assert first.header == "first e" and second.header == "second e"   # both reachable, distinct
+    parent = next(u for u in parsed.units if u.section_id == "S:1832.")
+    assert parent.child_ids.count("S:1832./SS:(e)") == 1                 # not duplicated
+    assert "S:1832./SS:(e)#2" in parent.child_ids                        # both assembled
+
+
 def test_synthetic_pre_rc_units_resolve_and_navigate():
     # V5 gap 1: preamble/resolving-clause units carry synthetic ids (PRE:/RC:). They must
     # be resolvable by get_bill_section's addresser and appear in the toc, or a whereas

@@ -193,6 +193,13 @@ _AVAILABLE = list(_available())
 def test_corpus_invariants(entry, path):
     data = path.read_bytes()
     assert hashlib.sha256(data).hexdigest() == entry["sha256"], f"{entry['package_id']} hash mismatch vs manifest"
-    _parsed, leaks, orphans = audit(data, entry["package_id"], entry["version"])
+    parsed, leaks, orphans = audit(data, entry["package_id"], entry["version"])
     assert not leaks, f"{entry['package_id']}: {len(leaks)} unit-source element(s) inside quoted material"
     assert not orphans, f"{entry['package_id']}: {len(orphans)} orphaned child(ren) dropped by subdivision"
+    # V8: every section_id must be unique -- a collision makes one unit unreachable
+    # (dict-overwrite in _resolve_unit / child_by_id) and drops its text from the
+    # assembled section. 116hr6395 s.1832 ships two subsection "(e)"s; without #-suffix
+    # disambiguation this fires.
+    ids = [u.section_id for u in parsed.units]
+    dupes = sorted({i for i in ids if ids.count(i) > 1})
+    assert not dupes, f"{entry['package_id']}: duplicate section_ids {dupes}"

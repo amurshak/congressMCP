@@ -442,8 +442,17 @@ class _Chunker:
                 continue
             units = []
             typ = SUBDIV_CODE[child_name]
+            # Disambiguate colliding sibling enums exactly as _node_for does for the
+            # structural path: bills contain genuine duplicate subdivision letters
+            # (e.g. 116hr6395 s.1832 has two subsection "(e)"s), and without the #{n}
+            # suffix the two units share an id -- _resolve_unit and get_bill_section's
+            # child_by_id then dict-overwrite, making the first unreachable and dropping
+            # its text from the assembled section. Local to one section's children.
+            sibling_counts: dict[str, int] = {}
             for idx, child in enumerate(child_elems, start=1):
-                enum = direct_text(child, "enum") or str(idx)
+                base_enum = direct_text(child, "enum") or str(idx)
+                sibling_counts[base_enum] = sibling_counts.get(base_enum, 0) + 1
+                enum = base_enum if sibling_counts[base_enum] == 1 else f"{base_enum}#{sibling_counts[base_enum]}"
                 node = AncestorNode(type=typ, enum=enum, header=direct_text(child, "header"))
                 child_id = "/".join([*(f"{item.type}:{item.enum}" for item in path), f"{node.type}:{node.enum}"])
                 child_unit = Unit(child_id, path, node.header, extract_segments(child, node.header))
