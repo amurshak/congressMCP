@@ -739,20 +739,20 @@ async def test_tool_wrappers_build_responses_without_network(monkeypatch):
 
     monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
 
-    toc = await tools_mod.get_bill_toc(None, 119, "s", 1071, depth=2)
+    toc = await tools_mod.get_bill_toc(None, congress=119, bill_type="s", number=1071, depth=2)
     assert "error" not in toc and toc["toc"]
     # Fixture sections sit at depth 3, so a depth-2 TOC must disclose the hidden
     # level rather than assert completeness.
     assert toc["toc_truncated"] is True
     assert "depth=3" in toc["toc_note"]
 
-    search = await tools_mod.search_bill_text(None, 119, "s", 1071, ["icebreaker"], max_hits=999)
+    search = await tools_mod.search_bill_text(None, congress=119, bill_type="s", number=1071, queries=["icebreaker"], max_hits=999)
     assert "error" not in search and search["hits"]
     assert "clamped to 50" in search["version_resolution_note"]  # clamp note still merges
     assert search["timing"]["search_ms"] is not None and search["timing"]["total_ms"] >= 0
     assert toc["timing"]["search_ms"] is None  # no search phase for toc
 
-    section = await tools_mod.get_bill_section(None, 119, "s", 1071, search["hits"][0]["section_id"])
+    section = await tools_mod.get_bill_section(None, congress=119, bill_type="s", number=1071, section_id=search["hits"][0]["section_id"])
     assert "error" not in section and section["text"]
 
 
@@ -783,7 +783,7 @@ async def test_get_bill_section_concatenates_subdivided_section_when_it_fits(mon
     assert parent.child_ids and parent.byte_length < 200  # intro only
 
     # Whole section fits the 25 KB default -> assembled at read time, not truncated.
-    whole = await tools_mod.get_bill_section(None, 119, "s", 1071, "S:1")
+    whole = await tools_mod.get_bill_section(None, congress=119, bill_type="s", number=1071, section_id="S:1")
     assert whole["truncated"] is False
     # byte_length is the unit's own clean size (intro), not the payload (spec §9);
     # the real content shows up in subtree_byte_length and in text.
@@ -793,7 +793,7 @@ async def test_get_bill_section_concatenates_subdivided_section_when_it_fits(mon
     assert len(whole["text"]) >= 8000  # both subsections concatenated into the payload
 
     # A tiny max_bytes forces the header+intro + child-descriptor path.
-    partial = await tools_mod.get_bill_section(None, 119, "s", 1071, "S:1", max_bytes=1000)
+    partial = await tools_mod.get_bill_section(None, congress=119, bill_type="s", number=1071, section_id="S:1", max_bytes=1000)
     assert partial["truncated"] is True
     assert [c["section_id"] for c in partial["children"]] == ["S:1/SS:(a)", "S:1/SS:(b)"]
     assert partial["byte_length"] <= 1000
@@ -810,7 +810,7 @@ async def test_tool_wrapper_catches_and_logs_unexpected_errors(monkeypatch, capl
 
     monkeypatch.setattr(tools_mod, "load_bill_text", boom)
     with caplog.at_level(logging.ERROR):
-        result = await tools_mod.get_bill_toc(None, 119, "s", 1071)
+        result = await tools_mod.get_bill_toc(None, congress=119, bill_type="s", number=1071)
     assert result["error"]["code"] == "internal_error"
     assert "RuntimeError" in result["error"]["message"]
     # Full traceback is logged (to stderr -> the MCP server log), not swallowed.

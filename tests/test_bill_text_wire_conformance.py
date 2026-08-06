@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import ast
 import asyncio
+import inspect
 from pathlib import Path
 from unittest.mock import patch
 
@@ -158,6 +159,18 @@ def test_bill_text_never_imports_shared_response_converters():
         "bill_text imports the shared response converter -- D2's serializer. Build the "
         f"response models directly instead: {offenders}"
     )
+
+
+@pytest.mark.parametrize("fn", [tools.search_bill_text, tools.get_bill_section, tools.get_bill_toc])
+def test_new_tools_params_are_keyword_only(fn):
+    # Freeze-now: every param except ctx is keyword-only, so argument ORDER can never
+    # ossify into a contract callers depend on (a reorder would otherwise be breaking).
+    # Scoped to the new bill-text tools by design. MCP passes args by name, so this is a
+    # Python-level guard with zero wire impact -- the input schema is unchanged.
+    params = list(inspect.signature(fn).parameters.values())
+    assert params[0].name == "ctx"
+    offenders = [p.name for p in params[1:] if p.kind is not inspect.Parameter.KEYWORD_ONLY]
+    assert not offenders, f"{fn.__name__}: params not keyword-only: {offenders}"
 
 
 @pytest.mark.parametrize("missing", ["hits", "text", "toc"])

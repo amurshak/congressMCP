@@ -122,11 +122,11 @@ def _clamp(value: int, low: int, high: int) -> tuple[int, str | None]:
 )
 async def search_bill_text(
     ctx: Context,
+    *,
     congress: int,
     bill_type: str,
     number: int,
     queries: list[str],
-    *,
     version: str | None = None,
     max_hits: int = 10,
 ) -> dict[str, Any]:
@@ -196,11 +196,11 @@ async def search_bill_text(
 )
 async def get_bill_section(
     ctx: Context,
+    *,
     congress: int,
     bill_type: str,
     number: int,
     section_id: str,
-    *,
     version: str | None = None,
     max_bytes: int = 25_000,
 ) -> dict[str, Any]:
@@ -307,10 +307,10 @@ async def get_bill_section(
 )
 async def get_bill_toc(
     ctx: Context,
+    *,
     congress: int,
     bill_type: str,
     number: int,
-    *,
     version: str | None = None,
     depth: int = 2,
 ) -> dict[str, Any]:
