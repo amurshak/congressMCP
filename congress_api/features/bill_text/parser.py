@@ -103,9 +103,16 @@ _HUG = r"[)\s,;]*" + _AMEND_VERB + r"\b"
 # of the same verb -- manufacturing the exact false-positive class V13 just removed,
 # in the freshly-approved public_law form. Any A6 must skip the clause for the OUTER
 # citation only; citations inside the clause stay ineligible.
+# The is_amendatory verb SUPERSET only -- never _AMEND_VERB, which gates `amends`
+# (V13 measured that gate's per-form precision at 0/30; an unmeasured form here would
+# reopen it for nothing). `to read as follows` added per V18: enumerated exhaustively,
+# it newly flags exactly ONE unit in the 18-bill corpus (115hr1 S:13502, a genuine
+# amendment -- "Paragraph (1) of section 743(d) is to read as follows:" -- that lacked
+# any gated verb), 0 false positives. §6 directs consumers to is_amendatory, so a known
+# false negative there contradicts how the field is sold.
 AMENDATORY_RE = re.compile(
     r"\b" + _AMEND_VERB + r"\b|\bby striking\b|\bby inserting\b|\bby adding\b|"
-    r"\bredesignat(?:e|ing|ed)\b",
+    r"\bredesignat(?:e|ing|ed)\b|\bto read as follows\b",
     re.IGNORECASE,
 )
 # Three accepted citation forms for `amends`, resolving to a U.S. Code or Public
@@ -204,8 +211,13 @@ class Unit:
 
     @property
     def is_amendatory(self) -> bool:
-        if any(segment.context == "quoted" for segment in self.segments):
-            return True
+        # Verb-only (V18). The prior quote branch -- "any quoted segment => amendatory"
+        # -- fired on non-amendatory quotation: appropriations account headings, short
+        # titles, defined terms, report titles, findings-quotes. A hand-coded sample
+        # (n=35, seed=18) over the 18-bill corpus was 35/35 non-amendatory, and the
+        # prediction that the branch caught ungated imperative amendments was falsified
+        # (0/35; ~1% by targeted probe). A structural marker is not evidence of
+        # amendment -- gate on the verb (A5's principle, applied to quotation).
         return any(AMENDATORY_RE.search(segment.text) for segment in self.segments if segment.context == "operative")
 
     @property

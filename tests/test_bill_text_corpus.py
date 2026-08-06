@@ -203,3 +203,8 @@ def test_corpus_invariants(entry, path):
     ids = [u.section_id for u in parsed.units]
     dupes = sorted({i for i in ids if ids.count(i) > 1})
     assert not dupes, f"{entry['package_id']}: duplicate section_ids {dupes}"
+    # V18: is_amendatory is verb-only (the quote branch was dropped -- the first change
+    # to shrink the left side of `amends != [] => is_amendatory`). Assert corpus-wide
+    # that no amends target was stranded by the narrowing.
+    stranded = [u.section_id for u in parsed.units if u.amends and not u.is_amendatory]
+    assert not stranded, f"{entry['package_id']}: amends target with is_amendatory False: {stranded}"

@@ -464,6 +464,29 @@ def test_a5_is_amendatory_verb_set_is_superset_of_the_gate():
         assert u.amends == [{"kind": "public_law", "cite": "P.L. 119-38"}], verb
 
 
+def test_v18_is_amendatory_is_verb_only_quote_alone_does_not_fire():
+    # V18: the quote branch is dropped. A quoted segment with no amendatory verb -- an
+    # appropriations account heading, a short title, a defined term -- is NOT amendatory.
+    # (Sample n=35 was 35/35 non-amendatory; a structural marker isn't evidence of one.)
+    unit = Unit("S:1", [], "Short title", [
+        Segment("operative", "This Act may be cited as the"),
+        Segment("quoted", "Consolidated Appropriations Act, 2021"),
+    ])
+    assert not unit.is_amendatory
+    assert unit.amends == []
+
+
+def test_v18_is_amendatory_catches_ungated_to_read_as_follows():
+    # V18: the one ungated amendatory form the corpus enumeration surfaced (115hr1
+    # S:13502) -- a genuine amendment with no gated verb. Added to AMENDATORY_RE (the
+    # is_amendatory superset), never to the amends gate. Operative-only here to prove
+    # the phrase drives it, not a lingering quote branch.
+    unit = Unit("S:1", [], "Modify", [
+        Segment("operative", "Paragraph (1) of section 743(d) is to read as follows:"),
+    ])
+    assert unit.is_amendatory
+
+
 def test_render_segments_wraps_quoted_and_hugs_trailing_punctuation():
     from congress_api.features.bill_text.parser import render_segments
 
