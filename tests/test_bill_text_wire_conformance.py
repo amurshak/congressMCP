@@ -29,12 +29,14 @@ from __future__ import annotations
 import ast
 import asyncio
 import inspect
+import json
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 import congress_api.features.bill_text.tools as tools
+from congress_api.features.bill_text import trace
 from congress_api.features.bill_text.client import ResolvedBillText
 from congress_api.features.bill_text.index import BillTextIndex
 from congress_api.features.bill_text.parser import parse_bill_xml
@@ -47,10 +49,11 @@ _SECTION_ID = "D:B/T:I/S:102"          # a real leaf section in the fixture
 
 
 def _loaded() -> LoadedBillText:
-    parsed = parse_bill_xml(FIXTURE.read_bytes(), PKG, VER, "2025-12-19T03:11:48Z")
+    raw = FIXTURE.read_bytes()
+    parsed = parse_bill_xml(raw, PKG, VER, "2025-12-19T03:11:48Z")
     resolved = ResolvedBillText(
         package_id=PKG, version=VER, version_resolved_at="2025-12-19T03:11:48Z",
-        version_resolution_note=None, last_modified="2025-12-19T03:11:48Z", xml_bytes=b"",
+        version_resolution_note=None, last_modified="2025-12-19T03:11:48Z", xml_bytes=raw,
     )
     return LoadedBillText(resolved=resolved, parsed=parsed, index=BillTextIndex(parsed),
                           timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0})
@@ -65,6 +68,8 @@ class _Ctx:  # never touched: load_bill_text is patched, so the fetch path never
 
 def _call(coro_fn, *args, **kwargs):
     async def fake_load(ctx, congress, bill_type, number, version):
+        # mirror the real load path's provenance stamp so trace tests see it
+        trace.set_source(LOADED.resolved.package_id, LOADED.resolved.version, LOADED.resolved.xml_bytes)
         return LOADED
     with patch.object(tools, "load_bill_text", new=fake_load):
         return asyncio.run(coro_fn(_Ctx(), *args, **kwargs))
@@ -159,6 +164,46 @@ def test_bill_text_never_imports_shared_response_converters():
         "bill_text imports the shared response converter -- D2's serializer. Build the "
         f"response models directly instead: {offenders}"
     )
+
+
+def test_trace_is_off_unless_trace_dir_is_set(tmp_path, monkeypatch):
+    # DEBUG ONLY, provably off: presence of CONGRESSMCP_TRACE_DIR is the only enable.
+    monkeypatch.delenv("CONGRESSMCP_TRACE_DIR", raising=False)
+    _call(tools.search_bill_text, congress=119, bill_type="s", number=1071, queries=[_QUERY], max_hits=2)
+    assert not list(tmp_path.iterdir())                    # nothing written anywhere when unset
+
+
+def test_trace_writes_jsonl_with_faithful_response_and_provenance(tmp_path, monkeypatch):
+    monkeypatch.setenv("CONGRESSMCP_TRACE_DIR", str(tmp_path))
+    live = _call(tools.search_bill_text, congress=119, bill_type="s", number=1071, queries=[_QUERY], max_hits=2)
+
+    trace_file = tmp_path / "bill_text_trace.jsonl"
+    assert trace_file.exists()
+    lines = trace_file.read_text().strip().splitlines()
+    assert len(lines) == 1
+    rec = json.loads(lines[0])
+    assert rec["tool"] == "search_bill_text"
+    assert rec["args"]["number"] == 1071 and rec["args"]["queries"] == [_QUERY]
+    # FAITHFULNESS: the logged response is the object the caller received, byte for byte
+    assert rec["response"] == live
+    # replay stamp extends the two-fixture policy: package_id + version + source sha256
+    assert rec["source"]["package_id"] == "BILLS-119s1071enr"
+    assert rec["source"]["version"] == "enr"
+    assert len(rec["source"]["sha256"]) == 64
+    assert "ts" in rec and isinstance(rec["duration_ms"], (int, float))
+
+
+def test_trace_redacts_api_key_at_write_time(tmp_path, monkeypatch):
+    # A trace is what gets pasted into a bug report; a live key must never reach disk.
+    # Force the key into traced content (as a query string) and assert it is redacted.
+    secret = "SüP3rSecretKeyValue0123456789"
+    monkeypatch.setenv("CONGRESS_API_KEY", secret)
+    monkeypatch.setenv("CONGRESSMCP_TRACE_DIR", str(tmp_path))
+    _call(tools.search_bill_text, congress=119, bill_type="s", number=1071,
+          queries=["icebreaker", secret], max_hits=2)
+    body = (tmp_path / "bill_text_trace.jsonl").read_text()
+    assert secret not in body            # no logged line matches the key
+    assert "[REDACTED]" in body          # and redaction actually fired on the traced content
 
 
 @pytest.mark.parametrize("fn", [tools.search_bill_text, tools.get_bill_section, tools.get_bill_toc])

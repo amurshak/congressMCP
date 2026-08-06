@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import logging
 import re
 import time
@@ -10,6 +11,7 @@ from typing import Any
 from mcp.server.mcpserver import Context
 
 from ...mcp_app import mcp
+from . import trace
 from .client import BillTextError, govinfo_details_url
 from .index import fts_literal, has_token, normalized_query, sqlite_supports_fts5
 from .models import (
@@ -29,6 +31,27 @@ from .service import LoadedBillText, load_bill_text
 
 
 logger = logging.getLogger(__name__)
+
+
+def _debug_logged(fn):
+    """DEBUG-ONLY out-of-band tracing (see trace.py). When CONGRESSMCP_TRACE_DIR is set,
+    each invocation + the exact returned response is appended as a JSONL record, with the
+    API key redacted at write time. Off (and zero-cost past one env check) otherwise.
+    functools.wraps preserves __wrapped__, so the MCP schema (built via inspect.signature)
+    sees the real keyword-only signature unchanged."""
+
+    @functools.wraps(fn)
+    async def wrapper(ctx, *args, **kwargs):
+        if not trace.enabled():
+            return await fn(ctx, *args, **kwargs)
+        trace.clear_source()  # don't let a prior call's provenance leak if load fails
+        started = time.perf_counter()
+        result = await fn(ctx, *args, **kwargs)
+        duration_ms = round((time.perf_counter() - started) * 1000, 1)
+        trace.write(fn.__name__, kwargs, result, duration_ms)
+        return result
+
+    return wrapper
 
 
 def _error(code: str, message: str, detail: dict[str, Any] | None = None, remediation: str | None = None) -> dict[str, Any]:
@@ -120,6 +143,7 @@ def _clamp(value: int, low: int, high: int) -> tuple[int, str | None]:
     "search_bill_text",
     title="Search a bill's full statutory text by section (GovInfo)",
 )
+@_debug_logged
 async def search_bill_text(
     ctx: Context,
     *,
@@ -194,6 +218,7 @@ async def search_bill_text(
     "get_bill_section",
     title="Retrieve the full statutory text of a bill section (GovInfo)",
 )
+@_debug_logged
 async def get_bill_section(
     ctx: Context,
     *,
@@ -305,6 +330,7 @@ async def get_bill_section(
     "get_bill_toc",
     title="Bill statutory-text table of contents for section navigation (GovInfo)",
 )
+@_debug_logged
 async def get_bill_toc(
     ctx: Context,
     *,
