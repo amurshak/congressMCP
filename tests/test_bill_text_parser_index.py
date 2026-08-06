@@ -180,6 +180,30 @@ def test_order_versions_precedence_primary_does_not_promote_null_dated_nontermin
     assert order_versions(versions)[0].code == "eh"
 
 
+def test_order_versions_logs_unknown_codes_loudly(caplog):
+    # A3 rests on this: §3 accepted precedence-primary because a new/unknown GPO code
+    # fails LOUD, not silent. Such a code sorts last (so if it marks the newest stage an
+    # older version wins) BUT a WARNING is logged -- that log is the whole tradeoff's
+    # condition. Pin it so a refactor can't silence it. Confirmed live: version=None on
+    # S.1071/119 resolves to `enr` (BILLS-119s1071enr), the defect-1 repro, end-to-end.
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="congress_api.features.bill_text.client"):
+        ordered = order_versions(
+            [
+                TextVersion(code="xz", date="2099-01-01", type_label="Future GPO code"),
+                TextVersion(code="enr", date="", type_label="Enrolled"),
+            ]
+        )
+    assert ordered[0].code == "enr"   # known beats unknown regardless of the unknown's date
+    assert ordered[-1].code == "xz"   # unknown sorts last
+    assert any(
+        "Unknown bill text version code" in r.message and "xz" in r.message
+        for r in caplog.records
+        if r.levelno == logging.WARNING
+    )
+
+
 def test_order_versions_all_unknown_codes_fall_back_to_date_primary():
     # Every code unknown -> precedence 0 for all -> the date tie-break governs,
     # i.e. date-primary among them (later date first).
