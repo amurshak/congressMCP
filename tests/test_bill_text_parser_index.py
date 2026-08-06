@@ -598,6 +598,42 @@ def test_no_addressable_unit_emitted_from_inside_quoted_block():
     assert hits[0].match_contexts == ["quoted"]
 
 
+def test_subdivided_section_intro_preserves_quoted_context():
+    # V14-class: when an over-size section is subdivided, its intro (the matter before
+    # the first subdivision) is emitted by extract_intro_segments. A <quote> there --
+    # e.g. `striking "X" in the matter preceding paragraph (1)` -- must keep `quoted`
+    # context, not be flattened to operative, or inserted language on the largest
+    # amendatory sections reads as enacted (the amendatory trap at the intro). The
+    # previous hard-coded operative label was latent on the two acceptance fixtures
+    # but LIVE in the wider corpus: a scan of 18 packages / 571 subdivided sections
+    # surfaced two real cases the old code mislabeled -- 117hr2471enr S:804 (VAWA,
+    # `Section 204 of Public Law 90-284 ... <quote>Indian Civil Rights Act of 1968`)
+    # and 116hr133enr S:401. This asserts the property directly (quote nested in a
+    # <text>, as in those documents, not a bare child).
+    filler = ("word " * 1200).strip()  # ~6000B each -> whole section forces subdivision
+    phrase = "polar security cutter distinctive intro phrase"
+    xml = (
+        b"<bill><legis-body><section><enum>5</enum><header>Amendatory</header>"
+        b"<text>Section 9062 of title 10, United States Code, is amended by striking "
+        b"<quote>" + phrase.encode() + b"</quote> in the matter preceding paragraph (1).</text>"
+        b"<subsection><enum>(a)</enum><text>" + filler.encode() + b"</text></subsection>"
+        b"<subsection><enum>(b)</enum><text>" + filler.encode() + b"</text></subsection>"
+        b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    parent = next(u for u in parsed.units if u.section_id == "S:5")
+    # the section did subdivide (so the intro path was exercised, not the whole-unit path)
+    assert parent.child_ids == ["S:5/SS:(a)", "S:5/SS:(b)"]
+    # the inserted phrase survives as a quoted segment of the intro, not operative
+    assert any(seg.context == "quoted" and phrase in seg.text for seg in parent.segments)
+    assert not any(seg.context == "operative" and phrase in seg.text for seg in parent.segments)
+    # and it is retrievable end-to-end with the correct context
+    index = BillTextIndex(parsed)
+    hits = index.search([normalized_query(phrase)], 5)
+    assert hits and hits[0].unit.section_id == "S:5"
+    assert hits[0].match_contexts == ["quoted"]
+
+
 def test_after_quoted_block_connective_renders_outside_the_quote():
     # Bill DTD puts the trailing connective ("; and", ".") in an <after-quoted-block>
     # child of every quoted-block. It must be operative and render OUTSIDE the quote,

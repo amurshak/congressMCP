@@ -557,9 +557,15 @@ def extract_intro_segments(elem: ET.Element, header: str | None) -> list[Segment
             break
         if local_name(child) in {"enum", "header"}:
             continue
-        text = element_text(child)
-        if text:
-            segments.append(Segment("operative", text))
+        # Delegate to extract_segments rather than flattening to a hard-coded
+        # `operative` segment: the matter preceding the first subdivision can carry a
+        # <quote>/<quoted-block> (e.g. `by striking "the Secretary" in the matter
+        # preceding paragraph (1)`), and that inserted text must keep `quoted`
+        # context or a byte-subdivided section presents struck/inserted language as
+        # enacted -- the V4 amendatory trap, at the intro of exactly the largest
+        # amendatory sections. extract_segments assigns the same contexts the main
+        # unit path does (spec §6).
+        segments.extend(extract_segments(child, None))
     return segments or ([Segment("header", header)] if header else [])
 
 
