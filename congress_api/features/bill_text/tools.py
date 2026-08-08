@@ -390,8 +390,30 @@ async def get_bill_toc(
         return _unexpected("get_bill_toc", exc)
 
 
+def _normalize_requested_id(requested: str) -> str:
+    """Apply F2's trailing-period rule to an id the CALLER supplied.
+
+    Ids no longer carry trailing periods (see parser.normalize_enum), so accepting
+    the period form on input cannot collide with anything -- and a model copying
+    "SEC. 804." out of the statutory text is the exact input that produced the
+    false "no section matched" assertion. Strip per component so a qualified id
+    (`D:H/T:I/S:3501.`) normalizes as readily as a bare enum.
+    """
+    parts = []
+    for component in requested.split("/"):
+        typ, sep, enum = component.partition(":")
+        cleaned = (enum if sep else typ).strip().rstrip(".").strip()
+        if not cleaned:
+            parts.append(component)
+        elif sep:
+            parts.append(f"{typ.strip()}:{cleaned}")
+        else:
+            parts.append(cleaned)
+    return "/".join(parts)
+
+
 def _resolve_unit(units: list[Unit], requested: str) -> Unit | dict[str, Any]:
-    requested = requested.strip()
+    requested = _normalize_requested_id(requested.strip())
     by_id = {unit.section_id: unit for unit in units}
     if requested in by_id:
         return by_id[requested]

@@ -285,6 +285,27 @@ class ParsedBill:
     subtree_bytes: dict[str, int] = field(default_factory=dict)
 
 
+def normalize_enum(value: str | None) -> str | None:
+    """Strip TRAILING periods from a document enum at id-construction time (F2).
+
+    An id component carries the enum's *identity*, not its typography. GovInfo
+    writes a section enum as `1832.` because the heading reads "SEC. 1832." -- the
+    period is a heading terminator and appears in no citation of that section. Left
+    in, it leaked into the id: `get_bill_section("804")` answered "No section or
+    chunk matched '804'" while three sections numbered 804 existed, and only `804.`
+    resolved. Four independent sessions tripped on it, and the tool asserting a
+    falsehood is worse than the miss.
+
+    Trailing only. Internal periods stay, so decimal-style enums (`1.2`) survive.
+    Contrast `PARA:(3)`: parentheses ARE how that enum is written and they
+    disambiguate level, so they are kept.
+    """
+    if value is None:
+        return None
+    cleaned = value.strip().rstrip(".").strip()
+    return cleaned or None
+
+
 def node_kind_for(section_id: str) -> str:
     """Derive node_kind from the id's leaf component prefix (spec §5)."""
     prefix = section_id.split("/")[-1].split(":", 1)[0]
@@ -407,7 +428,7 @@ class _Chunker:
             self.walk(child, path)
 
     def _node_for(self, elem: ET.Element, typ: str, path: list[AncestorNode]) -> AncestorNode:
-        enum = direct_text(elem, "enum") or self._synthetic_enum(typ)
+        enum = normalize_enum(direct_text(elem, "enum")) or self._synthetic_enum(typ)
         base_enum = enum
         parent_key = "/".join(f"{node.type}:{node.enum}" for node in path)
         key = (parent_key, typ, base_enum)
@@ -462,7 +483,7 @@ class _Chunker:
             # its text from the assembled section. Local to one section's children.
             sibling_counts: dict[str, int] = {}
             for idx, child in enumerate(child_elems, start=1):
-                base_enum = direct_text(child, "enum") or str(idx)
+                base_enum = normalize_enum(direct_text(child, "enum")) or str(idx)
                 sibling_counts[base_enum] = sibling_counts.get(base_enum, 0) + 1
                 enum = base_enum if sibling_counts[base_enum] == 1 else f"{base_enum}#{sibling_counts[base_enum]}"
                 node = AncestorNode(type=typ, enum=enum, header=direct_text(child, "header"))

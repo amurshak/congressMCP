@@ -1100,14 +1100,61 @@ def test_subdivide_disambiguates_colliding_subsection_enums():
     parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
     ids = [u.section_id for u in parsed.units]
     assert len(ids) == len(set(ids)), f"duplicate ids: {ids}"
-    assert "S:1832./SS:(e)" in ids and "S:1832./SS:(e)#2" in ids
-    first = _resolve_unit(parsed.units, "S:1832./SS:(e)")
-    second = _resolve_unit(parsed.units, "S:1832./SS:(e)#2")
+    # The source enum is "1832." and F2 strips the trailing heading terminator, so the
+    # id is S:1832 -- the # suffix still disambiguates the two real "(e)" subsections.
+    assert "S:1832/SS:(e)" in ids and "S:1832/SS:(e)#2" in ids
+    first = _resolve_unit(parsed.units, "S:1832/SS:(e)")
+    second = _resolve_unit(parsed.units, "S:1832/SS:(e)#2")
     assert not isinstance(first, dict) and not isinstance(second, dict)
     assert first.header == "first e" and second.header == "second e"   # both reachable, distinct
-    parent = next(u for u in parsed.units if u.section_id == "S:1832.")
-    assert parent.child_ids.count("S:1832./SS:(e)") == 1                 # not duplicated
-    assert "S:1832./SS:(e)#2" in parent.child_ids                        # both assembled
+    parent = next(u for u in parsed.units if u.section_id == "S:1832")
+    assert parent.child_ids.count("S:1832/SS:(e)") == 1                  # not duplicated
+    assert "S:1832/SS:(e)#2" in parent.child_ids                         # both assembled
+
+
+def test_f2_trailing_period_is_stripped_from_ids_and_accepted_on_input():
+    # F2: the tool ASSERTED A FALSEHOOD -- get_bill_section("804") returned "No section
+    # or chunk matched '804'" while three sections numbered 804 existed, because the
+    # source enum "804." put the heading terminator in the id. Four sessions tripped on
+    # it. An id component carries the enum's identity, not its typography.
+    xml = (
+        b"<bill><legis-body>"
+        b"<section><enum>804.</enum><header>Alpha</header><text>alpha text</text></section>"
+        b"<section><enum>1.2.</enum><header>Decimal</header><text>decimal text</text></section>"
+        b"<section><enum>90</enum><header>Bare</header><text>bare text</text></section>"
+        b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    ids = [u.section_id for u in parsed.units]
+    assert "S:804" in ids
+    assert "S:1.2" in ids          # INTERNAL periods survive: decimal-style enums are real
+    assert "S:90" in ids
+    assert not any(sid.endswith(".") for sid in ids)
+    # Both spellings resolve: the bare enum a citation uses, and the "SEC. 804."
+    # typography a model copies out of the statutory text.
+    for requested in ("804", "804.", "S:804", "S:804."):
+        unit = _resolve_unit(parsed.units, requested)
+        assert not isinstance(unit, dict), f"{requested!r} failed to resolve: {unit}"
+        assert unit.header == "Alpha"
+
+
+def test_f2_ambiguous_bare_enum_still_errors_rather_than_guessing():
+    # The period fix must not turn a genuine collision into a silent pick: three
+    # sections numbered 804 in different divisions is the real NDAA shape, and §5
+    # requires listing every qualified match rather than guessing one.
+    filler = b"<text>body</text>"
+    xml = (
+        b"<bill><legis-body>"
+        b"<division><enum>A</enum><section><enum>804.</enum><header>One</header>" + filler + b"</section></division>"
+        b"<division><enum>B</enum><section><enum>804.</enum><header>Two</header>" + filler + b"</section></division>"
+        b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    for requested in ("804", "804."):
+        result = _resolve_unit(parsed.units, requested)
+        assert isinstance(result, dict)
+        assert result["error"]["code"] == "ambiguous_section_id"
+        assert sorted(result["error"]["detail"]["matches"]) == ["D:A/S:804", "D:B/S:804"]
 
 
 def test_synthetic_pre_rc_units_resolve_and_navigate():
