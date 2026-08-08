@@ -23,25 +23,114 @@ logger = logging.getLogger(__name__)
 
 GOVINFO_BASE_URL = "https://api.govinfo.gov"
 MAX_XML_BYTES = 50 * 1024 * 1024
-VERSION_PRECEDENCE = {
-    "ih": 10,
-    "is": 10,
-    "rih": 10,
-    "ris": 10,
-    "rh": 20,
-    "rs": 20,
-    "rch": 20,
-    "rcs": 20,
-    "pcs": 30,
-    "pap": 30,
-    "eh": 40,
-    "es": 40,
-    "eah": 40,
-    "eas": 40,
-    "cph": 50,
-    "cps": 50,
-    "enr": 90,
+# Version codes: (precedence rank, category). Complete against GovInfo's published
+# list of 53 bill version codes (govinfo.gov/help/bills), not a 17-code subset.
+#
+# WHY A CATEGORY AND NOT JUST A RANK (F1). "Latest" means *most authoritative text*,
+# not *most recent artifact*, and for three classes those diverge -- a single linear
+# scale cannot express the difference, so a later editor "correcting" a rank toward
+# chronological order would silently reintroduce the bug the rank was placed to avoid.
+# The category records the intent:
+#
+#   TEXT_STAGE     -- a real stage of the legislative text; rank orders them.
+#   REISSUE        -- re-issues an earlier stage and SUPERSEDES it (rank sits just
+#                     above the stage it re-issues). `renr` outranking `enr` is one of
+#                     the two correctness bugs F1 names: at precedence 0 it sorted last
+#                     and `enr` won, returning superseded text as final.
+#   ADMINISTRATIVE -- chronologically later but textually identical to the stage it
+#                     annotates (sponsor changes, print orders). MUST NOT displace that
+#                     stage, so it ranks below every text stage: when the annotated
+#                     stage is present it wins, which is the correct pick since the two
+#                     carry the same text.
+#   NEGATIVE       -- chronologically LAST and NOT authoritative (failed passage, laid
+#                     on table, indefinitely postponed, vitiated). Must never be
+#                     "latest", so it ranks below everything -- including an unknown
+#                     code, because an unknown code might be a new authoritative stage
+#                     whereas these are known not to be.
+#
+# Ranks from the original 17-code table are preserved exactly; the 36 additions are
+# placed around them. `ath`/`ats` at 80 fixes F1's second correctness bug: simple and
+# concurrent resolutions never reach `enr`, so with those codes absent from the table
+# EVERY agreed-to resolution resolved to `ih`. Agreed-to IS terminal for a resolution,
+# and 80 keeps `enr` winning wherever both somehow appear.
+TEXT_STAGE = "text_stage"
+REISSUE = "reissue"
+ADMINISTRATIVE = "administrative"
+NEGATIVE = "negative"
+
+# Rank given to a code GPO adds after this table was written. Above NEGATIVE (an
+# unknown stage may be authoritative; a failed-passage one is known not to be) and
+# below every known text stage. Codes landing here also fire the §3 unknown-code
+# WARNING and a caller-facing version_resolution_note.
+UNKNOWN_PRECEDENCE = 0
+
+VERSION_CODES: dict[str, tuple[int, str]] = {
+    # --- not authoritative at any chronological position -------------------------
+    "fph": (-10, NEGATIVE),    # failed passage (House)
+    "fps": (-10, NEGATIVE),    # failed passage (Senate)
+    "fah": (-10, NEGATIVE),    # failed amendment (House)
+    "lth": (-10, NEGATIVE),    # laid on table (House)
+    "lts": (-10, NEGATIVE),    # laid on table (Senate)
+    "iph": (-10, NEGATIVE),    # indefinitely postponed (House)
+    "ips": (-10, NEGATIVE),    # indefinitely postponed (Senate)
+    "pav": (-10, NEGATIVE),    # previous action vitiated
+    # --- annotate a stage without changing its text ------------------------------
+    "ash": (5, ADMINISTRATIVE),   # House sponsors/cosponsors added or withdrawn
+    "sas": (5, ADMINISTRATIVE),   # additional sponsors (Senate)
+    "sc": (5, ADMINISTRATIVE),    # sponsor change
+    "as": (5, ADMINISTRATIVE),    # Senate amendment ordered to be printed
+    "oph": (5, ADMINISTRATIVE),   # ordered to be printed (House)
+    "ops": (5, ADMINISTRATIVE),   # ordered to be printed (Senate)
+    "pwah": (5, ADMINISTRATIVE),  # ordered to be printed with House amendment
+    "rhuc": (5, ADMINISTRATIVE),  # returned to House by unanimous consent
+    # --- introduced / referred in the originating chamber ------------------------
+    "ih": (10, TEXT_STAGE),
+    "is": (10, TEXT_STAGE),
+    "rih": (10, TEXT_STAGE),   # referred to House committee with instructions
+    "ris": (10, TEXT_STAGE),
+    "rth": (10, TEXT_STAGE),   # referred to committee (House)
+    "rts": (10, TEXT_STAGE),
+    "rah": (15, TEXT_STAGE),   # referred WITH amendments -- text has moved past introduced
+    "ras": (15, TEXT_STAGE),
+    "cdh": (15, TEXT_STAGE),   # committee discharged -- past committee, text usually as introduced
+    "cds": (15, TEXT_STAGE),
+    # --- reported ----------------------------------------------------------------
+    "rh": (20, TEXT_STAGE),
+    "rs": (20, TEXT_STAGE),
+    "rch": (20, TEXT_STAGE),   # referred to a different/additional House committee
+    "rcs": (20, TEXT_STAGE),
+    # --- calendar / print-as-passed ----------------------------------------------
+    "pch": (30, TEXT_STAGE),   # placed on calendar (House) -- sibling of pcs
+    "pcs": (30, TEXT_STAGE),
+    "pap": (30, TEXT_STAGE),   # printed as passed
+    "pp": (30, TEXT_STAGE),    # public print -- peer of pap (§3)
+    # --- engrossed / passed one chamber ------------------------------------------
+    "eh": (40, TEXT_STAGE),
+    "es": (40, TEXT_STAGE),
+    "eah": (40, TEXT_STAGE),
+    "eas": (40, TEXT_STAGE),
+    "eph": (40, TEXT_STAGE),   # engrossed and deemed passed by House
+    "reah": (45, REISSUE),     # re-engrossed amendment (House) -- supersedes eah
+    "res": (45, REISSUE),      # re-engrossed amendment (Senate) -- supersedes eas/es
+    "cph": (50, TEXT_STAGE),
+    "cps": (50, TEXT_STAGE),
+    # --- received in the second chamber: carries the FIRST chamber's passed text,
+    #     so these sit AFTER engrossment, not with ih/is (§3).
+    "rdh": (55, TEXT_STAGE),   # received in House from Senate
+    "rds": (55, TEXT_STAGE),
+    "rfh": (55, TEXT_STAGE),   # referred to House committee after receipt from Senate
+    "rfs": (55, TEXT_STAGE),
+    "hdh": (55, TEXT_STAGE),   # held at House desk after receipt from Senate
+    "hds": (55, TEXT_STAGE),
+    # --- terminal ----------------------------------------------------------------
+    "ath": (80, TEXT_STAGE),   # agreed to by House -- TERMINAL for a simple/concurrent resolution
+    "ats": (80, TEXT_STAGE),   # agreed to by Senate
+    "enr": (90, TEXT_STAGE),
+    "renr": (95, REISSUE),     # re-enrolled -- supersedes enr
 }
+VERSION_PRECEDENCE = {code: rank for code, (rank, _) in VERSION_CODES.items()}
+VERSION_CATEGORY = {code: category for code, (_, category) in VERSION_CODES.items()}
+
 VERSION_TYPE_MAP = {
     "introduced in house": "ih",
     "introduced in senate": "is",
@@ -51,6 +140,16 @@ VERSION_TYPE_MAP = {
     "reported in senate": "rs",
     "engrossed in house": "eh",
     "engrossed in senate": "es",
+    "engrossed amendment house": "eah",
+    "engrossed amendment senate": "eas",
+    "considered and passed house": "cph",
+    "considered and passed senate": "cps",
+    "placed on calendar house": "pch",
+    "placed on calendar senate": "pcs",
+    "agreed to house": "ath",
+    "agreed to senate": "ats",
+    "public print": "pp",
+    "printed as passed": "pap",
     "enrolled bill": "enr",
     "enrolled": "enr",
 }
@@ -142,13 +241,18 @@ async def resolve_and_fetch_bill_text(
         package_id = package_id_for(congress, bill_type, number, candidate.code)
         try:
             fetched = await fetch_govinfo_package(package_id)
-            note = base_note
+            parts = [base_note] if base_note else []
             if candidate != candidates[0]:
-                substitution = (
+                parts.append(
                     f"Latest listed version {candidates[0].code} was unavailable from GovInfo; "
                     f"fell back to {candidate.code}."
                 )
-                note = f"{base_note} {substitution}" if base_note else substitution
+            # F1: rank keeps a non-text-stage code from displacing real text; this
+            # says so out loud when one wins anyway for want of an alternative.
+            category_note = _category_note(candidate.code)
+            if category_note:
+                parts.append(category_note)
+            note = " ".join(parts) or None
             return ResolvedBillText(package_id, candidate.code, utc_now(), note, fetched[0], fetched[1])
         except BillTextError as exc:
             if exc.code != "govinfo_not_found":
@@ -251,6 +355,16 @@ async def congress_text_versions(ctx: Context, congress: int, bill_type: str, nu
         code = _version_code_from_item(congress, bill_type, number, item) or VERSION_TYPE_MAP.get(type_label.casefold())
         if code:
             versions.append(TextVersion(code=code.lower(), date=date, type_label=type_label))
+        else:
+            # §3 step 2: log an unmapped version-type string rather than guessing a
+            # code for it. Dropping it silently makes the entry invisible to both the
+            # operator and the caller, and a dropped entry can be the newest stage.
+            logger.warning(
+                "Congress.gov listed a text version whose GovInfo code could not be "
+                "derived from its URLs or type label %r; it was excluded from version "
+                "resolution.",
+                type_label,
+            )
     if not versions:
         raise BillTextError(
             "version_not_available",
@@ -415,12 +529,42 @@ def order_versions(versions: list[TextVersion]) -> list[TextVersion]:
     return sorted(
         versions,
         key=lambda item: (
-            VERSION_PRECEDENCE.get(item.code, 0),
+            VERSION_PRECEDENCE.get(item.code, UNKNOWN_PRECEDENCE),
             item.date or "",
             _inverse_lex_key(item.code),
         ),
         reverse=True,
     )
+
+
+def version_category(code: str) -> str | None:
+    """Category of a version code, or None if the code is not in the published table."""
+    return VERSION_CATEGORY.get(code.lower())
+
+
+def _category_note(code: str) -> str | None:
+    """Disclose a resolved version that is not a normal text stage.
+
+    Rank keeps these from displacing real text, but rank cannot say anything when
+    one is nonetheless selected because it is all the bill has. Silence there would
+    present a failed-passage or sponsor-change artifact as the bill's latest text,
+    which is the same wrong-answer-inside-a-success-envelope class the A3 note
+    closes. Fires only for version=None, where the server -- not the caller -- chose.
+    """
+    category = VERSION_CATEGORY.get(code)
+    if category == NEGATIVE:
+        return (
+            f"Resolved to '{code}', which records a negative or terminated action "
+            "(failed passage, laid on table, indefinitely postponed, or vitiated) "
+            "rather than authoritative bill text; no authoritative version was listed."
+        )
+    if category == ADMINISTRATIVE:
+        return (
+            f"Resolved to '{code}', an administrative version (sponsor or print "
+            "annotation) whose text mirrors the stage it annotates rather than "
+            "advancing it."
+        )
+    return None
 
 
 def package_id_for(congress: int, bill_type: str, number: int, version: str) -> str:

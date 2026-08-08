@@ -5,9 +5,16 @@ import pytest
 
 from congress_api.features.bill_text.index import BillTextIndex, fts_literal, has_token, normalized_query
 from congress_api.features.bill_text.client import (
+    ADMINISTRATIVE,
+    NEGATIVE,
+    REISSUE,
+    TEXT_STAGE,
+    VERSION_CODES,
     BillTextError,
     TextVersion,
     order_versions,
+    version_category,
+    _category_note,
     _xml_url_from_summary,
 )
 from congress_api.features.bill_text.models import AncestorNode
@@ -212,6 +219,124 @@ def test_order_versions_all_unknown_codes_fall_back_to_date_primary():
         TextVersion(code="zz2", date="2025-09-09", type_label="?"),
     ]
     assert order_versions(versions)[0].code == "zz2"
+
+
+def test_f1_reenrolled_supersedes_enrolled():
+    # F1 correctness bug 1: `renr` was absent from the 17-code table, so it took
+    # precedence 0 and sorted LAST -- `enr` won and the tool returned superseded
+    # text as the bill's final text. A re-issue must outrank what it re-issues.
+    versions = [
+        TextVersion(code="enr", date="", type_label="Enrolled Bill"),
+        TextVersion(code="renr", date="", type_label="Re-enrolled Bill"),
+    ]
+    assert order_versions(versions)[0].code == "renr"
+    # Same shape one tier down: re-engrossed amendments supersede the engrossed ones.
+    assert order_versions(
+        [
+            TextVersion(code="eah", date="2025-06-01", type_label="Engrossed Amendment House"),
+            TextVersion(code="reah", date="", type_label="Re-engrossed Amendment House"),
+        ]
+    )[0].code == "reah"
+
+
+def test_f1_agreed_to_resolution_does_not_resolve_to_introduced():
+    # F1 correctness bug 2: simple and concurrent resolutions never receive `enr`,
+    # and `ath`/`ats` were absent from the table entirely -- so EVERY agreed-to
+    # resolution resolved to `ih`, the introduced text, silently. Agreed-to is the
+    # terminal authoritative text for a resolution.
+    versions = [
+        TextVersion(code="ih", date="2025-06-01", type_label="Introduced in House"),
+        TextVersion(code="ath", date="", type_label="Agreed to House"),
+    ]
+    assert order_versions(versions)[0].code == "ath"
+    assert order_versions(
+        [
+            TextVersion(code="is", date="2025-06-01", type_label="Introduced in Senate"),
+            TextVersion(code="ats", date="", type_label="Agreed to Senate"),
+        ]
+    )[0].code == "ats"
+
+
+def test_f1_negative_terminal_versions_never_win():
+    # "Latest" means most authoritative text, not most recent artifact. Failed
+    # passage / laid on table / indefinitely postponed / vitiated are chronologically
+    # LAST and not authoritative, so a rank-only-by-chronology table picks exactly
+    # the wrong one. Every negative code must lose to any real text stage.
+    for negative in ("fph", "fps", "fah", "lth", "lts", "iph", "ips", "pav"):
+        versions = [
+            TextVersion(code=negative, date="2025-12-31", type_label="negative"),
+            TextVersion(code="ih", date="2025-01-01", type_label="Introduced in House"),
+        ]
+        assert order_versions(versions)[0].code == "ih", negative
+        assert version_category(negative) == NEGATIVE
+    # ... and lose to an UNKNOWN code too: a code GPO adds later may be a new
+    # authoritative stage, whereas these are known not to be.
+    assert order_versions(
+        [
+            TextVersion(code="fph", date="2025-12-31", type_label="Failed Passage House"),
+            TextVersion(code="xz", date="2025-01-01", type_label="Future GPO code"),
+        ]
+    )[0].code == "xz"
+
+
+def test_f1_administrative_versions_do_not_displace_the_stage_they_annotate():
+    # Sponsor changes and print orders are chronologically later but textually
+    # identical to the stage they annotate, so they must never displace it -- and
+    # must not displace a LATER stage either.
+    for admin in ("ash", "sas", "sc", "as", "oph", "ops", "pwah", "rhuc"):
+        assert version_category(admin) == ADMINISTRATIVE
+        versions = [
+            TextVersion(code=admin, date="2025-12-31", type_label="administrative"),
+            TextVersion(code="rh", date="2025-01-01", type_label="Reported in House"),
+        ]
+        assert order_versions(versions)[0].code == "rh", admin
+
+
+def test_f1_second_chamber_receipt_sits_after_engrossment_not_with_introduced():
+    # rfh/rfs (and the rdh/rds/hdh/hds siblings) carry the ORIGINATING chamber's
+    # passed text; ranking them with ih/is would bury a passed bill under its own
+    # introduced version.
+    for received in ("rfh", "rfs", "rdh", "rds", "hdh", "hds"):
+        assert order_versions(
+            [
+                TextVersion(code=received, date="", type_label="received"),
+                TextVersion(code="is", date="2025-12-31", type_label="Introduced in Senate"),
+            ]
+        )[0].code == received
+
+
+def test_f1_precedence_table_covers_every_published_govinfo_code():
+    # The table was 17 of GovInfo's 53 published codes, and BOTH correctness bugs
+    # F1 names were absences rather than misplacements. Pin the full published list
+    # (govinfo.gov/help/bills) so a future code addition is a visible test failure
+    # rather than a silent precedence-0 fallthrough.
+    published = {
+        "as", "ash", "ath", "ats", "cdh", "cds", "cph", "cps", "eah", "eas",
+        "eh", "eph", "enr", "es", "fah", "fph", "fps", "hdh", "hds", "ih",
+        "iph", "ips", "is", "lth", "lts", "oph", "ops", "pap", "pav", "pch",
+        "pcs", "pp", "pwah", "rah", "ras", "rch", "rcs", "rdh", "rds", "reah",
+        "renr", "res", "rfh", "rfs", "rh", "rhuc", "rih", "ris", "rs", "rth",
+        "rts", "sas", "sc",
+    }
+    assert len(published) == 53
+    assert published - set(VERSION_CODES) == set(), "published codes missing from the table"
+    assert set(VERSION_CODES) - published == set(), "table carries codes GovInfo does not publish"
+    # Every code carries a category, not just a rank -- the categorisation is what
+    # keeps a later editor from "correcting" a rank back toward chronological order.
+    assert all(
+        category in {TEXT_STAGE, REISSUE, ADMINISTRATIVE, NEGATIVE}
+        for _, category in VERSION_CODES.values()
+    )
+
+
+def test_f1_non_text_stage_selection_is_disclosed_to_the_caller():
+    # Rank keeps these from displacing real text but says nothing when one is
+    # selected anyway because it is all the bill has. Silence there presents a
+    # failed-passage artifact as the latest text -- wrong answer, success envelope.
+    assert "negative or terminated action" in (_category_note("fph") or "")
+    assert "administrative version" in (_category_note("ash") or "")
+    assert _category_note("enr") is None
+    assert _category_note("renr") is None
 
 
 def test_byte_split_enforces_cap_on_unbroken_paragraph():
