@@ -310,15 +310,39 @@ def test_f4_deleted_phrase_remains_absent_from_the_corpus():
     This assertion is what makes the zero mean *absent* rather than *unexamined*: if
     it ever fires, that firing IS the live document to design the handling against.
     Struck PHRASES would otherwise be emitted as ordinary operative text.
+
+    WATCHING THE NON-EMPTY SHAPE, refined on evidence. The first corpus expansion
+    fired this assertion, which is the mechanism working -- and the document it
+    pointed at settled the design: BILLS-115hr1625enr carries exactly one
+    <deleted-phrase>, and it is EMPTY (`<deleted-phrase
+    reported-display-style="strikethrough"></deleted-phrase>` inside an
+    appropriations text block). An empty element contributes no segments and cannot
+    leak struck language; verified against the parser, which emits nothing for it.
+    A NON-EMPTY one still would -- measured, its text comes out `operative` with no
+    marker -- and still measures zero. So the watch narrows to the shape that can
+    actually fail. An assertion that fires on an inert element trains its reader to
+    ignore it, which is how a watched zero stops being watched.
     """
     offenders = []
+    empty_seen = 0
     for entry, path in _AVAILABLE:
-        count = path.read_bytes().count(b"<deleted-phrase")
-        if count:
-            offenders.append(f"{entry['package_id']}: {count}")
+        data = path.read_bytes()
+        if b"<deleted-phrase" not in data:
+            continue
+        root = ET.fromstring(data)
+        for elem in root.iter():
+            if P.local_name(elem) != "deleted-phrase":
+                continue
+            if "".join(elem.itertext()).strip():
+                offenders.append(entry["package_id"])
+            else:
+                empty_seen += 1
     assert not offenders, (
-        "<deleted-phrase> now occurs in the corpus: " + ", ".join(offenders) + ". "
-        "F4 handled only changed=\"deleted\" because the inline form measured 0. "
-        "Design the handling against these documents -- struck phrases are currently "
-        "emitted as operative text, inline, with no marker."
+        "A NON-EMPTY <deleted-phrase> now occurs in: " + ", ".join(sorted(set(offenders)))
+        + ". F4 handled only changed=\"deleted\" because the inline form measured 0 "
+        "non-empty occurrences. Design the handling against these documents -- struck "
+        "phrases are currently emitted as ordinary operative text, inline, unmarked."
     )
+    # Pin the empty form too, so a change in its frequency is visible rather than
+    # silently absorbed: 1 across the 20-package corpus at time of writing.
+    assert empty_seen <= 5, f"empty <deleted-phrase> count jumped to {empty_seen}; re-examine"
