@@ -244,6 +244,13 @@ def _is_provenance_cite(text: str, start: int) -> bool:
 class Segment:
     context: str
     text: str
+    # True when this segment CONTINUES the preceding inline run rather than starting a
+    # new block (F12). An inline <quote> must still be its own segment -- §6 needs one
+    # context per segment and the amendatory safety property depends on it -- but it
+    # sits mid-sentence, so joining it with the BLOCK separator fractures the sentence:
+    #     "...(commonly known as the" | "Indian Civil Rights Act of 1968" | ") is amended"
+    # rendered as three blocks. The split is structurally required; the separator is not.
+    inline: bool = False
 
 
 @dataclass
@@ -256,7 +263,9 @@ class Unit:
 
     @property
     def display_text(self) -> str:
-        return "\n\n".join(segment.text for segment in self.segments if segment.text).strip()
+        # Same join as render_segments, minus the delimiters, so byte_length and the
+        # segment-concatenation invariant stay coherent with what a caller reads.
+        return join_segments(self.segments, render=False)
 
     @property
     def byte_length(self) -> int:
@@ -724,14 +733,18 @@ def extract_segments(elem: ET.Element, unit_header: str | None, in_quote: bool =
         # quoted text and emit it as a trailing operative segment; otherwise it reads
         # as '"(D) the Coast Guard. ; and"' with the connective swallowed (spec §6).
         out: list[Segment] = []
-        quoted_text = strip_quote_delimiters(element_text(elem, exclude={"after-quoted-block"}))
+        # flatten_quoted, not element_text: preserves block boundaries between the
+        # structural units of inserted material (F12, second direction).
+        quoted_text = strip_quote_delimiters(flatten_quoted(elem))
         if quoted_text:
-            out.append(Segment("quoted", quoted_text))
+            out.append(Segment("quoted", quoted_text, inline=is_inline_quote(elem)))
         for child in list(elem):
             if local_name(child) == "after-quoted-block":
                 connective = element_text(child)
                 if connective:
-                    out.append(Segment("operative", connective))
+                    # The connective follows the inserted material in the same
+                    # sentence, so it continues the run rather than starting a block.
+                    out.append(Segment("operative", connective, inline=True))
         return [segment for segment in out if segment.text]
     if name == "header" and unit_header and not in_quote:
         text = element_text(elem)
@@ -746,6 +759,7 @@ def extract_segments(elem: ET.Element, unit_header: str | None, in_quote: bool =
     # tails). It is flushed to a segment only at a real block boundary, so inline
     # elements never split a sentence into separate blocks.
     run = ""
+    run_inline = False
     if elem.text and elem.text.strip() and name not in {"bill", "legis-body", "resolution-body"}:
         run = normalize_text(elem.text)
     for child in list(elem):
@@ -774,13 +788,19 @@ def extract_segments(elem: ET.Element, unit_header: str | None, in_quote: bool =
         # Block child, or a context-changing quote/quoted-block: end the current
         # inline run, emit the child's own segments, then resume with its tail.
         if run:
-            segments.append(Segment(context, run))
+            segments.append(Segment(context, run, inline=run_inline))
             run = ""
+            run_inline = False
         segments.extend(extract_segments(child, unit_header, quote_now))
         if child.tail and child.tail.strip():
             run = _join_inline(run, normalize_text(child.tail))
+            # Text following an INLINE quote continues that sentence, so the run it
+            # starts must not be rendered as a new block (F12).
+            run_inline = run_inline or (
+                child_name in {"quote", "quoted-block"} and is_inline_quote(child)
+            )
     if run:
-        segments.append(Segment(context, run))
+        segments.append(Segment(context, run, inline=run_inline))
     if not segments and name not in {"bill", "legis-body", "resolution-body"}:
         text = element_text(elem)
         if text:
@@ -817,6 +837,68 @@ _QUOTE_CLOSE = '"'
 _ATTACH_PUNCT = ".,;:)]}%!?"
 
 
+# Structural levels that are their own block INSIDE quoted material. Flattening a
+# quoted-block with a plain space join ran sibling units together --
+# "(2) Annual basis.-(A) In general.-..." -- losing every boundary in an inserted
+# chapter, which is exactly the material a reader most needs structured.
+_QUOTED_BLOCK_LEVEL = {
+    "division", "title", "subtitle", "chapter", "subchapter", "part", "subpart",
+    "section", "subsection", "paragraph", "subparagraph", "clause", "subclause",
+    "item", "subitem",
+}
+
+
+def is_inline_quote(elem: ET.Element) -> bool:
+    """Does this quoting element flow inline, or stand as its own block?
+
+    Measured across the 20-package corpus rather than assumed: <quote> carries
+    display-inline on 0 of 38,277 occurrences -- it is the inline quoting element by
+    nature -- while <quoted-block> is block on 7,535 and explicitly inline on 208
+    (display-inline="yes-display-inline"). So the document declares it, and the only
+    inference is for <quote>, where the absence is total.
+    """
+    if local_name(elem) == "quote":
+        return True
+    return elem.get("display-inline") == "yes-display-inline"
+
+
+def flatten_quoted(elem: ET.Element) -> str:
+    """Flatten quoted material, preserving block boundaries between structural units.
+
+    element_text joins every child with a single space, which is right for inline
+    runs and wrong across sibling paragraphs. Whitespace only -- no token changes --
+    so the FTS index and every search result are unaffected; this alters how quoted
+    material READS, not what it matches.
+    """
+    out = ""
+
+    def add(piece: str, block: bool = False) -> None:
+        nonlocal out
+        if not piece:
+            return
+        if not out:
+            out = piece
+        elif block:
+            out += f"\n\n{piece}"
+        elif piece[:1] in _ATTACH_PUNCT:
+            out += piece
+        else:
+            out += f" {piece}"
+
+    if elem.text and elem.text.strip():
+        add(normalize_text(elem.text))
+    for child in list(elem):
+        name = local_name(child)
+        if name in SKIP_NAMES or name == "toc" or name == "after-quoted-block" or is_struck(child):
+            if child.tail and child.tail.strip():
+                add(normalize_text(child.tail))
+            continue
+        add(flatten_quoted(child), block=name in _QUOTED_BLOCK_LEVEL)
+        if child.tail and child.tail.strip():
+            add(normalize_text(child.tail))
+    return out
+
+
 def strip_quote_delimiters(text: str) -> str:
     """Remove one leading + one trailing source quote mark (the wrapping pair)."""
     stripped = text.strip()
@@ -825,6 +907,35 @@ def strip_quote_delimiters(text: str) -> str:
     if stripped[-1:] in _CLOSE_QUOTE_CHARS:
         stripped = stripped[:-1]
     return stripped.strip()
+
+
+def join_segments(segments: list[Segment], render: bool) -> str:
+    """Join segments, distinguishing an INLINE continuation from a BLOCK boundary.
+
+    §5's rule -- inline elements flow into the surrounding run, block elements
+    separate with "\\n\\n" -- was applied in reverse for quotes: an inline <quote>
+    got the block separator. One join function serves both display_text (render=False,
+    clean) and render_segments (render=True, delimiters on quoted spans), so the two
+    can never disagree about where a boundary falls.
+    """
+    out = ""
+    for segment in segments:
+        if not segment.text:
+            continue
+        piece = (
+            f"{_QUOTE_OPEN}{segment.text}{_QUOTE_CLOSE}"
+            if render and segment.context == "quoted"
+            else segment.text
+        )
+        if not out:
+            out = piece
+        elif piece[:1] in _ATTACH_PUNCT:
+            out += piece            # terminator hugs the preceding piece, no space
+        elif segment.inline:
+            out += f" {piece}"      # mid-sentence: continue the run
+        else:
+            out += f"\n\n{piece}"   # real block boundary
+    return out.strip()
 
 
 def render_segments(segments: list[Segment]) -> str:
@@ -837,18 +948,7 @@ def render_segments(segments: list[Segment]) -> str:
     relies on when it declines server-side direction inference. Trailing
     punctuation hugs a closing delimiter rather than orphaning after it.
     """
-    out = ""
-    for segment in segments:
-        if not segment.text:
-            continue
-        piece = f"{_QUOTE_OPEN}{segment.text}{_QUOTE_CLOSE}" if segment.context == "quoted" else segment.text
-        if not out:
-            out = piece
-        elif piece[:1] in _ATTACH_PUNCT:
-            out += piece
-        else:
-            out += f"\n\n{piece}"
-    return out.strip()
+    return join_segments(segments, render=True)
 
 
 def direct_text(elem: ET.Element, child_name: str) -> str | None:

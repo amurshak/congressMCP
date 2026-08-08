@@ -26,6 +26,7 @@ from congress_api.features.bill_text.parser import (
     byte_split_unit,
     node_kind_for,
     parse_bill_xml,
+    render_segments,
 )
 from congress_api.features.bill_text.tools import (
     _hidden_section_count,
@@ -1316,6 +1317,68 @@ def test_subdivide_disambiguates_colliding_subsection_enums():
     parent = next(u for u in parsed.units if u.section_id == "S:1832")
     assert parent.child_ids.count("S:1832/SS:(e)") == 1                  # not duplicated
     assert "S:1832/SS:(e)#2" in parent.child_ids                         # both assembled
+
+
+def test_f12_inline_quote_does_not_fracture_its_sentence():
+    # F12, first direction. An inline <quote> must stay its own SEGMENT -- §6 needs one
+    # context per segment and the amendatory property depends on it -- but it sits
+    # mid-sentence, so joining it with the BLOCK separator split one sentence into
+    # three blocks. The split is structurally required; the separator was not.
+    xml = (
+        b"<bill><legis-body><section><enum>804</enum><header>Tribal jurisdiction</header>"
+        b"<text>Section 204 of Public Law 90-284 (25 U.S.C. 1304) (commonly known as the "
+        b"<quote>Indian Civil Rights Act of 1968</quote>) is amended-</text>"
+        b"</section></legis-body></bill>"
+    )
+    unit = parse_bill_xml(xml, "X", "enr", None).units[0]
+    rendered = render_segments(unit.segments)
+    assert '(commonly known as the "Indian Civil Rights Act of 1968") is amended' in rendered
+    assert "the\n\n\"Indian" not in rendered      # the fracture this fixes
+    # The segment structure is UNCHANGED -- three segments, contexts intact -- because
+    # collapsing them would destroy what match_contexts reports.
+    assert [s.context for s in unit.segments] == ["header", "operative", "quoted", "operative"]
+    assert unit.segments[2].inline and unit.segments[3].inline
+
+
+def test_f12_block_quoted_block_still_separates():
+    # The inverse must not regress: a block-level <quoted-block> is a block, and only
+    # an explicit display-inline="yes-display-inline" makes one inline. Measured:
+    # <quote> carries display-inline on 0 of 38,277 occurrences, <quoted-block> is
+    # block on 7,535 and explicitly inline on 208.
+    block = (
+        b"<bill><legis-body><section><enum>1</enum><header>H</header>"
+        b"<text>is amended by adding at the end the following:</text>"
+        b"<quoted-block display-inline=\"no-display-inline\"><text>New material.</text></quoted-block>"
+        b"</section></legis-body></bill>"
+    )
+    unit = parse_bill_xml(block, "X", "enr", None).units[0]
+    assert "\n\n\"New material.\"" in render_segments(unit.segments)
+    assert not any(s.inline for s in unit.segments if s.context == "quoted")
+
+    inline = block.replace(b'no-display-inline', b'yes-display-inline')
+    unit2 = parse_bill_xml(inline, "X", "enr", None).units[0]
+    assert any(s.inline for s in unit2.segments if s.context == "quoted")
+
+
+def test_f12_quoted_material_keeps_its_block_structure():
+    # F12, second direction. Flattening quoted material with a plain space join ran
+    # sibling units together -- "(2) Annual basis.-(A) In general.-..." -- losing every
+    # boundary in an inserted chapter, which is the material a reader most needs
+    # structured. Whitespace only, so no token changes and search is unaffected.
+    xml = (
+        b"<bill><legis-body><section><enum>1</enum><header>H</header>"
+        b"<text>is amended to read as follows:</text>"
+        b"<quoted-block><section><enum>333.</enum><header>Training courses</header>"
+        b"<paragraph><enum>(2)</enum><header>Annual basis</header><text>Once each year.</text></paragraph>"
+        b"<paragraph><enum>(3)</enum><header>Covered recipients</header><text>Flag officers.</text></paragraph>"
+        b"</section></quoted-block></section></legis-body></bill>"
+    )
+    unit = parse_bill_xml(xml, "X", "enr", None).units[0]
+    quoted = next(s.text for s in unit.segments if s.context == "quoted")
+    assert "Once each year.\n\n(3) Covered recipients" in quoted   # siblings separated
+    assert "Once each year. (3)" not in quoted                     # the run-together
+    # Enum and header still ride WITH their own text -- they are one block, not three.
+    assert "(2) Annual basis Once each year." in quoted
 
 
 def test_amends_usc_section_suffix_accepts_any_unicode_dash():
