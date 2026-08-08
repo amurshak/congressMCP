@@ -1,26 +1,148 @@
 {
-  "rationale": "Extended corpus for 'does this construction occur in the wild' checks -- the third fixture category (spec §10). Distinct from trimmed fixtures (guard regressions) and acceptance fixtures (does this parse correctly). Chosen for DRAFTING-STYLE variety across shops -- tax, emergency, appropriations, defense authorization, infrastructure, reconciliation -- because that variety is what surfaced the VAWA/WRDA intro-<quote> mislabels (0/53 on acceptance fixtures, 2/571 here). Grow by widening STYLE, not volume; the obvious uncovered axes are chamber (these skew House/enrolled) and vintage (114th and earlier predate parts of the Bill DTD).",
+  "rationale": "Extended corpus for 'does this construction occur in the wild' checks -- the third fixture category (spec \u00a710). Distinct from trimmed fixtures (guard regressions) and acceptance fixtures (does this parse correctly). Chosen for DRAFTING-STYLE variety across shops -- tax, emergency, appropriations, defense authorization, infrastructure, reconciliation -- because that variety is what surfaced the VAWA/WRDA intro-<quote> mislabels (0/53 on acceptance fixtures, 2/571 here). Grow by widening STYLE, not volume; the obvious uncovered axes are chamber (these skew House/enrolled) and vintage (114th and earlier predate parts of the Bill DTD). F4 added the first REPORTED versions (rh/rs): committee change-tracking markup (changed=\"added\"/\"deleted\", reported-display-style, <deleted-phrase>) is declared by the Bill DTD but occurs in NO enrolled, engrossed, or introduced version -- measured 0 across enr/eh/es/is probes, and present in 38 of 80 sampled reported packages. A corpus without a reported version cannot see it at all.",
   "cache_env": "BILL_TEXT_CORPUS_CACHE",
   "cache_default": "tests/corpus/cache",
   "source": "https://api.govinfo.gov/packages/{package_id}/xml (X-Api-Key; enrolled text is immutable so sha256 is stable)",
   "packages": [
-    {"package_id": "BILLS-115hr1enr",    "version": "enr", "category": "tax",              "note": "Tax Cuts and Jobs Act -- dense USC amendment", "sha256": "6e39585027a03d172b078093aa5ae83cedbfb19fca8c48113a74482ff5f1cccf"},
-    {"package_id": "BILLS-117hr5376enr", "version": "enr", "category": "reconciliation",   "note": "Inflation Reduction Act -- tax/climate reconciliation", "sha256": "0d0585b6b72d7601aa52a1a98b6bf0fc86be0463486847fa3e454dfa25698a24"},
-    {"package_id": "BILLS-116hr748enr",  "version": "enr", "category": "emergency",        "note": "CARES Act -- fast-drafted emergency relief", "sha256": "08da5eef47697d975a1159c61d19076e69e6a9b9bcda3a0ebdad5fcfdcaa56bf"},
-    {"package_id": "BILLS-116hr133enr",  "version": "enr", "category": "appropriations",   "note": "Consolidated Approps 2021 -- WRDA intro-<quote> trigger (S:401)", "sha256": "4d0cf97f95218d17eee1e8557510d7b2abca7274bbbc4aa5b67b9e13a294e9d8"},
-    {"package_id": "BILLS-117hr2471enr", "version": "enr", "category": "appropriations",   "note": "Consolidated Approps 2022 -- VAWA intro-<quote> trigger (S:804)", "sha256": "cab7cbd0c02c7c90f384204c85cfbf7d6c2f2c46738536420a5b5ed4a9379288"},
-    {"package_id": "BILLS-115hr1625enr", "version": "enr", "category": "appropriations",   "note": "Consolidated Approps 2018", "sha256": "accc8796b3c0e74fac6a24be7194367cc01bf1409abda589d06ecae57d1050fe"},
-    {"package_id": "BILLS-116hr1865enr", "version": "enr", "category": "appropriations",   "note": "Further Consolidated Approps 2020", "sha256": "b13ca6e656e4c2a5f870f87101bd74c26a1966863664f38ae76bc8deb69d0495"},
-    {"package_id": "BILLS-118hr4366enr", "version": "enr", "category": "appropriations",   "note": "Approps minibus FY24", "sha256": "63ae3f506d9e06145b3713736e8c3122e90fe1261abcc8a67b19ab726e14cdb9"},
-    {"package_id": "BILLS-117hr3684enr", "version": "enr", "category": "infrastructure",   "note": "Infrastructure Investment and Jobs Act", "sha256": "6248d904729c0e4d1a98133fc6c4e56435a94c2b234344e559346864f27a7d82"},
-    {"package_id": "BILLS-115hr2810enr", "version": "enr", "category": "defense-auth",     "note": "NDAA FY18", "sha256": "8bfbed21e377e746212fa58ca5aa42da368547f44a106eef9e6df683370de771"},
-    {"package_id": "BILLS-116s1790enr",  "version": "enr", "category": "defense-auth",     "note": "NDAA FY20", "sha256": "4859ab02cdc794007b3656ab8865d445b6746d54618b68d8ad02a989dc1f6fdd"},
-    {"package_id": "BILLS-116hr6395enr", "version": "enr", "category": "defense-auth",     "note": "NDAA FY21", "sha256": "410d1a224a5abb963413628b36013f7ddf4c47d496b581713dac4af81889921c"},
-    {"package_id": "BILLS-117hr7776enr", "version": "enr", "category": "defense-auth",     "note": "NDAA FY23 (James M. Inhofe)", "sha256": "4381b87c985a7ede5b188c9436e563f941cd19ae798f1a73b3484155e0e1a637"},
-    {"package_id": "BILLS-119s1071enr",  "version": "enr", "category": "defense-auth",     "note": "NDAA FY26 -- primary semantic ground-truth fixture", "sha256": "6f68c0a169cdcf49dd11283aa5a6e61b731479b6ba54ef2b25bd3469b18a02c0"},
-    {"package_id": "BILLS-119hr1enr",    "version": "enr", "category": "reconciliation",   "note": "119th H.R.1 enrolled", "sha256": "407ee1c00e44527a62231741359407f105394d2976e8c887a8382e7cbb48c12e"},
-    {"package_id": "BILLS-119hr3838eh",  "version": "eh",  "category": "acceptance",       "note": "Engrossed -- parser-robustness fixture (U+2011 defect lived here)", "sha256": "6f13746dfb6dfba4625cef9011000eef17db762c3bd15e45aaac01b7bed3db4d"},
-    {"package_id": "BILLS-119hres463ih", "version": "ih",  "category": "resolution",       "note": "Simple resolution with preamble (introduced)", "sha256": "7efc69a2807b04a134da9670185134146c7443ee94d09c16830a3940e510084c"},
-    {"package_id": "BILLS-119s4977is",   "version": "is",  "category": "acceptance",       "note": "Small introduced bill", "sha256": "0363b9b6b84cdc2c5c2692db53ed55e41489c0d1a1395a3070d98ceb20fc647b"}
+    {
+      "package_id": "BILLS-115hr1enr",
+      "version": "enr",
+      "category": "tax",
+      "note": "Tax Cuts and Jobs Act -- dense USC amendment",
+      "sha256": "6e39585027a03d172b078093aa5ae83cedbfb19fca8c48113a74482ff5f1cccf"
+    },
+    {
+      "package_id": "BILLS-117hr5376enr",
+      "version": "enr",
+      "category": "reconciliation",
+      "note": "Inflation Reduction Act -- tax/climate reconciliation",
+      "sha256": "0d0585b6b72d7601aa52a1a98b6bf0fc86be0463486847fa3e454dfa25698a24"
+    },
+    {
+      "package_id": "BILLS-116hr748enr",
+      "version": "enr",
+      "category": "emergency",
+      "note": "CARES Act -- fast-drafted emergency relief",
+      "sha256": "08da5eef47697d975a1159c61d19076e69e6a9b9bcda3a0ebdad5fcfdcaa56bf"
+    },
+    {
+      "package_id": "BILLS-116hr133enr",
+      "version": "enr",
+      "category": "appropriations",
+      "note": "Consolidated Approps 2021 -- WRDA intro-<quote> trigger (S:401)",
+      "sha256": "4d0cf97f95218d17eee1e8557510d7b2abca7274bbbc4aa5b67b9e13a294e9d8"
+    },
+    {
+      "package_id": "BILLS-117hr2471enr",
+      "version": "enr",
+      "category": "appropriations",
+      "note": "Consolidated Approps 2022 -- VAWA intro-<quote> trigger (S:804)",
+      "sha256": "cab7cbd0c02c7c90f384204c85cfbf7d6c2f2c46738536420a5b5ed4a9379288"
+    },
+    {
+      "package_id": "BILLS-115hr1625enr",
+      "version": "enr",
+      "category": "appropriations",
+      "note": "Consolidated Approps 2018",
+      "sha256": "accc8796b3c0e74fac6a24be7194367cc01bf1409abda589d06ecae57d1050fe"
+    },
+    {
+      "package_id": "BILLS-116hr1865enr",
+      "version": "enr",
+      "category": "appropriations",
+      "note": "Further Consolidated Approps 2020",
+      "sha256": "b13ca6e656e4c2a5f870f87101bd74c26a1966863664f38ae76bc8deb69d0495"
+    },
+    {
+      "package_id": "BILLS-118hr4366enr",
+      "version": "enr",
+      "category": "appropriations",
+      "note": "Approps minibus FY24",
+      "sha256": "63ae3f506d9e06145b3713736e8c3122e90fe1261abcc8a67b19ab726e14cdb9"
+    },
+    {
+      "package_id": "BILLS-117hr3684enr",
+      "version": "enr",
+      "category": "infrastructure",
+      "note": "Infrastructure Investment and Jobs Act",
+      "sha256": "6248d904729c0e4d1a98133fc6c4e56435a94c2b234344e559346864f27a7d82"
+    },
+    {
+      "package_id": "BILLS-115hr2810enr",
+      "version": "enr",
+      "category": "defense-auth",
+      "note": "NDAA FY18",
+      "sha256": "8bfbed21e377e746212fa58ca5aa42da368547f44a106eef9e6df683370de771"
+    },
+    {
+      "package_id": "BILLS-116s1790enr",
+      "version": "enr",
+      "category": "defense-auth",
+      "note": "NDAA FY20",
+      "sha256": "4859ab02cdc794007b3656ab8865d445b6746d54618b68d8ad02a989dc1f6fdd"
+    },
+    {
+      "package_id": "BILLS-116hr6395enr",
+      "version": "enr",
+      "category": "defense-auth",
+      "note": "NDAA FY21",
+      "sha256": "410d1a224a5abb963413628b36013f7ddf4c47d496b581713dac4af81889921c"
+    },
+    {
+      "package_id": "BILLS-117hr7776enr",
+      "version": "enr",
+      "category": "defense-auth",
+      "note": "NDAA FY23 (James M. Inhofe)",
+      "sha256": "4381b87c985a7ede5b188c9436e563f941cd19ae798f1a73b3484155e0e1a637"
+    },
+    {
+      "package_id": "BILLS-119s1071enr",
+      "version": "enr",
+      "category": "defense-auth",
+      "note": "NDAA FY26 -- primary semantic ground-truth fixture",
+      "sha256": "6f68c0a169cdcf49dd11283aa5a6e61b731479b6ba54ef2b25bd3469b18a02c0"
+    },
+    {
+      "package_id": "BILLS-119hr1enr",
+      "version": "enr",
+      "category": "reconciliation",
+      "note": "119th H.R.1 enrolled",
+      "sha256": "407ee1c00e44527a62231741359407f105394d2976e8c887a8382e7cbb48c12e"
+    },
+    {
+      "package_id": "BILLS-119hr3838eh",
+      "version": "eh",
+      "category": "acceptance",
+      "note": "Engrossed -- parser-robustness fixture (U+2011 defect lived here)",
+      "sha256": "6f13746dfb6dfba4625cef9011000eef17db762c3bd15e45aaac01b7bed3db4d"
+    },
+    {
+      "package_id": "BILLS-119hres463ih",
+      "version": "ih",
+      "category": "resolution",
+      "note": "Simple resolution with preamble (introduced)",
+      "sha256": "7efc69a2807b04a134da9670185134146c7443ee94d09c16830a3940e510084c"
+    },
+    {
+      "package_id": "BILLS-119s4977is",
+      "version": "is",
+      "category": "acceptance",
+      "note": "Small introduced bill",
+      "sha256": "0363b9b6b84cdc2c5c2692db53ed55e41489c0d1a1395a3070d98ceb20fc647b"
+    },
+    {
+      "package_id": "BILLS-119s4726rs",
+      "version": "rs",
+      "category": "reported-senate",
+      "note": "PEACE in Sudan Act as reported -- Senate committee substitute ('strike all after the enacting clause, insert the part printed in italic'). Carries changed=\"deleted\" on 16 of 33 sections: the STRUCK original and the substitute both appear in one document. Required by F4; the acceptance fixtures and the original 18 packages are all enr/eh/is, where this markup never occurs.",
+      "sha256": "566ea80efe9f3e9423d0a15c00eafd65320cff4fa5a43b2ff9cff6925fb26b7b"
+    },
+    {
+      "package_id": "BILLS-118hr2670rh",
+      "version": "rh",
+      "category": "reported-house",
+      "note": "FY2024 NDAA as reported in the House -- large reported bill, House committee style, widens the chamber axis the manifest rationale names as uncovered. Carries changed=\"added\"/reported-display-style but no changed=\"deleted\", so it pins the ADDED half of the change-tracking markup.",
+      "sha256": "97123967957ba156241379b89d5d3ffb1ac49ef6eb799f921e6fe86e944a641f"
+    }
   ]
 }
