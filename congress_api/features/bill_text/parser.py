@@ -162,13 +162,36 @@ AMENDS_RE = re.compile(
     + _HUG,
     re.IGNORECASE,
 )
+# Section suffixes are joined by ANY unicode dash, not just the ASCII hyphen. The
+# source writes "42 U.S.C. 1395w-4" and "16 U.S.C. 3839aa-2" with U+2013, and the
+# ASCII-only class made the hug fail on the dash -- so EVERY en-dash-suffixed section
+# was dropped from `amends` even when perfectly hugged by an amendatory verb. Same
+# defect the P.L. form already carried and had corrected (repro S:549E); the USC form
+# was missed then. Found by V19 Population B, which flagged units as "short" that were
+# short for this reason rather than for A5's accepted recall cost.
+#
+# Precision re-checked at V13's standard before widening the gate: 198 newly-captured
+# cites corpus-wide, hand-coded sample n=30 (seed 13), 30/30 genuine amendment targets
+# -- every one "Section X of [Act] (N U.S.C. Y-Z) is amended by ...". No ranges, no
+# cross-references, no provenance cites.
+_SECTION_DASH = "\\-\u2010-\u2015"
 AMENDS_USC_RE = re.compile(
-    r"\b(\d+)\s+U\.?\s?S\.?\s?C\.?\s+"          # title N U.S.C.
-    r"(\d+[A-Za-z]*(?:-\d+)?)"                   # section: 823, 1395ww, 1395w-4
-    r"(?:\([0-9A-Za-z]+\))*"                     # optional subsection designators, e.g. (a)(1)
+    r"\b(\d+)\s+U\.?\s?S\.?\s?C\.?\s+"                        # title N U.S.C.
+    rf"(\d+[A-Za-z]*(?:[{_SECTION_DASH}]\d+[A-Za-z]*)?)"      # section: 823, 1395ww, 1395w-4
+    r"(?:\([0-9A-Za-z]+\))*"                                  # optional designators, e.g. (a)(1)
     + _HUG,
     re.IGNORECASE,
 )
+
+
+def _normalize_section_dash(section: str) -> str:
+    """Emit one canonical cite per target regardless of the dash the drafter typed.
+
+    Without this, the same section cited with U+2013 in one clause and a hyphen in
+    another yields two entries in `amends` for one target -- the de-duplication
+    failure the P.L. form was fixed for, reproduced in the USC form.
+    """
+    return re.sub(f"[{_SECTION_DASH}]", "-", section)
 AMENDS_PL_RE = re.compile(
     r"\b(?:Public\s+Law|Pub\.?\s*L\.?|P\.?\s*L\.?)\s*\.?\s*"
     # Congress-number joined by ANY unicode hyphen/dash. The bill mixes them: a
@@ -280,7 +303,7 @@ class Unit:
         for match in AMENDS_USC_RE.finditer(operative_text):
             if _is_provenance_cite(operative_text, match.start()):
                 continue
-            found.add(("usc", f"{match.group(1)} U.S.C. {match.group(2)}"))
+            found.add(("usc", f"{match.group(1)} U.S.C. {_normalize_section_dash(match.group(2))}"))
         # Public Law targets, preferring the P.L. form. The P.L. pattern absorbs a
         # same-instance Statutes-at-Large cite; a standalone Stat cite is emitted
         # only where no P.L. match covers its span (so one enactment cited two ways

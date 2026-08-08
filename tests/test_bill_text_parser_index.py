@@ -1318,6 +1318,40 @@ def test_subdivide_disambiguates_colliding_subsection_enums():
     assert "S:1832/SS:(e)#2" in parent.child_ids                         # both assembled
 
 
+def test_amends_usc_section_suffix_accepts_any_unicode_dash():
+    # The source writes "42 U.S.C. 1395w-4" and "16 U.S.C. 3839aa-2" with U+2013. The
+    # ASCII-only suffix class made the verb hug fail ON THE DASH, so every en-dash
+    # suffixed section was dropped from `amends` even when perfectly hugged -- the
+    # same defect the P.L. form had already been corrected for (repro S:549E).
+    # Surfaced by V19 Population B: units flagged short for a fixable regex gap rather
+    # than for A5's accepted recall cost.
+    for dash in ("-", "‐", "‑", "–", "—"):
+        unit = Unit(
+            section_id="S:1",
+            ancestor_path=[],
+            header=None,
+            segments=[
+                Segment(
+                    "operative",
+                    "Section 1848(t)(1) of the Social Security Act "
+                    f"(42 U.S.C. 1395w{dash}4(t)(1)) is amended by striking the second sentence.",
+                )
+            ],
+        )
+        # Normalized to a single canonical cite: the same target written with different
+        # dashes must not yield two entries, which is why the P.L. form normalizes too.
+        assert unit.amends == [{"kind": "usc", "cite": "42 U.S.C. 1395w-4"}], dash
+
+    # The A5 gate is untouched: without the verb hug it still resolves nothing.
+    ungated = Unit(
+        section_id="S:2",
+        ancestor_path=[],
+        header=None,
+        segments=[Segment("operative", "Nothing in this section affects 42 U.S.C. 1395w–4.")],
+    )
+    assert ungated.amends == []
+
+
 def test_f4_struck_sections_are_excluded_and_disclosed():
     # The dominant real shape (measured: 162 of 219 changed="deleted" occurrences sit
     # on <section>): a Senate committee substitute -- "strike all after the enacting
