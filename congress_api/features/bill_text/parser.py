@@ -55,6 +55,36 @@ BLOCK_NAMES = {
     "resolving-clause",
 }
 SKIP_NAMES = {"toc", "page-break"}
+# Committee-struck text (F4). The Bill DTD marks it with changed="deleted" (declared
+# on the structure-attribute groups) plus reported-display-style="strikethrough";
+# there is no <DELETED> element, which an earlier reading of the spec assumed.
+#
+# Struck text is IN the document but is not part of the bill as reported -- the
+# dominant shape is the Senate committee substitute, "strike all after the enacting
+# clause and insert the part printed in italic", which carries the whole original
+# bill struck alongside its replacement. Emitting it produced two versions of the
+# same bill side by side: on 119s4726rs, 16 of 33 sections were struck, 18 ids took a
+# V8 `#n` collision suffix that hid what the collision MEANT, and get_bill_section("1")
+# resolved uniquely -- no ambiguity error -- to the struck text, because struck text
+# comes first in document order.
+#
+# Excluded rather than given a fourth context, mirroring A4's quoted-block carve-out:
+# markup present in the document that is not enacted text. match_contexts stays
+# three-valued. Struck material contributes NEITHER a unit NOR text, so a live unit's
+# display_text can never contain struck language (a struck <quoted-block> inside a
+# live section is dropped, not kept as a `quoted` segment).
+#
+# THE CARVE-OUT BINDS EVERY UNIT-EMITTING PATH. Enumerated, because a rule scoped to
+# the path it was found on has failed four times in this feature (A4, A5, intro
+# labelling, _subdivide):
+#   1. structural discovery      -- _Chunker.walk returns before _emit_addressable
+#   2. synthetic emission        -- same early return covers _emit_synthetic
+#   3. structural subdivision    -- _subdivide skips struck children
+#   4. byte fallback             -- byte_split_unit splits an already-emitted unit, so
+#                                   it is bound transitively: no struck unit can reach
+#                                   it. Pinned by test rather than left to inference.
+#   5. text extraction           -- extract_segments / element_text skip struck subtrees
+DELETED_MARK = "deleted"
 # Inline/typographic elements whose text flows into the surrounding run rather
 # than forming a block of its own. Emitting them as separate segments turns e.g.
 # "Coast Guard cutter <italic>Mackinaw</italic> (WLBB-30)" into three fake blocks
@@ -278,11 +308,36 @@ class ParsedBill:
     units: list[Unit]
     sections_indexed: int
     quotes_seen: set[str]
+    # Sections dropped because a committee struck them (F4). Drives the caller-facing
+    # note: an exclusion nobody is told about is the defect-#2 shape (content silently
+    # lost), so this count is what turns a silent drop into an active disclosure.
+    struck_sections_excluded: int = 0
     # section_id -> total bytes of the unit *and its descendant chunks*. A
     # subdivided section's own `byte_length` is just its intro (e.g. 73 B), which
     # reads as a tiny section when the real subtree is tens of KB; this exposes
     # the true size so a consumer is not misled (spec §5 resolution, decision 2).
     subtree_bytes: dict[str, int] = field(default_factory=dict)
+
+
+def is_struck(elem: ET.Element) -> bool:
+    """True if this element was struck by committee (F4).
+
+    Attribute-based, namespace-agnostic on the value, and deliberately narrow: only
+    the DTD's own changed="deleted". reported-display-style="strikethrough" is a
+    RENDERING hint that accompanies it, not an independent signal -- treating a
+    display style as evidence of the property would be the structural-marker mistake
+    this feature has made repeatedly.
+    """
+    return elem.get("changed") == DELETED_MARK
+
+
+def count_struck_sections(elem: ET.Element) -> int:
+    """Sections inside a struck subtree, for the caller-facing disclosure count."""
+    total = 1 if local_name(elem) == "section" else 0
+    for child in elem.iter():
+        if child is not elem and local_name(child) == "section":
+            total += 1
+    return total
 
 
 def normalize_enum(value: str | None) -> str | None:
@@ -359,6 +414,7 @@ def parse_bill_xml(xml_bytes: bytes, package_id: str, version: str, last_modifie
         units=chunker.units,
         sections_indexed=chunker.sections_indexed,
         quotes_seen=chunker.quotes_seen,
+        struck_sections_excluded=chunker.struck_sections_excluded,
         subtree_bytes=compute_subtree_bytes(chunker.units),
     )
 
@@ -370,6 +426,7 @@ class _Chunker:
         self.last_modified = last_modified
         self.units: list[Unit] = []
         self.sections_indexed = 0
+        self.struck_sections_excluded = 0
         self.synthetic_counts: defaultdict[str, int] = defaultdict(int)
         self.sibling_counts: defaultdict[tuple[str, str, str], int] = defaultdict(int)
         self.quotes_seen: set[str] = set()
@@ -377,6 +434,12 @@ class _Chunker:
     def walk(self, elem: ET.Element, path: list[AncestorNode]) -> None:
         name = local_name(elem)
         if name in SKIP_NAMES:
+            return
+        if is_struck(elem):
+            # Paths 1 and 2 of the carve-out: returning here forecloses both
+            # _emit_addressable and _emit_synthetic for this element and everything
+            # beneath it, so no struck subtree can produce an addressable unit.
+            self.struck_sections_excluded += count_struck_sections(elem)
             return
         if name in {"quote", "quoted-block"}:
             # V14 carve-out (spec §5): never emit an addressable unit from inside
@@ -470,7 +533,13 @@ class _Chunker:
 
     def _subdivide(self, elem: ET.Element, path: list[AncestorNode]) -> list[Unit]:
         for child_name in FALLBACK_CHAIN:
-            child_elems = [child for child in list(elem) if local_name(child) == child_name]
+            # Path 3 of the carve-out: a struck subsection/paragraph inside a live
+            # section must not become a child unit either.
+            child_elems = [
+                child
+                for child in list(elem)
+                if local_name(child) == child_name and not is_struck(child)
+            ]
             if not child_elems:
                 continue
             units = []
@@ -615,6 +684,12 @@ def extract_segments(elem: ET.Element, unit_header: str | None, in_quote: bool =
     segments: list[Segment] = []
     name = local_name(elem)
     if name in SKIP_NAMES or name == "toc":
+        return segments
+    # Path 5 of the carve-out: struck material contributes no TEXT either, so a live
+    # unit's display_text never carries language the committee removed. This is what
+    # covers a struck <quoted-block> inside a live section -- it is dropped, not kept
+    # as a `quoted` segment (match_contexts stays three-valued).
+    if is_struck(elem):
         return segments
     quote_now = in_quote or name in {"quote", "quoted-block"}
     if quote_now and name in {"quote", "quoted-block"}:
@@ -762,14 +837,14 @@ def direct_text(elem: ET.Element, child_name: str) -> str | None:
 
 
 def element_text(elem: ET.Element, exclude: set[str] | None = None) -> str:
-    if local_name(elem) in SKIP_NAMES or local_name(elem) == "toc":
+    if local_name(elem) in SKIP_NAMES or local_name(elem) == "toc" or is_struck(elem):
         return ""
     pieces: list[str] = []
     if elem.text:
         pieces.append(elem.text)
     for child in list(elem):
         child_name = local_name(child)
-        if child_name in SKIP_NAMES or child_name == "toc" or (exclude and child_name in exclude):
+        if child_name in SKIP_NAMES or child_name == "toc" or is_struck(child) or (exclude and child_name in exclude):
             if child.tail:
                 pieces.append(child.tail)
             continue

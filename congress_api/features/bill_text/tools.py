@@ -127,7 +127,28 @@ def _envelope(loaded: LoadedBillText) -> dict[str, Any]:
         "cache": CacheStatus(index_hit=False, version_hit=False).model_dump(),
         "sections_indexed": loaded.parsed.sections_indexed,
         "chunks_indexed": len(loaded.parsed.units),
+        "struck_text_note": _struck_text_note(loaded),
     }
+
+
+def _struck_text_note(loaded: LoadedBillText) -> str | None:
+    """Disclose committee-struck text that was excluded from the index (F4).
+
+    Names the count and where the text can still be read. An exclusion the caller is
+    not told about is the defect-#2 shape -- substance silently absent -- and the
+    caller cannot infer it, because a reported bill with its original struck looks
+    exactly like a reported bill that changed nothing.
+    """
+    excluded = loaded.parsed.struck_sections_excluded
+    if not excluded:
+        return None
+    return (
+        f"{excluded} section(s) struck by committee in this reported version were "
+        "excluded: they appear in the document with strikethrough markup but are not "
+        "part of the bill as reported, so they are neither searchable nor citable "
+        "here. The text as it stood before the committee acted is available by "
+        "requesting the prior version (e.g. version='is' or 'ih')."
+    )
 
 
 def _normalize_queries(queries: list[str]) -> tuple[list[str], dict[str, str], list[str]]:

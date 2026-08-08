@@ -298,6 +298,51 @@ def test_f15_log_record_factory_chains_to_the_previous_one(monkeypatch):
         trace._log_redaction_installed = True
 
 
+def test_f4_struck_text_note_is_active_and_reaches_every_tool(monkeypatch):
+    # F4 disclosure. Passive fields depend on the reader: §17 measured a consumer
+    # acting on version_resolution_note while ignoring match_contexts on the SAME
+    # response, so the exclusion is disclosed through the mechanism that demonstrably
+    # propagates -- a response-level note, on all three tools, naming the count and
+    # where the text is still readable.
+    from congress_api.features.bill_text.parser import parse_bill_xml
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    xml = (
+        b"<bill><legis-body>"
+        b'<section changed="deleted"><enum>1</enum><header>Struck</header><text>gone</text></section>'
+        b"<section><enum>1</enum><header>Substitute</header><text>polar security cutter</text></section>"
+        b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, PKG, "rs", None)
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText(PKG, "rs", "2026-08-08T00:00:00Z", None, None, xml),
+        parsed=parsed, index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools, "load_bill_text", fake_load)
+
+    for call, kwargs in (
+        (tools.search_bill_text, {"queries": ["polar security cutter"]}),
+        (tools.get_bill_section, {"section_id": "1"}),
+        (tools.get_bill_toc, {}),
+    ):
+        res = asyncio.run(call(_Ctx(), congress=119, bill_type="s", number=4726, **kwargs))
+        note = res["struck_text_note"]
+        assert note, f"{call.__name__} did not disclose the exclusion"
+        assert "1 section(s) struck" in note
+        assert "version=" in note                  # says where the text is still readable
+
+    # Null -- not absent, and not a zero-count sentence -- when nothing was struck.
+    # A note that fires on documents with nothing to disclose trains the reader to
+    # skip it, which is how the passive-field failure starts.
+    clean = _call(tools.get_bill_toc, congress=119, bill_type="s", number=1071, depth=2)
+    assert "struck_text_note" in clean and clean["struck_text_note"] is None
+
+
 def test_f15_traceback_channel_is_redacted_including_under_rich(monkeypatch):
     # Residual 1: a TRACEBACK does not pass through msg/args, so the record-factory
     # redaction misses it. Reachable for real -- httpx's raise_for_status embeds the

@@ -1318,6 +1318,147 @@ def test_subdivide_disambiguates_colliding_subsection_enums():
     assert "S:1832/SS:(e)#2" in parent.child_ids                         # both assembled
 
 
+def test_f4_struck_sections_are_excluded_and_disclosed():
+    # The dominant real shape (measured: 162 of 219 changed="deleted" occurrences sit
+    # on <section>): a Senate committee substitute -- "strike all after the enacting
+    # clause and insert the part printed in italic" -- carries the WHOLE original bill
+    # struck alongside its replacement. Emitting both put two versions of the same bill
+    # side by side, and because struck text comes first in document order, a bare
+    # citation resolved uniquely -- with no ambiguity error -- to the struck version.
+    xml = (
+        b"<bill><legis-body>"
+        b'<section changed="deleted" reported-display-style="strikethrough"><enum>1</enum>'
+        b"<header>Short title</header><text>Original struck text about icebreakers.</text></section>"
+        b'<section changed="added"><enum>1</enum><header>Short title</header>'
+        b"<text>Substitute text about cutters.</text></section>"
+        b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s4726rs", "rs", None)
+    ids = [u.section_id for u in parsed.units]
+    assert ids == ["S:1"]                          # one section, not two
+    assert not any("#" in i for i in ids)          # no V8 collision suffix masking the duplication
+    assert parsed.sections_indexed == 1
+    assert parsed.struck_sections_excluded == 1
+    unit = _resolve_unit(parsed.units, "1")
+    assert "Substitute text about cutters." in unit.display_text
+    assert "icebreakers" not in unit.display_text   # struck text is gone, not merely flagged
+    # Struck text must not be searchable either -- it is not in the bill as reported.
+    assert BillTextIndex(parsed).search([normalized_query("icebreakers")], 5) == []
+
+
+def test_f4_carve_out_binds_every_unit_emitting_path():
+    # A rule scoped to the path it was found on has failed four times in this feature
+    # (A4, A5, intro labelling, _subdivide), so each enumerated path is pinned
+    # SEPARATELY rather than trusting one entry point to cover the rest.
+    # Each subsection must exceed MAX_UNIT_BYTES on its own: once the struck one is
+    # excluded its bytes are gone, so sizing the filler against the COMBINED total
+    # would leave the section under the threshold and it would never subdivide -- the
+    # test would then pass for the wrong reason.
+    filler = ("word " * 2000).strip().encode()   # ~10KB each, > MAX_UNIT_BYTES alone
+    assert len(filler) > MAX_UNIT_BYTES
+
+    # Path 3: struck subsection inside a LIVE section must not become a child unit.
+    xml = (
+        b"<bill><legis-body><section><enum>5</enum><header>Live</header>"
+        b'<subsection changed="deleted"><enum>(a)</enum><text>struck subsection ' + filler + b"</text></subsection>"
+        b"<subsection><enum>(b)</enum><text>live subsection " + filler + b"</text></subsection>"
+        b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "X", "rs", None)
+    ids = [u.section_id for u in parsed.units]
+    # The live subsection is oversized, so it byte-splits -- which exercises paths 3
+    # and 4 in one shot: the live branch reaches the byte fallback and the struck
+    # branch produces nothing at all, not even a chunk.
+    assert any(i.startswith("S:5/SS:(b)") for i in ids)
+    assert not any(i.startswith("S:5/SS:(a)") for i in ids)
+    assert not any("struck subsection" in u.display_text for u in parsed.units)
+
+    # Path 4: byte fallback is bound TRANSITIVELY -- no struck unit reaches it, so no
+    # CHUNK id may ever descend from struck material. Stated in the enumeration as an
+    # inference, pinned here as a fact.
+    xml_chunk = (
+        b"<bill><legis-body>"
+        b'<section changed="deleted"><enum>9</enum><header>Struck big</header><text>struck ' + filler + b"</text></section>"
+        b"</legis-body></bill>"
+    )
+    parsed_chunk = parse_bill_xml(xml_chunk, "X", "rs", None)
+    assert parsed_chunk.units == []
+    assert parsed_chunk.struck_sections_excluded == 1
+
+    # Path 5: struck material contributes no TEXT to a live unit either -- a struck
+    # <quoted-block> inside a live section is dropped, not kept as a `quoted` segment.
+    # This is what lets match_contexts stay three-valued.
+    xml_quote = (
+        b"<bill><legis-body><section><enum>7</enum><header>Live</header>"
+        b'<text>is amended by inserting <quoted-block changed="deleted"><text>struck insertion</text></quoted-block>'
+        b" and <quoted-block><text>live insertion</text></quoted-block>.</text>"
+        b"</section></legis-body></bill>"
+    )
+    parsed_quote = parse_bill_xml(xml_quote, "X", "rs", None)
+    unit = parsed_quote.units[0]
+    assert "live insertion" in unit.display_text
+    assert "struck insertion" not in unit.display_text
+    assert set(s.context for s in unit.segments) <= {"operative", "quoted", "header"}
+
+
+def test_f4_text_extraction_paths_are_pinned_independently():
+    # The two text-extraction guards are mutually redundant on the shapes above -- each
+    # covers the other, so removing either left the whole suite green. An enumeration
+    # whose members are not INDIVIDUALLY pinned is the same "one entry point covers the
+    # rest" assumption the enumeration exists to reject, so each gets the shape where
+    # it alone is load-bearing.
+
+    # extract_segments alone: a SMALL struck subsection in a section that never
+    # subdivides, so _subdivide never runs and element_text is never asked for it.
+    xml = (
+        b"<bill><legis-body><section><enum>3</enum><header>Live</header>"
+        b'<subsection changed="deleted"><enum>(a)</enum><text>struck small subsection</text></subsection>'
+        b"<subsection><enum>(b)</enum><text>live small subsection</text></subsection>"
+        b"</section></legis-body></bill>"
+    )
+    unit = parse_bill_xml(xml, "X", "rs", None).units[0]
+    assert "live small subsection" in unit.display_text
+    assert "struck small subsection" not in unit.display_text
+
+    # element_text alone: a struck child inside a <header>, which direct_text extracts
+    # without ever passing through extract_segments.
+    xml2 = (
+        b"<bill><legis-body><section><enum>4</enum>"
+        b'<header>Live title <quote changed="deleted">struck words</quote> tail</header>'
+        b"<text>body</text></section></legis-body></bill>"
+    )
+    unit2 = parse_bill_xml(xml2, "X", "rs", None).units[0]
+    assert unit2.header == "Live title tail"
+    assert "struck words" not in (unit2.header or "")
+    assert "struck words" not in unit2.display_text
+
+
+def test_f4_struck_marker_is_the_attribute_not_the_display_style():
+    # reported-display-style="strikethrough" is a RENDERING hint that accompanies the
+    # change marker, not independent evidence of it. Gating on the display style would
+    # be the structural-marker mistake this feature has made repeatedly -- so an
+    # element styled strikethrough WITHOUT changed="deleted" is kept.
+    xml = (
+        b"<bill><legis-body>"
+        b'<section reported-display-style="strikethrough"><enum>1</enum><header>Styled only</header>'
+        b"<text>kept because nothing marks it deleted</text></section>"
+        b'<section changed="not-changed"><enum>2</enum><header>Explicitly unchanged</header>'
+        b"<text>kept</text></section>"
+        b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "X", "rs", None)
+    assert [u.section_id for u in parsed.units] == ["S:1", "S:2"]
+    assert parsed.struck_sections_excluded == 0
+
+
+def test_f4_no_note_when_the_document_carries_no_struck_text():
+    # Measured 0 across every enrolled, engrossed, and introduced probe, so the note
+    # must stay null there -- a disclosure that fires on documents with nothing to
+    # disclose trains the reader to ignore it.
+    parsed = parse_fixture("bill_text_trimmed.xml")
+    assert parsed.struck_sections_excluded == 0
+
+
 def test_f2_trailing_period_is_stripped_from_ids_and_accepted_on_input():
     # F2: the tool ASSERTED A FALSEHOOD -- get_bill_section("804") returned "No section
     # or chunk matched '804'" while three sections numbered 804 existed, because the

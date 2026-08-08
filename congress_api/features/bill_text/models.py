@@ -62,6 +62,13 @@ class BillTextEnvelope(BaseModel):
     cache: CacheStatus = Field(default_factory=CacheStatus)
     sections_indexed: int
     chunks_indexed: int
+    # Active disclosure that committee-struck text was excluded (F4). A response-level
+    # NOTE rather than a per-hit field on purpose: §17 measured version_resolution_note
+    # being read and acted on by a consumer that ignored match_contexts on the same
+    # response, so the note is the mechanism that demonstrably propagates. Null when
+    # the document carries no struck text, which is every enrolled/engrossed/introduced
+    # version measured.
+    struck_text_note: str | None = None
     timing: Timing | None = None
 
 
