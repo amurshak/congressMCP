@@ -235,7 +235,10 @@ async def get_bill_section(
 
     Call this after search_bill_text or get_bill_toc to read a specific section by its section_id
     (e.g. "D:H/T:I/S:3501"). Fully-qualified section ids and chunk ids resolve directly; a bare
-    section number (e.g. "101") resolves only when it is unique across the bill. The returned text
+    section number (e.g. "101") resolves only when it is unique across the bill. Every id
+    get_bill_toc returns resolves here, including structural containers such as a division,
+    title, or subtitle ("D:C/T:XXXI/ST:B"), which return their heading plus child descriptors
+    when the subtree exceeds max_bytes. The returned text
     carries operative and quoted (amendatory) language in reading order; when the section is
     subdivided, child chunk descriptors are included. Text is capped at max_bytes, measured as
     UTF-8 encoded bytes of the returned text field, clamped to 1,000-100,000.
@@ -249,7 +252,18 @@ async def get_bill_section(
         loaded = await load_bill_text(ctx, congress, bill_type, number, version)
         unit_or_error = _resolve_unit(loaded.parsed.units, section_id)
         if isinstance(unit_or_error, dict):
-            return unit_or_error
+            # F5: before reporting section_not_found, try resolving the id as a
+            # structural container. Only section_not_found falls through --
+            # ambiguous_section_id is a real answer (§5 forbids guessing) and must
+            # not be swallowed here.
+            if unit_or_error["error"]["code"] != "section_not_found":
+                return unit_or_error
+            container = _resolve_container(
+                loaded.parsed.units, _normalize_requested_id(section_id.strip())
+            )
+            if container is None:
+                return unit_or_error
+            return _container_response(loaded, container, started, note, max_bytes)
         unit = unit_or_error
         # Preserve document order via child_ids (a subdivided parent lists its
         # leaves in order); the units list is also in that order, but keying makes
@@ -388,6 +402,125 @@ async def get_bill_toc(
         return _error(exc.code, exc.message, exc.detail, exc.remediation)
     except Exception as exc:
         return _unexpected("get_bill_toc", exc)
+
+
+def _container_response(
+    loaded: LoadedBillText, container: _Container, started: float, note: str | None, max_bytes: int
+) -> dict[str, Any]:
+    """Serve a container exactly as §5 serves a subdivided parent: assemble the whole
+    subtree when it fits in max_bytes, otherwise return its heading plus child
+    descriptors with truncated=true. Never silently return only the first child."""
+    subtree = loaded.parsed.subtree_bytes
+    subtree_len = subtree.get(container.section_id, 0)
+    children = _container_children(container, loaded.parsed.units, subtree)
+    if subtree_len <= max_bytes:
+        full = "\n\n".join(
+            part
+            for part in (
+                container.header or "",
+                *(render_segments(unit.segments) for unit in container.descendants),
+            )
+            if part
+        )
+        text = _limit_utf8(full, max_bytes)
+        truncated = len(full.encode("utf-8")) > max_bytes
+    else:
+        text = _limit_utf8(container.header or "", max_bytes)
+        truncated = True
+    return BillSectionResponse(
+        **_envelope(loaded),
+        version_resolution_note=note or loaded.resolved.version_resolution_note,
+        timing=_timing(loaded, started),
+        section_id=container.section_id,
+        node_kind=node_kind_for(container.section_id),
+        ancestor_path=container.ancestor_path,
+        header=container.header,
+        text=text,
+        # 0 for the same reason as in _container_children: a container's heading is
+        # not an indexed unit, so counting it would break the containment identity
+        # and disagree with the same node in get_bill_toc.
+        byte_length=0,
+        subtree_byte_length=subtree_len,
+        truncated=truncated,
+        children=children,
+    ).model_dump()
+
+
+class _Container:
+    """A TOC node that is a structural container (`D:C/T:XXXI/ST:B`) rather than an
+    emitted unit: a parent whose own text is a heading.
+
+    F5: the TOC's id namespace is a SUPERSET of the section namespace, and nothing
+    marked the difference -- `node_kind` reported `structural` for a subtitle and a
+    leaf section alike -- so an id copied verbatim out of a TOC response returned
+    section_not_found, and the remediation then named get_bill_toc, the tool that had
+    just supplied the id. §4 resolves containers instead of marking them, reusing the
+    header-plus-`children`-descriptors shape §5 already defines for a subdivided
+    parent, so TOC -> section -> child works end to end and nothing new is introduced.
+    """
+
+    def __init__(self, section_id: str, ancestor_path, node, descendants: list[Unit]):
+        self.section_id = section_id
+        self.ancestor_path = ancestor_path
+        self.header = node.header
+        self.descendants = descendants
+
+
+def _resolve_container(units: list[Unit], requested: str) -> _Container | None:
+    """Build a container view for `requested` if any unit sits beneath it."""
+    prefix = f"{requested}/"
+    descendants = [unit for unit in units if unit.section_id.startswith(prefix)]
+    if not descendants:
+        return None
+    depth = len(requested.split("/"))
+    # The container's own node lives at index depth-1 of any descendant's
+    # ancestor_path (a unit's ancestor_path is its id path minus its own leaf), and
+    # everything above it is the container's ancestor_path.
+    anchor = next((unit for unit in descendants if len(unit.ancestor_path) >= depth), None)
+    if anchor is None:
+        return None
+    return _Container(requested, anchor.ancestor_path[: depth - 1], anchor.ancestor_path[depth - 1], descendants)
+
+
+def _container_children(container: _Container, units: list[Unit], subtree: dict[str, int]) -> list[SectionChild]:
+    """Immediate children of a container, in document order: emitted units where the
+    next level down is a real unit, nested containers otherwise."""
+    by_id = {unit.section_id: unit for unit in units}
+    depth = len(container.section_id.split("/"))
+    seen: list[str] = []
+    for unit in container.descendants:
+        child_id = "/".join(unit.section_id.split("/")[: depth + 1])
+        if child_id not in seen:
+            seen.append(child_id)
+    children = []
+    for child_id in seen:
+        child = by_id.get(child_id)
+        if child is not None:
+            children.append(
+                SectionChild(
+                    section_id=child_id,
+                    node_kind=node_kind_for(child_id),
+                    header=child.header,
+                    byte_length=child.byte_length,
+                    subtree_byte_length=subtree.get(child_id, child.byte_length),
+                )
+            )
+            continue
+        nested = _resolve_container(units, child_id)
+        children.append(
+            SectionChild(
+                section_id=child_id,
+                node_kind=node_kind_for(child_id),
+                header=nested.header if nested else None,
+                # A container's own heading is display only -- it is not an indexed
+                # unit, so it contributes nothing to the subtree sum. Reporting 0
+                # keeps `subtree == own + Σ descendants` exact and keeps this field
+                # in agreement with the same node as rendered by get_bill_toc.
+                byte_length=0,
+                subtree_byte_length=subtree.get(child_id, 0),
+            )
+        )
+    return children
 
 
 def _normalize_requested_id(requested: str) -> str:

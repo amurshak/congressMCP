@@ -929,6 +929,135 @@ async def test_tool_wrappers_build_responses_without_network(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_f5_toc_container_ids_resolve_through_get_bill_section(monkeypatch):
+    # F5: `D:C/T:XXXI/ST:B` appeared VERBATIM in a get_bill_toc response and then
+    # returned section_not_found -- and the remediation named get_bill_toc, the tool
+    # that had just handed out the id. Every container id the TOC emits must resolve,
+    # so TOC -> section -> child works end to end for a consumer navigating the way
+    # the TOC invites.
+    import congress_api.features.bill_text.tools as tools_mod
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    parsed = parse_fixture("bill_text_trimmed.xml")
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText(
+            package_id="BILLS-119s1071enr",
+            version="enr",
+            version_resolved_at="2026-08-03T00:00:00Z",
+            version_resolution_note=None,
+            last_modified=None,
+            xml_bytes=b"",
+        ),
+        parsed=parsed,
+        index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
+
+    toc = await tools_mod.get_bill_toc(None, congress=119, bill_type="s", number=1071, depth=5)
+    ids = []
+    stack = list(toc["toc"])
+    while stack:
+        node = stack.pop()
+        ids.append(node["section_id"])
+        stack.extend(node["children"])
+    assert ids, "fixture produced no TOC nodes"
+
+    containers = [sid for sid in ids if not any(u.section_id == sid for u in parsed.units)]
+    assert containers, "fixture has no container nodes -- this test would prove nothing"
+
+    for sid in ids:
+        section = await tools_mod.get_bill_section(
+            None, congress=119, bill_type="s", number=1071, section_id=sid
+        )
+        assert "error" not in section, f"TOC handed out {sid!r} and get_bill_section rejected it: {section}"
+        assert section["section_id"] == sid
+
+    # A container serves the §5 subdivided-parent shape: heading text plus child
+    # descriptors, and each descriptor is itself fetchable (the next navigation hop).
+    container = await tools_mod.get_bill_section(
+        None, congress=119, bill_type="s", number=1071, section_id=containers[0]
+    )
+    assert container["children"]
+    assert container["subtree_byte_length"] > 0
+    for child in container["children"]:
+        hop = await tools_mod.get_bill_section(
+            None, congress=119, bill_type="s", number=1071, section_id=child["section_id"]
+        )
+        assert "error" not in hop
+
+
+@pytest.mark.asyncio
+async def test_f5_oversized_container_returns_descriptors_not_the_first_child(monkeypatch):
+    # §5: never silently return only the first chunk. A container too large for
+    # max_bytes returns its heading plus descriptors with truncated=true.
+    import congress_api.features.bill_text.tools as tools_mod
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    # max_bytes clamps at a 1,000 floor, so the container's subtree has to clear that
+    # for truncation to be reachable at all.
+    body = ("word " * 400).strip().encode()   # ~2KB per section
+    xml = (
+        b"<bill><legis-body><division><enum>C</enum><header>Big division</header>"
+        b"<title><enum>XXXI</enum><header>A title</header>"
+        b"<section><enum>3101</enum><header>One</header><text>" + body + b"</text></section>"
+        b"<section><enum>3102</enum><header>Two</header><text>" + body + b"</text></section>"
+        b"</title></division></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText("BILLS-119s1071enr", "enr", "2026-08-03T00:00:00Z", None, None, b""),
+        parsed=parsed,
+        index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
+
+    small = await tools_mod.get_bill_section(
+        None, congress=119, bill_type="s", number=1071, section_id="D:C/T:XXXI", max_bytes=1_000
+    )
+    assert "error" not in small
+    assert small["truncated"] is True
+    assert [child["section_id"] for child in small["children"]] == ["D:C/T:XXXI/S:3101", "D:C/T:XXXI/S:3102"]
+    # Heading only -- NOT the first child's text silently standing in for the whole.
+    assert body.decode() not in small["text"]
+    assert small["subtree_byte_length"] > len(small["text"].encode("utf-8"))
+
+    # The same container comfortably within max_bytes assembles the whole subtree,
+    # matching §5's "parent fits max_bytes -> return whole section" row.
+    whole = await tools_mod.get_bill_section(
+        None, congress=119, bill_type="s", number=1071, section_id="D:C/T:XXXI", max_bytes=100_000
+    )
+    assert whole["truncated"] is False
+    assert whole["text"].count("word") > 700     # both sections present
+
+
+def test_f5_ambiguous_bare_enum_is_not_swallowed_by_container_resolution():
+    # The container fallback must fire only on section_not_found. An ambiguous bare
+    # enum is a real answer under §5 ("never guess") and must survive.
+    filler = b"<text>body</text>"
+    xml = (
+        b"<bill><legis-body>"
+        b"<division><enum>A</enum><section><enum>101</enum>" + filler + b"</section></division>"
+        b"<division><enum>B</enum><section><enum>101</enum>" + filler + b"</section></division>"
+        b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    result = _resolve_unit(parsed.units, "101")
+    assert isinstance(result, dict) and result["error"]["code"] == "ambiguous_section_id"
+
+
+@pytest.mark.asyncio
 async def test_get_bill_section_concatenates_subdivided_section_when_it_fits(monkeypatch):
     # Spec §5/§9: "parent fits max_bytes -> return whole section" is served by
     # concatenating children at read time (the parent unit stores only its intro).
