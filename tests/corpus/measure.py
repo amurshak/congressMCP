@@ -136,6 +136,25 @@ def _amendatory_within_clause(text: str, start: int) -> bool:
     return bool(RELAXED_VERB_RE.search(window))
 
 
+def canonical_cite(title: str, section: str) -> str:
+    """Render a cite exactly as the parser renders it, so the two are comparable.
+
+    THE THIRD INSTRUMENT DEFECT IN THIS HARNESS, same family as the other two: the
+    detector was comparing unlike things. It kept the source's en-dash where the
+    parser normalizes to a hyphen, and kept subsection designators INSIDE the capture
+    where the parser drops them (§6 deliberately does not decompose title/section).
+    So "33 U.S.C. 467f-2(a)", "(b)" and "(c)" counted as THREE targets against the
+    parser's one, and Population B inflated by every multi-subsection amendment --
+    the most ordinary drafting shape there is.
+
+    A count comparison hid it: `present > reported` needs no set arithmetic, so the
+    mismatch never had to surface as an obviously wrong pairing.
+    """
+    section = re.sub(r"\([0-9A-Za-z]+\)", "", section)          # drop designators
+    section = re.sub(f"[{_DASH}]", "-", section)                # normalize the dash
+    return f"{title} U.S.C. {section}"
+
+
 def amendment_targets(text: str) -> set[str]:
     """Citations a reader would judge to be AMENDMENT TARGETS of this unit.
 
@@ -161,10 +180,10 @@ def amendment_targets(text: str) -> set[str]:
     found: set[str] = set()
     for match in USC_ANY_RE.finditer(text):
         if _amendatory_within_clause(text, match.end()) and not _is_provenance_cite(text, match.start()):
-            found.add(f"{match.group(1)} U.S.C. {match.group(2)}")
+            found.add(canonical_cite(match.group(1), match.group(2)))
     for match in LONGHAND_ANY_RE.finditer(text):
         if _amendatory_within_clause(text, match.end()) and not _is_provenance_cite(text, match.start()):
-            found.add(f"{match.group(2)} U.S.C. {match.group(1)}")
+            found.add(canonical_cite(match.group(2), match.group(1)))
     for lead in LEADIN_RE.finditer(text):
         clause = text[lead.end():lead.end() + 400]
         for bare in BARE_SECTION_RE.finditer(clause):
@@ -200,12 +219,25 @@ def measure(packages):
                         if len(examples["A"]) < 5:
                             examples["A"].append((pkg, unit.section_id, op[:150]))
                 else:
+                    # B compares within the U.S. Code domain, so the denominator is
+                    # units reporting at least one USC cite. A public-law-only unit has
+                    # nothing to be short OF in this domain, and counting it made every
+                    # USC target in such a unit read as a shortfall ("reports 0").
+                    reported = {a["cite"] for a in amends if a["kind"] == "usc"}
+                    if not reported:
+                        continue
                     v19b["N_populated"] += 1
-                    reported = len(amends)
-                    present = len(amendment_targets(op))
-                    if present > reported:
+                    present = amendment_targets(op)
+                    # BOTH operationalizations, because they answer different questions
+                    # and the spec pre-registered one of them. COUNT is §19's wording
+                    # ("more resolvable citations than amends reports"); SET is the
+                    # stricter "carries a target the field does not name", which also
+                    # fires when the counts happen to balance.
+                    if present - reported:
+                        v19b["N_short_set"] += 1
+                    if len(present) > len(reported):
                         v19b["N_short"] += 1
-                        shortfall[min(present - reported, 3)] += 1
+                        shortfall[min(len(present - reported), 3)] += 1
                         # Separate the fixable resolution bug from A5's accepted
                         # recall cost: they are the same symptom with different cures.
                         if any(
@@ -215,7 +247,8 @@ def measure(packages):
                             v19b["N_short_endash"] += 1
                         if len(examples["B"]) < 5:
                             examples["B"].append(
-                                (pkg, unit.section_id, reported, present, op[:150])
+                                (pkg, unit.section_id, len(reported), len(present),
+                                 sorted(present - reported)[:3], op[:110])
                             )
 
             # ---- V21 ------------------------------------------------------- #
@@ -345,6 +378,11 @@ def main() -> int:
     print(f"  N_amendatory    {v19a['N_amendatory']:>7,}   (denominator)")
     print(f"  N_empty         {v19a['N_empty']:>7,}   {pct(v19a['N_empty'], v19a['N_amendatory'])} of amendatory")
     print(f"  N_empty_leadin  {v19a['N_empty_leadin']:>7,}   {pct(v19a['N_empty_leadin'], v19a['N_empty'])} of empty")
+    print(f"  STABLE metric  N_empty_leadin / N_amendatory = "
+          f"{pct(v19a['N_empty_leadin'], v19a['N_amendatory'])}")
+    print("     (N_empty_leadin/N_empty has a SHRINKING denominator: every resolution fix")
+    print("      elsewhere removes non-lead-in empties and drifts the ratio upward while")
+    print("      the phenomenon is unchanged. Neither term of the stable metric moves.)")
     ratio_a = v19a["N_empty_leadin"] / v19a["N_empty"] if v19a["N_empty"] else 0
     print(f"\n  PRE-REGISTERED THRESHOLD: >= 20% -> per-unit response note; below -> tool description")
     print(f"  RESULT: {pct(v19a['N_empty_leadin'], v19a['N_empty'])} -> "
@@ -358,7 +396,10 @@ def main() -> int:
     print("=" * 78)
     require("N_populated", v19b["N_populated"])
     print(f"  N_populated     {v19b['N_populated']:>7,}   (denominator)")
-    print(f"  N_short         {v19b['N_short']:>7,}   {pct(v19b['N_short'], v19b['N_populated'])} of populated")
+    print(f"  N_short (COUNT) {v19b['N_short']:>7,}   {pct(v19b['N_short'], v19b['N_populated'])} of populated"
+          "   <- §19's wording, the pre-registered metric")
+    print(f"  N_short (SET)   {v19b['N_short_set']:>7,}   {pct(v19b['N_short_set'], v19b['N_populated'])} of populated"
+          "   <- stricter: names a target the field omits")
     if shortfall:
         print("  shortfall distribution:")
         for k in sorted(shortfall):
@@ -372,8 +413,8 @@ def main() -> int:
     print(f"\n  PRE-REGISTERED THRESHOLD: >= 10% -> completeness signal; below -> existing wording")
     print(f"  RESULT: {pct(v19b['N_short'], v19b['N_populated'])} -> "
           f"{'COMPLETENESS SIGNAL warranted' if ratio_b >= 0.10 else 'existing wording covers it'}")
-    for pkg, sid, rep, pres, txt in examples["B"]:
-        print(f"     e.g. {pkg} {sid}: reports {rep}, text carries {pres}: {txt[:90]!r}")
+    for pkg, sid, rep, pres, miss, txt in examples["B"]:
+        print(f"     e.g. {pkg} {sid}: reports {rep}, text carries {pres}, missing {miss}")
     print("\n  NOT POOLED with Population A: A is a resolution gap, B a disclosure gap.")
 
     print()

@@ -135,6 +135,27 @@ def test_shortfall_detector_sees_unicode_dash_suffixed_sections():
     assert any("3839aa" in c for c in found), found
 
 
+def test_cites_are_canonicalized_to_the_form_the_parser_emits():
+    # THE THIRD INSTRUMENT DEFECT, and the one that moved the headline number most.
+    # The detector kept the source's en-dash and kept subsection designators, while
+    # the parser normalizes the dash and drops designators (§6 does not decompose
+    # title/section). So one section amended in three subsections counted as THREE
+    # targets against the parser's one, inflating Population B by the most ordinary
+    # drafting shape there is. Compare like with like.
+    from tests.corpus.measure import canonical_cite
+
+    assert canonical_cite("33", "467f–2(a)") == "33 U.S.C. 467f-2"
+    assert canonical_cite("33", "467f–2(b)") == "33 U.S.C. 467f-2"
+    assert canonical_cite("33", "467f-2") == "33 U.S.C. 467f-2"
+    # Three subsections of one section collapse to a single target, as `amends` does.
+    text = (
+        "Section 8A(a) of the National Dam Safety Program Act (33 U.S.C. 467f–2(a)) is "
+        "amended by striking. Section 8A(b) (33 U.S.C. 467f–2(b)) is amended by striking. "
+        "Section 8A(c) (33 U.S.C. 467f–2(c)) is amended by striking."
+    )
+    assert amendment_targets(text) == {"33 U.S.C. 467f-2"}
+
+
 def test_shortfall_detector_counts_resolvable_forms_it_should():
     # Both explicit forms must be seen, or B under-counts and reports a false clean.
     text = (
