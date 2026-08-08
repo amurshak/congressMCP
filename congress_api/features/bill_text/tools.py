@@ -56,7 +56,26 @@ def _debug_logged(fn):
 
 
 def _error(code: str, message: str, detail: dict[str, Any] | None = None, remediation: str | None = None) -> dict[str, Any]:
-    return ErrorEnvelope(error=ErrorPayload(code=code, message=message, detail=detail, remediation=remediation)).model_dump()
+    # Redact at the single construction point for EVERY error path, present and
+    # future, rather than at the paths known to interpolate an exception today.
+    # An error envelope is a worse disclosure channel than a log: it reaches the
+    # CALLER, not just the operator. The live case is httpx's raise_for_status,
+    # whose message embeds the full request URL -- and the congress.gov client
+    # carries the key as a query parameter (§11, pre-existing), so
+    # `f"...: {exc}"` puts a live credential in a field the caller receives.
+    if detail is not None:
+        detail = {
+            key: trace.redact(value) if isinstance(value, str) else value
+            for key, value in detail.items()
+        }
+    return ErrorEnvelope(
+        error=ErrorPayload(
+            code=code,
+            message=trace.redact(message),
+            detail=detail,
+            remediation=trace.redact(remediation) if remediation else remediation,
+        )
+    ).model_dump()
 
 
 def _unexpected(tool: str, exc: Exception) -> dict[str, Any]:

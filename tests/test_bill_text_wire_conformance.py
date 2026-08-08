@@ -31,6 +31,7 @@ import asyncio
 import inspect
 import json
 from pathlib import Path
+from urllib.parse import quote
 from unittest.mock import patch
 
 import pytest
@@ -295,6 +296,87 @@ def test_f15_log_record_factory_chains_to_the_previous_one(monkeypatch):
     finally:
         logging.setLogRecordFactory(original)
         trace._log_redaction_installed = True
+
+
+def test_f15_traceback_channel_is_redacted_including_under_rich(monkeypatch):
+    # Residual 1: a TRACEBACK does not pass through msg/args, so the record-factory
+    # redaction misses it. Reachable for real -- httpx's raise_for_status embeds the
+    # full request URL in its message, and the congress.gov client sends the key as a
+    # query parameter (§11), so logger.exception renders a live credential.
+    import io
+    import logging
+
+    import httpx
+
+    secret = "SüP3rSecretKeyValue0123456789"
+    monkeypatch.setenv("CONGRESS_API_KEY", secret)
+    request = httpx.Request("GET", f"https://api.congress.gov/v3/x?api_key={secret}")
+    try:
+        httpx.Response(500, request=request).raise_for_status()
+    except httpx.HTTPStatusError:
+        import sys
+
+        exc_info = sys.exc_info()
+        # Precondition: the traceback carries the key -- in URL-ENCODED form, which
+        # is exactly the shape a literal substring match would sail past.
+        rendered_tb = "".join(__import__("traceback").format_exception(*exc_info))
+        assert quote(secret, safe="") in rendered_tb
+        record = logging.getLogRecordFactory()(
+            "n", logging.ERROR, "p", 1, "Unexpected error in %s", ("get_bill_section",), exc_info
+        )
+
+    # stdlib formatter path: honors the pre-set exc_text
+    rendered = logging.Formatter("%(message)s").format(record)
+    assert secret not in rendered and quote(secret, safe="") not in rendered
+
+    # rich path: renders exc_info DIRECTLY and ignores exc_text, so exc_text alone
+    # would pass the assertion above and still leak in this server's actual output.
+    rich_logging = pytest.importorskip("rich.logging")
+    from rich.console import Console
+
+    buffer = io.StringIO()
+    handler = rich_logging.RichHandler(
+        console=Console(file=buffer, width=250), rich_tracebacks=True, show_path=False
+    )
+    handler.emit(record)
+    assert secret not in buffer.getvalue() and quote(secret, safe="") not in buffer.getvalue()
+
+
+def test_f15_error_envelope_never_carries_the_key_to_the_caller(monkeypatch):
+    # Residual 2, and the worse one: an error envelope reaches the CALLER, not just
+    # the operator. _unexpected interpolates the exception into `message`, and
+    # httpx's raise_for_status message embeds the key-bearing URL.
+    import httpx
+
+    secret = "SüP3rSecretKeyValue0123456789"
+    monkeypatch.setenv("CONGRESS_API_KEY", secret)
+    request = httpx.Request("GET", f"https://api.congress.gov/v3/x?api_key={secret}")
+    try:
+        httpx.Response(500, request=request).raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        assert quote(secret, safe="") in str(exc)       # precondition: carried, URL-encoded
+        envelope = tools._unexpected("get_bill_section", exc)
+
+    # ensure_ascii=False deliberately: the default ESCAPES non-ASCII (ü -> ü), so
+    # `secret not in json.dumps(x)` is vacuously true for a non-ASCII secret whether or
+    # not redaction ran. That assertion passed against an unredacted envelope.
+    def _leaks(payload) -> bool:
+        body = json.dumps(payload, ensure_ascii=False)
+        return secret in body or quote(secret, safe="") in body
+
+    assert not _leaks(envelope)
+    assert "[REDACTED]" in envelope["error"]["message"]
+
+    # _unexpected alone does not prove the guarantee: logger.exception runs first and
+    # redacts the exception's args in place, so the envelope comes out clean even with
+    # _error's redaction removed. That safety is an ORDERING accident -- reorder the
+    # log call after the return and it leaks. Exercise the construction point directly,
+    # which is where the durable guarantee lives, covering every error path including
+    # future ones.
+    for form in (secret, quote(secret, safe="")):
+        other = tools._error("x", f"m {form}", {"url": f"u {form}", "n": 1}, f"r {form}")
+        assert not _leaks(other)
+        assert other["error"]["detail"]["n"] == 1       # non-strings pass through intact
 
 
 def test_f15_log_redaction_never_breaks_logging(monkeypatch):

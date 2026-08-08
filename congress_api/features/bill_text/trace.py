@@ -52,6 +52,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 _TRACE_DIR_ENV = "CONGRESSMCP_TRACE_DIR"
 _TRACE_FILE = "bill_text_trace.jsonl"
@@ -117,6 +118,16 @@ def _secret_values() -> list[str]:
             values.add(API_KEY)
     except Exception:  # noqa: BLE001
         pass
+    # Also match the PERCENT-ENCODED form. The disclosure channel is a URL, and a URL
+    # encodes what it carries: httpx renders a key containing any character outside
+    # the unreserved set as e.g. %C3%BC, which a literal substring match sails past.
+    # An api.data.gov key is alphanumeric and encodes to itself, so this is a no-op
+    # for the real one -- but redaction must not silently depend on the shape of the
+    # secret it is redacting.
+    for value in list(values):
+        encoded = quote(value, safe="")
+        if encoded != value:
+            values.add(encoded)
     resolved = list(values)
     _secret_cache = (fingerprint, resolved)
     return resolved
@@ -150,6 +161,49 @@ def _redact_log_arg(value: Any, secrets: list[str]) -> Any:
     except Exception:  # noqa: BLE001 -- a repr that raises must not break logging
         return value
     return redact(text) if any(secret in text for secret in secrets) else value
+
+
+def _redact_exception_channel(record: logging.LogRecord, secrets: list[str]) -> None:
+    """Redact a key carried by an exception attached to a log record.
+
+    A TRACEBACK does not pass through msg/args at all, so the record-factory
+    redaction misses it entirely. It is reachable: httpx's raise_for_status builds
+    "Server error '500 ...' for url '<full url>'", and the congress.gov client sends
+    the key as a query parameter (§11, pre-existing), so logger.exception renders a
+    live credential.
+
+    Two channels, because one is not enough:
+
+      exc_text -- the stdlib Formatter caches the rendered traceback here and reuses
+        it if already set. Set only when a secret is actually present, so ordinary
+        errors keep default formatting.
+
+      exception args -- rich's handler with rich_tracebacks renders exc_info DIRECTLY
+        and ignores exc_text (measured; this server logs through rich), so exc_text
+        alone would have been a fix that passes a stdlib test and leaks in the actual
+        deployment -- the same shape as the isinstance(str) miss. Redacting args
+        neutralises the message for any renderer that stringifies the exception.
+
+    KNOWN LIMIT, stated rather than papered over: a renderer configured to show
+    locals can still reach exc.request.url, and this cannot mitigate that. All of
+    this is downstream of the root cause -- the key belongs in a header, not a query
+    parameter (§11) -- and mitigation shrinks the surface without closing it. The
+    durable fix is the congress.gov client change, which is a separate PR.
+    """
+    exc_info = record.exc_info
+    if not exc_info or not isinstance(exc_info, tuple) or exc_info[1] is None:
+        return
+    exception = exc_info[1]
+    if exception.args:
+        redacted_args = tuple(_redact_log_arg(arg, secrets) for arg in exception.args)
+        if redacted_args != exception.args:
+            exception.args = redacted_args
+    if not record.exc_text:
+        import traceback as _traceback  # noqa: PLC0415 -- only on the error path
+
+        text = "".join(_traceback.format_exception(exc_info[0], exception, exc_info[2]))
+        if any(secret in text for secret in secrets):
+            record.exc_text = redact(text)
 
 
 _log_redaction_installed = False
@@ -216,6 +270,10 @@ def install_log_redaction() -> None:
                     record.args = tuple(
                         _redact_log_arg(value, secrets) for value in record.args
                     )
+            # A traceback bypasses msg/args entirely; stack_info is already a string.
+            _redact_exception_channel(record, secrets)
+            if record.stack_info and any(s in record.stack_info for s in secrets):
+                record.stack_info = redact(record.stack_info)
         except Exception:  # noqa: BLE001 -- never break the host's logging
             return record
         return record
