@@ -161,8 +161,19 @@ async def search_bill_text(
     U.S. Code and Public Law citations they amend.
 
     Use this to answer "what does bill X say about Y" without reading the whole bill.
-    Pass several phrasings and synonyms in one call, e.g. ["icebreaker", "polar security cutter"];
+
+    Queries match as LITERAL PHRASES WITH STEMMING -- not bag-of-words, and not semantically.
+    A query hits only where the bill contains that phrase verbatim, so a description of a topic
+    finds nothing: "Space Force end strength" returns zero against a bill containing both "End
+    strengths for active forces" and "Space Force". Prefer several short phrases you expect to
+    appear verbatim, plus synonyms, in one call, e.g. ["icebreaker", "polar security cutter"];
     matched_queries reports which phrasing produced each hit, so you can drop the dead ones next call.
+
+    Knowing a provision as codified law does NOT establish where it sits in THIS bill. Division,
+    title, and section numbers are properties of this document, and these tools are the only
+    source for them -- answering a bill-location question from prior knowledge produces a
+    confident, correctly-quoted, wrongly-cited answer. Call the tool instead.
+
     If "quoted" appears in match_contexts, the hit may include language the bill is removing,
     even when "operative" also appears; presence of "quoted" governs. Each amends entry is
     {kind: "usc"|"public_law", cite}; amends is a convenience (never named Acts, incl. the IRC by
