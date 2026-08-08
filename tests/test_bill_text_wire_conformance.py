@@ -206,6 +206,108 @@ def test_trace_redacts_api_key_at_write_time(tmp_path, monkeypatch):
     assert "[REDACTED]" in body          # and redaction actually fired on the traced content
 
 
+def test_f15_trace_mode_redacts_the_key_from_log_output_too(tmp_path, monkeypatch, caplog):
+    # F15: §3 has GovInfo and congress.gov sharing one api.data.gov key, and the
+    # congress.gov client sends it as a QUERY PARAMETER -- so httpx's INFO URL line
+    # prints a live credential (confirmed on a live run). Redacting only the JSONL is
+    # necessary-but-insufficient: a user debugging a bill-text problem attaches the
+    # logs next to the trace, and the artifact the redaction rule exists to protect
+    # still carries the key. Same disclosure path, same redaction.
+    import logging
+
+    secret = "SüP3rSecretKeyValue0123456789"
+    monkeypatch.setenv("CONGRESS_API_KEY", secret)
+    monkeypatch.setenv("CONGRESSMCP_TRACE_DIR", str(tmp_path))
+    original_factory = logging.getLogRecordFactory()
+    try:
+        _call(tools.search_bill_text, congress=119, bill_type="s", number=1071,
+              queries=["icebreaker"], max_hits=2)
+        logger = logging.getLogger("httpx")
+        with caplog.at_level(logging.INFO, logger="httpx"):
+            # The EXACT shape of the real leak, reproduced from httpx's own call:
+            #   logger.info('HTTP Request: %s %s "%s %d %s"', method, request.url, ...)
+            # request.url is an httpx.URL OBJECT, not a str. The first version of this
+            # fix guarded on isinstance(value, str), so it skipped precisely this arg
+            # -- and a test that passed a plain string went green while the live run
+            # still printed the key. Use a real httpx.URL so the test cannot drift
+            # back into asserting the easy case.
+            import httpx
+
+            url = httpx.URL(f"https://api.congress.gov/v3/bill/119/s/1071/text?api_key={secret}")
+            assert not isinstance(url, str)          # the property that broke it
+            logger.info('HTTP Request: %s %s "%s %d %s"', "GET", url, "HTTP/1.1", 200, "OK")
+            # ... and the plain-string and msg-inline shapes still redact.
+            logger.info("HTTP Request: %s", f"GET https://x/?api_key={secret}")
+            logger.info("bare message carrying %s inline" % f"key={secret}")
+        rendered = "\n".join(record.getMessage() for record in caplog.records)
+        assert secret not in rendered
+        assert "[REDACTED]" in rendered
+    finally:
+        logging.setLogRecordFactory(original_factory)
+
+
+def test_f15_log_redaction_is_installed_regardless_of_trace_mode(monkeypatch, caplog):
+    # UNCONDITIONAL by design. The key reaches INFO logs whether or not tracing is on,
+    # and so does the disclosure path (logs pasted into an issue), so gating the
+    # protection would remove it exactly when nobody is watching. Redaction can only
+    # remove a credential from output -- there is no case where the key is wanted in a
+    # log line -- so the gate bought nothing and made protection contingent on an
+    # unrelated variable.
+    import logging
+
+    secret = "SüP3rSecretKeyValue0123456789"
+    monkeypatch.delenv("CONGRESSMCP_TRACE_DIR", raising=False)
+    monkeypatch.setenv("CONGRESS_API_KEY", secret)
+    assert not trace.enabled()                      # tracing is OFF
+    assert trace._log_redaction_installed is True   # redaction is on anyway (import-time)
+    with caplog.at_level(logging.INFO, logger="httpx"):
+        logging.getLogger("httpx").info("HTTP Request: %s", f"GET https://x/?api_key={secret}")
+    rendered = "\n".join(record.getMessage() for record in caplog.records)
+    assert secret not in rendered
+    assert "[REDACTED]" in rendered
+
+
+def test_f15_log_record_factory_chains_to_the_previous_one(monkeypatch):
+    # setLogRecordFactory is process-global. If this package is imported into a host
+    # application rather than run as a server, replacing the host's factory outright
+    # silently discards whatever it adds. Pinned: a bare `def factory(...)` that
+    # ignored `previous` would fail here while still passing every redaction test.
+    import logging
+
+    secret = "SüP3rSecretKeyValue0123456789"
+    monkeypatch.setenv("CONGRESS_API_KEY", secret)
+    original = logging.getLogRecordFactory()
+    try:
+        def host_factory(*args, **kwargs):
+            record = original(*args, **kwargs)
+            record.host_attribute = "set-by-host"
+            return record
+
+        logging.setLogRecordFactory(host_factory)
+        monkeypatch.setattr(trace, "_log_redaction_installed", False)
+        trace.install_log_redaction()
+
+        record = logging.getLogRecordFactory()(
+            "n", logging.INFO, "p", 1, "key=%s", (secret,), None
+        )
+        assert getattr(record, "host_attribute", None) == "set-by-host"  # host survived
+        assert secret not in record.getMessage()                        # and redaction ran
+    finally:
+        logging.setLogRecordFactory(original)
+        trace._log_redaction_installed = True
+
+
+def test_f15_log_redaction_never_breaks_logging(monkeypatch):
+    # An unconditional process-global factory that raises would take down the host's
+    # logging entirely. Losing redaction on one line beats that, so failure falls back
+    # to the unredacted record.
+    import logging
+
+    monkeypatch.setattr(trace, "_secret_values", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    record = logging.getLogRecordFactory()("n", logging.INFO, "p", 1, "still logged", (), None)
+    assert record.getMessage() == "still logged"
+
+
 @pytest.mark.parametrize("fn", [tools.search_bill_text, tools.get_bill_section, tools.get_bill_toc])
 def test_new_tools_params_are_keyword_only(fn):
     # Freeze-now: every param except ctx is keyword-only, so argument ORDER can never
