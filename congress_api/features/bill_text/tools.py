@@ -15,6 +15,7 @@ from . import trace
 from .client import BillTextError, govinfo_details_url
 from .index import fts_literal, has_token, normalized_query, sqlite_supports_fts5
 from .models import (
+    AncestorNode,
     BillSectionResponse,
     BillTocResponse,
     CacheStatus,
@@ -473,13 +474,22 @@ def _resolve_container(units: list[Unit], requested: str) -> _Container | None:
     if not descendants:
         return None
     depth = len(requested.split("/"))
-    # The container's own node lives at index depth-1 of any descendant's
-    # ancestor_path (a unit's ancestor_path is its id path minus its own leaf), and
-    # everything above it is the container's ancestor_path.
-    anchor = next((unit for unit in descendants if len(unit.ancestor_path) >= depth), None)
-    if anchor is None:
-        return None
-    return _Container(requested, anchor.ancestor_path[: depth - 1], anchor.ancestor_path[depth - 1], descendants)
+    anchor = descendants[0]
+    if len(anchor.ancestor_path) >= depth:
+        # Normal case: the container's own node sits at index depth-1 of a
+        # descendant's ancestor_path, and everything above it is its ancestry.
+        node = anchor.ancestor_path[depth - 1]
+    else:
+        # The container lies BELOW where ancestor_path reaches. This is the
+        # byte-split section: byte_split_unit replaces the section unit with its
+        # CHUNK units, which carry the section's ancestor_path (stopping at the
+        # title) and its header. So `D:D/T:XLVII/S:4701` names a real, citable
+        # section that is not itself a unit -- 5 such sections on s1071, every one
+        # rejected until now even though the TOC lists them. Rebuild the node from
+        # the id component and take the header from the chunks, which inherit it.
+        typ, _, enum = requested.split("/")[-1].partition(":")
+        node = AncestorNode(type=typ, enum=enum, header=anchor.header)
+    return _Container(requested, anchor.ancestor_path[: depth - 1], node, descendants)
 
 
 def _container_children(container: _Container, units: list[Unit], subtree: dict[str, int]) -> list[SectionChild]:
@@ -581,24 +591,43 @@ def _toc_nodes(units: list[Unit], depth: int, subtree_bytes: dict[str, int]) -> 
 
 
 def _build_toc(units: list[Unit], depth: int, subtree_bytes: dict[str, int]) -> list[TocNode]:
+    """Build the TOC tree from each unit's ACTUAL section_id components.
+
+    The id must never be reconstructed as `ancestor_path + leaf`. That holds only
+    while ancestor_path covers every component but the last, and it does not for a
+    byte-split chunk: `byte_split_unit` carries the PARENT's ancestor_path onto the
+    chunk while appending `/CHUNK:{n}` to the parent's id, so the section component
+    sits in neither. Reconstruction silently dropped it and emitted
+    `D:D/T:XLVII/CHUNK:2` for a unit whose real id is `D:D/T:XLVII/S:4701/CHUNK:2`
+    -- 28 such ids on s1071, every one of them referring to nothing, rejected by
+    get_bill_section and missing from subtree_bytes (so they also reported size 0).
+    Same failure as F5 -- the TOC handing out ids it invented -- via a second cause.
+    The id is authoritative; ancestor_path supplies headers only.
+    """
     roots: list[TocNode] = []
     node_map: dict[str, TocNode] = {}
     for unit in units:
-        path = [*unit.ancestor_path]
-        last = unit.section_id.split("/")[-1]
-        typ, enum = last.split(":", 1)
-        path.append(type("Node", (), {"type": typ, "enum": enum, "header": unit.header})())
+        components = unit.section_id.split("/")
         parent = None
-        for idx, node in enumerate(path[:depth]):
-            sid = "/".join(f"{item.type}:{item.enum}" for item in path[: idx + 1])
+        for idx, component in enumerate(components[:depth]):
+            sid = "/".join(components[: idx + 1])
             if sid not in node_map:
+                typ, _, enum = component.partition(":")
+                # Headers come from ancestor_path where it reaches; past its end the
+                # remaining components belong to this unit (its own node, and any
+                # chunk of it, which carries the parent header as a breadcrumb).
+                header = (
+                    unit.ancestor_path[idx].header
+                    if idx < len(unit.ancestor_path)
+                    else unit.header
+                )
                 toc_node = TocNode(
                     section_id=sid,
                     node_kind=node_kind_for(sid),
-                    type=node.type,
-                    enum=node.enum,
-                    header=node.header,
-                    byte_length=unit.byte_length if idx == len(path) - 1 else 0,
+                    type=typ,
+                    enum=enum,
+                    header=header,
+                    byte_length=unit.byte_length if idx == len(components) - 1 else 0,
                     # Size-per-branch: sum of own bytes at-or-under this prefix,
                     # so a consumer sees which division/title is worth descending
                     # into (spec §9 -- highest-value place for the field).

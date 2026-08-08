@@ -1042,6 +1042,83 @@ async def test_f5_oversized_container_returns_descriptors_not_the_first_child(mo
     assert whole["text"].count("word") > 700     # both sections present
 
 
+@pytest.mark.asyncio
+async def test_f5_byte_split_section_resolves_and_reassembles_from_its_chunks(monkeypatch):
+    # A section too large to subdivide structurally is REPLACED by its CHUNK units,
+    # so the section id itself is not a unit -- yet it is a real, citable section and
+    # the TOC lists it (5 such on s1071, all rejected before this fix). It must
+    # resolve and reassemble at read time; the chunks stay fetchable but non-citable.
+    import congress_api.features.bill_text.tools as tools_mod
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    # No structural children to subdivide on -> byte fallback.
+    body = ("word " * 4000).strip().encode()   # ~20KB, one <text>, no subsections
+    xml = (
+        b"<bill><legis-body><division><enum>D</enum><header>Div D</header>"
+        b"<title><enum>XLVII</enum><header>Title XLVII</header>"
+        b"<section><enum>4701</enum><header>Big section</header><text>" + body + b"</text></section>"
+        b"</title></division></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    ids = [u.section_id for u in parsed.units]
+    assert "D:D/T:XLVII/S:4701" not in ids            # replaced by its chunks
+    assert any(sid.startswith("D:D/T:XLVII/S:4701/CHUNK:") for sid in ids)
+
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText("BILLS-119s1071enr", "enr", "2026-08-03T00:00:00Z", None, None, b""),
+        parsed=parsed,
+        index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
+
+    section = await tools_mod.get_bill_section(
+        None, congress=119, bill_type="s", number=1071, section_id="D:D/T:XLVII/S:4701", max_bytes=100_000
+    )
+    assert "error" not in section
+    assert section["node_kind"] == "structural"       # a real section, citable
+    assert section["header"] == "Big section"
+    assert section["text"].count("word") > 3900       # reassembled from every chunk
+    assert all(child["node_kind"] == "chunk" for child in section["children"])
+
+
+def test_f5_toc_ids_come_from_the_unit_id_not_ancestor_path_plus_leaf():
+    # Found live while verifying F5 on s1071: 28 TOC nodes carried ids like
+    # `D:D/T:XLVII/CHUNK:2` for units whose real id is `D:D/T:XLVII/S:4701/CHUNK:2`.
+    # byte_split_unit carries the PARENT's ancestor_path onto a chunk while appending
+    # /CHUNK:{n} to the parent's id, so the section component is in neither -- and
+    # rebuilding the id as ancestor_path+leaf dropped it. The fabricated ids referred
+    # to nothing: rejected by get_bill_section, and absent from subtree_bytes so they
+    # reported size 0 as well.
+    chunk = Unit(
+        section_id="D:D/T:XLVII/S:4701/CHUNK:2",
+        ancestor_path=[
+            AncestorNode(type="D", enum="D", header="Division D"),
+            AncestorNode(type="T", enum="XLVII", header="Title XLVII"),
+        ],
+        header="Section header",
+        segments=[Segment("operative", "body text")],
+    )
+    nodes = _toc_nodes([chunk], 5, {})[0]
+    ids = []
+    stack = list(nodes)
+    while stack:
+        node = stack.pop()
+        ids.append(node.section_id)
+        stack.extend(node.children)
+    assert "D:D/T:XLVII/S:4701/CHUNK:2" in ids
+    assert "D:D/T:XLVII/S:4701" in ids
+    assert "D:D/T:XLVII/CHUNK:2" not in ids   # the fabricated id
+    # Every id the TOC emits must be a prefix of a real unit id, or a real unit id.
+    real = {chunk.section_id}
+    assert all(any(r == sid or r.startswith(f"{sid}/") for r in real) for sid in ids)
+
+
 def test_f5_ambiguous_bare_enum_is_not_swallowed_by_container_resolution():
     # The container fallback must fire only on section_not_found. An ambiguous bare
     # enum is a real answer under §5 ("never guess") and must survive.
