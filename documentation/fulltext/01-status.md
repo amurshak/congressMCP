@@ -304,12 +304,23 @@ holds **by construction** rather than by measurement. Incoherent units 126 → 0
 outstanding; §6 decision approved), V16 (delimiter source fidelity — **never present**,
 render unconditionally; §6 decision settled).
 
-**V5 status is unresolved in this document.** It is marked ❌ above and defect #2 is
-marked fixed and live-verified with hres463 → 16 units / 15 `PRE:` clauses, which is most
-of what V5 asserts. But V5 also requires that synthetic `PRE:`/`RC:` ids resolve through
-`get_bill_section` and that `get_bill_toc` degrades sensibly at a non-existent depth,
-neither of which the defect-fix note covers. Do not mark V5 passed until those two are
-run; do not leave it marked ❌ if they have been.
+**V5 status — limbo resolved to one owed observation (2026-08-08).** It is marked ❌ above and
+defect #2 is fixed and live-verified with hres463 → 16 units / 15 `PRE:` clauses, which is most
+of what V5 asserts. V5 also requires two more things:
+
+1. **`get_bill_toc` degrades sensibly at a non-existent depth — SATISFIED by the F11 work.**
+   The F11 table (§18) shows `hres463` requesting depth 5 against a shallow tree and being
+   *served* depth 5 with `toc_truncated: false` and `depth_reduced: false` — a deeper-than-exists
+   request returning the full tree cleanly, with no error and no false truncation. That is the
+   sensible degradation V5 wanted; cite that row.
+2. **Synthetic `PRE:`/`RC:` ids resolve through `get_bill_section` — STILL OWED.** The defect-#2
+   note covers only that the `PRE:` units are *produced*, not that they *resolve on input*. **The
+   one observation that flips V5 to PASS:** `get_bill_section` on a `PRE:` id from `hres463`
+   (and, if any exists, an `RC:` id) returns the whereas/resolving-clause text rather than
+   `section_not_found`. Hand this to the implementer; it is the last thing between V5 and a
+   pass/fail mark.
+
+Do not mark V5 passed until item 2 is observed; do not leave it ❌ once it is.
 
 ### Defect status (updated after fix round — 11 passed, 1 skipped)
 

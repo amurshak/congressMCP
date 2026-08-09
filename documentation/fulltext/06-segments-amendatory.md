@@ -603,6 +603,15 @@ counterargument; it is the trap.
 `amends` is a convenience, not a completeness guarantee.** State this in the tool
 description, not only the README.
 
+> **IMPLEMENTED 2026-08-08 — `833a570` (F3 + F8, one edit).** The description no longer stops at
+> "convenience" and a list of what `amends` never resolves — that phrasing reads as a caveat
+> about *empty* arrays only. It now states the partial case: **a populated list is not evidence
+> it is the whole list; nothing distinguishes three-of-three from three-of-four; treat it as
+> citations *found*, not citations *present*.** Per the F8 ruling it deliberately **omits** the
+> chapter/title lead-in cause (8.1% on the stable denominator, against four-fifths of empty
+> `amends` being empty by design) — naming one minority cause of a majority-deliberate condition
+> would misdescribe the field.
+
 ### Public Law / Statutes-at-Large targets — APPROVED with one open denominator (V15)
 
 **Invariant, amended:** `amends` resolves **U.S. Code and Public Law citations, never

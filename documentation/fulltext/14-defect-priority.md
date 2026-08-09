@@ -75,9 +75,12 @@ A5's recall cost was accepted because a unit losing a cite still flies `is_amend
 **That covers empty arrays, not short ones.** A populated array reads as *the* answer, and
 nothing distinguishes three-of-three from three-of-four. **Partial population is worse than
 empty.** Does not reopen the verb gate; reopens disclosure.
-**Status: RULED 2026-08-06 — documentation, no schema change.** V19 Population B: 9.5% after
-the en-dash resolution fix, and an upper bound at that. §6's existing *convenience, not
-completeness* wording carries it.
+**Status: RULED 2026-08-06 — documentation, no schema change. IMPLEMENTED 2026-08-08 —
+`833a570`.** V19 Population B: 9.5% after the en-dash resolution fix, and an upper bound at that.
+The tool description no longer stops at "convenience"/what `amends` never resolves (which reads
+as a caveat about *empty* arrays); it now states the partial case: **a populated list is not
+evidence it is the whole list — nothing distinguishes three-of-three from three-of-four — so
+treat it as citations *found*, not citations *present*.** Same edit closes F8.
 
 ### F4. No reported version has ever been parsed `[AUDIT]`
 
@@ -224,10 +227,13 @@ The ceiling derived the limitation from first principles — chapter-level amend
 conforming machinery, non-USC targets — **without ever naming the field whose documented
 caveat it was describing.** An independent scorer flagged the same omission. 22 amendatory
 hits returned `amends: []` in one (biased) sample.
-**Status: RULED 2026-08-06 — tool description, no schema change.** V19 Population A: 512
-lead-in cases, **8.1% of amendatory units** on the stable denominator. Four-fifths of empty
-`amends` is empty **by design** — named Acts, IRC bare sections, unresolvable targets — so
-disclosing one minority cause of a majority-deliberate condition is not warranted.
+**Status: RULED 2026-08-06 — tool description, no schema change. IMPLEMENTED 2026-08-08 —
+`833a570`, with F3.** V19 Population A: 512 lead-in cases, **8.1% of amendatory units** on the
+stable denominator. Four-fifths of empty `amends` is empty **by design** — named Acts, IRC bare
+sections, unresolvable targets — so disclosing one minority cause of a majority-deliberate
+condition is not warranted. The description edit deliberately **omits** the chapter/title
+lead-in cause for that reason: naming one minority cause of a majority-deliberate condition
+would misdescribe the field. It carries the F3 partial-population caveat instead.
 
 ---
 
@@ -246,6 +252,26 @@ before collapsing to single common words.
 
 Zero means *absent* or *not phrased as the document phrases it*, indistinguishable. Return
 the actual tokenisation. **Cost:** small.
+**Status: FIXED 2026-08-08 — `79fe05a`.** `search_bill_text` returns `query_diagnostics` per
+query that matched nothing — `terms` (the FTS5 stems), `absent` (terms not in the index), and a
+`verdict`: **`phrasing`** (terms all present, so rephrase) vs **`absent_term`** (a term is
+missing, so stop). Null when every query hit, so the field's *presence* means something died.
+Diagnosed **per query, not only on all-zero responses** — a dead query inside a successful call
+is equally unreadable and shares the code path.
+
+**The tokeniser is FTS5 itself, through a probe table sharing one `FTS_TOKENIZER` constant with
+the segment index — not a Python Porter reimplementation.** That shortcut is the trap: sabotage
+confirms a reimplementation reports `icebreaker` absent from a bill that contains it — telling
+the caller to abandon a word that is there, the worst failure this field can have. Three tests
+pin it. Measured on 100 real V20 queries × 20 packages = **1,677 zero-hit pairs, 50.1%
+`phrasing` / 49.9% `absent_term`** — the verdict discriminates rather than collapsing; all 841
+`phrasing` verdicts checked against stems of separately-assembled rendered text, 0 mislabelled.
+
+> **Method note (fifth instance this thread).** The first checker reported 7 mislabellings that
+> were *its own* defect — it compared the stem `heavi` against raw text containing `heavy`. An
+> instrument confusing stemmed and unstemmed text is precisely the confusion this diagnostic
+> exists to expose: *a measurement of a property is subject to the same failure class as the
+> property* (`00-INDEX`). Second one the implementer caught before it reached this document.
 
 ### F11. `toc_truncated` cannot signal depth clamping `[E2E]`
 

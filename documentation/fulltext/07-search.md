@@ -143,6 +143,15 @@ one.
 Zero hits currently means *absent* or *not phrased as the document phrases it*, and nothing
 distinguishes them — the same ambiguity this spec has now ruled on five times elsewhere.
 
+> **FIXED 2026-08-08 — `79fe05a` (F10).** `search_bill_text` returns `query_diagnostics` for
+> every query that matched nothing: `terms` (FTS5 stems), `absent` (terms not in the index), and
+> a `verdict` — **`phrasing`** (all terms present → rephrase) or **`absent_term`** (a term is
+> missing → stop). Null when every query hit; diagnosed **per query**, not only on all-zero
+> responses. **The tokeniser is FTS5 itself via a probe table sharing the `FTS_TOKENIZER`
+> constant with the segment index — never a Python re-implementation**, which sabotage shows
+> reports `icebreaker` absent from a bill that contains it. Measured: 1,677 zero-hit pairs split
+> 50.1% `phrasing` / 49.9% `absent_term`, so the verdict discriminates. See §18 F10.
+
 ---
 
 ## Rewrite imbalance is the model's to control, so tell the model
