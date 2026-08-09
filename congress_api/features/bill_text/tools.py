@@ -413,8 +413,12 @@ async def get_bill_toc(
 
     This is a navigation aid, not the answer path: it returns structure and headers, never the
     statutory text itself. depth is clamped to 1-5 (default 2) and total nodes are capped at 500.
-    toc_truncated is true when the node cap forced a shallower tree OR sections nest below the
-    returned depth (toc_note then gives the depth needed to reveal them).
+
+    Two different things can be incomplete, and they are reported separately. depth_reduced is
+    true when the node cap served a shallower tree than you asked for -- compare depth against
+    requested_depth to see by how much. toc_truncated is true when more exists below what you
+    got, which includes the case where your depth was honored in full; toc_note then gives the
+    depth needed to reveal the rest, or says so when no depth can.
     """
     capability_error = _capability_error()
     if capability_error:
@@ -423,7 +427,9 @@ async def get_bill_toc(
         started = time.perf_counter()
         depth, note = _clamp(depth, 1, 5)
         loaded = await load_bill_text(ctx, congress, bill_type, number, version)
-        toc, node_capped, actual_depth = _toc_nodes(loaded.parsed.units, depth, loaded.parsed.subtree_bytes)
+        toc, node_capped, actual_depth, list_truncated = _toc_nodes(
+            loaded.parsed.units, depth, loaded.parsed.subtree_bytes
+        )
         # A node showing children:[] at the depth boundary is indistinguishable
         # from a genuinely empty one, so a consumer reads "this subtitle has no
         # sections" and stops. Detect sections that nest below the returned depth
@@ -435,18 +441,31 @@ async def get_bill_toc(
         notes: list[str] = []
         if note:
             notes.append(note)
+        if node_capped:
+            # Always stated, even alongside hidden_note (F11). hidden_note explains
+            # what is MISSING from the tree; it never says the depth argument was
+            # overridden, and its remedy is phrased in terms of the depth actually
+            # served -- so on its own it reads as if the request had been honored.
+            notes.append(
+                f"Requested depth {depth} was reduced to {actual_depth} by the 500-node cap."
+            )
+        if list_truncated:
+            # Distinct from a depth reduction and previously undisclosed: the tree is
+            # at the requested depth but nodes were dropped off the end of the list.
+            notes.append(
+                "The node list was cut at the 500-node cap, so some top-level nodes are "
+                "missing entirely; use search_bill_text to reach them."
+            )
         if hidden_note:
             notes.append(hidden_note)
-        elif node_capped:
-            # Only when nothing is hidden does the bare cap notice stand alone; when
-            # sections are hidden, hidden_note already explains the cap's effect.
-            notes.append(f"TOC node cap of 500 reached; returned depth {actual_depth}.")
         return BillTocResponse(
             **_envelope(loaded),
             version_resolution_note=loaded.resolved.version_resolution_note,
             timing=_timing(loaded, started),
+            requested_depth=depth,
             depth=actual_depth,
-            toc_truncated=node_capped or hidden_note is not None,
+            depth_reduced=node_capped,
+            toc_truncated=node_capped or list_truncated or hidden_note is not None,
             toc_note=" ".join(notes) or None,
             toc=toc,
         ).model_dump()
@@ -632,13 +651,25 @@ def _limit_utf8(text: str, max_bytes: int) -> str:
     return encoded[:max_bytes].decode("utf-8", errors="ignore")
 
 
-def _toc_nodes(units: list[Unit], depth: int, subtree_bytes: dict[str, int]) -> tuple[list[TocNode], bool, int]:
+def _toc_nodes(
+    units: list[Unit], depth: int, subtree_bytes: dict[str, int]
+) -> tuple[list[TocNode], bool, int, bool]:
+    """Build the deepest tree the 500-node cap allows, at or below `depth`.
+
+    Returns (nodes, node_capped, actual_depth, list_truncated). The cap degrades in two
+    distinguishable ways and F11 turns on telling them apart: it can serve a SHALLOWER
+    tree than asked (actual_depth < depth), or -- when even depth 1 exceeds the cap --
+    serve the requested depth with the node list CUT (list_truncated). The old single
+    `node_capped` flag was true for both, so a caller could not tell "your depth was
+    overridden" from "top-level nodes were dropped", and the second case reported a
+    depth reduction that had not happened.
+    """
     for actual_depth in range(depth, 0, -1):
         nodes = _build_toc(units, actual_depth, subtree_bytes)
         count = _count_toc(nodes)
         if count <= 500:
-            return nodes, depth != actual_depth, actual_depth
-    return _build_toc(units, 1, subtree_bytes)[:500], True, 1
+            return nodes, depth != actual_depth, actual_depth, False
+    return _build_toc(units, 1, subtree_bytes)[:500], depth != 1, 1, True
 
 
 def _build_toc(units: list[Unit], depth: int, subtree_bytes: dict[str, int]) -> list[TocNode]:

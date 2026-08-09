@@ -97,7 +97,7 @@ def test_rrf_dedupes_duplicate_queries():
 
 def test_toc_depth_and_node_cap_shape():
     parsed = parse_fixture("bill_text_trimmed.xml")
-    toc, truncated, depth = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
+    toc, truncated, depth, _ = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
     assert depth == 2
     assert not truncated  # node cap is a separate concern from depth-limiting
     assert toc[0].section_id == "D:A"
@@ -124,7 +124,7 @@ def test_toc_flags_sections_hidden_below_returned_depth():
     parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
     # The two sections under T:I/ST:A sit at depth 3; T:II/S:201 sits at depth 2.
     assert _max_section_depth(parsed.units) == 3
-    _, node_capped, actual = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
+    _, node_capped, actual, _ = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
     assert not node_capped  # nothing was cut by the node cap
     assert _hidden_section_count(parsed.units, actual) == 2  # the two ST:A sections
     # Requesting the required depth reveals everything; nothing hidden.
@@ -918,6 +918,10 @@ async def test_tool_wrappers_build_responses_without_network(monkeypatch):
     # level rather than assert completeness.
     assert toc["toc_truncated"] is True
     assert "depth=3" in toc["toc_note"]
+    # ...but depth 2 was served in full, so this is "more exists below", not an
+    # override. The distinction F11 adds (see the dedicated tests below).
+    assert toc["depth_reduced"] is False
+    assert toc["requested_depth"] == 2 and toc["depth"] == 2
 
     search = await tools_mod.search_bill_text(None, congress=119, bill_type="s", number=1071, queries=["icebreaker"], max_hits=999)
     assert "error" not in search and search["hits"]
@@ -1645,11 +1649,94 @@ def test_get_bill_section_retrieves_synthetic_unit_end_to_end():
     assert res.get("text", "").strip()
 
 
+def test_toc_depth_reduced_is_false_when_the_depth_was_honored():
+    # F11, the case toc_truncated cannot express. The tree is complete to the depth
+    # asked for; sections merely nest deeper. toc_truncated is TRUE here and always
+    # has been -- so a caller reading it alone cannot distinguish this from a request
+    # that was silently overridden. depth_reduced must separate them.
+    parsed = parse_bill_xml(_deep_bill_xml(2, 2, 2), "BILLS-119s1071enr", "enr", None)
+    toc, capped, actual, list_truncated = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
+    assert actual == 2 and not capped and not list_truncated
+    assert _hidden_section_note(parsed.units, actual, 2, parsed.subtree_bytes) is not None
+
+
+def test_toc_depth_reduced_fires_only_on_an_actual_reduction():
+    # The planted positive: 2*10*30 = 600 sections exceed the cap at depth 3, so a
+    # depth-5 request is served at depth 2. requested_depth must survive into the
+    # response -- reporting only the served depth is what forced a consumer to diff
+    # its own request to notice, and neither cell did.
+    parsed = parse_bill_xml(_deep_bill_xml(2, 10, 30), "BILLS-119s1071enr", "enr", None)
+    _, capped, actual, list_truncated = _toc_nodes(parsed.units, 5, parsed.subtree_bytes)
+    assert capped is True and actual < 5 and not list_truncated
+
+
+def test_toc_node_cap_at_depth_one_is_a_cut_list_not_a_depth_reduction():
+    # THE GUARD AGAINST THE OBVIOUS IMPLEMENTATION. Reusing the old `node_capped` flag
+    # as depth_reduced reports a reduction that did not happen: when even depth 1
+    # exceeds the cap, the requested depth IS served and the node LIST is cut instead.
+    # The two degradations are different losses and need different signals -- and the
+    # cut list was previously disclosed by nothing at all.
+    parsed = parse_bill_xml(_deep_bill_xml(600, 1, 1), "BILLS-119s1071enr", "enr", None)
+    _, capped, actual, list_truncated = _toc_nodes(parsed.units, 1, parsed.subtree_bytes)
+    assert actual == 1                 # the requested depth was honored...
+    assert capped is False             # ...so this is NOT a depth reduction
+    assert list_truncated is True      # ...it is a truncated list
+
+
+@pytest.mark.asyncio
+async def test_toc_response_separates_depth_reduction_from_more_below(monkeypatch):
+    # End to end through the response model: the two fields must disagree on a bill
+    # where the depth was reduced, which is the whole point of splitting them.
+    import congress_api.features.bill_text.tools as tools_mod
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    parsed = parse_bill_xml(_deep_bill_xml(2, 10, 30), "BILLS-119s1071enr", "enr", None)
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText(
+            package_id="BILLS-119s1071enr",
+            version="enr",
+            version_resolved_at="2026-08-03T00:00:00Z",
+            version_resolution_note=None,
+            last_modified=None,
+            xml_bytes=b"",
+        ),
+        parsed=parsed,
+        index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
+
+    reduced = await tools_mod.get_bill_toc(
+        None, congress=119, bill_type="s", number=1071, depth=5)
+    assert "error" not in reduced
+    assert reduced["depth_reduced"] is True
+    assert reduced["requested_depth"] == 5
+    assert reduced["depth"] < 5
+    # The reduction must be stated in words too, alongside the hidden-section advice
+    # rather than suppressed by it -- the note is the only channel a text-only reader has.
+    assert "reduced to" in reduced["toc_note"]
+    assert "search_bill_text" in reduced["toc_note"]
+
+    # Same bill, a depth the cap can serve: more still exists below, but nothing was
+    # overridden. toc_truncated stays true; depth_reduced must go false.
+    honored = await tools_mod.get_bill_toc(
+        None, congress=119, bill_type="s", number=1071, depth=1)
+    assert honored["depth_reduced"] is False
+    assert honored["requested_depth"] == 1 and honored["depth"] == 1
+    assert honored["toc_truncated"] is True
+    assert "reduced to" not in (honored["toc_note"] or "")
+
+
 def test_toc_hidden_advice_promises_depth_only_when_servable():
     # V5 gap 2: when the depth ARGUMENT is what hides sections and the full tree still
     # fits under the node cap, advise the reachable depth.
     parsed = parse_bill_xml(_deep_bill_xml(2, 2, 2), "BILLS-119s1071enr", "enr", None)  # tiny, 8 sections
-    toc, capped, actual = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
+    toc, capped, actual, _ = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
     assert not capped and actual == 2
     note = _hidden_section_note(parsed.units, actual, 2, parsed.subtree_bytes)
     assert note and "call with depth=3" in note  # depth 3 is servable, so promise it
@@ -1660,7 +1747,7 @@ def test_toc_hidden_advice_does_not_recommend_a_depth_the_node_cap_blocks():
     # sections, advising "call with depth=N" is circular -- that call re-caps to the same
     # tree. 2*10*30 = 600 sections exceed 500 at depth 3, forcing degradation to depth 2.
     parsed = parse_bill_xml(_deep_bill_xml(2, 10, 30), "BILLS-119s1071enr", "enr", None)
-    toc, capped, actual = _toc_nodes(parsed.units, 5, parsed.subtree_bytes)
+    toc, capped, actual, _ = _toc_nodes(parsed.units, 5, parsed.subtree_bytes)
     assert capped and actual < 3  # the cap forced a depth shallower than the sections
     note = _hidden_section_note(parsed.units, actual, 5, parsed.subtree_bytes)
     assert note is not None

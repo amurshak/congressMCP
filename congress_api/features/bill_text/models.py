@@ -128,7 +128,20 @@ class TocNode(BaseModel):
 
 
 class BillTocResponse(BillTextEnvelope):
+    # The depth this call ATTEMPTED, after clamping the argument to 1-5 (the clamp
+    # itself is disclosed separately in toc_note). Reported so a caller can see the
+    # depth actually served without holding onto its own request to diff against.
+    requested_depth: int
+    # The depth actually served.
     depth: int
+    # True when the 500-node cap forced a shallower tree than requested_depth (F11).
+    # Distinct from toc_truncated on purpose: toc_truncated answers "does more exist
+    # below what I got?", which is true whenever sections nest deeper -- INCLUDING
+    # when the requested depth was honored in full. It therefore cannot signal that
+    # the depth argument was overridden, and a caller reading only toc_truncated
+    # cannot tell a complete depth-3 tree with deeper sections from a depth-5 request
+    # silently served at 3. Observed on s1071 (5 -> 3) and hr2471 (4/5 -> 2).
+    depth_reduced: bool = False
     toc_truncated: bool = False
     toc_note: str | None = None
     toc: list[TocNode]
