@@ -301,7 +301,9 @@ channel a script introduces.
 
 **1b. Built-in tools break trace scope.** With `WebSearch`/`WebFetch`/`Read`/`Bash` live, a claim
 can enter from a source the trace cannot see, and trace-absence stops being interpretable — the
-error corrected twice already here. Disable them for the comparability run; the ruling and its
+error corrected twice already here, and (per the built-ins ruling) the one the **prior Desktop
+runs themselves committed**, since Desktop had web access and grounded some claims outside these
+tools. Disable them so the re-run is the first fully-attributable measurement; the ruling and its
 exception (a separate realistic-agent cell) are in the re-run harness subsection.
 
 **2. These prompts are adversarial probes, not a usage sample.** Groups A–E were written
@@ -323,12 +325,16 @@ something with no history on this project.
 
 ### The re-run harness — reproducible automation of this method (specified 2026-08-08)
 
-The prior §17 runs were hand-driven and recorded as prose. After the fix round (F1–F16, V5,
-with the header-separator and fresh-fidelity items still owed), the suite is being **re-run to
-measure whether the fixes reached the consumer** — a fixed defect that still reproduces at the
-consumer layer is a fix that did not land where it matters. The implementation session will
-write a CLI-driven script to execute the prompts, record each answer, and capture the trace per
-model and per group. This subsection is that script's **contract**: what it must produce and,
+The prior §17 runs were hand-driven, recorded as prose, and — established 2026-08-09 — run on a
+surface (Claude Desktop) with **web access that grounded some claims outside these tools**, so
+they are not a fully-attributable measurement. After the fix round (F1–F16, V5, the
+header-separator and fresh-fidelity items now all landed), the suite is being **re-run to measure
+whether the fixes reached the consumer, on an instrument where every claim's source is in the
+trace** — a fixed defect that still reproduces at the consumer layer is a fix that did not land
+where it matters, and this is the first run that can tell tool-carried from web-propped. The
+implementation session will write a CLI-driven script to execute the prompts, record each answer,
+and capture the trace per model and per group. This subsection is that script's **contract**:
+what it must produce and,
 more load-bearingly, the properties it must not break. It specifies the harness, not its code.
 
 **The central hazard: automation is the easiest place to silently violate the method.**
@@ -395,30 +401,38 @@ spawn — never the literal keys — with an assertion that the file on disk con
 (`assert_config_carries_no_secret`). This is trace-constraint 1 (redact at write time) extended
 to a second artifact, and the same process-side-effect channel F15 named.
 
-> **Ruling — built-ins stay OFF for the comparability re-run; this is instrument integrity, not a
-> preference (2026-08-09, IR call).** Two independent reasons, the second the stronger:
+> **Ruling — built-ins stay OFF; the basis is instrument integrity, and comparability is NOT part
+> of it (2026-08-09, IR call; premise corrected same day).**
 >
-> 1. **Comparability.** The re-run exists to *diff against the prior §17 findings*, which ran
->    through Desktop where these built-ins did not exist. Enabling them makes a difference
->    attributable to web access rather than to the fixes — the confound the controlled design
->    exists to exclude.
-> 2. **Trace-scope integrity.** The trace records the **three bill-text tools only.** Give the
->    model `WebFetch`/`WebSearch`/`Read` and a claim can enter from a source the instrument cannot
->    see, so trace-absence stops meaning anything — and a Group A *pass* can be the model reading
->    the U.S. Code off the web rather than the tool carrying the property, which is exactly the F7
->    failure (codified law is not bill location). **This is the trace-scope error already
->    corrected twice here** (the P.L. 119-60 claim, A3's "zero tool calls"); leaving built-ins on
->    would build that error into the harness by construction. A1 verified live reaches its pinned
->    criterion on **two** trace records (`search_bill_text` + `get_bill_section`) — the tools need
->    no help.
+> **Correction to the first draft of this ruling.** I first offered *comparability with the
+> Desktop-era runs* as a reason, on the belief that Desktop had no web access. **It does — and the
+> prior runs actually grounded some claims in web artifacts rather than in these tools.** So OFF
+> does not reproduce Desktop conditions, and, more to the point, **the prior findings are not a
+> clean baseline to reproduce.** Comparability is off the table in both directions; strike it as a
+> reason.
 >
-> **The realistic-agent-with-web-access run is a different, defensible measurement — and not this
-> one.** It answers "does the property survive when the model has other ways to get information,"
-> worth knowing before public release. But it needs its own instrument (a trace capturing the
-> *whole* tool surface, or an explicit acceptance that claims cannot be attributed), it is **not
-> merge-gating**, and it must **not** be diffed against the Desktop-era findings. Run it as a
-> separate, labelled cell after the comparability re-run has done its job; flip the built-ins only
-> there, and record the flip.
+> **The remaining reason is sufficient on its own: trace-scope integrity.** The trace records the
+> **three bill-text tools only.** With `WebFetch`/`WebSearch`/`Read` live, a claim can enter from a
+> source the instrument cannot see, trace-absence stops meaning anything, and a Group A *pass* can
+> be the model reading the U.S. Code off the web rather than the tool carrying the property — the
+> F7 failure (codified law is not bill location). This is not hypothetical: it is the error
+> corrected twice already here (P.L. 119-60, A3's "zero tool calls"), and the correction above
+> establishes that the **prior Desktop runs did exactly this, at unknown breadth.** A1 verified
+> live reaches its pinned criterion on **two** trace records (`search_bill_text` +
+> `get_bill_section`) — the tools need no help.
+>
+> **So the re-run is not a comparison; it is the clean measurement that supersedes a contaminated
+> one.** Every claim's source is in the trace, so for the first time a Group A pass means the tool
+> carried the property and nothing else did. Where the re-run **disagrees** with a prior finding,
+> read the disagreement *through* the prior contamination: a prior pass the re-run fails most
+> likely means **the tool never carried it and the web was propping it up** — a finding about the
+> tool, not a regression in it. That is worth more than a diff.
+>
+> **The realistic-agent-with-web-access run is still a separate, defensible measurement — and
+> emphatically not this one.** It answers "does the property survive alongside web access," not
+> "does the tool carry the property." It needs its own instrument (a trace over the *whole* tool
+> surface, or an explicit acceptance that claims cannot be attributed) and is **not merge-gating**.
+> Flip built-ins only there, and label it.
 
 **Invariants — the must / must-not list.**
 - **Never batch prompts into a session.** One incognito process each; a model primed by the
@@ -453,20 +467,24 @@ to a second artifact, and the same process-side-effect channel F15 named.
 **Output layout.** `<run>/<cell>/<group>/<prompt>/` holding `answer.txt` (verbatim),
 `trace.jsonl`, and `meta.json`; plus a top-level `run-manifest.json` (build sha, model ids,
 surfaces, corpus shas, timestamps, the full prompt set with pinned criteria). One directory per
-prompt, JSONL throughout, so the run is greppable, diffable, and re-scorable — and **diffable
-against the prior findings by prompt id**, which is the comparison that gives the re-run its
-meaning.
+prompt, JSONL throughout, so the run is greppable, diffable, and re-scorable. It can be **lined
+up against the prior findings by prompt id** — but that is a *cross-reference*, not a clean diff:
+the prior runs had web access and grounded some claims outside these tools (see the built-ins
+ruling), so a disagreement is read through that contamination, never as a bare regression.
 
 > **Preregistration for the re-run (before it runs).** *Expected:* prompts whose defects this
 > round fixed no longer reproduce at the consumer layer — the trailing-period false negative
 > (F2), the TOC container-id rejection (F5), the codified-law-is-not-bill-location fabrication
 > (F7), the undocumented query semantics (F9), the silent zero-hit (F10), the depth-clamp
-> ambiguity (F11), the inline/block join (F12) — while **Group A still passes in both cells**,
-> the property the whole suite is built around. *Falsifier:* a fixed defect still reproduces in a
-> cold run against the current build (the fix did not reach the consumer, or a regression), or
-> Group A drops a cell it previously held. Either is a real finding, recorded against this
-> preregistration rather than explained after the fact. The re-run's value is precisely this
-> diff; the harness exists to make it defensible.
+> ambiguity (F11), the inline/block join (F12) — while **Group A still passes in both cells** on
+> the strength of the tools alone, every claim sourced in the trace. *Falsifier:* a fixed defect
+> still reproduces in a cold run against the current build (the fix did not reach the consumer, or
+> a regression). **Note the asymmetry the premise correction forces:** a prior pass that the
+> re-run *fails* is **not** automatically a regression — the prior pass may have been web-propped,
+> and the clean run is simply the first to see it. So a Group A cell dropping versus the prior
+> runs triggers a **trace inspection** (did the tool ever carry it?), not an automatic
+> regression verdict. The re-run's value is being the measurement whose every claim is
+> attributable, which the prior runs were not.
 
 ---
 

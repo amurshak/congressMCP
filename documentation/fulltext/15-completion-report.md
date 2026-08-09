@@ -84,11 +84,15 @@ Fill `result` and `finding` from `01-status.md`; this table is largely complete 
 ## E. §17 — consumer-layer results
 
 - **Original runs (pre-fix).** Group A passed in both cells; 13 findings ranked in §18; B1 at
-  the floor made zero calls (F7). The safety property is carried by the tool, not the consumer's
-  reasoning budget.
-- **Re-run — `[ PENDING ]`.** Harness specified (§17, the re-run subsection); Haiku capability
-  cell added; preregistration recorded (fixed defects should not reproduce, Group A holds both
-  cells). **Not yet executed.** This is a blocker below, not a blank to leave.
+  the floor made zero calls (F7). **Caveat established 2026-08-09:** these ran on Claude Desktop
+  with web access, and some claims were grounded in web artifacts rather than in these tools — so
+  the prior findings are **not fully attributable** to the tools, and some passes may have been
+  web-propped. Treat them as a cross-reference, not a clean baseline.
+- **Re-run — `[ PENDING ]`.** Harness specified and built (§17 re-run subsection; runner landed
+  in `544e778`/`38129e3`); Haiku capability cell added; built-ins ruled OFF so every claim's
+  source is in the trace (the first fully-attributable run). Preregistration recorded — with the
+  asymmetry that a prior pass the re-run *fails* is a trace-inspection trigger, not an automatic
+  regression. **Not yet executed.** Blocker below, not a blank.
 
 ## F. Measured profile
 
