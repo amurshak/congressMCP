@@ -25,6 +25,8 @@ contract is defined here, follow it exactly rather than improvising.
 | `12-e2e-prompts.md` | §17 end-to-end prompt suite — tests the *consumer*, not the code | Before merge |
 | `13-deferred-options.md` | §14b deferred and rejected design options, with the evidence | Before reopening a settled call |
 | `14-defect-priority.md` | §18 prioritized defect list from §17 and the source audit | **Deciding what to fix next** |
+| `15-completion-report.md` | §16 completion report — **DRAFT SKELETON**, structured against the enumerations | Before merge; fill last |
+| `16-user-guide.md` | **User-facing** draft — §12 README deliverable plus a usage guide | Publishing docs; PR 2 |
 
 Cross-references in the text use section numbers (§5, §6). The table above maps them.
 

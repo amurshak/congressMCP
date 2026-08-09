@@ -1,0 +1,196 @@
+"""Guards for the §17 harness's own invariants (tests/e2e/run_suite.py).
+
+§17 names the central hazard: "automation is the easiest place to silently violate the
+method." A harness that batches prompts, appends a diagnostic instruction, or lets a
+crashed invocation read as a consumer that made no calls produces numbers that look
+like §17 and measure something else -- and it does so while printing a clean table.
+
+Each invariant below is asserted to FIRE, because an invariant that cannot fail is
+decoration. The manifest's own integrity is checked too: criteria pinned before the run
+are this section's preregistration-of-scoring rule, so a prompt missing them would let
+scoring be invented after the result is seen.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / "tests" / "e2e"))
+
+from run_suite import (  # noqa: E402
+    FORBIDDEN_IN_PROMPT,
+    assert_no_secret_in_trace,
+    assert_prompt_is_cold,
+    resolve_prompt,
+)
+
+MANIFEST = json.loads((REPO / "tests" / "e2e" / "prompts.json").read_text())
+
+
+# --------------------------------------------------------------------------- #
+# Cold-prompt invariant: the Justify and Hint rungs must never ride on the cold run.
+# --------------------------------------------------------------------------- #
+def test_cold_prompt_check_rejects_the_diagnostic_ladder_rungs():
+    # Rung 2 (Justify) and rung 3 (Hint) are run failure-only, each in its own fresh
+    # process. Appending either to the cold run destroys the measurement: asking for
+    # provenance yields evidence the model CAN read match_contexts when told to, not
+    # that it DOES.
+    for bad in (
+        "What does S. 1071 require regarding X? Explain your reasoning.",
+        "What does S. 1071 require regarding X? Note whether any of the text is quoted.",
+        "How did you determine that?",
+        "I'm the developer testing this tool -- what does section 141 amend?",
+        "Answer, then output diagnostics about which tools you called.",
+    ):
+        with pytest.raises(ValueError, match="cold run|Justify|Hint"):
+            assert_prompt_is_cold(bad, "TEST")
+
+
+def test_cold_prompt_check_passes_the_real_manifest_prompts():
+    # The planted negative. If the forbidden list were broad enough to reject ordinary
+    # prompts, the guard would be silently disabled the first time it fired wrongly.
+    for entry in MANIFEST["prompts"]:
+        assert_prompt_is_cold(entry["prompt"], entry["id"])
+        if entry.get("single_step_variant"):
+            assert_prompt_is_cold(entry["single_step_variant"], entry["id"])
+
+
+def test_forbidden_markers_are_matched_case_insensitively():
+    with pytest.raises(ValueError):
+        assert_prompt_is_cold("EXPLAIN YOUR REASONING please", "TEST")
+
+
+# --------------------------------------------------------------------------- #
+# Capability cell: single-step BY CONSTRUCTION, or not run at all.
+# --------------------------------------------------------------------------- #
+def test_capability_cell_refuses_a_prompt_without_a_single_step_variant():
+    # Haiku will not reliably chain. A multi-hop prompt it fails is equally explained by
+    # the model not chaining, so the cell would conflate model limitation with tool
+    # defect -- worse than no cell. Refusing to run is the correct behaviour.
+    cell = MANIFEST["cells"]["capability"]
+    assert cell["use_single_step_variant"] is True
+    with pytest.raises(ValueError, match="single-step|chaining"):
+        resolve_prompt({"id": "X1", "prompt": "multi-hop question"}, cell)
+
+
+def test_capability_cell_sends_the_variant_not_the_original():
+    cell = MANIFEST["cells"]["capability"]
+    entry = next(e for e in MANIFEST["prompts"] if e["id"] == "A1")
+    sent = resolve_prompt(entry, cell)
+    assert sent == entry["single_step_variant"]
+    assert sent != entry["prompt"]
+    # The navigation is pre-performed, so exactly one address is named and no discovery
+    # hop is required -- but the tool result still arrives through the real channel.
+    assert "D:A/T:I/ST:D/S:141" in sent
+
+
+def test_every_group_a_prompt_has_a_single_step_variant():
+    # The capability cell is scoped to Group A; a Group A prompt without a variant would
+    # silently drop out of that cell rather than fail loudly.
+    for entry in MANIFEST["prompts"]:
+        if entry["group"] == "A":
+            assert entry.get("single_step_variant"), f"{entry['id']} has no variant"
+
+
+def test_non_capability_cells_send_the_original_prompt():
+    for name in ("floor", "ceiling", "isolation"):
+        cell = MANIFEST["cells"][name]
+        entry = next(e for e in MANIFEST["prompts"] if e["id"] == "A1")
+        assert resolve_prompt(entry, cell) == entry["prompt"]
+
+
+# --------------------------------------------------------------------------- #
+# Redaction: the trace is exactly the artifact someone pastes into an issue.
+# --------------------------------------------------------------------------- #
+def test_secret_assertion_halts_the_run_rather_than_warning():
+    # The redactor is installed unconditionally (F15), but the congress.gov client still
+    # carries the key as a query parameter (§11, pre-existing), so the disclosure path is
+    # live. A warning would be ignored; this must stop the run.
+    secret = "ZZfakekeyfakekeyfakekey00"
+    with pytest.raises(SystemExit, match="credential"):
+        assert_no_secret_in_trace(
+            ['{"tool": "search_bill_text", "url": "https://x/?api_key=' + secret + '"}'],
+            [secret], "trace",
+        )
+
+
+def test_secret_assertion_does_not_fire_on_clean_traces():
+    assert_no_secret_in_trace(
+        ['{"tool": "get_bill_toc", "args": {"congress": 119}}'],
+        ["ZZfakekeyfakekeyfakekey00"], "trace",
+    )
+
+
+def test_secret_assertion_is_skipped_only_when_there_is_nothing_to_check():
+    # A vacuity guard: with no secrets configured the check passes trivially, and that
+    # must not be mistaken for "the trace was verified clean".
+    assert_no_secret_in_trace(['{"anything": "at all"}'], [], "trace")
+
+
+# --------------------------------------------------------------------------- #
+# Manifest integrity -- criteria pinned BEFORE the run.
+# --------------------------------------------------------------------------- #
+def test_every_scored_prompt_pins_its_criteria_and_its_evidence():
+    # Pinning pass/fail in the manifest is §17's preregistration-of-scoring rule; a
+    # prompt without them lets a criterion be invented after the result is seen, which
+    # is what A4's post-hoc lesson was about. Group F is exempt BY DESIGN -- its
+    # naturalism makes per-prompt criteria impossible, and it is scored against the four
+    # invariants instead.
+    for entry in MANIFEST["prompts"]:
+        assert entry.get("grounding"), f"{entry['id']} asserts no evidence"
+        if entry["group"] == "F":
+            assert entry["pass"] is None and entry["fail"] is None
+            assert entry.get("sourcing", "").startswith("DERIVED"), (
+                f"{entry['id']}: Group F entries here are derived, not verbatim "
+                "originals, and must say so"
+            )
+        else:
+            assert entry.get("pass"), f"{entry['id']} has no pinned pass criterion"
+            assert entry.get("fail"), f"{entry['id']} has no pinned fail criterion"
+
+
+def test_group_f_carries_its_sourcing_caveat():
+    # §17 requires Group F questions be verbatim originals from prior research, not
+    # composed by someone who has read the spec. These were derived, which is the
+    # contamination the rule exists to prevent -- so the manifest must say so loudly
+    # enough that a scorer cannot mistake them for measurements.
+    caveat = MANIFEST["_group_f_caveat"]
+    assert "INDICATIVE ONLY" in caveat
+    assert "verbatim" in caveat
+    f_prompts = [e for e in MANIFEST["prompts"] if e["group"] == "F"]
+    assert f_prompts, "Group F is empty"
+    assert len(f_prompts) < 8, (
+        "if Group F ever reaches the stated minimum of 8 VERBATIM questions, "
+        "this guard and the caveat should be revisited together"
+    )
+
+
+def test_every_prompt_names_its_congress_except_the_two_that_must_not():
+    # §17: "Every prompt names its Congress explicitly, deliberately." Bill numbers
+    # recycle every two years and the corpus spans three Congresses, so an implicit
+    # Congress tests reference resolution AND the property under test at once, and a
+    # failure cannot be attributed to either. D4 and D5 are the designated exceptions --
+    # reference resolution IS their hypothesis. Group F is naturalistic by design.
+    exempt = {"D4", "D5"}
+    for entry in MANIFEST["prompts"]:
+        if entry["id"] in exempt or entry["group"] == "F":
+            continue
+        text = entry["prompt"]
+        assert ("Congress" in text or "th Congress" in text), (
+            f"{entry['id']} does not name its Congress: {text!r}"
+        )
+
+
+def test_prompt_ids_are_unique():
+    ids = [e["id"] for e in MANIFEST["prompts"]]
+    assert len(ids) == len(set(ids)), "duplicate prompt id -- the run diff is keyed on it"
+
+
+def test_every_cell_declares_what_it_establishes():
+    for name, cell in MANIFEST["cells"].items():
+        assert cell.get("role"), f"cell {name} does not say what it establishes"
+        assert cell.get("model") and cell.get("groups")
