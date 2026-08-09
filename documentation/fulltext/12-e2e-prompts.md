@@ -284,7 +284,7 @@ floor cell will not be able to afford. Score correctness and effort separately.
 behavior specific to one vendor's models; anything that only works because a particular
 model happens to be careful is not a property of the tool.
 
-### Two contamination paths worth naming
+### Contamination paths worth naming
 
 **1. Memory on the test surface.** If these prompts are run on a memory-enabled assistant
 surface that already carries this project's history, the "fresh session" is not fresh — the
@@ -292,6 +292,17 @@ trap, the segment model, and the citation discipline may all be primed from prio
 conversations. **Run the suite somewhere with no memory of this work**: an incognito
 session, a different client, or a dedicated Claude Code session against the dev MCP server.
 This is the likeliest way the suite silently self-passes.
+
+**1a. cwd = the repo is silent developer framing (harness-specific, found in the smoke test).**
+An automated runner whose working directory is the repo hands the model `CLAUDE.md`, the full
+spec, and the implementation — the completest developer priming available, delivered with nothing
+in the prompt. Run each prompt in an **empty per-prompt directory**. Same family as path 1, on a
+channel a script introduces.
+
+**1b. Built-in tools break trace scope.** With `WebSearch`/`WebFetch`/`Read`/`Bash` live, a claim
+can enter from a source the trace cannot see, and trace-absence stops being interpretable — the
+error corrected twice already here. Disable them for the comparability run; the ruling and its
+exception (a separate realistic-agent cell) are in the re-run harness subsection.
 
 **2. These prompts are adversarial probes, not a usage sample.** Groups A–E were written
 with knowledge of the codebase's known failure modes, which makes them well-targeted and
@@ -363,6 +374,51 @@ below are the method above, restated as machine constraints.
    record alone.
 4. **Record a meta row:** prompt id, cell, model id, surface, thinking budget, context
    condition, build sha, document package/version/sha, timestamps, and **exit status**.
+
+**Tool surface and process isolation — the environment is part of the instrument.** Each
+invocation runs in an **empty per-prompt working directory**, never the repo: a cwd of the repo
+hands the model `CLAUDE.md`, the full spec, and the implementation silently — the most complete
+developer framing there is, delivered without a word in the prompt. And the model's **built-in
+tools (WebSearch, WebFetch, Bash, Read) are disabled** — the three bill-text tools are
+self-sufficient and need none of them. The harness also **writes the MCP config** per prompt
+rather than trusting the operator's setup, which is what makes the cell matrix *real*: the
+isolation cell's three tools come from `CONGRESSMCP_BILL_TEXT_ONLY` in the written config and
+floor/ceiling get the full surface, by construction rather than by assumption. (The config must
+point at the actual serving entry — `python -m congress_api --transport stdio`, with
+`--strict-mcp-config` — not a module that imports the server object without calling `run()`,
+which starts a process that looks alive and answers nothing.)
+
+**The config file is a secret-disclosure channel, and a worse one than the trace.** It sits next
+to the results someone attaches to an issue, and nobody thinks of a config file as *output*. It
+must carry `${CONGRESS_API_KEY}` / `${GOVINFO_API_KEY}` **references**, expanded by the CLI at
+spawn — never the literal keys — with an assertion that the file on disk contains no secret
+(`assert_config_carries_no_secret`). This is trace-constraint 1 (redact at write time) extended
+to a second artifact, and the same process-side-effect channel F15 named.
+
+> **Ruling — built-ins stay OFF for the comparability re-run; this is instrument integrity, not a
+> preference (2026-08-09, IR call).** Two independent reasons, the second the stronger:
+>
+> 1. **Comparability.** The re-run exists to *diff against the prior §17 findings*, which ran
+>    through Desktop where these built-ins did not exist. Enabling them makes a difference
+>    attributable to web access rather than to the fixes — the confound the controlled design
+>    exists to exclude.
+> 2. **Trace-scope integrity.** The trace records the **three bill-text tools only.** Give the
+>    model `WebFetch`/`WebSearch`/`Read` and a claim can enter from a source the instrument cannot
+>    see, so trace-absence stops meaning anything — and a Group A *pass* can be the model reading
+>    the U.S. Code off the web rather than the tool carrying the property, which is exactly the F7
+>    failure (codified law is not bill location). **This is the trace-scope error already
+>    corrected twice here** (the P.L. 119-60 claim, A3's "zero tool calls"); leaving built-ins on
+>    would build that error into the harness by construction. A1 verified live reaches its pinned
+>    criterion on **two** trace records (`search_bill_text` + `get_bill_section`) — the tools need
+>    no help.
+>
+> **The realistic-agent-with-web-access run is a different, defensible measurement — and not this
+> one.** It answers "does the property survive when the model has other ways to get information,"
+> worth knowing before public release. But it needs its own instrument (a trace capturing the
+> *whole* tool surface, or an explicit acceptance that claims cannot be attributed), it is **not
+> merge-gating**, and it must **not** be diffed against the Desktop-era findings. Run it as a
+> separate, labelled cell after the comparability re-run has done its job; flip the built-ins only
+> there, and record the flip.
 
 **Invariants — the must / must-not list.**
 - **Never batch prompts into a session.** One incognito process each; a model primed by the
