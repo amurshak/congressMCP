@@ -322,6 +322,17 @@ of what V5 asserts. V5 also requires two more things:
 
 Do not mark V5 passed until item 2 is observed; do not leave it ❌ once it is.
 
+> **Preregistration for item 2 (2026-08-08, before it runs).** *Expected:* `get_bill_section`
+> on a `PRE:` id produced for `hres463` (and an `RC:` id if one exists) returns the corresponding
+> whereas / resolving-clause text — synthetic ids are addressable on input, **V5 PASSES**, and
+> §5's addressing model needs no change. *Falsifier:* the call returns `section_not_found` or any
+> error, establishing that `PRE:`/`RC:` ids are **produced but not resolvable** — a new defect in
+> the **F5/F14 family** (an id handed to a consumer that the resolver rejects), which reopens §5's
+> addressing contract for synthetic units. Both outcomes are defensible; record the exact id
+> tried and the returned text or error. **This is the shape V5 was written to catch** — a fix can
+> produce the units (defect #2, verified) while leaving them unaddressable, and only an
+> on-input resolution observes the second half.
+
 ### Defect status (updated after fix round — 11 passed, 1 skipped)
 
 **Fixed and live-verified:** #1 (NDAA `version=None` → `enr` ✓), #2 (hres463 → 16 units,
