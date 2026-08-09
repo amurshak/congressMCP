@@ -66,6 +66,7 @@ CHECKS: list[tuple[str, str, str]] = [
     ("C3", "BILLS-119hres463ih", "shallow_tree"),
     ("D1", "BILLS-119s1071enr", "absent_term"),
     ("D3", "BILLS-119s1071enr", "id_absent"),
+    ("E3", "BILLS-119hr3838eh", "versions_differ"),
 ]
 
 failures: list[str] = []
@@ -159,6 +160,34 @@ for prompt_id, pkg, claim in CHECKS:
         ok = not any(u.section_id == "D:H/T:IX/S:9999" for u in parsed.units)
         report(ok, prompt_id, claim, "D:H/T:IX/S:9999 is absent, as the prompt assumes")
 
+    elif claim == "versions_differ":
+        # E3 asserts two versions differ on a named provision. Verify the assertion
+        # itself -- the original E3 presupposed an ENROLLED version that does not exist,
+        # and nothing checked. A version prompt whose two versions are identical (or
+        # whose second version is imaginary) tests nothing while looking like it does.
+        rh_parsed, rh_index = load("BILLS-119hr3838rh")
+        target = "D:A/T:III/ST:D/S:354"
+        rh_units = {u.section_id: u for u in rh_parsed.units}
+        eh_units = {u.section_id: u for u in parsed.units}
+        shared = set(rh_units) & set(eh_units)
+        differing = [i for i in shared
+                     if rh_units[i].display_text != eh_units[i].display_text]
+        phrase = normalized_query(entry["substitution"])
+        rh_hit = rh_index.search([phrase], 3)
+        eh_hit = index.search([phrase], 3)
+        ok = (
+            target in differing
+            and bool(rh_hit) and bool(eh_hit)
+            and rh_hit[0].unit.section_id == target == eh_hit[0].unit.section_id
+            and "Hampton Roads" in eh_units[target].display_text
+            and "Hampton Roads" not in rh_units[target].display_text
+        )
+        report(ok, prompt_id, claim,
+               f"{len(differing)} of {len(shared)} shared ids differ; "
+               f"{target} differs={target in differing}; "
+               f"phrase resolves to it in rh={bool(rh_hit) and rh_hit[0].unit.section_id == target} "
+               f"eh={bool(eh_hit) and eh_hit[0].unit.section_id == target}")
+
 print(f"\nchecked {checked} grounded claims across {len(MANIFEST['documents'])} documents")
 if failures:
     print(f"\n{len(failures)} FAILED -- a prompt whose grounding drifted is dull, and it "
@@ -172,6 +201,5 @@ ungrounded = [e["id"] for e in MANIFEST["prompts"]
               if e.get("substitution") and e["id"] not in {c[0] for c in CHECKS}]
 if ungrounded:
     print(f"\nNOTE: these carry a substitution with no automated check: {ungrounded}")
-print("NOTE: E3 presupposes an enrolled 119hr3838 exists. Only the `eh` version is "
-      "cached, and this script cannot verify the presupposition offline -- confirm the "
-      "version list live before scoring E3, or the prompt is confounded the way A3 was.")
+else:
+    print("\nEvery substitution in the manifest has an automated check.")

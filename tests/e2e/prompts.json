@@ -41,6 +41,7 @@
     "BILLS-117hr2471enr": {"congress": 117, "bill_type": "hr", "number": 2471, "version": "enr", "sha256_16": "cab7cbd0c02c7c90"},
     "BILLS-119hres463ih": {"congress": 119, "bill_type": "hres", "number": 463, "version": "ih", "sha256_16": "7efc69a2807b04a1"},
     "BILLS-119hr3838eh": {"congress": 119, "bill_type": "hr", "number": 3838, "version": "eh", "sha256_16": "6f13746dfb6dfba4"},
+    "BILLS-119hr3838rh": {"congress": 119, "bill_type": "hr", "number": 3838, "version": "rh", "sha256_16": "58c47cbe2fb7e3ec"},
     "BILLS-119s4977is": {"congress": 119, "bill_type": "s", "number": 4977, "version": "is", "sha256_16": "0363b9b6b84cdc2c"},
     "BILLS-119hr1enr": {"congress": 119, "bill_type": "hr", "number": 1, "version": "enr", "sha256_16": "407ee1c00e44527a"},
     "BILLS-116hr133enr": {"congress": 116, "bill_type": "hr", "number": 133, "version": "enr", "sha256_16": "4d0cf97f95218d17"}
@@ -259,12 +260,12 @@
       "group": "E",
       "title": "Version disambiguation",
       "document": "BILLS-119hr3838eh",
-      "prompt": "How did the House-passed version of H.R. 3838 (119th Congress) differ from the enrolled version on the authorization of appropriations in Title I?",
-      "substitution": "the authorization of appropriations in Title I",
-      "grounding": "PARTIAL -- see caveat. Measured: only BILLS-119hr3838eh is in the cached corpus (1,016 units, 888 sections); D:A/T:I/ST:A/S:101 'Authorization of appropriations' exists in it. Whether an ENROLLED 119hr3838 exists at all is NOT established here, and the harness cannot establish it offline.",
-      "pass": "Resolves both versions explicitly and names which is which -- OR reports that the enrolled version does not exist, if that is the fact.",
-      "fail": "Silently answers from one version, or treats a null-dated entry as most recent.",
-      "watch": "CAVEAT FOR THE SCORER: this prompt presupposes an enrolled version exists. If it does not, the prompt is confounded in exactly the way A3 and B3 were -- written from plausibility about corpus content. Verify the version list live BEFORE scoring; a 'failure' here may be a defective prompt. Substitute a bill with a confirmed eh/enr pair if so."
+      "prompt": "How did the House-reported version of H.R. 3838 (119th Congress) differ from the House-engrossed version on the United States Navy Museum System?",
+      "substitution": "the United States Navy Museum System",
+      "grounding": "Measured across BOTH cached versions. H.R. 3838 exists as ih, rh, and eh only -- there is NO enrolled version (verified against govinfo's version list, 2026-08-09). rh (693 units) and eh (1,016 units) share 693 section ids, of which 15 differ in text. D:A/T:III/ST:D/S:354 is one, and the query 'Navy Museum System' returns exactly that id in BOTH versions, so the comparison is reachable from the same phrase either way. The difference is concrete: eh adds '(11) The Hampton Roads Naval Museum' and renumbers the catch-all to (12), and replaces '(6) The USS Constitution Museum' with '(6) USS Constitution Naval History and Heritage Command, Detachment Boston'.",
+      "pass": "Resolves BOTH versions explicitly, names which is which, and reports a real difference in the museum list (Hampton Roads added, and/or the USS Constitution entry renamed).",
+      "fail": "Silently answers from one version, or treats a null-dated entry as most recent. Also a fail: asserting a difference that is not among the 15 measured ones.",
+      "watch": "REWRITTEN 2026-08-09. The original asked about the ENROLLED version, which does not exist -- confounded in exactly the way A3 and B3 were, written from plausibility about corpus content rather than from the record. Third instance of that failure mode in this section, so the rewrite is grounded on a diff of two versions actually in hand. Version precedence is the property under test: rh and eh must not be silently collapsed."
     },
     {
       "id": "F1",

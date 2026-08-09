@@ -143,6 +143,13 @@
       "category": "reported-house",
       "note": "FY2024 NDAA as reported in the House -- large reported bill, House committee style, widens the chamber axis the manifest rationale names as uncovered. Carries changed=\"added\"/reported-display-style but no changed=\"deleted\", so it pins the ADDED half of the change-tracking markup.",
       "sha256": "97123967957ba156241379b89d5d3ffb1ac49ef6eb799f921e6fe86e944a641f"
+    },
+    {
+      "package_id": "BILLS-119hr3838rh",
+      "version": "rh",
+      "category": "reported-house",
+      "note": "FY2026 NDAA as reported in the House. Paired with the already-cached BILLS-119hr3838eh so the corpus carries a CONFIRMED two-version pair of the same bill -- 693 shared section ids, 15 of which differ in text. Grounds S17's E3 (version disambiguation), which previously presupposed an enrolled version that does not exist: govinfo lists ih, rh, eh only.",
+      "sha256": "58c47cbe2fb7e3ecfa3e1639e75f8ecd50f62b91790d251046d732af93dec405"
     }
   ]
 }
