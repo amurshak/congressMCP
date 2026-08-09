@@ -22,7 +22,7 @@ enacts.
 | V2 measurements | ✅ | NDAA `enr`: sha `6f68c0a1…`, 9.36 MB XML, 1397 units, 1133 sections, 3.15 MB text. Cold: fetch 2.82s / parse 0.51s / index 0.14s / **total 3.88s**. |
 | V3 needle | ✅ | NDAA `[icebreaker, polar security cutter]` → 2 hits in **Division G, Titles LXXI/LXXII** (Coast Guard), `ancestor_path` interpretable without a second call. RECA carrier = `enr` (5 hits); `eh` = 0 hits **with `sections_indexed`=334 > 0**. 119hr1 has only `eh` + `enr`. |
 | V4 amendatory trap | ✅ | See headline. |
-| V5 structural floor | ❌ **FAILS on real data** | Passed on trimmed fixtures. See the fixture caveat in §13. |
+| V5 structural floor | ✅ **PASS 2026-08-08** (was ❌ on real data — kept as history) | Three assertions satisfied; synthetic ids resolve on input (`PRE:` 15/15 live on `hres463`, `RC:`/`U:` via constructed docs). The prior real-data failure — passed on trimmed fixtures, failed on a real resolution — is **why the corpus exists** (§13); kept, not deleted with the mark. See the V5 status block below. |
 | V6 tokenizer | ✅ | porter collapses icebreaker/icebreaking/icebreakers → 1 hit each; amend/amended/amending → 50 each. |
 | V7 / V9 / V10 | ✅ (unit) | Escaping, RRF dedupe, non-empty rebuild covered. |
 | V12 quota | ✅ **isolated** | 3 GovInfo calls left the congress counter unchanged. **36,000 (GovInfo) vs 20,000 (congress)** — independent buckets. Indexing cannot starve congress.gov tools. |
@@ -332,6 +332,29 @@ Do not mark V5 passed until item 2 is observed; do not leave it ❌ once it is.
 > tried and the returned text or error. **This is the shape V5 was written to catch** — a fix can
 > produce the units (defect #2, verified) while leaving them unaddressable, and only an
 > on-input resolution observes the second half.
+
+> **Outcome 2026-08-08 — V5 PASS, the preregistered *expected* result not the falsifier
+> (`de3149e`).** All 15 `PRE:` ids from `hres463` resolve on input to their whereas text, **0
+> failures** (`sections_indexed: 16` = 15 `PRE:` + 1 `S:1`). Item 1 was re-observed live rather
+> than cited: `hres463` at depth 5 → served 5, `depth_reduced: false`, `toc_truncated: false`,
+> `toc_note: null`, 16 nodes, 10 search hits. §5's addressing model needs no change; the F5/F14
+> family is **not** reopened.
+>
+> **The prereg's "`RC:` id if one exists" clause earned its place — none exists, anywhere.** All
+> 20 packages mint `PRE:` only (n=15, all `hres463`), so a corpus-only pass rests on **one of
+> three** synthetic shapes. The zero was confirmed real, not a classifier blind spot: the scan
+> classifies through the same `_SYNTHETIC_PREFIXES = {PRE, RC, U}` the resolver uses, so `RC:`/`U:`
+> would have been counted had they appeared — the *scan-that-errors-must-not-look-like-one-that-
+> found-nothing* discipline (`00-INDEX`), applied to the classifier. Both uncovered branches were
+> then reached with constructed documents and both resolve: `RC:` (`<resolving-clause>` →
+> *"Resolved, That the House finds as follows."*) and `U:` (undivided body → *"An undivided body
+> with no sections at all."*).
+>
+> **A real coverage gap closed on the way.** `RC:` already had an end-to-end test; `U:` had only
+> `node_kind_for("U:1") == "synthetic"`, which exercises the **classifier, not the resolver.**
+> Since no corpus package mints a `U:` id, neither the suite nor the corpus could have caught a
+> resolver that emits the id and then rejects it — **the exact F5/F14 shape V5 exists to watch.**
+> Now covered by a resolver test.
 
 ### Defect status (updated after fix round — 11 passed, 1 skipped)
 
