@@ -119,6 +119,13 @@ through `get_bill_section`, `get_bill_toc` degrades sensibly when the depth does
 exist. **`sections_indexed` must be > 0** — synthetic units count. Zero chunks silently
 returned is a failure.
 
+**PASS 2026-08-08 (`de3149e`).** All four assertions met: 16 usable units from
+`<resolution-body>`, 10 search hits, `PRE:` 15/15 resolve on input, and TOC non-existent-depth
+via the F11 `hres463` depth-5 row. `RC:`/`U:` are minted nowhere in the corpus, so both were
+reached with constructed documents and both resolve — which closed a real `U:` resolver-test gap
+(F5/F14 shape). Full outcome in `01-status.md`. **Passed on trimmed fixtures long before it
+passed on a real resolution** — that history is why the extended corpus exists (§13).
+
 **V6 — tokenizer.** *(no credentials needed)* Confirm porter collapses `icebreaker` / `icebreaking` /
 `icebreakers` to one stem on the real fixtures. If not, say so; the query-expansion
 story depends on it.
