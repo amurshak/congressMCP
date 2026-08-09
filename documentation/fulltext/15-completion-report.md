@@ -120,6 +120,15 @@ Fill `result` and `finding` from `01-status.md`; this table is largely complete 
     instrument. *Residuals:* ~62 of the 68 co-occurrence-supported cites were not individually
     eyeballed (the 6 highest-risk were, all genuine); the audit checks target existence, not
     correct subsection/action.
+  - **Capability floor (Haiku, `2026-08-09T172014Z`): PASSES the criterion — errs safe.**
+    `claude-haiku-4-5`, single-step variant, **2 calls** (can't afford the ceiling's 31), so it
+    relied on the tool and answered: *"No, this likely isn't all of them"* — citing the F3/F8
+    convenience caveat **by name** and independently catching the `max_hits=50` truncation. This
+    confirms the hypothesis: A4's intended over-trust test fires at the capability floor, and the
+    disclosure holds at the **weakest tier** (the strongest form of the result — no reasoning
+    required). *Caveats:* the cell ran `bill_text_only=false` (full surface, **not** fully
+    attributable), so the *criterion* PASS is solid (content-based) but the section list's accuracy
+    is uncertified; and the single-step prompt pre-directed the search. n=1.
   - **Disposition DEFERRED to PR2 (decision 2026-08-09).** The "did more work than I wanted"
     concern — the 31-call read-through and the completeness over-claim — is **cost-contingent**: it
     only matters if the calls are expensive. PR1 has no cache (~4.4 s/call; A4 ceiling ran 408 s),
