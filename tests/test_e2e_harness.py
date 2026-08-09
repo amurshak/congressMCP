@@ -27,6 +27,7 @@ from run_suite import (  # noqa: E402
     assert_config_carries_no_secret,
     assert_no_secret_in_trace,
     assert_prompt_is_cold,
+    make_cold_cwd,
     resolve_prompt,
     write_mcp_config,
 )
@@ -185,6 +186,36 @@ def test_isolation_cell_config_turns_on_bill_text_only(tmp_path):
     assert on["mcpServers"]["congress"]["env"]["CONGRESSMCP_BILL_TEXT_ONLY"] == "1"
     off = json.loads(write_mcp_config(tmp_path, tmp_path / "t", False).read_text())
     assert off["mcpServers"]["congress"]["env"]["CONGRESSMCP_BILL_TEXT_ONLY"] == ""
+
+
+def test_cold_cwd_is_outside_the_repo_and_under_no_project():
+    # THE CONTAMINATION GUARD. The CLI resolves project context by walking UP from its
+    # working directory, so a scratch dir inside the repo -- which the default run
+    # directory made it -- hands the model CLAUDE.md, the source, the spec, and the git
+    # history. A run answered "I had to identify H.R. 3838 from your git history" before
+    # this was fixed: cold prompt, correct tool surface, and the filesystem leaked the
+    # whole project anyway.
+    path = make_cold_cwd("TEST")
+    resolved = path.resolve()
+    repo = REPO.resolve()
+    assert resolved != repo and repo not in resolved.parents
+    assert not any(p.name == "congressMCP" for p in resolved.parents)
+    # Nothing above it may look like a project either.
+    for parent in [resolved, *resolved.parents]:
+        assert not (parent / ".git").exists(), f"{parent}/.git is above the cold cwd"
+        assert not (parent / "CLAUDE.md").exists(), f"{parent}/CLAUDE.md is above the cold cwd"
+    assert not any(resolved.iterdir()), "the cold working directory must start empty"
+
+
+def test_cold_cwd_refuses_a_location_under_a_project(monkeypatch, tmp_path):
+    # The planted positive: make the temp location land under something that looks like a
+    # project, and the guard must halt rather than run a contaminated prompt.
+    nested = tmp_path / "someproject" / "scratch"
+    nested.mkdir(parents=True)
+    (tmp_path / "someproject" / ".git").mkdir()
+    monkeypatch.setattr("tempfile.mkdtemp", lambda **kw: str(nested))
+    with pytest.raises(SystemExit, match="walking up|project context"):
+        make_cold_cwd("TEST")
 
 
 def test_web_and_file_builtins_are_disallowed():

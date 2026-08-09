@@ -15,10 +15,15 @@ The harness writes its own MCP config per prompt, pointing the CLI at this repo'
 on stdio (`python -m congress_api --transport stdio`) with --strict-mcp-config, so the
 tool surface is configuration rather than whatever the operator happens to have
 registered -- and so the isolation cell's three tools and the floor/ceiling full surface
-are real settings. Credentials are referenced as ${VAR} and expanded by the CLI at spawn;
-they are never written to the config. The CLI runs in an empty per-prompt directory, not
-this repo: running it here would hand the model CLAUDE.md, the spec, and the
-implementation, which is the most complete developer framing available.
+are real settings. The config names NO credential in any form -- the stdio child
+inherits the environment, and an unset ${VAR} would arrive as that literal string and
+override the working key.
+
+The CLI runs in an empty temp directory OUTSIDE this repo. It resolves project context by
+walking up from its working directory, so anywhere inside the repo -- including the
+default run directory -- hands the model CLAUDE.md, the source, the spec, and the git
+history. One run answered "I had to identify H.R. 3838 from your git history" before this
+was fixed.
 
 THE CENTRAL HAZARD, restated from §17: automation is the easiest place to silently
 violate the method. A script that runs all prompts in one session, appends a diagnostic
@@ -36,6 +41,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -117,6 +123,46 @@ def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool) -> Path:
     return path
 
 
+def make_cold_cwd(prompt_id: str) -> Path:
+    """An empty working directory OUTSIDE this repository, per prompt.
+
+    The CLI resolves project context by walking UP from its working directory: it finds
+    the enclosing git repository and any CLAUDE.md above it. So a scratch directory
+    inside the repo -- which `runs/<timestamp>/<cell>/<group>/<prompt>/cwd` was, since
+    the default run directory lives in the repo -- hands the model this project's
+    CLAUDE.md, source, spec, and git history. That is the most complete developer
+    framing available, delivered silently, and §17 exists to measure a consumer that has
+    none of it.
+
+    Not hypothetical: a run produced the answer "I had to identify H.R. 3838 from your
+    git history." The prompt was cold and the tool surface was right; the *filesystem*
+    leaked the project. A temp directory is the only version of "fresh, no project
+    memory" that survives contact with a tool that reads its surroundings.
+    """
+    path = Path(tempfile.mkdtemp(prefix=f"s17-{prompt_id}-"))
+    resolved = path.resolve()
+    if resolved == REPO.resolve() or REPO.resolve() in resolved.parents:
+        raise SystemExit(
+            f"FATAL: cold working directory {resolved} is inside {REPO}. The CLI would "
+            "read this project's git history and CLAUDE.md as context, which is exactly "
+            "the developer framing §17 forbids."
+        )
+    # Being outside THIS repo is necessary but not sufficient -- the CLI walks up until
+    # it finds a git root or a CLAUDE.md, so a temp directory nested under any other
+    # project would pick that up instead. Check the whole ancestry, deterministically,
+    # rather than relying on a probe run to notice afterwards.
+    for parent in [resolved, *resolved.parents]:
+        for leak in (".git", "CLAUDE.md"):
+            if (parent / leak).exists():
+                raise SystemExit(
+                    f"FATAL: {parent / leak} sits above the cold working directory "
+                    f"{resolved}. The CLI resolves project context by walking up, so "
+                    "the model would run with that project's context. Set TMPDIR to a "
+                    "location with no project above it."
+                )
+    return path
+
+
 def assert_config_carries_no_secret(path: Path, secrets: list[str]) -> None:
     text = path.read_text()
     for secret in secrets:
@@ -163,6 +209,8 @@ class Meta:
     # The exact argv, so the tool surface a result was produced under is part of the
     # record rather than inferred from the cell name.
     command: list[str] = field(default_factory=list)
+    # Where the CLI ran. Must be outside the repo, or the model reads the project.
+    cold_cwd: str = ""
     criteria: dict = field(default_factory=dict)
 
 
@@ -297,8 +345,7 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     # put CLAUDE.md, the spec, and the implementation in the model's reach -- the most
     # complete developer framing available, handed over silently. §17: "no memory of
     # this project, no developer framing." An empty directory is the only way to mean it.
-    cold_cwd = dest / "cwd"
-    cold_cwd.mkdir(exist_ok=True)
+    cold_cwd = make_cold_cwd(prompt_id)
 
     text = resolve_prompt(entry, cell)
     assert_prompt_is_cold(text, prompt_id)
@@ -385,6 +432,7 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
         tool_calls=tools,
         answer_chars=len(answer),
         command=cmd,
+        cold_cwd=str(cold_cwd),
         # Criteria travel WITH the result so a scorer never has to reconstruct them,
         # and so editing one after seeing a result is visible in the diff.
         criteria={k: entry.get(k) for k in ("title", "pass", "fail", "watch",
