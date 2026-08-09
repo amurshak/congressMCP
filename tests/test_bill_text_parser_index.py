@@ -1649,6 +1649,47 @@ def test_get_bill_section_retrieves_synthetic_unit_end_to_end():
     assert res.get("text", "").strip()
 
 
+def test_undivided_body_unit_resolves_on_input_like_the_other_synthetic_shapes():
+    # V5 completes the ENUMERATION, not one member of it. _SYNTHETIC_PREFIXES has three
+    # shapes minted at three different call sites; PRE: and RC: are covered above and
+    # observed live, but U: was only ever asserted as a STRING classification
+    # (node_kind_for("U:1") == "synthetic") -- never resolved through the tool. No corpus
+    # package produces a U: id (0 of 20), so nothing else can catch a resolver that
+    # emits the id and then rejects it, which is exactly the F5/F14 shape V5 watches for.
+    import asyncio
+    from unittest.mock import patch
+
+    import congress_api.features.bill_text.tools as tools
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.index import BillTextIndex
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    # A body with no whereas, no resolving clause, and no structural children: the
+    # only construction that reaches the U: branch.
+    parsed = parse_bill_xml(
+        b"<bill><legis-body><text>An undivided body with no sections at all.</text>"
+        b"</legis-body></bill>",
+        "BILLS-119hres463ih", "ih", None,
+    )
+    assert [u.section_id for u in parsed.units] == ["U:1"]
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText("BILLS-119hres463ih", "ih", "t", None, None, b""),
+        parsed=parsed, index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, *a, **k):
+        return loaded
+
+    with patch.object(tools, "load_bill_text", new=fake_load):
+        res = asyncio.run(tools.get_bill_section(
+            object(), congress=119, bill_type="hres", number=463, section_id="U:1"))
+    assert "error" not in res, res
+    assert res.get("section_id") == "U:1"
+    assert res.get("node_kind") == "synthetic"
+    assert "undivided body" in res.get("text", "")
+
+
 def test_zero_hit_diagnostic_separates_absent_from_merely_phrased_otherwise():
     # F10, the whole point. Both queries return zero hits and are indistinguishable in
     # the response without this. One is answerable by rephrasing; the other is not, and
