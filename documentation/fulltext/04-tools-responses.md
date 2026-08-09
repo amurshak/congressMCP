@@ -270,6 +270,25 @@ If containers are instead left unfetchable, they must be **marked** — a distin
 only option that should not survive, because it guarantees a failed call for any consumer
 that navigates the way the TOC invites.
 
+## `get_bill_toc` depth disclosure — three degradations, three signals (F11, 2026-08-08)
+
+One flag was answering two questions and hiding a third. The fix (`a52d54a`) keeps
+`toc_truncated`'s meaning and adds two fields, so a consumer never has to diff request against
+response to learn what happened:
+
+- **`toc_truncated`** — more exists below the returned tree. Unchanged.
+- **`depth_reduced`** (bool) + **`requested_depth`** — the node budget served a **shallower
+  depth than requested** (`s1071` 5→3, `hr2471` 4/5→2). Distinct from `toc_truncated`: the two
+  disagree on 3 of 5 `s1071` rows, and that disagreement is the information that did not exist
+  before. `hres463` is clean on both.
+- **`toc_note`** — the **third** degradation: even depth 1 can exceed the node cap, in which
+  case the requested depth **is** served but the node list is **cut**. That is neither
+  truncation-below nor depth reduction, and it was disclosed by nothing at all. Do **not** reuse
+  the internal `node_capped` as `depth_reduced` — it reports a reduction that never happened
+  (sabotage-checked: the substitution fails the depth-1 test). The reduction note is also not
+  suppressed when hidden-section advice is present, because `hidden_note` phrases its remedy in
+  terms of the depth *served* and alone reads as though the request was honored.
+
 ---
 
 ## Amendment A6 — `timing` ships one field, not two (2026-08-06)

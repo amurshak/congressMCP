@@ -115,7 +115,59 @@ itself** and warned its reader it had done so.
 **Ruling: render the boundary, but do not imitate GPO.** The requirement is that the boundary
 be *visible*, not that it match `.—`. A neutral separator is preferable precisely because
 `.—` inside quoted material could be mistaken for source text — the doubling hazard V16
-handled by stripping. This is F12's sibling and belongs with it, not as a new defect.
+handled by stripping.
+
+**Corrected 2026-08-08 by an observation run (20 packages, 19,829 units, 170,986 segments) —
+the between-segment boundaries already carry `\n\n`; the real class is inside flattened quoted
+blocks.** A first-pass generalization here (a join-based rule over "header → header" and
+"header → body") was falsified by the measurement — both shapes are already separated, by code
+that predates F12:
+
+- **header → header** never occurs as an adjacency: `coalesce_segments` merges adjacent
+  same-context segments, so it is **0 of 170,986** joins. The `(2) Annual basis` → `(A) In
+  general` break renders `\n\n` (12,439 such breaks live *inside* 41,841 `header` segments).
+- **header → body at a segment join** renders `\n\n` on **41,290 of 41,292** header→`operative`
+  boundaries.
+
+**The run-on the report flagged is a third case, and segment identity locates it.** In
+`119s1071enr S:7201/SS:(e)` the rendered text is
+`(2) Annual basis\n\n(A) In general At least once each year, …`. The sibling boundary is `\n\n`
+— **that is F12's second direction, shipped in `5a54833`**, whose commit message carries this
+exact string as its *before* case. What runs on is `In general At least once each year`: a
+**header → body boundary inside one flattened `quoted` block**, where `flatten_quoted`
+deliberately keeps enum/header/text together. It is not a segment join, so a separator written
+at `join_segments` fires on **zero** of it. The class is **exclusively `quoted`**, now measured
+rather than inferred: **16,042 run-on occurrences** across **3,221 units (16.2% of 19,829)**, in
+**4,279 quoted segments (10.3% of 41,589)** — the segment figure is the same phenomenon counted
+per-segment, not a competing measurement, and there was no "inflation" (the 16,094 variant is
+16,042 plus 52 abbreviation false positives; pin **16,042**). All **18** enum-like non-`quoted`
+candidates were classified exhaustively and are abbreviations or an inline enumeration
+(`(IT)`, `(RO)`, `(2005)`, `; and (2) The Chief Evaluation Office`) — **zero** header→body
+run-ons outside quoted.
+
+**Ruling, relocated — render the flattened header → body boundary, still neutrally, still not
+`.—`.** The principle survives; its *site* moves from the segment join to `flatten_quoted`, so
+this is now a rule about rendering **inserted material**, not about a segment join. Because that
+is a real shift in what the rule governs, the ` — ` glyph is **re-opened**, not still pinned —
+the implementer's refusal to treat it as ruled is correct. Two hard constraints any rule at this
+site must meet:
+
+1. **Detect the boundary structurally, never by a regex over the flattened text.** Key off the
+   `<enum>`/`<header>` child elements inside `flatten_quoted`. This is not a nicety: the
+   designator slot takes four digits (`(2005)`), so no text-level pattern can reliably tell an
+   enum from an abbreviation — which is exactly why the 52 abbreviation false positives exist
+   *only* text-side. Structural detection also dissolves the split-`.—` hazard for free:
+   `117hr7776enr S:1092/SS:(b)` and `119s1071enr S:1095/SS:(b)` carry
+   `<header>Quorum</header><text>.A majority…</text>` — GPO's `.—` split with the `.` at the head
+   of the text node — but a boundary taken from the element structure never sees that punctuation,
+   so there is no `Quorum — .A majority` to avoid. This is the conventions' identity-over-string-
+   matching rule applied to rendering.
+2. **It moves rankings, and the site is inside quoted material** — exactly where this section
+   already warned a rendered mark can be mistaken for source text. 16,042 occurrences in 4,279
+   rendered `quoted` segments (3,221 units) change, shifting byte-split boundaries → chunk content
+   → bm25. It **must go through the replay gate** and carries a *measured* impact, not
+   "whitespace-only." F10/F11 are safe; this is in F12's class. Finalize the glyph only after the
+   gate render confirms the mark reads as editorial rather than as source.
 
 Also fix inline-quote spacing so terminators do not orphan (`"referred to as the Service
 )"`, trailing `" .`). Punctuation adjacent to a closing delimiter belongs outside it,
@@ -137,6 +189,16 @@ without an inserted space.
 > **General consequence worth carrying forward: any change to text rendering propagates into
 > ranking through chunk boundaries.** F11 and F10 are response fields and touch no text, so
 > they are safe. **PR 2 is not** — see below.
+
+> **Preregistration outcome, 2026-08-08 — FALSIFIED, correction retracted.** The prereg
+> written here expected the header shapes to run together with no separator. The observation run
+> shows the opposite: header → header is `\n\n` by construction (coalesce), header → body at a
+> join is `\n\n` on 41,290/41,292. The falsifier condition — *a rendered string already carries
+> a neutral separator at a header boundary* — was met, so the "header separator is unshipped"
+> correction is **wrong**: the between-segment separator shipped long ago, independent of F12.
+> What remains is the flatten-site case ruled above. **This is the second inference of mine in
+> this thread that a corpus measurement overturned** — the exact shape the conventions warn
+> about (structure inferred from a report is not a measurement). Recorded, not quietly dropped.
 
 > **Live 2026-08-06 — this is one defect, and only the delimiter half shipped.** §17's
 > Group A and B runs show **segment joining does not distinguish inline from block**, in

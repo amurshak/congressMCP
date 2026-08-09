@@ -250,7 +250,13 @@ ruling is robust to the choice, which is why it stands unrevised.
 rendering moves chunk boundaries, which moves bm25, which reordered 3 of 30 replayed rounds
 (0 targets lost). **New PR 2 requirement:** the cache key must carry a **rendering** version,
 not only a schema version, or a stale index serves differently-chunked content under a valid
-key (§10).
+key (§10). **F12 as shipped is the inline-quote + `<quoted-block>` separator pair**, and its
+second direction — the `(2) Annual basis` → `(A) In general` sibling break — shipped `\n\n`. An
+observation run (2026-08-08) confirms both between-segment header boundaries already carry `\n\n`.
+The *remaining* run-on is a third case — header → body **inside flattened `quoted` blocks**
+(`flatten_quoted`) — tracked under §6's relocated header-boundary ruling; the ` — ` glyph is
+re-opened at that site with a leading-punctuation constraint and a required replay-gate run. See
+§6 and §18.
 
 **Gate rewrite reviewed: right in direction, dropped a check that need not have been.** The
 replay gate was doing two jobs — fidelity (replay reproduces shipped `search()`) and
@@ -258,6 +264,16 @@ regression (answers not lost). Fidelity is inherently version-pinned and does no
 code change; regression is durable. **Restore fidelity as `replay == live_search` computed
 fresh on both sides**, which never goes stale and is not self-referential. Keep the rewritten
 regression assertion and the impact classification as-is.
+
+> **Follow-up 2026-08-08 (F12 report).** The implementer landed the gate rewrite and framed the
+> choice as binary — keep the stale "reproduces the trace exactly" assertion (which forbids
+> legitimate change and gets deleted the first time it is inconvenient) or drop it and report
+> impact as measured. They took the latter, keeping "a known-correct target present in the trace
+> must still be found" plus the impact classification. **Accepted as far as it goes** — but it
+> omits the third option recorded above: fidelity as `replay == live_search` **computed fresh on
+> both sides in the same run**, which is neither the stale pre-F12 trace nor a re-recorded trace
+> (self-referential). It tests the replay *machinery* against live ground truth and never goes
+> stale. **Still owed**; the regression + impact-classification gate is fine to ship meanwhile.
 
 **Header/text boundary ruled** — render it, neutrally, not as GPO's `.—`. V16 set the
 precedent: a structural distinction the source makes must survive serialization, which is why

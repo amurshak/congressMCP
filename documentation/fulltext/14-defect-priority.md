@@ -255,17 +255,54 @@ honored. A consumer must diff request against response to notice; neither cell d
 field is otherwise meaningful (`hres463` returned `false`).
 **Fix:** a distinct field when the requested depth was reduced. **Cost:** small.
 
+**Status: FIXED 2026-08-08 — `a52d54a`, 136 passed.** Added `depth_reduced` (bool) and
+`requested_depth`; `toc_truncated`'s meaning left alone, so one flag no longer answers two
+questions. The two fields disagree on 3 of 5 `s1071` rows, and that disagreement is the
+information that did not exist before:
+
+| bill | depth req | served | `depth_reduced` | `toc_truncated` |
+|---|---|---|---|---|
+| `s1071` | 1–3 | = | false | true |
+| `s1071` | 4, 5 | 3 | true | true |
+| `hr2471` | 3, 4, 5 | 2 | true | true |
+| `hres463` | 2, 5 | = | false | false |
+
+The 5→3 and 4/5→2 clamps reproduce exactly; `hres463` stays clean on both fields.
+
+**A third degradation was hiding in the same flag.** `_toc_nodes` returned
+`node_capped=True` even when depth 1 exceeds the cap — but that case **serves the requested
+depth and cuts the node list**, so reusing `node_capped` as `depth_reduced` reports a
+reduction that never happened, while the cut list itself was disclosed by nothing at all. Now
+separated and stated in `toc_note`. **Both substitutions sabotage-checked:** reusing
+`node_capped` fails the depth-1 test; restoring the note's `elif` fails the prose assertion.
+
+The reduction note is also **no longer suppressed when hidden-section advice is present** —
+they say different things, and `hidden_note` phrases its remedy in terms of the depth *served*,
+so alone it reads as though the request had been honored. See §4.
+
 ### F12. Segment joining does not distinguish inline from block `[E2E]`
 
-One defect, two directions: inline `<quote>` spans are separated by `\n\n` (the **block**
-separator), fracturing sentences; `header` segments join their text with **no** separator,
-producing `(2) Annual basis.—(A) In general.—…` as a run-on. A consumer rebuilt the
-subparagraph hierarchy itself and warned the reader it had done so. §5's rule is right and
-the implementation has it inverted for both cases. **Fix them together — they share a
-cause.** **Status: FIXED** — `5a54833`. One join function for `display_text` and `render_segments`;
-inline-ness measured (`<quote>` inline on 0 of 38,277). **Reordered 3 of 30 replayed rounds
-despite being whitespace-only** — rendering propagates into ranking through chunk boundaries,
-which is now a PR 2 cache-key requirement (§10).
+One cause — segment joining not distinguishing inline from block — in two directions: inline
+`<quote>` spans separated by `\n\n` (the **block** separator), fracturing sentences; and
+`<quoted-block>` sibling paragraphs joined with a single space by `element_text`, losing their
+block boundaries. A consumer rebuilt the subparagraph hierarchy itself and warned the reader it
+had done so. §5's rule is right and the implementation had it inverted for both.
+**Status: FIXED** — `5a54833`. One join function for `display_text` and `render_segments`;
+segments carry an `inline` flag, measured not assumed (`<quote>` inline on 0 of 38,277;
+`<quoted-block>` block on 7,535, explicitly inline on 208). Replay impact — **27/30 rounds
+exact, 1 differing only in chunk indices, 2 at section level (one section drops out of a
+top-8), 0 known-correct targets lost** — not "whitespace-only." Rendering propagates into
+ranking through chunk boundaries, now a PR 2 cache-key requirement (§10).
+
+**Correction 2026-08-08 (retracts a reassignment first written here).** The `(2) Annual basis`
+→ `(A) In general` sibling break **is** F12's second direction and shipped `\n\n` in `5a54833`
+— an observation run confirms it, and both between-segment header boundaries already carry `\n\n`
+(header → header 0 adjacencies via `coalesce_segments`; header → body 41,290/41,292). The
+genuine remaining run-on is a **third** case: a header → body boundary **inside a flattened
+`quoted` block** (`(A) In general At least once each year…`), living in `flatten_quoted`, not at
+any segment join — so a join-level separator rule fires on zero of it. Tracked under §6's
+relocated header-boundary ruling, where the ` — ` glyph is re-opened at the flatten site with a
+leading-source-punctuation constraint and a required replay-gate run. See §6.
 
 ### F13. Chunk `header` — CLOSED, both halves `[E2E]`
 
