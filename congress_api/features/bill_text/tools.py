@@ -236,9 +236,13 @@ async def search_bill_text(
 
     If "quoted" appears in match_contexts, the hit may include language the bill is removing,
     even when "operative" also appears; presence of "quoted" governs. Each amends entry is
-    {kind: "usc"|"public_law", cite}; amends is a convenience (never named Acts, incl. the IRC by
-    bare section number) -- use is_amendatory and match_contexts to identify amendatory text.
-    max_hits is clamped to 1-50.
+    {kind: "usc"|"public_law", cite}. amends is a convenience, never a complete list of what a
+    section amends: it resolves no named Acts (including the IRC by bare section number), no
+    chapter- or title-level amendments, and no non-U.S. Code targets. A NON-EMPTY amends can
+    still be short -- a populated list is not evidence it is the whole list, and nothing
+    distinguishes three-of-three from three-of-four. Treat it as citations found, not citations
+    present; use is_amendatory and match_contexts to identify amendatory text, and read the
+    section to enumerate its targets. max_hits is clamped to 1-50.
     """
     capability_error = _capability_error()
     if capability_error:
