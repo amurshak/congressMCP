@@ -327,8 +327,10 @@ ranking through chunk boundaries, now a PR 2 cache-key requirement (§10).
 genuine remaining run-on is a **third** case: a header → body boundary **inside a flattened
 `quoted` block** (`(A) In general At least once each year…`), living in `flatten_quoted`, not at
 any segment join — so a join-level separator rule fires on zero of it. Tracked under §6's
-relocated header-boundary ruling, where the ` — ` glyph is re-opened at the flatten site with a
-leading-source-punctuation constraint and a required replay-gate run. See §6.
+relocated header-boundary ruling. **IMPLEMENTED 2026-08-08 (`3c90288`):** structural detection
+off `<header>`, 16,479 occurrences / 3,221 units, glyph `·` (the pinned `—` collides with the
+corpus's own em-dash usage inside quoted segments — 10,177×); replay via the fresh gate
+27 exact / 2 chunk-only / 1 section-level, 0 lost. See §6.
 
 ### F13. Chunk `header` — CLOSED, both halves `[E2E]`
 

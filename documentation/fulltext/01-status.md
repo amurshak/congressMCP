@@ -254,9 +254,10 @@ key (§10). **F12 as shipped is the inline-quote + `<quoted-block>` separator pa
 second direction — the `(2) Annual basis` → `(A) In general` sibling break — shipped `\n\n`. An
 observation run (2026-08-08) confirms both between-segment header boundaries already carry `\n\n`.
 The *remaining* run-on is a third case — header → body **inside flattened `quoted` blocks**
-(`flatten_quoted`) — tracked under §6's relocated header-boundary ruling; the ` — ` glyph is
-re-opened at that site with a leading-punctuation constraint and a required replay-gate run. See
-§6 and §18.
+(`flatten_quoted`) — tracked under §6's relocated header-boundary ruling. **IMPLEMENTED
+2026-08-08 (`3c90288`):** structural detection off `<header>`, 16,479 occurrences / 3,221 units,
+glyph `·` (not `—`, which collides with the corpus's own em-dash usage inside quoted segments);
+replay via the fresh gate 27 exact / 2 chunk-only / 1 section-level, 0 lost. See §6 and §18.
 
 **Gate rewrite reviewed: right in direction, dropped a check that need not have been.** The
 replay gate was doing two jobs — fidelity (replay reproduces shipped `search()`) and
@@ -274,6 +275,19 @@ regression assertion and the impact classification as-is.
 > both sides in the same run**, which is neither the stale pre-F12 trace nor a re-recorded trace
 > (self-referential). It tests the replay *machinery* against live ground truth and never goes
 > stale. **Still owed**; the regression + impact-classification gate is fine to ship meanwhile.
+>
+> **DONE 2026-08-08 — `f4b1a40`, and it turned out to be about the harness's own validity.** The
+> fresh check compares `replay == live_search` at the shipped k, both computed fresh in one
+> process: **30/30.** The sharper framing the implementation surfaced: `rank_map` + `fused_order`
+> *reimplement* `search()`'s admission and RRF, and the k-sweep, the max-of-lists control, and
+> every fusion diagnostic run on that copy — nothing had verified the copy agreed with `search()`,
+> so a drifted copy would characterise a fusion that does not ship while printing a full table of
+> plausible ranks. Sabotage: fusing at k=10 fails 1/30 (weak — V20's flat-k finding), **shrinking
+> the candidate cap fails 3/30 (the structural drift that matters).** The failure report names the
+> **first diverging rank**, not a fixed prefix — found while reading sabotage output, where two
+> lines printed identically but diverged at rank 21 (40 results vs 20). *A gate whose failure looks
+> like a false positive gets ignored* — the same set-vs-count lesson from V19, on the gate's own
+> output. **This closes the fresh-fidelity item; nothing on it remains owed.**
 
 **Header/text boundary ruled** — render it, neutrally, not as GPO's `.—`. V16 set the
 precedent: a structural distinction the source makes must survive serialization, which is why

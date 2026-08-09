@@ -145,29 +145,61 @@ candidates were classified exhaustively and are abbreviations or an inline enume
 (`(IT)`, `(RO)`, `(2005)`, `; and (2) The Chief Evaluation Office`) — **zero** header→body
 run-ons outside quoted.
 
-**Ruling, relocated — render the flattened header → body boundary, still neutrally, still not
-`.—`.** The principle survives; its *site* moves from the segment join to `flatten_quoted`, so
-this is now a rule about rendering **inserted material**, not about a segment join. Because that
-is a real shift in what the rule governs, the ` — ` glyph is **re-opened**, not still pinned —
-the implementer's refusal to treat it as ruled is correct. Two hard constraints any rule at this
-site must meet:
+**Ruling, relocated — render the flattened header → body boundary, neutrally, not `.—`.** The
+principle survives; its *site* moves from the segment join to `flatten_quoted`, so this is a rule
+about rendering **inserted material**, not about a segment join. Two hard constraints, both now
+resolved by the implementation:
 
 1. **Detect the boundary structurally, never by a regex over the flattened text.** Key off the
-   `<enum>`/`<header>` child elements inside `flatten_quoted`. This is not a nicety: the
-   designator slot takes four digits (`(2005)`), so no text-level pattern can reliably tell an
-   enum from an abbreviation — which is exactly why the 52 abbreviation false positives exist
-   *only* text-side. Structural detection also dissolves the split-`.—` hazard for free:
-   `117hr7776enr S:1092/SS:(b)` and `119s1071enr S:1095/SS:(b)` carry
-   `<header>Quorum</header><text>.A majority…</text>` — GPO's `.—` split with the `.` at the head
-   of the text node — but a boundary taken from the element structure never sees that punctuation,
-   so there is no `Quorum — .A majority` to avoid. This is the conventions' identity-over-string-
-   matching rule applied to rendering.
-2. **It moves rankings, and the site is inside quoted material** — exactly where this section
-   already warned a rendered mark can be mistaken for source text. 16,042 occurrences in 4,279
-   rendered `quoted` segments (3,221 units) change, shifting byte-split boundaries → chunk content
-   → bm25. It **must go through the replay gate** and carries a *measured* impact, not
-   "whitespace-only." F10/F11 are safe; this is in F12's class. Finalize the glyph only after the
-   gate render confirms the mark reads as editorial rather than as source.
+   `<header>` child element inside `flatten_quoted`. The designator slot takes four digits
+   (`(2005)`), so no text-level pattern can reliably tell an enum from an abbreviation — sabotage
+   confirms a text-level rule corrupts `(2005) Monitoring`, `(UN) General Assembly`,
+   `(IT) Platform Planning` (two tests fail). Structural detection also dissolves the split-`.—`
+   hazard: a boundary taken from the element structure never sees punctuation at the head of the
+   text node.
+   > **Correction (implementation, 2026-08-08): the `Quorum.A majority` cases I cited here are not
+   > at this site.** `117hr7776enr S:1092/SS:(b)` and `119s1071enr S:1095/SS:(b)` are in
+   > **operative** context — the `join_segments` path (header → `operative`), where they are the
+   > 2-of-41,292 exceptions already noted. Inside `flatten_quoted` there is **exactly one**
+   > leading-`.` instance, degenerate (`'Authorization of appropriation' + '.'`). The absorption
+   > was implemented anyway because the drafting shape is live one path over, but at the ruled site
+   > it is a **near-watched-zero, not a fix for observed damage.** The `Quorum` operative run-on
+   > (header eats the `.`, no `\n\n`) is a separate 2-instance residual on `join_segments`, outside
+   > this ruling.
+2. **It moves rankings, and the site is inside quoted material** — where a rendered mark can be
+   mistaken for source text. The structural header-boundary population is **16,479 occurrences
+   across 3,221 units** (the markup ground truth; the earlier text-side run-on figure of 16,042
+   was detection-limited and is superseded). These are rendered `quoted` blocks, so they shift
+   byte-split boundaries → chunk content → bm25, and the change **went through the fresh-fidelity
+   replay gate**: 30/30, **27 exact / 2 chunk-only / 1 section-level, 0 targets lost** — fidelity
+   *slightly better* than F12 alone (one round moved section-level → chunk-only).
+
+> **IMPLEMENTED 2026-08-08 — `3c90288`, glyph `·` not `—`.** Structural detection off `<header>`
+> ships; sibling enums keep their `\n\n` (F12), and the header → body boundary renders a spaced
+> middle dot:
+>
+> ```
+> (2) Annual basis
+>
+> (A) In general · At least once each year, any covered recipients shall receive…
+> ```
+>
+> **The glyph changed on the criterion I set, applied to evidence I did not have.** The pin was
+> `—`, on *reads as editorial, not source*. Inside quoted segments the corpus itself uses em dash
+> **10,177×**, en dash 1,408×, colon 2,022× — the same order of magnitude as the 16,479
+> separators, so a reader cannot tell the bill's mark from the inserted one. That is the exact
+> ambiguity the criterion rejected in GPO's `.—`. Middle dot occurs **0×** in quoted material (as
+> do `|`, `»`, `▸`), so `·` is unambiguously editorial. **Accepted — this is the criterion working,
+> not a departure from it.** Still a legibility call: overrule freely; the *separation* is what was
+> ruled, not the mark.
+>
+> **Two measurement errors the implementer caught before they reached here, both the reflexive
+> form of this very defect** — attributing the renderer's own output to the source. (a) A first
+> scan for `—` in rendered output reported 167+14 "artifacts" that were the *source's* dashes; a
+> re-run with an emitted-sentinel gives 16,479, exactly the markup population, 0 badly placed.
+> (b) A glyph table listed `\n` at 103,088 "in source" when those newlines are this renderer's.
+> The separator work is *about* telling inserted marks from source marks, and the instrument
+> tripped on that same confusion twice — recorded, because the pattern is the point.
 
 Also fix inline-quote spacing so terminators do not orphan (`"referred to as the Service
 )"`, trailing `" .`). Punctuation adjacent to a closing delimiter belongs outside it,
