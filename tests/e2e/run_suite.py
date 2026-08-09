@@ -79,10 +79,25 @@ def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool) -> Path:
     floor/ceiling "full surface" and the isolation cell's three tools actual
     configuration instead of an assumption.
 
-    SECRETS ARE NEVER WRITTEN. The keys go in as ${VAR} references, expanded by the CLI
-    from the environment at spawn time; assert_config_carries_no_secret verifies the
-    file on disk. A config file is a worse disclosure channel than a trace -- it sits in
-    the run directory next to results someone will attach to an issue.
+    NO CREDENTIALS APPEAR HERE, in any form -- not literally, and not as ${VAR}
+    references. Measured, not assumed, with a probe server that dumps the env it was
+    spawned with:
+
+      * The stdio child INHERITS the parent environment. A key exported in the shell
+        that runs this harness reaches the server without being named here at all.
+      * ${VAR} expands only when VAR IS SET. When it is not, the value arrives as the
+        LITERAL string "${VAR}" -- not empty, not absent.
+
+    Those two together are why the first version of this function was wrong and would
+    have failed every run. `GOVINFO_API_KEY` is normally unset, because api.congress.gov
+    and api.govinfo.gov share one api.data.gov key; the client reads
+    `os.getenv("GOVINFO_API_KEY") or API_KEY`. Writing "${GOVINFO_API_KEY}" therefore
+    handed the server a truthy literal, which overrode the working inherited key and
+    was sent to GovInfo verbatim -- 401 govinfo_key_rejected on every single call, in a
+    shape that reads like a tool defect rather than a harness bug.
+
+    So the env block carries only the two per-prompt variables the harness must control.
+    Everything else, credentials included, comes from inheritance.
     """
     config = {
         "mcpServers": {
@@ -91,8 +106,6 @@ def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool) -> Path:
                 "args": ["-m", "congress_api", "--transport", "stdio"],
                 "cwd": str(REPO),
                 "env": {
-                    "CONGRESS_API_KEY": "${CONGRESS_API_KEY}",
-                    "GOVINFO_API_KEY": "${GOVINFO_API_KEY}",
                     "CONGRESSMCP_TRACE_DIR": str(trace_dir),
                     "CONGRESSMCP_BILL_TEXT_ONLY": "1" if bill_text_only else "",
                 },
@@ -109,9 +122,20 @@ def assert_config_carries_no_secret(path: Path, secrets: list[str]) -> None:
     for secret in secrets:
         if secret in text:
             raise SystemExit(
-                f"FATAL: {path} contains a live credential literally. It must carry "
-                "${VAR} references only. Run halted; delete this file."
+                f"FATAL: {path} contains a live credential. The config must name no "
+                "credential at all -- the stdio child inherits them. Run halted; "
+                "delete this file."
             )
+    # An unset ${VAR} arrives at the server as that literal string, so a reference here
+    # is not a harmless placeholder: it silently overrides the inherited value with
+    # nonsense. Since nothing in this config legitimately needs one, any occurrence is
+    # a bug, and this catches it at the file rather than at the 401.
+    if "${" in text:
+        raise SystemExit(
+            f"FATAL: {path} contains an unexpanded ${{VAR}} reference. When the variable "
+            "is unset the server receives the literal text, overriding the inherited "
+            "value. Pass credentials by exporting them, not by naming them here."
+        )
 
 
 @dataclass
@@ -152,6 +176,39 @@ def working_tree_clean() -> bool:
     out = subprocess.run(["git", "status", "--porcelain"], cwd=REPO,
                          capture_output=True, text=True)
     return not out.stdout.strip()
+
+
+def preflight_credentials() -> str | None:
+    """Confirm the server can actually reach GovInfo BEFORE running 70 prompts.
+
+    CONGRESS_API_KEY alone is sufficient: api.congress.gov and api.govinfo.gov share one
+    api.data.gov key, and the client reads `os.getenv("GOVINFO_API_KEY") or API_KEY`, so
+    GOVINFO_API_KEY is an optional override rather than a second requirement.
+
+    This exists because a credential problem does not announce itself as one. Every tool
+    call returns govinfo_key_rejected, every answer says it cannot find the bill, and the
+    run records seventy consumer failures that are really one missing export -- an
+    errored scan reading as a scan that found nothing, which is the discipline this
+    project keeps relearning. Fail here, loudly, once.
+    """
+    if not (os.getenv("CONGRESS_API_KEY", "").strip() or os.getenv("GOVINFO_API_KEY", "").strip()):
+        return ("neither CONGRESS_API_KEY nor GOVINFO_API_KEY is set. CONGRESS_API_KEY "
+                "alone is enough -- the two APIs share one api.data.gov key.")
+    import asyncio
+
+    sys.path.insert(0, str(REPO))
+    try:
+        from congress_api.features.bill_text.client import fetch_govinfo_package
+    except Exception as exc:  # noqa: BLE001
+        return f"could not import the GovInfo client: {type(exc).__name__}: {exc}"
+    try:
+        # hres463 is the smallest package in the corpus, so this costs one small fetch.
+        asyncio.run(fetch_govinfo_package("BILLS-119hres463ih"))
+    except Exception as exc:  # noqa: BLE001
+        return (f"live GovInfo probe failed: {type(exc).__name__}: {str(exc)[:160]}. "
+                "Every prompt would record a tool failure that reads like a consumer "
+                "result.")
+    return None
 
 
 def secret_values() -> list[str]:
@@ -383,6 +440,16 @@ def main() -> int:
     if not args.dry_run and shutil.which(runner[0]) is None:
         print(f"FATAL: runner {runner[0]!r} not on PATH. Pass --runner, or --dry-run.")
         return 1
+
+    if not args.dry_run:
+        problem = preflight_credentials()
+        if problem:
+            print(f"FATAL: {problem}")
+            print("Export the key in the shell that runs this harness; the stdio server "
+                  "inherits it. Do NOT name it in the MCP config -- an unset ${VAR} "
+                  "arrives as that literal string and overrides the working value.")
+            return 1
+        print("preflight  : GovInfo reachable with the configured key.")
 
     docs = manifest["documents"]
     planned: list[tuple[dict, str, dict]] = []

@@ -138,23 +138,26 @@ def test_secret_assertion_is_skipped_only_when_there_is_nothing_to_check():
 # The MCP config the harness writes -- it OWNS the tool surface, and must not
 # own a copy of the credentials.
 # --------------------------------------------------------------------------- #
-def test_written_mcp_config_references_secrets_but_never_contains_them(tmp_path):
-    # A config file sits in the run directory beside results someone will attach to an
-    # issue -- a worse disclosure channel than the trace, because nobody thinks of it as
-    # output. Keys go in as ${VAR}, expanded by the CLI at spawn time.
+def test_written_mcp_config_names_no_credential_in_any_form(tmp_path):
+    # THE REGRESSION GUARD FOR THE 401. Measured with a probe server that dumps the env
+    # it was spawned with: the stdio child INHERITS the parent environment, and ${VAR}
+    # expands ONLY when VAR is set -- otherwise the literal string "${VAR}" arrives.
+    #
+    # GOVINFO_API_KEY is normally unset, because both APIs share one api.data.gov key
+    # and the client reads `os.getenv("GOVINFO_API_KEY") or API_KEY`. So writing
+    # "${GOVINFO_API_KEY}" handed the server a truthy literal that OVERRODE the working
+    # inherited key -- 401 govinfo_key_rejected on every call, in a shape that reads
+    # like a tool defect. The config must name no credential at all.
     path = write_mcp_config(tmp_path, tmp_path / "trace", bill_text_only=False)
     text = path.read_text()
-    assert "${CONGRESS_API_KEY}" in text and "${GOVINFO_API_KEY}" in text
-    config = json.loads(text)
-    server = config["mcpServers"]["congress"]
+    assert "API_KEY" not in text, "the config must not name a credential variable"
+    assert "${" not in text, "an unset ${VAR} arrives as a literal and overrides inheritance"
+    server = json.loads(text)["mcpServers"]["congress"]
     assert server["args"] == ["-m", "congress_api", "--transport", "stdio"], (
         "the server must be launched on stdio via the module entry point; "
         "run_server.py only imports the server object and never serves"
     )
-    for value in server["env"].values():
-        assert not (len(value) > 30 and "/" not in value and "$" not in value), (
-            f"suspicious literal in config env: {value!r}"
-        )
+    assert set(server["env"]) == {"CONGRESSMCP_TRACE_DIR", "CONGRESSMCP_BILL_TEXT_ONLY"}
 
 
 def test_config_secret_assertion_halts_on_a_literal_key(tmp_path):
@@ -163,6 +166,16 @@ def test_config_secret_assertion_halts_on_a_literal_key(tmp_path):
     bad.write_text(json.dumps({"mcpServers": {"c": {"env": {"CONGRESS_API_KEY": secret}}}}))
     with pytest.raises(SystemExit, match="credential"):
         assert_config_carries_no_secret(bad, [secret])
+
+
+def test_config_assertion_also_rejects_an_unexpanded_var_reference(tmp_path):
+    # Not a harmless placeholder: when the variable is unset the server receives the
+    # literal text and it beats the inherited value. Nothing in this config legitimately
+    # needs one, so any occurrence is the bug returning.
+    bad = tmp_path / "mcp-config.json"
+    bad.write_text(json.dumps({"mcpServers": {"c": {"env": {"GOVINFO_API_KEY": "${GOVINFO_API_KEY}"}}}}))
+    with pytest.raises(SystemExit, match=r"unexpanded"):
+        assert_config_carries_no_secret(bad, [])
 
 
 def test_isolation_cell_config_turns_on_bill_text_only(tmp_path):
