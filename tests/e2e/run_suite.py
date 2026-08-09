@@ -446,7 +446,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run-dir", default=None, help="output root (default runs/<utc-date>)")
-    ap.add_argument("--cells", default="floor,ceiling", help="comma-separated cell names")
+    ap.add_argument("--cells", default="floor,ceiling, capability, isolation", help="comma-separated cell names")
     ap.add_argument("--groups", default=None, help="restrict to these groups, e.g. A,B")
     ap.add_argument("--prompts", default=None, help="restrict to these prompt ids")
     ap.add_argument("--runner", default="claude -p --model {model}",
