@@ -1,0 +1,1065 @@
+[
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 1,
+  "ts": "2026-08-06T04:23:56.155792+00:00",
+  "package_id": "BILLS-117hr2471enr",
+  "target": {
+   "congress": 117,
+   "bill_type": "hr",
+   "number": 2471,
+   "version": null
+  },
+  "queries": [
+   "Division W",
+   "Sec. 804"
+  ],
+  "max_hits": 10,
+  "n_hits": 1,
+  "top_hits": [
+   "D:X/T:VIII/ST:A/S:801."
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:W/S:804.",
+    "resolved": "D:W/S:804.",
+    "error": "section_not_found"
+   },
+   {
+    "requested": "D:W/T:VIII/S:804.",
+    "resolved": "D:W/T:VIII/S:804.",
+    "error": "section_not_found"
+   },
+   {
+    "requested": "D:W/T:VIII",
+    "resolved": "D:W/T:VIII",
+    "error": "section_not_found"
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 8,
+  "ts": "2026-08-06T04:24:37.931529+00:00",
+  "package_id": "BILLS-117hr2471enr",
+  "target": {
+   "congress": 117,
+   "bill_type": "hr",
+   "number": 2471,
+   "version": null
+  },
+  "queries": [
+   "special tribal criminal jurisdiction",
+   "Sec. 804",
+   "SEC. 804"
+  ],
+  "max_hits": 15,
+  "n_hits": 9,
+  "top_hits": [
+   "D:W/T:VIII/ST:A/S:804./PARA:(2)",
+   "D:W/T:VIII/ST:A/S:804./PARA:(3)",
+   "D:W/T:VIII/ST:B/S:812.",
+   "D:W/T:VIII/ST:B/S:813./SS:(c)",
+   "D:W/T:VIII/ST:B/S:813./SS:(d)",
+   "D:W/T:VIII/ST:A/S:804./PARA:(6)",
+   "D:W/T:VIII/ST:B/S:811.",
+   "D:W/T:VIII/ST:B/S:813./SS:(e)",
+   "D:W/T:VIII/ST:A/S:804./PARA:(8)"
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:W/T:VIII/ST:A/S:804.",
+    "resolved": "D:W/T:VIII/ST:A/S:804.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 10,
+  "ts": "2026-08-06T04:38:23.901343+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "air refueling tanker aircraft",
+   "total aircraft inventory",
+   "tanker"
+  ],
+  "max_hits": 10,
+  "n_hits": 6,
+  "top_hits": [
+   "D:A/T:I/ST:D/S:141.",
+   "D:A/T:I/ST:D/S:147.",
+   "D:G/T:LXXIII/ST:E/S:7348.",
+   "D:A/T:I/ST:D/S:149.",
+   "D:G/T:LXXIII/ST:C/S:7322.",
+   "D:D/T:XLII/S:4201./CHUNK:6"
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:A/T:I/ST:D/S:141.",
+    "resolved": "D:A/T:I/ST:D/S:141.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 12,
+  "ts": "2026-08-06T04:40:40.808083+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "A-10 aircraft",
+   "primary mission aircraft inventory",
+   "96 A-10"
+  ],
+  "max_hits": 15,
+  "n_hits": 2,
+  "top_hits": [
+   "D:A/T:I/ST:D/S:147.",
+   "D:A/T:I/ST:D/S:141."
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:A/T:I/ST:D/S:147.",
+    "resolved": "D:A/T:I/ST:D/S:147.",
+    "error": null
+   },
+   {
+    "requested": "D:W/S:804",
+    "resolved": "D:W/S:804",
+    "error": "section_not_found"
+   },
+   {
+    "requested": "D:W/T:VIII/S:804.",
+    "resolved": "D:W/T:VIII/S:804.",
+    "error": "section_not_found"
+   },
+   {
+    "requested": "D:W/T:VIII",
+    "resolved": "D:W/T:VIII",
+    "error": "section_not_found"
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 18,
+  "ts": "2026-08-06T04:45:30.221770+00:00",
+  "package_id": "BILLS-117hr2471enr",
+  "target": {
+   "congress": 117,
+   "bill_type": "hr",
+   "number": 2471,
+   "version": null
+  },
+  "queries": [
+   "Alaska Tribal public safety empowerment",
+   "special Tribal criminal jurisdiction",
+   "Indian Civil Rights Act of 1968"
+  ],
+  "max_hits": 15,
+  "n_hits": 12,
+  "top_hits": [
+   "D:W/T:VIII/ST:B/S:812.",
+   "D:W/T:VIII/ST:B/S:813./SS:(d)",
+   "D:W/T:VIII/ST:B/S:813./SS:(e)",
+   "D:W/T:VIII/ST:A/S:801.",
+   "D:W/T:VIII/ST:A/S:804./PARA:(2)",
+   "D:W/T:VIII/ST:A/S:804.",
+   "D:W/T:VIII/ST:A/S:804./PARA:(3)",
+   "D:W/T:VIII/ST:B/S:813./SS:(a)",
+   "D:W/T:VIII/ST:B/S:813./SS:(c)",
+   "D:W/T:VIII/ST:A/S:804./PARA:(6)"
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:W/T:VIII/ST:A/S:804.",
+    "resolved": "D:W/T:VIII/ST:A/S:804.",
+    "error": null
+   },
+   {
+    "requested": "D:G/S:7002.",
+    "resolved": "D:G/S:7002.",
+    "error": null
+   },
+   {
+    "requested": "D:G/S:7103.",
+    "resolved": "D:G/S:7103.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 24,
+  "ts": "2026-08-06T04:49:00.193743+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": "enr"
+  },
+  "queries": [
+   "Coast Guard Academy",
+   "merchant mariner credential"
+  ],
+  "max_hits": 5,
+  "n_hits": 5,
+  "top_hits": [
+   "D:G/T:LXXII/ST:D/S:7243.",
+   "D:G/T:LXXIII/ST:A/S:7301.",
+   "D:G/T:LXXII/ST:D/S:7246.",
+   "D:G/T:LXXIII/ST:A/S:7301./SS:(g)",
+   "D:G/T:LXXII/ST:D/S:7247."
+  ],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 25,
+  "ts": "2026-08-06T04:49:30.614197+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": "enr"
+  },
+  "queries": [
+   "title 46, United States Code, is amended"
+  ],
+  "max_hits": 15,
+  "n_hits": 15,
+  "top_hits": [
+   "D:G/T:LXXIII/ST:C/S:7321.",
+   "D:G/T:LXXIII/ST:A/S:7301./SS:(b)",
+   "D:G/T:LXXVII/S:7701.",
+   "D:G/T:LXXIII/ST:A/S:7301./SS:(c)",
+   "D:G/T:LXXIII/ST:E/S:7343.",
+   "D:G/T:LXXIII/ST:B/S:7311.",
+   "D:G/T:LXXIII/ST:B/S:7314.",
+   "D:G/T:LXXIV/S:7402.",
+   "D:G/T:LXXIII/ST:B/S:7312.",
+   "D:G/T:LXXIII/ST:B/S:7313."
+  ],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 26,
+  "ts": "2026-08-06T04:50:06.486793+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": "enr"
+  },
+  "queries": [
+   "title 14, United States Code, is amended"
+  ],
+  "max_hits": 40,
+  "n_hits": 40,
+  "top_hits": [
+   "D:G/T:LXXII/ST:D/S:7242.",
+   "D:G/T:LXXI/ST:B/S:7112.",
+   "D:G/T:LXXII/ST:A/S:7201./SS:(j)",
+   "D:G/T:LXXII/ST:C/S:7223.",
+   "D:G/T:LXXII/ST:C/S:7230.",
+   "D:G/T:LXXI/ST:B/S:7113.",
+   "D:G/T:LXXII/ST:A/S:7203.",
+   "D:G/T:LXXII/ST:B/S:7213.",
+   "D:G/T:LXXI/ST:A/S:7102.",
+   "D:G/T:LXXII/ST:A/S:7201./SS:(k)"
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:G/T:LXXVII/S:7701.",
+    "resolved": "D:G/T:LXXVII/S:7701.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 28,
+  "ts": "2026-08-06T04:50:46.445895+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": "enr"
+  },
+  "queries": [
+   "Coast Guard title 10, United States Code, is amended",
+   "Coast Guard title 37, United States Code",
+   "Coast Guard title 5, United States Code, is amended",
+   "title 33, United States Code, is amended",
+   "title 49, United States Code, is amended Coast Guard"
+  ],
+  "max_hits": 12,
+  "n_hits": 0,
+  "top_hits": [],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace.jsonl",
+  "group": "A (mixed: Sonnet A3-rerun rows 0-9, Opus A1-A4 rows 10-29)",
+  "row": 29,
+  "ts": "2026-08-06T04:50:57.153805+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": "enr"
+  },
+  "queries": [
+   "Coast Guard is operating amended title 10",
+   "Coast Guard Reserve title 10 amended",
+   "title 6, United States Code"
+  ],
+  "max_hits": 8,
+  "n_hits": 0,
+  "top_hits": [],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-b-opus-5-high.jsonl",
+  "group": "B (ceiling)",
+  "row": 0,
+  "ts": "2026-08-06T22:20:52.484113+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "congressional operations training",
+   "training on Congress",
+   "legislative process training",
+   "flag officers training",
+   "senior officials training"
+  ],
+  "max_hits": 10,
+  "n_hits": 0,
+  "top_hits": [],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-b-opus-5-high.jsonl",
+  "group": "B (ceiling)",
+  "row": 1,
+  "ts": "2026-08-06T22:21:05.202080+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "Coast Guard training congressional",
+   "flag officer congressional operations",
+   "role of Congress training",
+   "congressional engagement training",
+   "Coast Guard senior officers education"
+  ],
+  "max_hits": 15,
+  "n_hits": 0,
+  "top_hits": [],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-b-opus-5-high.jsonl",
+  "group": "B (ceiling)",
+  "row": 2,
+  "ts": "2026-08-06T22:21:13.984036+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "Coast Guard"
+  ],
+  "max_hits": 15,
+  "n_hits": 15,
+  "top_hits": [
+   "D:G/T:LXXVI/S:7606.",
+   "D:G/T:LXXII/ST:E/S:7268.",
+   "D:G/T:LXXV/ST:C/S:7521.",
+   "D:G/T:LXXV/ST:C/S:7527.",
+   "D:G/T:LXXII/ST:E/S:7261.",
+   "D:G/T:LXXII/ST:A/S:7201./SS:(k)",
+   "D:G/T:LXXII/ST:E/S:7269.",
+   "D:G/T:LXXV/ST:B/S:7515.",
+   "D:B/T:XXVIII/ST:D/S:2867.",
+   "D:G/T:LXXII/ST:A/S:7201./SS:(j)"
+  ],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-b-opus-5-high.jsonl",
+  "group": "B (ceiling)",
+  "row": 3,
+  "ts": "2026-08-06T22:21:25.678098+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "legislative branch",
+   "appropriations process",
+   "congressional affairs",
+   "flag officers",
+   "oversight role of Congress"
+  ],
+  "max_hits": 20,
+  "n_hits": 13,
+  "top_hits": [
+   "D:G/T:LXXII/ST:A/S:7201./SS:(e)/CHUNK:3",
+   "D:A/T:X/ST:G/S:1095./SS:(c)",
+   "D:H/T:LXXXIV/ST:A/S:8401.",
+   "D:A/T:X/ST:G/S:1095./SS:(a)",
+   "D:G/T:LXXV/ST:B/S:7513.",
+   "D:A/T:V/ST:A/S:505.",
+   "D:G/T:LXXV/ST:C/S:7530.",
+   "D:A/T:VI/ST:D/S:631.",
+   "D:G/T:LXXV/ST:C/S:7522.",
+   "D:G/T:LXXI/ST:B/S:7114."
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:G/T:LXXII/ST:A/S:7201./SS:(e)/CHUNK:3",
+    "resolved": "D:G/T:LXXII/ST:A/S:7201./SS:(e)/CHUNK:3",
+    "error": null
+   },
+   {
+    "requested": "S:1",
+    "resolved": "S:1",
+    "error": null
+   },
+   {
+    "requested": "PRE:1",
+    "resolved": "PRE:1",
+    "error": null
+   },
+   {
+    "requested": "1832",
+    "resolved": "1832",
+    "error": "section_not_found"
+   },
+   {
+    "requested": "S:1832.",
+    "resolved": "D:A/T:XVIII/ST:D/S:1832.",
+    "error": null
+   },
+   {
+    "requested": "1832.",
+    "resolved": "D:A/T:XVIII/ST:D/S:1832.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace-c-opus-5-high.jsonl",
+  "group": "C (ceiling)",
+  "row": 4,
+  "ts": "2026-08-07T22:33:00.673913+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "weapons activities",
+   "defense environmental cleanup",
+   "National Nuclear Security Administration"
+  ],
+  "max_hits": 8,
+  "n_hits": 8,
+  "top_hits": [
+   "D:D/T:XLVII/S:4701./CHUNK:1",
+   "D:C/T:XXXI/ST:B/S:3111./SS:(a)/CHUNK:33",
+   "D:C/T:XXXI/ST:B/S:3111./SS:(a)/CHUNK:40",
+   "D:C/T:XXXI/ST:B/S:3111./SS:(a)/CHUNK:18",
+   "D:C/T:XXXI/ST:B/S:3111./SS:(a)/CHUNK:3",
+   "D:C/T:XXXI/ST:B/S:3111./SS:(a)/CHUNK:6",
+   "D:C/T:XXXI/ST:B/S:3111./SS:(a)/CHUNK:5",
+   "D:C/T:XXXI/ST:A/S:3101."
+  ],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-c-opus-5-high.jsonl",
+  "group": "C (ceiling)",
+  "row": 5,
+  "ts": "2026-08-07T22:35:18.610901+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "polar security cutter",
+   "icebreaker",
+   "Arctic Security Cutter",
+   "heavy polar icebreaker"
+  ],
+  "max_hits": 20,
+  "n_hits": 2,
+  "top_hits": [
+   "D:G/T:LXXI/ST:B/S:7117.",
+   "D:G/T:LXXII/ST:B/S:7215."
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:G/T:LXXI/ST:B/S:7117.",
+    "resolved": "D:G/T:LXXI/ST:B/S:7117.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace-c-opus-5-high.jsonl",
+  "group": "C (ceiling)",
+  "row": 7,
+  "ts": "2026-08-07T22:35:37.988165+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "Polar Security",
+   "polar",
+   "icebreaking",
+   "Arctic"
+  ],
+  "max_hits": 25,
+  "n_hits": 22,
+  "top_hits": [
+   "D:G/T:LXXI/ST:B/S:7117.",
+   "D:D/T:XLII/S:4201./CHUNK:1",
+   "D:G/T:LXXII/ST:B/S:7215.",
+   "D:G/T:LXXIII/ST:C/S:7322.",
+   "D:A/T:XVI/ST:A/S:1609.",
+   "D:E/T:I/ST:C/S:5143./SS:(d)",
+   "D:G/T:LXXVII/S:7701.",
+   "D:D/T:XLII/S:4201./CHUNK:8",
+   "D:E/T:I/ST:C/S:5143./SS:(g)",
+   "D:E/T:I/ST:C/S:5143./SS:(f)"
+  ],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-d-opus-5-high.jsonl",
+  "group": "D (ceiling)",
+  "row": 0,
+  "ts": "2026-08-06T23:39:50.467122+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "cryptocurrency mining",
+   "digital asset mining",
+   "cryptocurrency",
+   "virtual currency",
+   "blockchain",
+   "bitcoin"
+  ],
+  "max_hits": 25,
+  "n_hits": 0,
+  "top_hits": [],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-d-opus-5-high.jsonl",
+  "group": "D (ceiling)",
+  "row": 1,
+  "ts": "2026-08-06T23:40:01.447226+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "digital asset",
+   "crypto",
+   "mining",
+   "distributed ledger",
+   "stablecoin",
+   "financial technology"
+  ],
+  "max_hits": 25,
+  "n_hits": 8,
+  "top_hits": [
+   "D:A/T:VIII/ST:E/S:848.",
+   "D:E/T:VI/S:5605.",
+   "D:D/T:XLII/S:4201./CHUNK:3",
+   "D:D/T:XLII/S:4201./CHUNK:4",
+   "D:D/T:XLI/S:4101./CHUNK:1",
+   "D:D/T:XLVI/S:4601./CHUNK:2",
+   "D:A/T:VIII/ST:F/S:867./SS:(a)/CHUNK:2",
+   "D:D/T:XLI/S:4101./CHUNK:3"
+  ],
+  "fetched_after": [
+   {
+    "requested": "S:2.",
+    "resolved": "S:2.",
+    "error": null
+   },
+   {
+    "requested": "D:H/T:IX/S:9999",
+    "resolved": "D:H/T:IX/S:9999",
+    "error": "section_not_found"
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace-d-opus-5-high.jsonl",
+  "group": "D (ceiling)",
+  "row": 6,
+  "ts": "2026-08-06T23:48:16.566956+00:00",
+  "package_id": "BILLS-119hr1enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "hr",
+   "number": 1,
+   "version": null
+  },
+  "queries": [
+   "child tax credit",
+   "qualifying child credit",
+   "refundable credit child",
+   "social security number child credit"
+  ],
+  "max_hits": 10,
+  "n_hits": 1,
+  "top_hits": [
+   "T:VII/ST:A/S:70104."
+  ],
+  "fetched_after": [
+   {
+    "requested": "T:VII/ST:A/S:70104.",
+    "resolved": "T:VII/ST:A/S:70104.",
+    "error": null
+   },
+   {
+    "requested": "804",
+    "resolved": "804",
+    "error": "section_not_found"
+   },
+   {
+    "requested": "804.",
+    "resolved": "804.",
+    "error": "ambiguous_section_id"
+   },
+   {
+    "requested": "D:E/T:VIII/S:804.",
+    "resolved": "D:E/T:VIII/S:804.",
+    "error": null
+   },
+   {
+    "requested": "D:W/T:VIII/ST:A/S:804.",
+    "resolved": "D:W/T:VIII/ST:A/S:804.",
+    "error": null
+   },
+   {
+    "requested": "D:W/T:VIII/ST:A/S:804./PARA:(3)",
+    "resolved": "D:W/T:VIII/ST:A/S:804./PARA:(3)",
+    "error": null
+   },
+   {
+    "requested": "D:X/T:VIII/ST:A/S:804.",
+    "resolved": "D:X/T:VIII/ST:A/S:804.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace-e-opus-5-high.jsonl",
+  "group": "E (ceiling)",
+  "row": 0,
+  "ts": "2026-08-06T22:49:59.535851+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "icebreaker",
+   "polar security cutter",
+   "Arctic",
+   "ice-capable vessel",
+   "Great Lakes icebreaker",
+   "polar"
+  ],
+  "max_hits": 25,
+  "n_hits": 22,
+  "top_hits": [
+   "D:G/T:LXXI/ST:B/S:7117.",
+   "D:G/T:LXXII/ST:B/S:7215.",
+   "D:D/T:XLII/S:4201./CHUNK:1",
+   "D:G/T:LXXIII/ST:C/S:7322.",
+   "D:A/T:XVI/ST:A/S:1609.",
+   "D:E/T:I/ST:C/S:5143./SS:(d)",
+   "D:G/T:LXXVII/S:7701.",
+   "D:D/T:XLII/S:4201./CHUNK:8",
+   "D:E/T:I/ST:C/S:5143./SS:(g)",
+   "D:E/T:I/ST:C/S:5143./SS:(f)"
+  ],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-e-opus-5-high.jsonl",
+  "group": "E (ceiling)",
+  "row": 1,
+  "ts": "2026-08-06T22:50:10.625654+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "Arctic Security Cutter",
+   "icebreaking",
+   "ice season",
+   "medium icebreaker",
+   "commercially available icebreaker",
+   "polar operations",
+   "ice-strengthened",
+   "Healy"
+  ],
+  "max_hits": 25,
+  "n_hits": 1,
+  "top_hits": [
+   "D:G/T:LXXII/ST:B/S:7215."
+  ],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-e-opus-5-high.jsonl",
+  "group": "E (ceiling)",
+  "row": 2,
+  "ts": "2026-08-06T22:50:22.293776+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "Arctic District",
+   "Bering Strait",
+   "cutter acquisition",
+   "vessel traffic Arctic",
+   "Arctic infrastructure",
+   "Arctic operations Coast Guard",
+   "high latitude"
+  ],
+  "max_hits": 20,
+  "n_hits": 5,
+  "top_hits": [
+   "D:A/T:X/ST:F/S:1069.",
+   "D:G/T:LXXI/ST:B/S:7117.",
+   "D:G/T:LXXIII/ST:C/S:7322.",
+   "D:G/T:LXXVII/S:7701.",
+   "D:G/T:LXXI/ST:B/S:7111."
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:G/T:LXXI/ST:B/S:7117.",
+    "resolved": "D:G/T:LXXI/ST:B/S:7117.",
+    "error": null
+   },
+   {
+    "requested": "D:G/T:LXXII/ST:B/S:7215.",
+    "resolved": "D:G/T:LXXII/ST:B/S:7215.",
+    "error": null
+   },
+   {
+    "requested": "D:G/T:LXXI/ST:B/S:7111.",
+    "resolved": "D:G/T:LXXI/ST:B/S:7111.",
+    "error": null
+   },
+   {
+    "requested": "D:G/T:LXXIII/ST:C/S:7322.",
+    "resolved": "D:G/T:LXXIII/ST:C/S:7322.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace-e-opus-5-high.jsonl",
+  "group": "E (ceiling)",
+  "row": 7,
+  "ts": "2026-08-06T22:51:05.781314+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "Storis",
+   "Mackinaw",
+   "Seventeenth Coast Guard District",
+   "domestic icebreaking",
+   "Alaska homeport",
+   "Arctic strategy Department of Defense",
+   "Arctic Council"
+  ],
+  "max_hits": 20,
+  "n_hits": 7,
+  "top_hits": [
+   "D:G/T:LXXII/ST:B/S:7215.",
+   "D:E/T:I/ST:C/S:5143./SS:(i)",
+   "D:G/T:LXXI/ST:B/S:7111.",
+   "D:G/T:LXXVII/S:7701.",
+   "D:A/T:VIII/ST:D/S:838.",
+   "D:E/T:I/ST:C/S:5143./SS:(c)",
+   "D:D/T:XLVI/S:4601./CHUNK:2"
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:G/T:LXXVII/S:7701.",
+    "resolved": "D:G/T:LXXVII/S:7701.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace-e-opus-5-high.jsonl",
+  "group": "E (ceiling)",
+  "row": 9,
+  "ts": "2026-08-06T22:54:48.197246+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "polar security cutter",
+   "icebreaker",
+   "Coast Guard housing"
+  ],
+  "max_hits": 50,
+  "n_hits": 4,
+  "top_hits": [
+   "D:G/T:LXXI/ST:B/S:7117.",
+   "D:G/T:LXXII/ST:A/S:7206.",
+   "D:G/T:LXXII/ST:B/S:7215.",
+   "D:G/T:LXXII/ST:C/S:7228."
+  ],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-e-opus-5-high.jsonl",
+  "group": "E (ceiling)",
+  "row": 10,
+  "ts": "2026-08-06T23:03:30.690726+00:00",
+  "package_id": "BILLS-119hr3838eh",
+  "target": {
+   "congress": 119,
+   "bill_type": "hr",
+   "number": 3838,
+   "version": "eh"
+  },
+  "queries": [
+   "Space Force end strength",
+   "authorized strengths commissioned officers Space Force",
+   "Space Force active duty end strength"
+  ],
+  "max_hits": 10,
+  "n_hits": 0,
+  "top_hits": [],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace-e-opus-5-high.jsonl",
+  "group": "E (ceiling)",
+  "row": 11,
+  "ts": "2026-08-06T23:03:36.653121+00:00",
+  "package_id": "BILLS-119hr3838eh",
+  "target": {
+   "congress": 119,
+   "bill_type": "hr",
+   "number": 3838,
+   "version": "eh"
+  },
+  "queries": [
+   "Space Force",
+   "end strengths",
+   "officers"
+  ],
+  "max_hits": 20,
+  "n_hits": 20,
+  "top_hits": [
+   "D:A/T:VI/ST:A/S:601./SS:(c)",
+   "D:A/T:V/ST:A/S:501.",
+   "D:A/T:XVII/ST:B/S:1721.",
+   "D:A/T:VI/ST:A/S:601./SS:(b)",
+   "D:A/T:IV/ST:A/S:401.",
+   "D:A/T:XVI/ST:A/S:1601.",
+   "D:A/T:VI/ST:A/S:601./SS:(e)",
+   "D:A/T:V/ST:A/S:506.",
+   "D:A/T:V/ST:A/S:507.",
+   "D:A/T:V/ST:A/S:502."
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:A/T:V/ST:A/S:502.",
+    "resolved": "D:A/T:V/ST:A/S:502.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace-e-opus-5-high.jsonl",
+  "group": "E (ceiling)",
+  "row": 13,
+  "ts": "2026-08-06T23:03:54.206614+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": "enr"
+  },
+  "queries": [
+   "Space Force",
+   "end strengths for active forces",
+   "general officers on active duty"
+  ],
+  "max_hits": 20,
+  "n_hits": 20,
+  "top_hits": [
+   "D:A/T:V/ST:A/S:502.",
+   "D:A/T:IV/ST:A/S:401.",
+   "D:A/T:VI/ST:A/S:601./SS:(c)",
+   "D:A/T:VI/ST:A/S:601./SS:(g)",
+   "D:A/T:VI/ST:A/S:601./SS:(f)",
+   "D:A/T:XVII/S:1701.",
+   "D:A/T:V/ST:A/S:501.",
+   "D:A/T:V/ST:F/S:552.",
+   "D:A/T:VI/ST:A/S:601./SS:(a)",
+   "D:A/T:VI/ST:A/S:601./SS:(b)"
+  ],
+  "fetched_after": [
+   {
+    "requested": "D:A/T:V/ST:A/S:502.",
+    "resolved": "D:A/T:V/ST:A/S:502.",
+    "error": null
+   },
+   {
+    "requested": "D:A/T:V/ST:A/S:501.",
+    "resolved": "D:A/T:V/ST:A/S:501.",
+    "error": null
+   },
+   {
+    "requested": "D:A/T:V/ST:A/S:501.",
+    "resolved": "D:A/T:V/ST:A/S:501.",
+    "error": null
+   }
+  ]
+ },
+ {
+  "trace": "bill_text_trace_reruns-sonnet-5-low.jsonl",
+  "group": "floor reruns (B1/D1/E2)",
+  "row": 0,
+  "ts": "2026-08-08T00:57:21.265505+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "cryptocurrency mining",
+   "crypto mining",
+   "digital asset mining",
+   "cryptocurrency"
+  ],
+  "max_hits": 10,
+  "n_hits": 0,
+  "top_hits": [],
+  "fetched_after": []
+ },
+ {
+  "trace": "bill_text_trace_reruns-sonnet-5-low.jsonl",
+  "group": "floor reruns (B1/D1/E2)",
+  "row": 1,
+  "ts": "2026-08-08T01:01:02.997382+00:00",
+  "package_id": "BILLS-119s1071enr",
+  "target": {
+   "congress": 119,
+   "bill_type": "s",
+   "number": 1071,
+   "version": null
+  },
+  "queries": [
+   "polar security cutter",
+   "icebreaker"
+  ],
+  "max_hits": 30,
+  "n_hits": 2,
+  "top_hits": [
+   "D:G/T:LXXI/ST:B/S:7117.",
+   "D:G/T:LXXII/ST:B/S:7215."
+  ],
+  "fetched_after": []
+ }
+]

@@ -1,0 +1,431 @@
+*(congressMCP bill-text spec — see `00-INDEX.md` for the file map, conventions, and settled decisions.)*
+
+# 18. Prioritized defect list — from §17 and the GovInfo code audit
+
+Everything the adversarial prompt suite and the accompanying source audit surfaced, ranked
+by **harm if left unfixed**, not by fix cost. Fix cost and status are annotated separately
+so the two are not confused.
+
+**Provenance is marked** because it changes how much weight each item carries: `[E2E]` =
+observed live in a §17 run; `[AUDIT]` = found by comparing the spec against GovInfo's
+published documentation; `[E2E-]` = observed but with a caveat on the evidence.
+
+**On merge gating.** §17's stated rule is that a **Group A** failure blocks merge. **Group A
+passed in both cells**, so *by the stated rule nothing here blocks*. F1 and F2 should block
+on ordinary correctness grounds regardless — they are not consumer-behavior findings, they
+return wrong content. Do not let a clean Group A be read as a clean bill of health.
+
+---
+
+## P0 — returns the wrong document or asserts something false
+
+### F1. `renr` loses to `enr`; agreed-to resolutions resolve to `ih` `[AUDIT]`
+
+The precedence table covers **17 of GovInfo's 53 published version codes**. Two gaps are
+correctness bugs, not coverage gaps:
+
+- **`renr` (re-enrolled) gets precedence 0 and sorts last**, so `enr` wins and the resolver
+  returns **superseded text as final**.
+- **`ath` / `ats` are absent entirely**, and simple and concurrent resolutions never receive
+  `enr` — so **every agreed-to resolution resolves to `ih`**.
+
+Worst failure available: everything downstream is drawn from the wrong document and nothing
+in the response says so. §3's invariant (*"if an `enr` version exists… enrolled is terminal
+for every bill"*) is wrong on both counts.
+
+**Fix:** complete the table against the published list, **and assign categories, not just
+ranks** — administrative codes (`ash`, `sas`, `sc`, `oph`, `ops`), negative terminals
+(`fph`, `fps`, `fah`, `lth`, `lts`, `iph`, `ips`, `pav`), and re-issues (`renr`, `reah`,
+`res`) cannot be expressed on one linear scale. A failed-passage version is chronologically
+last and must never be "latest."
+**Status: FIXED 2026-08-06.** 53 codes, each with a category alongside its rank; `renr` 95
+beats `enr`; `ath`/`ats` 80. **`NEGATIVE` sorts below even unknown codes** — an unknown code
+might be a new authoritative stage, a failed-passage version is known not to be — and
+selection of one for want of an alternative is disclosed in `version_resolution_note`. A
+completeness test pins all 53 so a future GPO addition fails loudly rather than falling to
+precedence 0. Original ranks preserved exactly.
+
+### F2. Trailing period makes the tool assert a falsehood `[E2E]`
+
+`get_bill_section("804")` returns *"No section or chunk matched '804'"* — **while three
+sections numbered 804 exist**. `804.` returns the correct `ambiguous_section_id`. Four
+independent incognito sessions tripped on this.
+
+A citation is written `§1832`, never `§1832.`; the period is a heading terminator that
+leaked into the id namespace.
+
+**Fix:** strip **trailing** periods at id construction, never internal ones. Free today under
+§10 (schema version in filename, discard and rebuild); permanent the day PR 2 ships.
+**Status: FIXED 2026-08-06.** Stripped at id construction (trailing only, internal
+preserved); the resolver **also accepts the period form on input**, which cannot collide
+because ids no longer contain one. That second half matters — a model copying `SEC. 804.`
+verbatim was the exact input that produced the false "no section matched". Live on the NDAA:
+`804`, `804.`, `7223`, `7117` all resolve; zero period-bearing ids remain; ambiguity still
+errors rather than guessing.
+
+---
+
+## P1 — silently incomplete or unexamined content
+
+### F3. `amends` can be **partially** populated `[E2E]`
+
+`S:7223.` returns `[2158, 2159(c), 2160]` while its own snippet also amends **§2161**.
+
+A5's recall cost was accepted because a unit losing a cite still flies `is_amendatory: true`.
+**That covers empty arrays, not short ones.** A populated array reads as *the* answer, and
+nothing distinguishes three-of-three from three-of-four. **Partial population is worse than
+empty.** Does not reopen the verb gate; reopens disclosure.
+**Status: RULED 2026-08-06 — documentation, no schema change.** V19 Population B: 9.5% after
+the en-dash resolution fix, and an upper bound at that. §6's existing *convenience, not
+completeness* wording carries it.
+
+### F4. No reported version has ever been parsed `[AUDIT]`
+
+GovInfo marks deleted text with `<DELETED>` tags in bill text files. **Struck-in-committee
+text is not `operative`, `quoted`, or `header`** — the segment model has no name for it. If
+it parses as `operative`, the tool presents text a committee **removed** as text the bill
+contains: the amendatory trap at a layer V4 does not cover.
+
+Every fixture and all 18 extended-corpus packages are `enr`, `eh`, or `is`. Struck text
+appears in **reported** versions (`rh`, `rs`). **An entire version class is unrepresented** —
+which is exactly how the intro-labelling hazard stayed latent at 0-of-53.
+**Status: measured and RULED 2026-08-06; implementation open.** The premise was right in
+substance, wrong in specifics: no `<DELETED>` element — the DTD uses `changed="deleted"`
+(219 instances, 80 packages, 162 on `<section>`) and inline `<deleted-phrase>` (**0 in the
+wild**). Present in 38 of 80 reported packages, **zero in enrolled/engrossed/introduced**.
+
+**Severity was worse than "unknown" — it was live.** On `119s4726rs`, 16 of 33 sections are
+struck and the parser emits all 33, so **`get_bill_section("1")` resolves uniquely, with no
+ambiguity error, to the struck text.** A consumer citing it cites what the bill as reported
+does not say.
+
+**IMPLEMENTED 2026-08-06.** `119s4726rs`: 33 → 17 sections, **18 collisions → 0**, and
+`get_bill_section("1")` now returns the **substitute**. Five paths enumerated and each
+**sabotage-verified individually** — which caught a real gap, since two text-extraction
+guards covered each other on every tested shape. `struck_text_note` on all three tools,
+naming the count and pointing at the prior version, null when nothing was struck.
+`<deleted-phrase>` pinned at zero by corpus assertion, with a failure message naming what
+the firing document is for.
+
+**Ruling: exclude and disclose** — never emit a unit from a `changed="deleted"` subtree;
+`match_contexts` stays three-valued. Full reasoning in §6, including why a fourth context,
+opt-in retrieval, and refusing reported versions were each rejected. Three conditions:
+carve-out binds **every** unit-emitting path, disclosure is **active** (the mechanism §17
+showed consumers actually read), and `deleted-phrase` gets a corpus assertion pinning it at
+zero rather than speculative handling.
+
+### F16. The collision suffix silently masked the substitute pattern `[E2E]`
+
+18 ids on `119s4726rs` carry V8's `#2` suffix because the struck original and the substitute
+are two versions of the same section side by side; search ranks `S:9` and `S:9#2` adjacently
+and nothing distinguishes them.
+
+**V8 was built for genuine duplicate enums across divisions.** This is a different condition
+wearing the same shape, and the handler could not tell them apart — **it succeeded, and in
+succeeding it hid that anything had duplicated.** F4's carve-out should drop `#2` from this
+cause to zero; confirm it does. Then decide whether a silently-applied disambiguation should
+be silent: **a mechanism that quietly resolves an anomaly prevents anyone from learning the
+anomaly occurred.**
+**Status:** open, downstream of F4. **Cost:** small once F4 lands.
+
+### F5. The TOC hands out ids `get_bill_section` rejects `[E2E]`
+
+`D:C/T:XXXI/ST:B` appears verbatim in a TOC response and returns `section_not_found`.
+`node_kind` reports `structural` for containers and leaf sections alike, so a consumer
+walking the TOC cannot tell which ids are fetchable. The remediation then names
+`get_bill_toc` — the tool that supplied the rejected id.
+
+**Status: FIXED 2026-08-06.** Containers resolve through `get_bill_section`, reusing §5's
+subdivided-parent shape — subtree assembled when it fits `max_bytes`, heading plus child
+descriptors when it does not.
+
+### F14. TOC ids were reconstructed instead of carried `[FIXED — found while closing F5]`
+
+`_build_toc` rebuilt each id as `ancestor_path + leaf`, valid only while `ancestor_path`
+covers every component but the last — **false for byte-split chunks.** It emitted
+`D:D/T:XLVII/CHUNK:2` for a unit whose real id is `D:D/T:XLVII/S:4701/CHUNK:2`. **28 ids on
+`s1071` referred to nothing**, were rejected by `get_bill_section`, and were absent from
+`subtree_bytes` — so they also reported **size 0**. A related short-`ancestor_path`
+assumption hid **5 byte-split sections**, including `S:4701`, a real citable section that
+exists only as chunks.
+
+Fixed: the id is authoritative; `ancestor_path` supplies headers only. Live across four
+bills — NDAA, Consolidated Appropriations 2022, `hres463`, `sres27` — every TOC id and every
+search-hit id resolves. **0 rejections.**
+
+> **Blast radius, measured after the fix — and it falsifies half of what was written here
+> first.** `compute_subtree_bytes` keys on **real** unit ids and sums over prefixes, so it
+> never saw the fabricated ids. `D:D` reports 214,109 bytes and `D:D/T:XLVII` 12,738
+> **before and after**, and the title ranking inside Division D is identical rank-for-rank.
+> The five hidden sections' chunks carry real ids that prefix-match their ancestors, so
+> their bytes were always counted.
+>
+> **Damage was confined to two things:** fabricated **leaf** nodes looking up an absent key
+> and reporting 0 (105 at depth 5, 28 at depth 3), and the **5 byte-split sections those ids
+> displaced out of the tree entirely.** `S:4701` and four siblings never appeared in the TOC.
+>
+> **So C1 consumed correct values and its conclusion stands.** The harm is **completeness of
+> the tree, not correctness of the aggregates** — a consumer asking what is in Title XLVII
+> would have received an incomplete list at accurate sizes.
+
+#### The principle survives; this is not its instance
+
+*§17 tests consumption, V-steps test production, and neither covers the other* is worth
+keeping. **But only one direction of it has been demonstrated.**
+
+- **Production correct, consumption fails — demonstrated.** F6: `match_contexts` was right in
+  the response and the floor consumer ignored it. No V-step can see that.
+- **Production wrong, consumption passes — still hypothetical.** F14 looked like the
+  instance and is not, because its bogus leaves were **additive** rather than corrupting an
+  aggregate. Demonstrating it needs a field whose **aggregate** is wrong while a consumer
+  reads it happily. No such case has been found.
+
+Recorded as an asymmetry rather than a symmetry, because claiming both halves are shown when
+one is would be the same error this entry corrects.
+
+
+## P2 — the safety margin depends on the reader
+
+### F6. `match_contexts` is passive, and the floor drops it `[E2E]`
+
+Both cells received `['operative','quoted','header']` on the same `§7215` hit. The ceiling
+volunteered *"some of the matched language may be text being struck."* **The floor said
+nothing.**
+
+The floor's answer is not wrong — the margin is what vanished. **Active disclosures
+propagate** (`version_resolution_note` was acted on; `amends` was used by both cells);
+**passive fields depend on the reader**, and `match_contexts` is the passive field carrying
+this project's load-bearing property.
+**Status: RULED 2026-08-06 — per-hit note, on a different condition than specified.** V21 at
+hit level: mixed 8.8%, **quoted-only 29.2%**, operative-only 57.9%, neither 4.2% (n=240). The
+unit-population proxy had said 46.5% — **wrong by 5×.**
+
+**The note fires on `operative` ∉ `match_contexts`** — quoted-only plus neither, 33.4% of
+hits — not on mixing. A hit matching only in quoted material is one where the query matched
+**nothing the bill enacts**, it is 3.3× more common than the mixed case, and it is the more
+dangerous of the two because a mixed hit still contains an operative anchor. A1's `S:141.` hit
+was exactly this shape and passed only because the ceiling model read the field.
+
+### F7. A consumer that never calls the tool cannot be reached `[E2E]`
+
+B1 at the floor made **zero calls** and produced a fabricated bill citation — *"Div. G,
+Title II, § 204"* against a division whose titles are LXXI–LXXVII and sections 7001–7999.
+The codified `§333(a)(2)` text was right from priors; **the bill-level location, the one
+thing these tools uniquely supply, was invented** — and the answer read *more* authoritative
+than the correct one.
+
+No response-side change reaches this. **Fix:** the tool description must say that knowing
+codified law does not establish where a provision sits **in this bill**.
+**Status: FIXED** — `07f3889`.
+
+### F8. The `amends` boundary is discoverable but not disclosed `[E2E]`
+
+The ceiling derived the limitation from first principles — chapter-level amendments,
+conforming machinery, non-USC targets — **without ever naming the field whose documented
+caveat it was describing.** An independent scorer flagged the same omission. 22 amendatory
+hits returned `amends: []` in one (biased) sample.
+**Status: RULED 2026-08-06 — tool description, no schema change.** V19 Population A: 512
+lead-in cases, **8.1% of amendatory units** on the stable denominator. Four-fifths of empty
+`amends` is empty **by design** — named Acts, IRC bare sections, unresolvable targets — so
+disclosing one minority cause of a majority-deliberate condition is not warranted.
+
+---
+
+## P3 — cost, legibility, and ergonomics
+
+### F9. Query semantics are undocumented `[E2E]`
+
+Matching is **literal phrase with stemming** — not bag-of-words, not semantic.
+`Space Force end strength` returns zero against a bill containing both *"End strengths for
+active forces"* and *"Space Force."* §7 assigns expansion to the calling model, which cannot
+expand well against semantics nobody stated. **Two independent sessions burned 13 queries**
+before collapsing to single common words.
+**Status: FIXED** — `07f3889`.
+
+### F10. Zero-hit responses carry no diagnostic `[E2E]`
+
+Zero means *absent* or *not phrased as the document phrases it*, indistinguishable. Return
+the actual tokenisation. **Cost:** small.
+
+### F11. `toc_truncated` cannot signal depth clamping `[E2E]`
+
+The node budget silently clamps requested depth (5→3 on `s1071`, 4/5→2 on `hr2471`), and
+`toc_truncated` is `true` whenever more exists below — including when the depth **was**
+honored. A consumer must diff request against response to notice; neither cell did. The
+field is otherwise meaningful (`hres463` returned `false`).
+**Fix:** a distinct field when the requested depth was reduced. **Cost:** small.
+
+### F12. Segment joining does not distinguish inline from block `[E2E]`
+
+One defect, two directions: inline `<quote>` spans are separated by `\n\n` (the **block**
+separator), fracturing sentences; `header` segments join their text with **no** separator,
+producing `(2) Annual basis.—(A) In general.—…` as a run-on. A consumer rebuilt the
+subparagraph hierarchy itself and warned the reader it had done so. §5's rule is right and
+the implementation has it inverted for both cases. **Fix them together — they share a
+cause.** **Status: FIXED** — `5a54833`. One join function for `display_text` and `render_segments`;
+inline-ness measured (`<quote>` inline on 0 of 38,277). **Reordered 3 of 30 replayed rounds
+despite being whitespace-only** — rendering propagates into ranking through chunk boundaries,
+which is now a PR 2 cache-key requirement (§10).
+
+### F13. Chunk `header` — CLOSED, both halves `[E2E]`
+
+**Indexing half: §5 is honored.** 584 chunks across 93 documents — header as display field
+574 (permitted), as indexed segment 150, **parent header duplicated 0**. The 21 multi-header
+chunk groups are distinct descendant headings, which is legitimate.
+
+**Provenance half: falsified — and the hypothesis was mine.** I proposed that
+`CHUNK:3`'s `header: "Chapter 3"` was a heading drawn from inserted text, and called it *"the
+quoted carve-out applied to the header field"* and a fifth path for F4's enumeration.
+**Measured: 0 of 41,854 header segments and 0 of 15,085 header fields draw from quoted
+material.** The `Chapter 3` case reproduces exactly, and its source is
+`<header>Chapter 3</header>` with `quoted_ancestor=False` under
+`<subsection><enum>(e)</enum>` — **the bill's own subsection heading, naming the chapter that
+subsection amends.** Accurate, and permitted by §5 as a breadcrumb.
+
+**Consequences:** F13 closes entirely rather than half. F12 and F13 do **not** merge, so F12
+stands alone. And F4's enumeration has five paths, not six.
+
+> **Second wrong call of mine in this project**, after reading the orphaned `" .` as a
+> surviving source delimiter. Both were inferences from a single suggestive instance, both
+> stated with more confidence than one instance supports, and both were overturned by a
+> corpus measurement. The pattern in my own contributions is the same one the conventions
+> warn about — recorded rather than quietly corrected.
+
+> **The harness caught three of its own defects before any result reached this document**,
+> via planted positives and negatives. The middle one matters most: the shortfall detector
+> counted **every** citation and reported **14.1%** against a 10% threshold — measuring
+> cross-references, which is **A5's false-positive class reintroduced as a measurement and
+> aimed at the very field A5 had just cleaned of it.** It would have driven a schema change
+> on a wrong number.
+>
+> **General rule, now in the conventions: a measurement of a property is subject to the same
+> failure class as the implementation of that property.** Plant positives and negatives in
+> the detector before trusting the figure.
+
+---
+
+## Not defects — recorded so they are not re-raised
+
+- **~4.4 s per call, full re-index every time.** Caching is PR 2 and unimplemented. The
+  **inert `cache` fields reporting `false`** are worth changing to `null` before then: this
+  spec's own author read them as a measurement twice.
+- **RRF `k=60`.** Challenged on sound theoretical grounds — correlated query rewrites are not
+  independent voters — but **no fusion failure has been observed in any trace.** V20
+  specified; do not retune before it reports.
+- **`rfs` unrecognised.** The `version_resolution_note` fired live and a consumer acted on it.
+  The ruling, implementation, and consumer response were all correct; the missing code is
+  F1's problem, not a separate defect.
+
+---
+
+## F15. The API key is in INFO logs — and it is one credential, not two `[E2E, confirmed live]`
+
+Full `api_key=…` appears in the congress.gov request URL at INFO level. Recorded in §11 as
+pre-existing and out of scope. **Two facts make "out of scope" the wrong resting place:**
+
+1. **§3 states GovInfo and congress.gov use the same key.** So the `X-Api-Key` header
+   migration on the new GovInfo client — done, in PR 1 — is undermined by the client beside
+   it. **PR 1's own dependency leaks the credential PR 1 uses.** The hardening is not
+   partial; it is bypassed.
+2. **Trace mode redaction is necessary but not sufficient.** §17 requires
+   `CONGRESSMCP_TRACE_DIR` to redact the key at write time. If INFO logs carry it anyway, the
+   artifact a user attaches to a bug report still contains a live credential — which is the
+   exact scenario the redaction rule was written for.
+
+**Not a request to fix the pre-existing client inside PR 1.** But it belongs on the register
+at correctness-class severity for PR A, and **trace-mode redaction should cover log output as
+well as trace output**, since they share the same disclosure path.
+
+**Status: FIXED 2026-08-06**, as a `LogRecord` **factory** rather than a filter. The
+reasoning is right and worth preserving: a logger filter sees only records made through that
+logger, a handler filter only handlers attached at install time, and the property wanted is
+*no log record carries the key* — which only a factory delivers across loggers and handlers
+configured later. It also catches the real shape: **httpx puts the URL in `record.args`, not
+`record.msg`**, so a naive `msg`-only redaction would have passed its test and leaked in
+production. **Verified non-vacuously** — the fix was sabotaged and the test failed with the
+key visible. Third application of the prove-the-detector-bites discipline, after the
+quoted-leak predicate and the subdivision-coverage assertion.
+
+> **Two things to change or confirm.**
+>
+> **1. Install it unconditionally, not only while `CONGRESSMCP_TRACE_DIR` is set.** The key
+> reaches INFO logs regardless of trace mode, and the disclosure path — logs pasted into an
+> issue — does not depend on trace mode either. **Gating means the protection is absent
+> exactly when nobody is watching.** Redaction can only remove a credential from output;
+> there is no scenario in which the key is wanted in a log line, so the gate adds a failure
+> mode (protection contingent on an unrelated variable) for no benefit.
+>
+> **Both actioned, squashed into `1284500`.** Unconditional install **surfaced a live leak
+> that four green tests had missed**: httpx logs `request.url` as an `httpx.URL`, not a
+> `str`, so the `isinstance(value, str)` guard skipped exactly the argument carrying the
+> key and `%s` restored it at emit time. Chaining was already correct and is now pinned — a
+> bare factory ignoring `previous` fails a dedicated test while passing every redaction
+> test. Live at INFO: `api_key=[REDACTED]`, zero occurrences, call succeeds.
+
+#### What this cost the discipline, and what replaces it
+
+**The earlier sabotage check could not have caught this.** Sabotaging a fix that does not
+work still fails the test. Non-vacuity establishes that a test is sensitive to **the fix**;
+it says nothing about whether the test exercises the **real input shape** — and a test and
+the fix it guards are usually written from the same mental model, so perturbing one never
+surfaces an assumption they share. Here both assumed `str`.
+
+**What caught it:** installing unconditionally forced a realistic run, and the log was
+**grepped** rather than trusted. The generalized rule is now in `00-INDEX.md`: any test whose
+input the author constructs inherits the author's assumptions, and something in the chain
+must exercise an input the author did not build. The trimmed-fixture rule, outside the parser.
+
+**Residuals closed 2026-08-06.** Both were real. Error envelopes: `_unexpected` interpolated
+the exception and `raise_for_status` embedded the URL — redaction moved to the single
+`_error` construction point, covering every path rather than today's known ones. Tracebacks:
+`exc_text` alone was insufficient because the server renders through **rich**, which formats
+`exc_info` directly — the same test-environment-differs-from-production shape as the
+`isinstance(str)` miss, on a different axis. **Stated limit:** a renderer showing locals can
+still reach `exc.request.url`; all of this is downstream of the key being a query parameter,
+so the surface shrinks and the durable fix remains the separate PR.
+
+**Two more vacuous tests found by sabotage-then-watch-it-pass**, both now in the conventions:
+an assertion that cannot fail for non-ASCII secrets (`ensure_ascii` escaping), and an
+apparent guarantee that was an **ordering accident** — `logger.exception` mutating exception
+args in place before `_error` ran, so the envelope stayed clean with the redaction deleted.
+
+**Third coverage channel identified.** A leaked credential is invisible to both V-steps
+(response content) and §17 (consumer behavior). Process side effects — logs, tracebacks,
+files, emitted URLs — are a channel nothing tests. Recorded in §11, with two residuals to
+confirm before F15 closes: **uncaught tracebacks bypass the logging system entirely**, and
+any error path echoing a request URL would put the key in a response rather than a log,
+which is strictly worse.
+
+---
+
+## Suggested order — revised 2026-08-06
+
+**~~Next: answer F13's open indexing question~~ — done 2026-08-06: §5 is honored, the
+display field is not indexed, parent-header duplication is 0/584. V21's definition is
+updated accordingly (project `header` out; report the operative × quoted 2×2).**
+
+**Next: the three corpus measurements — V19, V21, V20 — as one pass.** Since the original `S 4042` finding — five chunks each carrying the header
+*"In general"* — it has never been established whether a chunk's inherited header is emitted
+as an indexed `header` **segment** or only as a display field. §5 forbids the former.
+
+It goes first because **V21 depends on it.** V21 reports the distribution across all four
+`match_contexts` combinations; if headers are duplicated into chunks as segments, `header`
+is inflated and the distribution it measures is not the distribution that exists. Answer it
+before the scan, not after.
+
+**Then the three corpus measurements together — V19, V21, V20.** One harness, one corpus
+pass, and they share the hygiene requirements just recorded (non-zero denominator, identity
+not string matching, members pinned individually). Running them now is also when the
+`urllib`/403 lesson is cheapest to apply; in a month it is a paragraph nobody rereads.
+
+V19 gates F3 and F8, V21 gates F6, V20 gates the RRF question. **Decisions are the
+bottleneck, not implementation** — every one of these is fast to fix and slow to rule, so
+measure first and the queue drains quickly afterward.
+
+**Then F12 + F13 together**, as the spec requires — they share a cause (segment joining not
+distinguishing inline from block). **F12 fixed `5a54833`; F13 closed separately.**
+
+**Then F11 and F10**, whenever. Both are small, neither blocks anything.
+
+**Already landed:** F9 (query semantics) and F7 (codified-law-is-not-bill-location) shipped
+in `07f3889`.
