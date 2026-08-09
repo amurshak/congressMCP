@@ -195,6 +195,52 @@ def main() -> int:
         base = [re.sub(r"/CHUNK:\d+$", "", i) for i in ids]
         return [b for n, b in enumerate(base) if n == 0 or b != base[n - 1]]
 
+    # ---- GATE A: FRESH FIDELITY (replay == live_search, one run) ------------- #
+    # The gate below compares against RECORDED top_hits, which are from a pre-F12
+    # build: it can only ever weaken as legitimate rendering fixes land, and it cannot
+    # speak to the harness's own correctness at all. This one can, and it is the check
+    # every number after it depends on.
+    #
+    # rank_map + fused_order REIMPLEMENT search()'s candidate admission and RRF sum.
+    # The k-sweep, the max-of-lists control, and every fusion diagnostic below run on
+    # that copy, not on the shipped path -- so if the copy has drifted, the whole
+    # analysis characterises a fusion the product does not use, and it does so with a
+    # full table of plausible-looking ranks. Compare the two, both computed FRESH in
+    # this process at the shipped k: neither stale like the trace, nor self-referential
+    # like re-recording the trace from the current build would be.
+    SHIPPED_K = 60
+    drift = []
+    for r in rounds:
+        index = indexes[r["package_id"]]
+        queries = [normalized_query(q) for q in r["queries"]]
+        live = [h.unit.section_id for h in index.search(queries, r["max_hits"])]
+        unit_rank, _, by_id = rank_map(index, queries, r["max_hits"])
+        replayed = [
+            by_id[uid].section_id for uid in fused_order(unit_rank, by_id, SHIPPED_K)
+        ][: r["max_hits"]]
+        if live != replayed:
+            drift.append((r["queries"], live, replayed))
+    if drift:
+        print(f"FAIL: the harness's fusion disagrees with the shipped search on "
+              f"{len(drift)}/{len(rounds)} rounds. Every rank below is about a fusion "
+              f"that does not ship.")
+        for q, live, replayed in drift[:3]:
+            # Report the FIRST DIVERGING POSITION, not a fixed prefix. A fixed prefix
+            # prints two identical-looking lines whenever the lists agree early and
+            # differ later, which reads as a false positive and gets the gate ignored.
+            at = next(
+                (i for i in range(max(len(live), len(replayed)))
+                 if live[i:i + 1] != replayed[i:i + 1]),
+                0,
+            )
+            print(f"   queries={q[:3]}  first divergence at rank {at + 1} "
+                  f"(lengths {len(live)} vs {len(replayed)})")
+            print(f"     shipped : {live[at:at + 3]}")
+            print(f"     harness : {replayed[at:at + 3]}")
+        return 1
+    print(f"fresh gate : harness fusion == shipped search on {len(rounds)}/{len(rounds)} "
+          f"rounds at k={SHIPPED_K}, both computed in this run.")
+
     exact, chunk_only, section_level, lost = 0, [], [], []
     for r in rounds:
         hits = indexes[r["package_id"]].search(
