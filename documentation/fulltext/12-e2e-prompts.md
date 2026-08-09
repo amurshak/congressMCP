@@ -751,6 +751,37 @@ themselves must come from the original sessions, not be composed against this li
 | F7 | | |
 | F8 | | |
 
+### A question class that needs an obscure bill: version-difference / semantic-difference
+
+Recorded 2026-08-09 from a maintainer probe — *"What is the difference of H.R. 1 in the 119th
+Congress as engrossed in the House and amended in the Senate?"* **Two observations came with it,
+both from a memory-enabled Desktop session, so treat them as hypotheses, not results:**
+
+1. **The two versions were complete rewrites of each other** (common for a reconciliation bill).
+   Verifiable on the tools — segment/section counts and text overlap between `eh` and the
+   Senate-amended version — so it is a measurement, not a claim to accept.
+2. **Finding the *semantic* difference required the model's priors about the bill's contentious
+   items.** This is the sharp one. **These tools are a retrieval layer, not an analysis layer:**
+   they return per-version text and `amends`, but *"what changed and why it matters"* is judgement
+   the consumer supplies from world knowledge. 119hr1 was maximally publicized, so the model had
+   rich priors — which means **a pass here is prior-driven, not tool-driven, and proves nothing
+   about the tools.** On a bill with no public priors the same question is much harder, and the
+   failure mode is fabrication or false confidence.
+
+**Methodological rule this forces: to test the version-difference / semantic-difference class,
+use an *obscure* bill the model has no priors on.** 119hr1 is the worst possible test bill for it.
+This extends the "unprimed" requirement from *prompt phrasing* to *bill choice* — a prompt can be
+perfectly cold and still be answered from priors if the bill is famous.
+
+**The experiment that settles observation 2** (hand to the implementation session): run one
+version-difference prompt on the fully-attributable isolation instrument against **(a)** 119hr1
+(maximal priors) and **(b)** an obscure, low-salience bill with two contentful versions (no
+priors). Compare whether the answer degrades — fabricates a difference, or honestly reports it
+cannot characterise the change from the text alone. If (b) collapses while (a) passes, the
+"difference" answer was never the tool's to give. **No version-*diff* capability exists** (nor is
+one in scope — settled: no amendment-direction inference); the tools retrieve each version, and
+diffing is the consumer's.
+
 ### Scoring Group F — different from A–E, necessarily
 
 Pre-registered per-prompt pass conditions are impossible here; that is the price of

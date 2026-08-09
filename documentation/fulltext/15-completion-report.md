@@ -157,6 +157,10 @@ Fill `result` and `finding` from `01-status.md`; this table is largely complete 
 - Header→body operative run-on (`Quorum.A majority`) — 2-instance residual on `join_segments`,
   outside the flatten-site separator ruling.
 - Caching, offline, disk cap — **PR 2**; `cache` fields currently inert.
+- **Retrieval, not analysis.** The tools return per-version text and `amends`; *version-difference*
+  and *"what changed and why it matters"* are the consumer's to compute, drawn from priors — so a
+  convincing answer on a famous bill (119hr1) can be prior-driven, not tool-driven. No
+  version-diff capability, by design (§17 Group F; settled: no amendment-direction inference).
 
 ## H. Process notes
 
