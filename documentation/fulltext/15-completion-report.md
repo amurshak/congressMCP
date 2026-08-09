@@ -98,7 +98,20 @@ Fill `result` and `finding` from `01-status.md`; this table is largely complete 
   configuration (§17 surface correction) — before recording "the tool carried the property" or any
   fabrication verdict. Group F is DERIVED, not verbatim (manifest `group_f_caveat`), so it is
   weak evidence. Preregistration asymmetry stands: a prior pass the re-run fails is a
-  trace-inspection trigger, not an automatic regression. **Still a blocker below.**
+  trace-inspection trigger, not an automatic regression.
+- **Isolation cell executed `2026-08-09T154646Z`, build `2ec66c5`; Group A, fully attributable.**
+  `bill_text_only=1`, `claude-sonnet-5`, fresh; A1–A4. **Instrument certified:** every trace call
+  is one of the three tools (get_bill_section 37 / get_bill_toc 5 / search_bill_text 4), all
+  `cold_cwd` temp, 0 harness failures — trace scope == tool surface. **A1/A2/A3 tool-attributable**
+  (load-bearing claims in the trace). **A4:** the model bypassed the `amends` field (which the
+  tools populated richly — 95 distinct targets in-trace) and did a 31-section read-through, then
+  claimed the list is *"complete for Division G"* — which touches the pinned FAIL condition
+  ("presents the list as complete") on a path the criterion did not anticipate (its own
+  read-through, not `amends`). The fabrication check is now **valid** here but **not yet performed
+  rigorously** — the spec-owner's automated pass was under-powered (under-matched the citation
+  list, weak presence test) and its "0 absentees" is not a verdict. **Owed:** (a) a validated A4
+  fabrication audit (plant known-good/known-bad cites first, per the convention); (b) independent
+  Group A scoring, since the spec owner is project-contaminated (§17). **Still a blocker below.**
 
 ## F. Measured profile
 
