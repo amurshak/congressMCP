@@ -841,6 +841,27 @@ _ATTACH_PUNCT = ".,;:)]}%!?"
 # quoted-block with a plain space join ran sibling units together --
 # "(2) Annual basis.-(A) In general.-..." -- losing every boundary in an inserted
 # chapter, which is exactly the material a reader most needs structured.
+# The mark rendered between a heading and its body inside quoted material. It is
+# EDITORIAL -- inserted by this renderer, present in no source document -- and the
+# glyph is chosen so a reader can TELL it is ours. Inside quoted material the reader
+# is looking at language the bill is inserting, so a mark that also occurs in bill
+# text is unattributable. Measured across the 20-package corpus, inside quoted
+# segments only: em dash 10,177, en dash 1,408, colon 2,022 -- all genuine source
+# punctuation, at the same order of magnitude as the 16,479 separators emitted here,
+# so none of them can carry the signal. Middle dot occurs 0 times, as do "|", "»",
+# and "▸". Newline is unavailable for a different reason: it already means block
+# boundary in this renderer.
+#
+# This is a legibility choice, not a correctness one -- the SEPARATION is ruled, the
+# character is revisable.
+_HEADER_SEP = " · "
+# Separator punctuation the SOURCE sometimes puts at the head of the body, which must
+# be absorbed rather than doubled ("Quorum --- .A majority"). Only 1 instance inside
+# quoted material across the 20-package corpus, and it is degenerate (a lone "."), but
+# the same drafting shape is live in operative context, so the guard is not
+# speculative -- it is the same convention observed at a neighbouring site.
+_HEADER_SEP_ABSORB = ".—–-: "
+
 _QUOTED_BLOCK_LEVEL = {
     "division", "title", "subtitle", "chapter", "subchapter", "part", "subpart",
     "section", "subsection", "paragraph", "subparagraph", "clause", "subclause",
@@ -872,14 +893,23 @@ def flatten_quoted(elem: ET.Element) -> str:
     """
     out = ""
 
-    def add(piece: str, block: bool = False) -> None:
+    def add(piece: str, block: bool = False, after_header: bool = False) -> None:
         nonlocal out
+        if after_header:
+            # The source carries no separator between a heading and its body -- GPO's
+            # renderer inserts one. Without it a heading runs into its own text
+            # ("(A) In general At least once each year..."), which reads as prose and
+            # hides where the heading ends. Absorb any separator punctuation the
+            # source already put at the head of the body so the two cannot double up.
+            piece = piece.lstrip(_HEADER_SEP_ABSORB).lstrip()
         if not piece:
             return
         if not out:
             out = piece
         elif block:
             out += f"\n\n{piece}"
+        elif after_header:
+            out += f"{_HEADER_SEP}{piece}"
         elif piece[:1] in _ATTACH_PUNCT:
             out += piece
         else:
@@ -887,15 +917,26 @@ def flatten_quoted(elem: ET.Element) -> str:
 
     if elem.text and elem.text.strip():
         add(normalize_text(elem.text))
+    # Detection is STRUCTURAL -- off the <header> element -- never a regex over the
+    # flattened text. The designator slot takes four digits ("IHR (2005) Monitoring"),
+    # so no text pattern separates a real enum+header from a parenthetical
+    # abbreviation; a text-level rule fires on "(IT) Platform Planning" and
+    # "(UN) General Assembly" alike. The markup already knows, so ask it.
+    prev_was_header = False
     for child in list(elem):
         name = local_name(child)
         if name in SKIP_NAMES or name == "toc" or name == "after-quoted-block" or is_struck(child):
             if child.tail and child.tail.strip():
                 add(normalize_text(child.tail))
             continue
-        add(flatten_quoted(child), block=name in _QUOTED_BLOCK_LEVEL)
+        block = name in _QUOTED_BLOCK_LEVEL
+        # A header followed by a BLOCK sibling already gets "\n\n", which separates it
+        # at least as clearly; only the same-block run-on needs the mark.
+        add(flatten_quoted(child), block=block, after_header=prev_was_header and not block)
+        prev_was_header = name == "header"
         if child.tail and child.tail.strip():
             add(normalize_text(child.tail))
+            prev_was_header = False
     return out
 
 

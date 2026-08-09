@@ -1382,7 +1382,72 @@ def test_f12_quoted_material_keeps_its_block_structure():
     assert "Once each year.\n\n(3) Covered recipients" in quoted   # siblings separated
     assert "Once each year. (3)" not in quoted                     # the run-together
     # Enum and header still ride WITH their own text -- they are one block, not three.
-    assert "(2) Annual basis Once each year." in quoted
+    # The heading is marked off from its body rather than run into it (the separate
+    # flatten_quoted header rule); what F12 asserts here is that this stays ONE block,
+    # with no "\n\n" between the heading and the text it heads.
+    assert "(2) Annual basis · Once each year." in quoted
+    assert "Annual basis\n\nOnce each year" not in quoted
+
+
+def _quoted_of(xml: bytes) -> str:
+    unit = parse_bill_xml(xml, "X", "enr", None).units[0]
+    return next(s.text for s in unit.segments if s.context == "quoted")
+
+
+def test_header_separator_is_detected_structurally_not_by_text_pattern():
+    # THE CONSTRAINT THAT DECIDES THE IMPLEMENTATION. A regex over flattened text
+    # cannot tell a real enum+header from a parenthetical abbreviation: the designator
+    # slot takes four digits, so "IHR (2005) Monitoring and Evaluation" and
+    # "(UN) General Assembly Resolution" match the same shape as "(2) Annual basis".
+    # Detection must key off the <header> ELEMENT. Both cases below are prose with NO
+    # header markup, so a structural rule leaves them untouched and a text rule
+    # corrupts them.
+    for body in (
+        b"<text>the IHR (2005) Monitoring and Evaluation Framework applies.</text>",
+        b"<text>United Nations (UN) General Assembly Resolution 2758 is noted.</text>",
+        b"<text>recommendations from the (IT) Platform Planning workstream.</text>",
+    ):
+        quoted = _quoted_of(
+            b"<bill><legis-body><section><enum>1</enum><header>H</header>"
+            b"<text>is amended to read as follows:</text><quoted-block><section>"
+            b"<enum>9.</enum><header>T</header><paragraph><enum>(1)</enum>"
+            + body
+            + b"</paragraph></section></quoted-block></section></legis-body></bill>"
+        )
+        assert "·" not in quoted.split("\n\n")[-1], quoted
+
+
+def test_header_separator_absorbs_punctuation_the_source_already_supplies():
+    # GPO's ".---" is sometimes split across the markup, with the period sitting at the
+    # head of the body text node (observed live as "Quorum.A majority..."). Inserting a
+    # separator without absorbing it yields "Quorum - .A majority". Only one degenerate
+    # instance sits inside quoted material corpus-wide, but the drafting shape is live
+    # in operative context, so the guard is not speculative.
+    quoted = _quoted_of(
+        b"<bill><legis-body><section><enum>1</enum><header>H</header>"
+        b"<text>is amended to read as follows:</text><quoted-block><section>"
+        b"<enum>9.</enum><header>T</header>"
+        b"<subparagraph><enum>(D)</enum><header>Quorum</header>"
+        b"<text>.A majority of the members shall constitute a quorum.</text>"
+        b"</subparagraph></section></quoted-block></section></legis-body></bill>"
+    )
+    assert "Quorum · A majority" in quoted, quoted
+    assert "· ." not in quoted and "·  " not in quoted
+
+
+def test_header_separator_is_not_added_where_a_block_break_already_separates():
+    # A header followed by a block-level sibling already gets "\n\n", which separates
+    # at least as clearly. Adding the mark there would double the signal and leave a
+    # dangling dash at the end of a line.
+    quoted = _quoted_of(
+        b"<bill><legis-body><section><enum>1</enum><header>H</header>"
+        b"<text>is amended to read as follows:</text><quoted-block><section>"
+        b"<enum>9.</enum><header>Heading with no body</header>"
+        b"<paragraph><enum>(1)</enum><text>Body of the paragraph.</text></paragraph>"
+        b"</section></quoted-block></section></legis-body></bill>"
+    )
+    assert "Heading with no body\n\n(1) Body" in quoted, quoted
+    assert "·" not in quoted
 
 
 def test_amends_usc_section_suffix_accepts_any_unicode_dash():
