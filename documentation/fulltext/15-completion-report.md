@@ -120,9 +120,16 @@ Fill `result` and `finding` from `01-status.md`; this table is largely complete 
     instrument. *Residuals:* ~62 of the 68 co-occurrence-supported cites were not individually
     eyeballed (the 6 highest-risk were, all genuine); the audit checks target existence, not
     correct subsection/action.
-  - **Still owed:** independent scoring of the A4 *criterion* (the "complete for Division G"
-    framing) — the spec owner is project-contaminated (§17); the fabrication *measurement* needs
-    no scorer. **Blocker below.**
+  - **Disposition DEFERRED to PR2 (decision 2026-08-09).** The "did more work than I wanted"
+    concern — the 31-call read-through and the completeness over-claim — is **cost-contingent**: it
+    only matters if the calls are expensive. PR1 has no cache (~4.4 s/call; A4 ceiling ran 408 s),
+    so over-work is costly *now*; **PR2 caching sets the real per-call cost, and if cached calls
+    are cheap the read-through is fine — arguably the right behavior (verify rather than trust an
+    incomplete `amends`).** So the A4-criterion rework / re-scope-to-floor question waits until PR2
+    measures that cost. **What does not defer:** the fabrication audit passed on a fully-
+    attributable instrument, and the F3/F8 tool-description property held — the model understood
+    `amends` might be incomplete, which is *why* it verified. **A4 removed as a merge blocker; it
+    is a PR2 open question.**
 
 ## F. Measured profile
 

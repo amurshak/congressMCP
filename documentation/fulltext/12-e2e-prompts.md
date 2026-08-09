@@ -555,6 +555,17 @@ exhaustive list. *Fail:* presents the list as complete. Tests whether "convenien
 completeness" survives contact with a consumer — it is stated in the tool description
 precisely for this moment.
 
+> **Confounded at the ceiling; disposition DEFERRED to PR2 (2026-08-09).** The
+> `2026-08-09T154646Z` isolation run (`claude-sonnet-5`) did **not** take the path this criterion
+> assumes: rather than trusting `amends`, it read 31 sections and built its own list — the
+> disclosure *worked*, and the criterion cannot then tell over-verification from the target
+> failure. The fabrication audit on that answer **passed** (0 fabrications; the two prior-run
+> fabrications now trace-grounded). What remains — is the read-through "too much work"? — is
+> **cost-contingent** and unanswerable until PR2 caching sets the real per-call cost. If cheap,
+> the behavior is fine; if not, re-scope the intended over-trust test to the floor/Haiku cell,
+> where a model that cannot afford the read-through must rely on `amends`. **Not a merge blocker;
+> a PR2 open question.** See `15-completion-report.md` §E.
+
 ---
 
 ## Group B — citation discipline
