@@ -22,10 +22,13 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tests" / "e2e"))
 
 from run_suite import (  # noqa: E402
+    DISALLOWED_BUILTINS,
     FORBIDDEN_IN_PROMPT,
+    assert_config_carries_no_secret,
     assert_no_secret_in_trace,
     assert_prompt_is_cold,
     resolve_prompt,
+    write_mcp_config,
 )
 
 MANIFEST = json.loads((REPO / "tests" / "e2e" / "prompts.json").read_text())
@@ -129,6 +132,55 @@ def test_secret_assertion_is_skipped_only_when_there_is_nothing_to_check():
     # A vacuity guard: with no secrets configured the check passes trivially, and that
     # must not be mistaken for "the trace was verified clean".
     assert_no_secret_in_trace(['{"anything": "at all"}'], [], "trace")
+
+
+# --------------------------------------------------------------------------- #
+# The MCP config the harness writes -- it OWNS the tool surface, and must not
+# own a copy of the credentials.
+# --------------------------------------------------------------------------- #
+def test_written_mcp_config_references_secrets_but_never_contains_them(tmp_path):
+    # A config file sits in the run directory beside results someone will attach to an
+    # issue -- a worse disclosure channel than the trace, because nobody thinks of it as
+    # output. Keys go in as ${VAR}, expanded by the CLI at spawn time.
+    path = write_mcp_config(tmp_path, tmp_path / "trace", bill_text_only=False)
+    text = path.read_text()
+    assert "${CONGRESS_API_KEY}" in text and "${GOVINFO_API_KEY}" in text
+    config = json.loads(text)
+    server = config["mcpServers"]["congress"]
+    assert server["args"] == ["-m", "congress_api", "--transport", "stdio"], (
+        "the server must be launched on stdio via the module entry point; "
+        "run_server.py only imports the server object and never serves"
+    )
+    for value in server["env"].values():
+        assert not (len(value) > 30 and "/" not in value and "$" not in value), (
+            f"suspicious literal in config env: {value!r}"
+        )
+
+
+def test_config_secret_assertion_halts_on_a_literal_key(tmp_path):
+    secret = "ZZfakekeyfakekeyfakekey00"
+    bad = tmp_path / "mcp-config.json"
+    bad.write_text(json.dumps({"mcpServers": {"c": {"env": {"CONGRESS_API_KEY": secret}}}}))
+    with pytest.raises(SystemExit, match="credential"):
+        assert_config_carries_no_secret(bad, [secret])
+
+
+def test_isolation_cell_config_turns_on_bill_text_only(tmp_path):
+    # The isolation cell's three-tool surface must be CONFIGURATION, not an assumption
+    # about what the operator has registered.
+    on = json.loads(write_mcp_config(tmp_path, tmp_path / "t", True).read_text())
+    assert on["mcpServers"]["congress"]["env"]["CONGRESSMCP_BILL_TEXT_ONLY"] == "1"
+    off = json.loads(write_mcp_config(tmp_path, tmp_path / "t", False).read_text())
+    assert off["mcpServers"]["congress"]["env"]["CONGRESSMCP_BILL_TEXT_ONLY"] == ""
+
+
+def test_web_and_file_builtins_are_disallowed():
+    # §17's trace records ONLY the three bill-text tools. A claim the model reached by
+    # fetching a web page or reading a file is invisible to the instrument, which is the
+    # trace-scope error this project has already had to correct twice. The prior runs
+    # went through Claude Desktop, where these built-ins were not present at all.
+    for tool in ("WebSearch", "WebFetch", "Bash", "Read"):
+        assert tool in DISALLOWED_BUILTINS
 
 
 # --------------------------------------------------------------------------- #

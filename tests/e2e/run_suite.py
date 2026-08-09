@@ -6,10 +6,19 @@ verbatim answer and the server-side trace separately, and writes a diffable run
 directory. It does NOT score: pass/fail against the pinned criteria is a human
 judgment, and Group A should be scored by someone with no project history.
 
-    BILL_TEXT_CORPUS_CACHE=... GOVINFO_API_KEY=... CONGRESS_API_KEY=... \
+    CONGRESS_API_KEY=... GOVINFO_API_KEY=... \
         python -m tests.e2e.run_suite --run-dir runs/2026-08-09 --cells floor,ceiling
 
     python -m tests.e2e.run_suite --dry-run     # validate manifest + layout, call nothing
+
+The harness writes its own MCP config per prompt, pointing the CLI at this repo's server
+on stdio (`python -m congress_api --transport stdio`) with --strict-mcp-config, so the
+tool surface is configuration rather than whatever the operator happens to have
+registered -- and so the isolation cell's three tools and the floor/ceiling full surface
+are real settings. Credentials are referenced as ${VAR} and expanded by the CLI at spawn;
+they are never written to the config. The CLI runs in an empty per-prompt directory, not
+this repo: running it here would hand the model CLAUDE.md, the spec, and the
+implementation, which is the most complete developer framing available.
 
 THE CENTRAL HAZARD, restated from §17: automation is the easiest place to silently
 violate the method. A script that runs all prompts in one session, appends a diagnostic
@@ -49,6 +58,62 @@ FORBIDDEN_IN_PROMPT = (
 )
 
 
+# Claude Code's own built-ins. §17's trace records ONLY the three bill-text tools, so a
+# claim the model reached by fetching a web page or reading a file is invisible to the
+# instrument -- the exact trace-scope error already corrected twice in this project (the
+# P.L. 119-60 claim, and A3's "zero tool calls" verdict). The prior runs went through
+# Claude Desktop, where these were not present at all; leaving them on here would make
+# this re-run non-comparable with the findings it exists to diff against.
+DISALLOWED_BUILTINS = (
+    "WebSearch", "WebFetch", "Bash", "Read", "Write", "Edit",
+    "Glob", "Grep", "Task", "NotebookEdit",
+)
+
+
+def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool) -> Path:
+    """Write the per-prompt MCP config the CLI is pointed at.
+
+    The harness owns the tool surface rather than inheriting whatever the operator has
+    configured. That is the difference between a reproducible cell and a run that
+    silently measured a different surface than it recorded -- and it is what makes the
+    floor/ceiling "full surface" and the isolation cell's three tools actual
+    configuration instead of an assumption.
+
+    SECRETS ARE NEVER WRITTEN. The keys go in as ${VAR} references, expanded by the CLI
+    from the environment at spawn time; assert_config_carries_no_secret verifies the
+    file on disk. A config file is a worse disclosure channel than a trace -- it sits in
+    the run directory next to results someone will attach to an issue.
+    """
+    config = {
+        "mcpServers": {
+            "congress": {
+                "command": str(REPO / ".venv" / "bin" / "python"),
+                "args": ["-m", "congress_api", "--transport", "stdio"],
+                "cwd": str(REPO),
+                "env": {
+                    "CONGRESS_API_KEY": "${CONGRESS_API_KEY}",
+                    "GOVINFO_API_KEY": "${GOVINFO_API_KEY}",
+                    "CONGRESSMCP_TRACE_DIR": str(trace_dir),
+                    "CONGRESSMCP_BILL_TEXT_ONLY": "1" if bill_text_only else "",
+                },
+            }
+        }
+    }
+    path = dest / "mcp-config.json"
+    path.write_text(json.dumps(config, indent=2) + "\n")
+    return path
+
+
+def assert_config_carries_no_secret(path: Path, secrets: list[str]) -> None:
+    text = path.read_text()
+    for secret in secrets:
+        if secret in text:
+            raise SystemExit(
+                f"FATAL: {path} contains a live credential literally. It must carry "
+                "${VAR} references only. Run halted; delete this file."
+            )
+
+
 @dataclass
 class Meta:
     prompt_id: str
@@ -71,6 +136,9 @@ class Meta:
     trace_records: int
     tool_calls: list[str] = field(default_factory=list)
     answer_chars: int = 0
+    # The exact argv, so the tool surface a result was produced under is part of the
+    # record rather than inferred from the cell name.
+    command: list[str] = field(default_factory=list)
     criteria: dict = field(default_factory=dict)
 
 
@@ -168,14 +236,24 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     dest.mkdir(parents=True, exist_ok=True)
     trace_dir = dest / "trace"
     trace_dir.mkdir(exist_ok=True)
+    # A NEUTRAL working directory, per prompt. Running the CLI inside this repo would
+    # put CLAUDE.md, the spec, and the implementation in the model's reach -- the most
+    # complete developer framing available, handed over silently. §17: "no memory of
+    # this project, no developer framing." An empty directory is the only way to mean it.
+    cold_cwd = dest / "cwd"
+    cold_cwd.mkdir(exist_ok=True)
 
     text = resolve_prompt(entry, cell)
     assert_prompt_is_cold(text, prompt_id)
 
     doc = entry.get("document")
-    env = dict(os.environ)
+    secrets = secret_values()
     # Unique per (run, cell, group, prompt) so no two invocations can share a trace and
     # be mistaken for one session -- the batching failure, made structurally impossible.
+    config_path = write_mcp_config(dest, trace_dir, bool(cell.get("bill_text_only")))
+    assert_config_carries_no_secret(config_path, secrets)
+
+    env = dict(os.environ)
     env["CONGRESSMCP_TRACE_DIR"] = str(trace_dir)
     env["CONGRESSMCP_BILL_TEXT_ONLY"] = "1" if cell.get("bill_text_only") else ""
 
@@ -185,13 +263,23 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     exit_status = -1
     answer = ""
 
+    cmd = [part.replace("{model}", cell["model"]) for part in runner] + [
+        "--strict-mcp-config",          # ignore every config the operator happens to have
+        "--mcp-config", str(config_path),
+        "--permission-mode", "acceptEdits",
+        "--allowed-tools", "mcp__congress",
+        "--disallowed-tools", ",".join(DISALLOWED_BUILTINS),
+    ]
+
     if dry_run:
         exit_status, answer = 0, "[dry-run: no model was called]"
     else:
-        cmd = [part.replace("{model}", cell["model"]) for part in runner] + [text]
         try:
-            proc = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True,
-                                  text=True, timeout=900)
+            # The prompt goes in on STDIN, not argv. --mcp-config is variadic and will
+            # swallow a trailing positional; stdin also keeps the prompt out of the
+            # process table. cwd is the neutral directory, never the repo.
+            proc = subprocess.run(cmd, cwd=cold_cwd, env=env, input=text,
+                                  capture_output=True, text=True, timeout=900)
             exit_status = proc.returncode
             answer = proc.stdout
             if exit_status != 0:
@@ -239,6 +327,7 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
         trace_records=n_records,
         tool_calls=tools,
         answer_chars=len(answer),
+        command=cmd,
         # Criteria travel WITH the result so a scorer never has to reconstruct them,
         # and so editing one after seeing a result is visible in the diff.
         criteria={k: entry.get(k) for k in ("title", "pass", "fail", "watch",
@@ -256,7 +345,9 @@ def main() -> int:
     ap.add_argument("--groups", default=None, help="restrict to these groups, e.g. A,B")
     ap.add_argument("--prompts", default=None, help="restrict to these prompt ids")
     ap.add_argument("--runner", default="claude -p --model {model}",
-                    help="command template; {model} is substituted, prompt appended as argv")
+                    help="command template; {model} is substituted. The harness appends "
+                         "--strict-mcp-config, --mcp-config, --allowed-tools and "
+                         "--disallowed-tools, and feeds the prompt on stdin.")
     ap.add_argument("--dry-run", action="store_true",
                     help="validate manifest, cells, and layout without calling any model")
     ap.add_argument("--allow-dirty", action="store_true",
