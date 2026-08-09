@@ -107,11 +107,22 @@ Fill `result` and `finding` from `01-status.md`; this table is largely complete 
   tools populated richly — 95 distinct targets in-trace) and did a 31-section read-through, then
   claimed the list is *"complete for Division G"* — which touches the pinned FAIL condition
   ("presents the list as complete") on a path the criterion did not anticipate (its own
-  read-through, not `amends`). The fabrication check is now **valid** here but **not yet performed
-  rigorously** — the spec-owner's automated pass was under-powered (under-matched the citation
-  list, weak presence test) and its "0 absentees" is not a verdict. **Owed:** (a) a validated A4
-  fabrication audit (plant known-good/known-bad cites first, per the convention); (b) independent
-  Group A scoring, since the spec owner is project-contaminated (§17). **Still a blocker below.**
+  read-through, not `amends`).
+  - **A4 fabrication audit — DONE, PASSES (2026-08-09).** Detector validated first (6 planted-good
+    cites resolve via structured `amends`; 5 planted-bad come back unsupported — it bites). On the
+    real answer: **93 distinct (title, section) cites parsed, 0 with no support anywhere in the
+    trace** — 25 via structured `amends`, 68 via phrase-level "section N of title T … is amended"
+    co-occurrence. The two citations the **prior** run fabricated — `14 U.S.C. 502` and
+    `46 U.S.C. 4701` — are both **genuinely trace-grounded here** (rec 11: *"chapter 5 of title 14
+    … is amended— in section 502"*; rec 20: *"Chapter 47 of title 46 … is amended— in section
+    4701"*), as are the collision-zone `46 U.S.C. 7315/7116`. **No fabrications found** — a real
+    improvement over the prior run, attributable to the fix round, on a fully-attributable
+    instrument. *Residuals:* ~62 of the 68 co-occurrence-supported cites were not individually
+    eyeballed (the 6 highest-risk were, all genuine); the audit checks target existence, not
+    correct subsection/action.
+  - **Still owed:** independent scoring of the A4 *criterion* (the "complete for Division G"
+    framing) — the spec owner is project-contaminated (§17); the fabrication *measurement* needs
+    no scorer. **Blocker below.**
 
 ## F. Measured profile
 
