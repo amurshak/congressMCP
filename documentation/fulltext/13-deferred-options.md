@@ -187,3 +187,41 @@ discriminator per entry? The latter unifies the concept but complicates the comm
 which is currently a flat `list[str]`. Decide when scoping, not now.
 
 ---
+
+### Cross-version section content-fingerprint diff — DEFERRED (follow-on, not this feature)
+
+**The idea (recovered from the 2026-08-09 maintainer probe, and scoped out by its own proposer).**
+The version-difference finding in §17's Group F establishes that these tools surface **structural**
+divergence between two versions for free (`get_bill_toc` comparison — title counts, missing
+subtitles, one-sided headers) but leave **content/value** changes under an *identical header*
+invisible (a rate moving 3.5% → 1%), because no query finds them unless you already suspect them.
+The proposed closer: **align sections across versions on identity — `header` text plus
+amended-citation set — rather than on `section_id`, then flag pairs that match on identity but
+diverge on body.**
+
+**Why it is a different feature, not a spec amendment.** The current tools are per-version
+retrieval; this is a cross-version *comparison* that produces a candidate-change list. It does
+**not** violate the settled *no amendment-direction inference* line — it reports "these two
+sections are the same provision and the body changed," not which way. But it is new surface and
+new machinery, and the proposer explicitly called it a follow-on. **Adopting it is a requirements
+decision, not recorded here as adopted.**
+
+**Design notes to keep if it is ever built:**
+
+1. **Do not anchor on `amends` alone** — the tool contract already says `amends` is a convenience,
+   not complete (F3/F8), so it will miss alignments. The signal is **`header` + `amends` +
+   `byte_length` delta together**: match on header (and amends where present), then flag an
+   identity-match with a body/byte divergence as a candidate worth a human read.
+2. **It produces a candidate list, not a verdict.** The output is "these section pairs probably
+   changed materially" — the consumer still reads them. That keeps it on the retrieval side of the
+   retrieval-vs-analysis line the Group F finding drew.
+3. **The value it adds is exactly the case priors cannot cover:** a content change under an
+   unchanged header, which structural TOC comparison and query search both miss. Test it on an
+   **obscure** bill (per the Group F methodological rule) — a famous bill's changes are already in
+   the model's priors and would not exercise the feature.
+
+**Status: deferred, unrejected.** No measurement against it; it addresses a real, characterized
+gap. It waits on a requirements decision and on PR 2 (a cross-version diff wants the cache, or it
+re-indexes both versions every call).
+
+---

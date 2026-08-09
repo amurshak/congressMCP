@@ -773,14 +773,29 @@ use an *obscure* bill the model has no priors on.** 119hr1 is the worst possible
 This extends the "unprimed" requirement from *prompt phrasing* to *bill choice* — a prompt can be
 perfectly cold and still be answered from priors if the bill is famous.
 
-**The experiment that settles observation 2** (hand to the implementation session): run one
-version-difference prompt on the fully-attributable isolation instrument against **(a)** 119hr1
-(maximal priors) and **(b)** an obscure, low-salience bill with two contentful versions (no
-priors). Compare whether the answer degrades — fabricates a difference, or honestly reports it
-cannot characterise the change from the text alone. If (b) collapses while (a) passes, the
-"difference" answer was never the tool's to give. **No version-*diff* capability exists** (nor is
-one in scope — settled: no amendment-direction inference); the tools retrieve each version, and
-diffing is the consumer's.
+**The recovered follow-up sharpens this — the degradation is partial and predictable, not
+total.** `get_bill_toc` on both versions surfaces **structural** divergence for free, with no
+priors: different title counts, missing subtitles, headers present on only one side. A reorganized
+or added/removed subtitle (the follow-up's example: the RECA subtitle) falls out of a TOC
+comparison unaided. What stays invisible without priors is a **content/value** change inside a
+section whose *header is identical* — a rate moving 3.5% → 1% under an unchanged heading — because
+no query finds it unless you already suspect it. So the division of labor is precise: **the
+consumer's priors choose what to look for; the tools verify and correct the details.** (The
+follow-up picked SALT, debt limit, remittance rate, AI moratorium, provider taxes from memory, and
+the search confirmed each and fixed the specifics — the 2030 snap-back, the §275 relocation, House
+moratorium vs ratchet.) Output quality is bounded by knowing what to ask.
+
+**The experiment that settles it** (hand to the implementation session): one version-difference
+prompt on the fully-attributable isolation instrument against **(a)** 119hr1 (maximal priors) and
+**(b)** an obscure, low-salience bill with two contentful versions (no priors). **Predicted
+outcome, now falsifiable:** on (b) the model still reports *structural* divergence via TOC
+comparison but misses — or fabricates — *content/value* changes under identical headers, and
+should honestly say it cannot characterise those from the text alone. If (b) collapses to
+structure-only while (a) reads as substantive, the substance was never the tool's to give. **No
+version-*diff* capability exists** (nor is one in current scope — settled: no amendment-direction
+inference); the tools retrieve each version, diffing is the consumer's. The content change under
+an unchanged header is exactly the gap the deferred **content-fingerprint diff** in
+`13-deferred-options.md` would close — a follow-on feature, not this one.
 
 ### Scoring Group F — different from A–E, necessarily
 
