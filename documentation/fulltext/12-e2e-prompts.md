@@ -152,6 +152,46 @@ ninety-nine registered operations, mid-way through someone else's task, has far 
 attention per tool result than one answering a single question in a clean session. If only
 one floor variable can be changed, change that one.
 
+### The capability floor — a Haiku cell, single-step by construction
+
+Sonnet is the floor for **attention** (crowded context, minimal thinking). **Haiku is the floor
+for capability**, and it brings a confound the rest of the matrix does not: **Haiku will not
+reliably chain** resolve → search → drill-down → read. A multi-hop prompt that Haiku fails tells
+you nothing about the tool, because the failure is equally explained by the model not chaining.
+This suite exists to separate tool-design defects from model behaviour; a cell that cannot tell
+the two apart is worse than no cell.
+
+**So the Haiku cell's prompts are single-step by construction.** The chaining a stronger model
+does inline is **pre-performed in the prompt**: it names the exact bill coordinates and the exact
+`section_id` (or the exact search phrase) the discovery hops would have produced, so the model
+needs **one** tool call and then the **one judgment the prompt is testing**. This is the
+phrase-substitution rule the method already requires — *"substitute concrete phrases from the V4
+harness output"* — extended to substitute the concrete **address** as well. The tool result still
+arrives through the real channel; only the navigation is removed. Pasting the tool output into
+the prompt instead would test reading-comprehension-of-text, not reading-a-tool-result — keep the
+single call.
+
+**What this isolates.** A single-step Group A prompt fed to Haiku tests exactly one thing: with
+the tool result in front of the weakest consumer that plausibly calls these tools, does the
+safety signal land? It is the sharpest available test of **F6 / V21** — whether `match_contexts`,
+a **passive** field, survives a reader with no budget to reason around it, or whether it needs an
+**active** form. The ceiling reasons its way to the distinction; Haiku cannot, so if Haiku reads
+it, the response *made* it read it.
+
+**Diagnosis mapping for this cell:**
+- **Haiku passes single-step Group A** → the explicit signal carries the property at the
+  capability floor. The strongest possible result — the property depends on no reasoning at all.
+- **Haiku fails single-step Group A** → the signal is not prominent enough for the weakest
+  consumer. A **tool-design defect**, fixed in the response shape or description (an active
+  disclosure, a field rename), never by "use a better model."
+
+**Scope: Group A, single-step.** Do **not** run Haiku on the navigation and reference-resolution
+prompts (the D group), where chaining *is* the variable under test — a Haiku failure there
+conflates model and tool by construction, the exact thing this cell exists to avoid. If a
+navigation prompt is run against Haiku at all, a failure is attributed to the model and marked as
+such, never counted as a tool defect. **One prompt, one hypothesis** — and for Haiku the
+hypothesis is always the tool property, never the chaining.
+
 ### Self-sufficiency — confirmed, and it changes the cell design
 
 **The three tools stand alone.** `get_bill_toc(congress=119, bill_type="s", number=1801)`
@@ -269,6 +309,108 @@ that is deliberate — anyone who has been party to the fixes carries a strong p
 system works, and scoring against written criteria rather than impression is the only
 protection. For Group A specifically, consider having the answers scored by someone or
 something with no history on this project.
+
+### The re-run harness — reproducible automation of this method (specified 2026-08-08)
+
+The prior §17 runs were hand-driven and recorded as prose. After the fix round (F1–F16, V5,
+with the header-separator and fresh-fidelity items still owed), the suite is being **re-run to
+measure whether the fixes reached the consumer** — a fixed defect that still reproduces at the
+consumer layer is a fix that did not land where it matters. The implementation session will
+write a CLI-driven script to execute the prompts, record each answer, and capture the trace per
+model and per group. This subsection is that script's **contract**: what it must produce and,
+more load-bearingly, the properties it must not break. It specifies the harness, not its code.
+
+**The central hazard: automation is the easiest place to silently violate the method.**
+Everything above this subsection is the measurement — fresh incognito session per prompt, no
+developer identity, no "output diagnostics," trace captured out-of-band. A script that runs all
+prompts in one session, appends a diagnostic instruction, or reads the model's *own account* of
+its tool calls produces numbers that look like §17 and measure something else. The invariants
+below are the method above, restated as machine constraints.
+
+**Inputs.**
+- **A machine-readable prompt manifest**, one entry per prompt (A1–A4, B1–B3, C1–C3, D1–D8,
+  E1–E3, and Group F once its questions are collected). Each carries the prompt text, the
+  explicit Congress, the V4-harness phrase to substitute where required, the grounding
+  annotation (harness output / fixture / measured figure, per the "cite its evidence" rule), and
+  the **pre-written pass/fail criteria**. Pinning the criteria in the manifest *before* the run
+  is this section's preregistration-of-scoring rule — the harness records them beside each
+  result, it does not invent them.
+- **The cell matrix**, per the configuration table above: **floor** (Sonnet, minimal/no
+  thinking, crowded context), **ceiling** (Opus, high reasoning, fresh, question-first), the
+  **capability floor** (Haiku — **Group A only, prompts single-step by construction**, see the
+  Haiku-cell subsection; its prompts are a distinct manifest variant carrying the pre-resolved
+  `section_id`/phrase so no chaining is required), the **isolation runs** (full vs isolated
+  surface via `CONGRESSMCP_BILL_TEXT_ONLY`, runs 1/2/3), and optionally **cross-vendor Group A**
+  (GPT-5.6 Terra). Model ids are operator parameters defaulting to this table. "Each model ×
+  each group" is this matrix — with Haiku scoped to Group A so a chaining limitation is never
+  scored as a tool defect.
+- **The build and the corpus.** Record the implementation commit sha, so a result attaches to a
+  known code state, and — per trace constraint 3 — each document's `package_id`, version, and
+  `sha256`. A result tied to neither a build nor a document is unreadable later.
+
+**Procedure, per (prompt × cell) — per cell, never batched.**
+1. **One fresh process per prompt.** No shared session, no memory of this project, no prior
+   prompt, no developer framing. The prompt sent is exactly the manifest text with the phrase
+   substituted — nothing appended. This is rung 1 (Cold); the Justify and Hint rungs are
+   separate, failure-only, each its own fresh process.
+2. **Trace out-of-band.** Set `CONGRESSMCP_TRACE_DIR` to a unique path per (run, cell, group,
+   prompt) so the *server* writes the trace; the model is **never** asked for its tool calls.
+   Trace mode's four constraints (redact-at-write, serialize-from-`model_dump()`, stamp-for-
+   replay, off-by-default) apply unchanged — the harness is their primary consumer.
+3. **Keep two separate records:** the model's **verbatim answer** (from the client) and the
+   **JSONL trace** (from the server). Both, always — the failure this suite exists to catch is
+   correct data in the trace paired with a wrong answer in the transcript, invisible in either
+   record alone.
+4. **Record a meta row:** prompt id, cell, model id, surface, thinking budget, context
+   condition, build sha, document package/version/sha, timestamps, and **exit status**.
+
+**Invariants — the must / must-not list.**
+- **Never batch prompts into a session.** One incognito process each; a model primed by the
+  previous prompt is not a cold consumer.
+- **Cold prompt only.** Do not append "explain your reasoning" or "note whether any text is
+  quoted" — those are the Justify and Hint rungs, run only against prompts the scorer marks
+  failed, each in its own fresh process. Automating them onto the cold run destroys the measurement.
+- **Never identify as the developer**, in the prompt or the surrounding framing.
+- **Redact and assert.** The trace redactor is installed unconditionally (F15); the harness must
+  still assert no trace line matches the key, because the trace is exactly the artifact a user
+  pastes into an issue.
+- **A run that errored must not read as a consumer that made no calls.** B1 at the floor made
+  **zero tool calls, and that was a real finding**; a crashed invocation, a timeout, or an empty
+  answer is a **harness failure** and is recorded as one, never scored as a consumer result.
+  Assert the invocation completed before recording "zero calls" — the
+  scan-that-errors-must-not-look-like-one-that-found-nothing discipline (`00-INDEX`), applied to
+  the harness itself.
+- **Record inputs; do not assume deterministic outputs.** Models are stochastic. The harness
+  captures verbatim answer + trace + full config so a result is re-scorable, and leans — as the
+  method already does — on findings that recur across independent prompts rather than on a single
+  reproducible string.
+
+**What the harness does not do.**
+- **It does not score.** Pass/fail against the pinned criteria is a human/model judgment —
+  "correct call + wrong answer = fail" is a phrasing call — and Group A should be scored by
+  someone with no project history. The harness produces the artifact and carries the criteria
+  beside it; it does not decide.
+- **It does not call a claim fabricated on trace-absence.** That is a scoring rule requiring
+  independent fact-verification first (a claim absent from the trace may have been retrieved
+  where this instrument cannot see). The harness records; the scorer verifies.
+
+**Output layout.** `<run>/<cell>/<group>/<prompt>/` holding `answer.txt` (verbatim),
+`trace.jsonl`, and `meta.json`; plus a top-level `run-manifest.json` (build sha, model ids,
+surfaces, corpus shas, timestamps, the full prompt set with pinned criteria). One directory per
+prompt, JSONL throughout, so the run is greppable, diffable, and re-scorable — and **diffable
+against the prior findings by prompt id**, which is the comparison that gives the re-run its
+meaning.
+
+> **Preregistration for the re-run (before it runs).** *Expected:* prompts whose defects this
+> round fixed no longer reproduce at the consumer layer — the trailing-period false negative
+> (F2), the TOC container-id rejection (F5), the codified-law-is-not-bill-location fabrication
+> (F7), the undocumented query semantics (F9), the silent zero-hit (F10), the depth-clamp
+> ambiguity (F11), the inline/block join (F12) — while **Group A still passes in both cells**,
+> the property the whole suite is built around. *Falsifier:* a fixed defect still reproduces in a
+> cold run against the current build (the fix did not reach the consumer, or a regression), or
+> Group A drops a cell it previously held. Either is a real finding, recorded against this
+> preregistration rather than explained after the fact. The re-run's value is precisely this
+> diff; the harness exists to make it defensible.
 
 ---
 
