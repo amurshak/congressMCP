@@ -386,7 +386,11 @@ invocation runs in an **empty per-prompt working directory**, never the repo: a 
 hands the model `CLAUDE.md`, the full spec, and the implementation silently — the most complete
 developer framing there is, delivered without a word in the prompt. And the model's **built-in
 tools (WebSearch, WebFetch, Bash, Read) are disabled** — the three bill-text tools are
-self-sufficient and need none of them. The harness also **writes the MCP config** per prompt
+self-sufficient and need none of them. **Disabling the built-ins is necessary but not sufficient
+for attribution:** at full surface the server's ~93 other congress tools are registered and
+uninstrumented, so only the isolation cell (`bill_text_only=true`) has trace scope equal to tool
+surface — see the surface correction in the built-ins ruling below. The harness also **writes the
+MCP config** per prompt
 rather than trusting the operator's setup, which is what makes the cell matrix *real*: the
 isolation cell's three tools come from `CONGRESSMCP_BILL_TEXT_ONLY` in the written config and
 floor/ceiling get the full surface, by construction rather than by assumption. (The config must
@@ -422,8 +426,9 @@ to a second artifact, and the same process-side-effect channel F15 named.
 > `get_bill_section`) — the tools need no help.
 >
 > **So the re-run is not a comparison; it is the clean measurement that supersedes a contaminated
-> one.** Every claim's source is in the trace, so for the first time a Group A pass means the tool
-> carried the property and nothing else did. Where the re-run **disagrees** with a prior finding,
+> one** — *provided the trace is complete, which requires the isolation cell; see the surface
+> correction below.* In that configuration every claim's source is in the trace, so a Group A pass
+> means the tool carried the property and nothing else did. Where the re-run **disagrees** with a prior finding,
 > read the disagreement *through* the prior contamination: a prior pass the re-run fails most
 > likely means **the tool never carried it and the web was propping it up** — a finding about the
 > tool, not a regression in it. That is worth more than a diff.
@@ -433,6 +438,34 @@ to a second artifact, and the same process-side-effect channel F15 named.
 > "does the tool carry the property." It needs its own instrument (a trace over the *whole* tool
 > surface, or an explicit acceptance that claims cannot be attributed) and is **not merge-gating**.
 > Flip built-ins only there, and label it.
+
+> **Correction 2026-08-09, forced by the first real run (`2026-08-09T062714Z`) — built-ins were
+> only half the boundary.** The floor and ceiling cells register the **full ~96-operation congress
+> surface** (`CONGRESSMCP_BILL_TEXT_ONLY` unset → full) and **only the three bill-text tools are
+> instrumented.** So the sentence above — *"every claim's source is in the trace"* — is **false for
+> the full-surface cells:** a claim can come from a sibling congress tool (bill metadata,
+> summaries, actions) the trace never records, and "only three tool names appear in the trace"
+> means only that the trace can *see* three, not that the model *used* three. Disabling the model's
+> built-ins was necessary and **not sufficient**; the larger uninstrumented channel is the server's
+> own sibling tools. This is the *enumerate-every-path-and-check-it-is-exhaustive* failure the
+> conventions name — committed in this ruling, one leak path closed and another left open.
+>
+> **Consequence — trace scope must equal tool surface, and only the isolation cell satisfies it.**
+> `bill_text_only=true` registers *only* the three instrumented tools, so there trace scope == tool
+> surface and the run is **fully attributable**. The full-surface floor/ceiling cells are valid
+> **cold** runs (temp cwd, built-ins off, no context contamination — all confirmed on this run) but
+> are **not** fully attributable, and attribution-dependent conclusions — above all *"the tool
+> carried the property"* and the fabrication check *"citation ∉ trace ⟹ fabricated"* (F7/A4) — hold
+> **only in the isolation cell.** Run Group A in the isolation cell before recording any such
+> conclusion. Instrumenting the whole congress surface is the alternative, and it is larger and
+> unnecessary while the isolation cell already exists.
+>
+> **What the full-surface run still supports.** Scoring the answer's safety *framing* (amends-vs-
+> requires) is content-based and needs no attribution. And **per-claim** attribution is salvageable
+> where a load-bearing claim is present in the bill-text trace: on this run A1/A2/A3's pinned claims
+> are all in the `search_bill_text`/`get_bill_section` records, so those three are tool-attributable
+> even at full surface. A4 is precisely the one that is not — its citation list cannot be audited
+> for fabrication until the trace is complete.
 
 **Invariants — the must / must-not list.**
 - **Never batch prompts into a session.** One incognito process each; a model primed by the

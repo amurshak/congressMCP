@@ -88,11 +88,17 @@ Fill `result` and `finding` from `01-status.md`; this table is largely complete 
   with web access, and some claims were grounded in web artifacts rather than in these tools — so
   the prior findings are **not fully attributable** to the tools, and some passes may have been
   web-propped. Treat them as a cross-reference, not a clean baseline.
-- **Re-run — `[ PENDING ]`.** Harness specified and built (§17 re-run subsection; runner landed
-  in `544e778`/`38129e3`); Haiku capability cell added; built-ins ruled OFF so every claim's
-  source is in the trace (the first fully-attributable run). Preregistration recorded — with the
-  asymmetry that a prior pass the re-run *fails* is a trace-inspection trigger, not an automatic
-  regression. **Not yet executed.** Blocker below, not a blank.
+- **Re-run — first run executed `2026-08-09T062714Z`, build `9e119f9`; PARTIAL.** Floor
+  (`claude-sonnet-5`) + ceiling (`claude-opus-5`), Groups A–F, 48 results, 0 harness failures, all
+  `cold_cwd` temp, built-ins off. **Valid cold run, but NOT fully attributable:** both cells ran
+  the full ~96-op congress surface with only the three bill-text tools instrumented, so a claim can
+  come from an untraced sibling tool. Per-claim salvage confirmed for A1/A2/A3 (pinned claims
+  present in the bill-text trace); A4 (fabrication check) cannot be audited until the trace is
+  complete. **Owed: the isolation cell (`bill_text_only=true`)** — the only fully-attributable
+  configuration (§17 surface correction) — before recording "the tool carried the property" or any
+  fabrication verdict. Group F is DERIVED, not verbatim (manifest `group_f_caveat`), so it is
+  weak evidence. Preregistration asymmetry stands: a prior pass the re-run fails is a
+  trace-inspection trigger, not an automatic regression. **Still a blocker below.**
 
 ## F. Measured profile
 
