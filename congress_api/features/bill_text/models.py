@@ -90,9 +90,34 @@ class SearchHit(BaseModel):
     subtree_byte_length: int
 
 
+class QueryDiagnostic(BaseModel):
+    """Why one query matched nothing (F10).
+
+    A zero-hit response is otherwise unreadable: "this bill does not discuss the
+    subject" and "the bill discusses it in other words" are the same empty list, and
+    the caller cannot tell whether rephrasing would help. `terms` also exposes the
+    stemming, which is where a phrase quietly stops meaning what was typed
+    ("Force" indexes as "forc", "striking" as "strike").
+    """
+
+    query: str
+    # The query as the index tokenized it -- produced by FTS5 itself, not a
+    # reimplementation, so it is the tokenisation the search actually ran.
+    terms: list[str]
+    # Terms that appear nowhere in this bill. Non-empty means no rephrasing helps.
+    absent_terms: list[str]
+    # "absent_term": at least one term is missing from the bill entirely.
+    # "phrasing": every term is present, but not as this contiguous phrase -- the
+    # query is answerable, just not in these words. Matching is literal phrase with
+    # stemming, so word order and adjacency are load-bearing.
+    verdict: Literal["absent_term", "phrasing"]
+
+
 class SearchBillTextResponse(BillTextEnvelope):
     chunks_searched: int
     queries_used: list[str]
+    # Present only for queries that matched nothing; null when every query hit.
+    query_diagnostics: list[QueryDiagnostic] | None = None
     hits: list[SearchHit]
 
 

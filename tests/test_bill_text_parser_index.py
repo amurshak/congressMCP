@@ -1649,6 +1649,89 @@ def test_get_bill_section_retrieves_synthetic_unit_end_to_end():
     assert res.get("text", "").strip()
 
 
+def test_zero_hit_diagnostic_separates_absent_from_merely_phrased_otherwise():
+    # F10, the whole point. Both queries return zero hits and are indistinguishable in
+    # the response without this. One is answerable by rephrasing; the other is not, and
+    # a caller told only "hits: []" will report "the bill does not address it" for both.
+    parsed = parse_fixture("bill_text_trimmed.xml")
+    index = BillTextIndex(parsed)
+
+    # Every word IS in the bill -- just never adjacent in this order. This is F9's
+    # canonical burned-queries example.
+    phrasing = index.diagnose(normalized_query("icebreaker polar security"))
+    assert index.search([normalized_query("icebreaker polar security")], 10) == []
+    assert phrasing.absent == []
+    assert phrasing.verdict == "phrasing"
+
+    # A word that is simply not in this document. No rephrasing recovers it.
+    absent = index.diagnose(normalized_query("cryptocurrency"))
+    assert absent.verdict == "absent_term"
+    assert absent.absent == absent.terms != []
+
+
+def test_zero_hit_diagnostic_reports_the_tokenisation_the_index_actually_used():
+    # The instrument must not be a second tokeniser. Porter stemming is what makes a
+    # phrase stop meaning what the caller typed, so the reported terms have to be the
+    # STEMS the search ran on -- if these came back as the raw words, the diagnostic
+    # would explain a search that never happened.
+    parsed = parse_fixture("bill_text_trimmed.xml")
+    index = BillTextIndex(parsed)
+    diagnosis = index.diagnose(normalized_query("Amended by striking forces"))
+    assert diagnosis.terms == ["amend", "by", "strike", "forc"], diagnosis.terms
+
+
+def test_zero_hit_diagnostic_absence_test_runs_against_the_search_index():
+    # The absence claim is the load-bearing one -- it tells a caller to stop trying.
+    # A term present in the bill must never be reported absent, so plant both: a stem
+    # that IS in the index and one that cannot be.
+    parsed = parse_fixture("bill_text_trimmed.xml")
+    index = BillTextIndex(parsed)
+    present = index.diagnose(normalized_query("icebreaker"))
+    assert present.terms == ["icebreak"] and present.absent == []
+    missing = index.diagnose(normalized_query("icebreaker zzqqxx"))
+    assert missing.absent == ["zzqqxx"]      # only the planted word
+    assert "icebreak" in missing.terms       # the real one still reported, not absent
+
+
+@pytest.mark.asyncio
+async def test_search_response_diagnoses_only_the_queries_that_died(monkeypatch):
+    import congress_api.features.bill_text.tools as tools_mod
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    parsed = parse_fixture("bill_text_trimmed.xml")
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText(
+            package_id="BILLS-119s1071enr", version="enr",
+            version_resolved_at="2026-08-08T00:00:00Z", version_resolution_note=None,
+            last_modified=None, xml_bytes=b"",
+        ),
+        parsed=parsed, index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
+
+    # One live query, one dead. The dead one must be diagnosed even though the call
+    # succeeded -- a hit elsewhere does not explain the query that found nothing.
+    mixed = await tools_mod.search_bill_text(
+        None, congress=119, bill_type="s", number=1071,
+        queries=["icebreaker", "cryptocurrency mining"])
+    assert mixed["hits"]
+    diags = mixed["query_diagnostics"]
+    assert [d["query"] for d in diags] == ["cryptocurrency mining"]
+    assert diags[0]["verdict"] == "absent_term"
+
+    # All queries productive -> the field stays null rather than reporting an empty
+    # list, so its presence alone means "something found nothing".
+    clean = await tools_mod.search_bill_text(
+        None, congress=119, bill_type="s", number=1071, queries=["icebreaker"])
+    assert clean["hits"] and clean["query_diagnostics"] is None
+
+
 def test_toc_depth_reduced_is_false_when_the_depth_was_honored():
     # F11, the case toc_truncated cannot express. The tree is complete to the depth
     # asked for; sections merely nest deeper. toc_truncated is TRUE here and always

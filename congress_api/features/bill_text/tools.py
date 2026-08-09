@@ -21,6 +21,7 @@ from .models import (
     CacheStatus,
     ErrorEnvelope,
     ErrorPayload,
+    QueryDiagnostic,
     SearchBillTextResponse,
     SearchHit,
     SectionChild,
@@ -173,6 +174,18 @@ def _normalize_queries(queries: list[str]) -> tuple[list[str], dict[str, str], l
     return normalized, display, notes
 
 
+def _query_diagnostic(index, normalized: str, shown: str) -> QueryDiagnostic:
+    # `shown` is the caller's own phrasing, not the normalized form: a diagnostic the
+    # caller cannot match back to what they typed is one more thing to decode.
+    diagnosis = index.diagnose(normalized)
+    return QueryDiagnostic(
+        query=shown,
+        terms=diagnosis.terms,
+        absent_terms=diagnosis.absent,
+        verdict=diagnosis.verdict,
+    )
+
+
 def _clamp(value: int, low: int, high: int) -> tuple[int, str | None]:
     clamped = min(high, max(low, value))
     if clamped == value:
@@ -209,6 +222,13 @@ async def search_bill_text(
     appear verbatim, plus synonyms, in one call, e.g. ["icebreaker", "polar security cutter"];
     matched_queries reports which phrasing produced each hit, so you can drop the dead ones next call.
 
+    A query that matches nothing gets an entry in query_diagnostics saying why, so zero hits is
+    readable rather than ambiguous. verdict "phrasing" means every term IS in the bill but not as
+    this contiguous phrase -- rephrase, do not conclude the bill is silent. verdict "absent_term"
+    means absent_terms appear nowhere in the bill, so no rephrasing of them will help. terms shows
+    the stemmed tokens actually searched ("Force" -> "forc"), which is where a phrase stops
+    meaning what you typed.
+
     Knowing a provision as codified law does NOT establish where it sits in THIS bill. Division,
     title, and section numbers are properties of this document, and these tools are the only
     source for them -- answering a bill-location question from prior knowledge produces a
@@ -231,12 +251,22 @@ async def search_bill_text(
         search_start = time.perf_counter()
         ranked = loaded.index.search(normalized, max_hits)
         search_ms = round((time.perf_counter() - search_start) * 1000, 1)
+        # F10: diagnose every query that matched nothing -- which covers the all-zero
+        # response and the individually-dead query in an otherwise successful call,
+        # since both leave the caller unable to tell "absent" from "worded otherwise".
+        productive = {item for hit in ranked for item in hit.matched_queries}
+        diagnostics = [
+            _query_diagnostic(loaded.index, item, display[item])
+            for item in normalized
+            if item not in productive
+        ]
         response = SearchBillTextResponse(
             **_envelope(loaded),
             version_resolution_note=note or loaded.resolved.version_resolution_note,
             timing=_timing(loaded, started, search_ms=search_ms),
             chunks_searched=len(loaded.parsed.units),
             queries_used=[display[item] for item in normalized],
+            query_diagnostics=diagnostics or None,
             hits=[
                 SearchHit(
                     section_id=hit.unit.section_id,

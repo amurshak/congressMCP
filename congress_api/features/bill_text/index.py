@@ -15,6 +15,12 @@ from .parser import ParsedBill, Unit
 
 CONTEXT_ORDER = {"operative": 0, "quoted": 1, "header": 2}
 
+# ONE definition, used to build the segment index AND to tokenize queries for the
+# zero-hit diagnostic (F10). Two copies would let the diagnostic drift into reporting
+# a tokenisation the search never performed -- an instrument that reproduces the
+# failure class of the thing it measures.
+FTS_TOKENIZER = "porter unicode61 remove_diacritics 2"
+
 
 @dataclass(frozen=True)
 class RankedHit:
@@ -23,6 +29,23 @@ class RankedHit:
     match_contexts: list[str]
     matched_queries: list[str]
     snippet: str
+
+
+@dataclass(frozen=True)
+class QueryDiagnosis:
+    """Why a query found nothing: the terms it became, and which the bill lacks."""
+
+    terms: list[str]
+    absent: list[str]
+
+    @property
+    def verdict(self) -> str:
+        # The distinction F10 exists to draw. Zero hits with every term present means
+        # the words are in the bill but not adjacent in this order -- a phrasing
+        # problem the caller can fix by rephrasing. Zero hits with a term missing
+        # means no rephrasing will help; the concept is not in this document under
+        # that word.
+        return "absent_term" if self.absent else "phrasing"
 
 
 def sqlite_supports_fts5() -> bool:
@@ -80,8 +103,27 @@ class BillTextIndex:
               text,
               content='segments',
               content_rowid='id',
-              tokenize='porter unicode61 remove_diacritics 2'
+              tokenize='"""
+            + FTS_TOKENIZER
+            + """'
             );
+
+            -- The bill's term vocabulary, post-stemming, straight off the index that
+            -- answers the search. Lets the zero-hit diagnostic ask "is this term
+            -- anywhere in the document" without a second scan that could disagree.
+            CREATE VIRTUAL TABLE seg_vocab USING fts5vocab(seg_fts, 'row');
+
+            -- A scratch table for tokenizing QUERIES with the identical tokenizer.
+            -- Running the query through FTS5 itself is the only way to report the
+            -- tokenisation the search actually used; a Python re-implementation of
+            -- Porter stemming would be a different tokeniser wearing its name.
+            CREATE VIRTUAL TABLE probe_fts USING fts5(
+              text,
+              tokenize='"""
+            + FTS_TOKENIZER
+            + """'
+            );
+            CREATE VIRTUAL TABLE probe_vocab USING fts5vocab(probe_fts, 'row');
             """
         )
         segment_id = 1
@@ -112,6 +154,33 @@ class BillTextIndex:
         self.conn.execute("INSERT INTO seg_fts(seg_fts) VALUES('rebuild')")
         self.conn.execute("INSERT INTO seg_fts(seg_fts) VALUES('optimize')")
         self.conn.commit()
+
+    def diagnose(self, query: str) -> QueryDiagnosis:
+        """Tokenize `query` exactly as the index does, and say which terms the bill lacks.
+
+        A zero-hit response is otherwise unreadable: "absent from the bill" and "present
+        but not phrased this way" look identical, and the caller has no way to tell
+        whether to rephrase or to give up on the word (F10). Reporting the terms also
+        surfaces the stemming, which is where a phrase silently stops meaning what the
+        caller typed.
+        """
+        self.conn.execute("DELETE FROM probe_fts")
+        self.conn.execute("INSERT INTO probe_fts(text) VALUES (?)", (query,))
+        terms = [row[0] for row in self.conn.execute("SELECT term FROM probe_vocab")]
+        # fts5vocab yields terms in index (sorted) order, not query order. Sort by where
+        # each stem first prefixes the query so the list reads left-to-right as typed;
+        # this is display order only and never affects the absence test below.
+        lowered = query.casefold()
+        terms.sort(key=lambda term: (lowered.find(term[:4]), term))
+        absent = [
+            term
+            for term in terms
+            if self.conn.execute(
+                "SELECT 1 FROM seg_vocab WHERE term = ? LIMIT 1", (term,)
+            ).fetchone()
+            is None
+        ]
+        return QueryDiagnosis(terms=terms, absent=absent)
 
     def search(self, queries: Iterable[str], max_hits: int) -> list[RankedHit]:
         query_list = list(queries)
