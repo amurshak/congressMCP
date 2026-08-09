@@ -41,6 +41,16 @@ reads naturally with the operative verbs surrounding the quoted material.
 **Quoted-containment dominates.** A header nested inside quoted material is `quoted`,
 not `header`. One context per segment, deterministic.
 
+> **Verified in the wild — `114hr5147enr` (the BABIES Act), 2026-08-09.** GovInfo XML checked
+> directly: the enrolled bill contains `<header>Pubic building</header>` — a real typo — sitting
+> **inside a `<quoted-block style="USC">`** (the defined term in the body, `<quote>public
+> building</quote>`, is spelled correctly). Quoted-containment dominates, so this header is
+> `quoted`: the model attributes the misspelling to **text the bill is inserting into 40 U.S.C.**,
+> not to the bill's own operative voice. That is the distinction earning its keep on real data —
+> Congress enacted a misspelled heading *into the Code*, and a segment-blind reader (or a naive
+> cross-version diff) would instead report it as a change the bill made to itself. It also anchors
+> the segment-aware constraint on the deferred content-fingerprint diff (`13-deferred-options.md`).
+
 ### Both quoting constructs count
 
 Bill DTD has two: `<quoted-block>` for block-level insertions, inline `<quote>` for

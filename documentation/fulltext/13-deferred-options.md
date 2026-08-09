@@ -219,6 +219,13 @@ decision, not recorded here as adopted.**
    unchanged header, which structural TOC comparison and query search both miss. Test it on an
    **obscure** bill (per the Group F methodological rule) — a famous bill's changes are already in
    the model's priors and would not exercise the feature.
+4. **It must be segment-aware, or it reports the wrong thing.** A body change inside a
+   `<quoted-block>` is text the bill is inserting into the Code, not a change to the bill's own
+   voice — so a diff must compare operative-to-operative and quoted-to-quoted, and label which. The
+   verified case: `114hr5147enr` carries the enacted typo `<header>Pubic building</header>` inside
+   a quoted-block (§6). A segment-blind diff would flag "the bill changed Public→Pubic"; the truth
+   is Congress enacted a misspelled heading *into 40 U.S.C.* The segment model is a prerequisite
+   for this feature, which is one more reason it is a follow-on and not a bolt-on.
 
 **Status: deferred, unrejected.** No measurement against it; it addresses a real, characterized
 gap. It waits on a requirements decision and on PR 2 (a cross-version diff wants the cache, or it

@@ -773,6 +773,17 @@ use an *obscure* bill the model has no priors on.** 119hr1 is the worst possible
 This extends the "unprimed" requirement from *prompt phrasing* to *bill choice* — a prompt can be
 perfectly cold and still be answered from priors if the bill is famous.
 
+**And a version-difference question is often vacuous, which is the first correct answer.** Most
+bills that become law pass the Senate **unchanged** (unanimous consent), so there is no
+engrossed-amendment-Senate version to compare — the House-vs-Senate diff the question asks for
+does not exist, and the meaningful divergence is *upstream, within the House* (`ih` → `eh`).
+H.R. 1 was the atypical bill; the modal one is `114hr5147` (the BABIES Act), whose version list is
+`ih → rh → eh → rds → enr` with **no `eas`**. Recognizing that the requested comparison does not
+exist — from the version list itself — is a pass, not a failure. **`114hr5147` is a good obscure
+fixture for this whole class:** tiny, no priors, substantive `ih`→`eh` changes (scope narrowed,
+exceptions 2→4, a new jurisdictional definition, applicability halved), and it carries the
+verified quoted-text typo that exercises the segment model (§6).
+
 **The recovered follow-up sharpens this — the degradation is partial and predictable, not
 total.** `get_bill_toc` on both versions surfaces **structural** divergence for free, with no
 priors: different title counts, missing subtitles, headers present on only one side. A reorganized
