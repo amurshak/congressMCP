@@ -95,4 +95,9 @@ def _cache_dir() -> Path:
 
 
 if __name__ == "__main__":
-    main()
+    # sys.exit(main()), not bare main(): the console script generated from
+    # [project.scripts] wraps the entry point and propagates its return value, so
+    # `congressmcp cache clear` without --yes exits 2 while `python -m congress_api
+    # cache clear` exited 0 for the same refusal. Two invocation paths disagreeing
+    # about the exit code makes the CLI unscriptable through the module form.
+    raise SystemExit(main())

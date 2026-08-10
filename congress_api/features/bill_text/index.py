@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 import sqlite3
@@ -48,7 +49,12 @@ class QueryDiagnosis:
         return "absent_term" if self.absent else "phrasing"
 
 
+@functools.cache
 def sqlite_supports_fts5() -> bool:
+    # Cached: this probes a COMPILE-TIME property of the linked SQLite, which cannot
+    # change within a process, but every one of the three tools calls it on every
+    # invocation -- so an unavoidable answer was being re-derived by opening and
+    # closing a database each time.
     try:
         conn = sqlite3.connect(":memory:")
         conn.execute("CREATE VIRTUAL TABLE fts_probe USING fts5(text)")

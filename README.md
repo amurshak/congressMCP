@@ -112,7 +112,6 @@ congressmcp --transport streamable-http --port 8000
 |----------|----------|---------|-------------|
 | `CONGRESS_API_KEY` | Yes | — | Your free Congress.gov API key |
 | `GOVINFO_API_KEY` | No | — | Optional override for GovInfo; otherwise `CONGRESS_API_KEY` is reused |
-| `MCP_TRANSPORT` | No | `stdio` | Transport mode (`stdio` or `streamable-http`) |
 | `ENABLE_CACHING` | No | `false` | Cache API responses in memory |
 | `CACHE_TIMEOUT` | No | `300` | Cache TTL in seconds |
 | `CONGRESSMCP_CACHE_DIR` | No | Platform cache path | Planned PR 2 bill-text package cache root |
