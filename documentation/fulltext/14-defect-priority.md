@@ -520,10 +520,14 @@ this is triage — which touch the spec's contracts (recorded here) versus pure 
 
 **Out of the bill-text feature and out of this directory's authority (relay only):**
 
-- `bug_002` (normal): the **default** (non-`BILL_TEXT_ONLY`) server path is unstartable — 33
-  feature files still import `mcp.server.fastmcp` (gone in mcp 2.x). The isolation gate is
-  currently the *only* working path. Broad MCP-2 migration, tracked as D9 in
-  `../tool-defect-register.md` (outside this directory).
+- `bug_002` (normal) — **REFUTED 2026-08-10 by maintainer manual review.** The finding claimed
+  the default (non-`BILL_TEXT_ONLY`) server path is unstartable because 33 feature files import
+  `mcp.server.fastmcp`. **False:** the full server starts, and every surviving `fastmcp` import is
+  in **test** files, not runtime feature modules — the MCP-2 migration that predates this work
+  already converted the runtime path. Verified on this branch **and** on `master`. The reviewer's
+  file attribution (naming `congress_api/features/*.py`) and its "reproduced on this checkout"
+  repro did not survive manual review plus actually starting the server — the grep-vs-run lesson,
+  on the review side. **No action; the default path is not broken.**
 - `bug_008` (normal): `ctx.error()` is async in mcp 2.x and called without `await` in
   `make_api_request` — coroutine leak + dropped error notifications. **Bill-text tools are
   unaffected** (they use their own client), per the reviewer.
