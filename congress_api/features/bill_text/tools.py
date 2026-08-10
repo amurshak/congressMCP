@@ -284,7 +284,8 @@ async def search_bill_text(
         ]
         response = SearchBillTextResponse(
             **_envelope(loaded),
-            version_resolution_note=_merge_notes(loaded.resolved.version_resolution_note, note),
+            version_resolution_note=loaded.resolved.version_resolution_note,
+            request_note=_merge_notes(note),
             timing=_timing(loaded, started, search_ms=search_ms),
             chunks_searched=len(loaded.parsed.units),
             queries_used=[display[item] for item in normalized],
@@ -419,7 +420,8 @@ async def get_bill_section(
         )
         return BillSectionResponse(
             **_envelope(loaded),
-            version_resolution_note=_merge_notes(loaded.resolved.version_resolution_note, note),
+            version_resolution_note=loaded.resolved.version_resolution_note,
+            request_note=_merge_notes(note),
             timing=_timing(loaded, started),
             section_id=unit.section_id,
             node_kind=node_kind_for(unit.section_id),
@@ -552,7 +554,8 @@ def _container_response(
         truncated = True
     return BillSectionResponse(
         **_envelope(loaded),
-        version_resolution_note=_merge_notes(loaded.resolved.version_resolution_note, note),
+        version_resolution_note=loaded.resolved.version_resolution_note,
+        request_note=_merge_notes(note),
         timing=_timing(loaded, started),
         section_id=container.section_id,
         node_kind=node_kind_for(container.section_id),

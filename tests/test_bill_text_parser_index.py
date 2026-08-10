@@ -925,7 +925,12 @@ async def test_tool_wrappers_build_responses_without_network(monkeypatch):
 
     search = await tools_mod.search_bill_text(None, congress=119, bill_type="s", number=1071, queries=["icebreaker"], max_hits=999)
     assert "error" not in search and search["hits"]
-    assert "clamped to 50" in search["version_resolution_note"]  # clamp note still merges
+    # The clamp advisory lands in request_note, NOT version_resolution_note. This
+    # assertion previously read `in search["version_resolution_note"]`, which is the
+    # contract F17 broke: it passed whether or not the version note survived beside it,
+    # because this fixture resolves cleanly and has no version note to lose.
+    assert "clamped to 50" in search["request_note"]
+    assert search["version_resolution_note"] is None
     assert search["timing"]["search_ms"] is not None and search["timing"]["total_ms"] >= 0
     assert toc["timing"]["search_ms"] is None  # no search phase for toc
 
@@ -1792,14 +1797,16 @@ async def test_clamp_note_does_not_clobber_the_version_resolution_note(monkeypat
 
     monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
 
-    # search_bill_text: max_hits out of range -> clamp note fires alongside the version note.
+    # search_bill_text: max_hits out of range. Both notices survive, in SEPARATE fields.
     search = await tools_mod.search_bill_text(
         None, congress=119, bill_type="s", number=1071,
         queries=["icebreaker"], max_hits=999)
     assert "error" not in search
-    assert "failed-passage" in search["version_resolution_note"] or \
-        "negative or terminated" in search["version_resolution_note"], search["version_resolution_note"]
-    assert "clamped to 50" in search["version_resolution_note"]
+    assert "negative or terminated" in search["version_resolution_note"]
+    assert "clamped to 50" in search["request_note"]
+    # ...and neither field carries the other's content.
+    assert "clamped" not in search["version_resolution_note"]
+    assert "negative or terminated" not in search["request_note"]
 
     # get_bill_section: max_bytes out of range, same collision.
     section = await tools_mod.get_bill_section(
@@ -1807,13 +1814,58 @@ async def test_clamp_note_does_not_clobber_the_version_resolution_note(monkeypat
         section_id=search["hits"][0]["section_id"], max_bytes=10)
     assert "error" not in section
     assert "negative or terminated" in section["version_resolution_note"]
-    assert "clamped to 1000" in section["version_resolution_note"]
+    assert "clamped to 1000" in section["request_note"]
 
-    # And with no clamp, the version note still stands alone -- the merge must not
-    # introduce stray separators or drop the sole note.
+    # With no clamp, the version note stands alone and request_note is null.
     clean = await tools_mod.search_bill_text(
         None, congress=119, bill_type="s", number=1071, queries=["icebreaker"])
     assert clean["version_resolution_note"] == version_note
+    assert clean["request_note"] is None
+
+
+@pytest.mark.asyncio
+async def test_version_resolution_note_is_null_when_only_the_request_was_clamped(monkeypatch):
+    # THE INVARIANT THE FIELD SPLIT EXISTS FOR: version_resolution_note != null <=> a
+    # version issue. Merging the clamp advisory in fixed F17's data loss but broke the
+    # invariant the other way -- every over-large max_hits produced a non-null
+    # version_resolution_note, so a consumer keying on the field's PRESENCE (which is
+    # the point of a note field: no string parsing) got a false version warning on a
+    # perfectly ordinary request. That is the F17 collision inverted, and it is why the
+    # dedicated field is worth a schema change rather than living with the merge.
+    import congress_api.features.bill_text.tools as tools_mod
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    parsed = parse_fixture("bill_text_trimmed.xml")
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText(
+            package_id="BILLS-119s1071enr", version="enr",
+            version_resolved_at="2026-08-10T00:00:00Z",
+            version_resolution_note=None,          # a clean resolution
+            last_modified=None, xml_bytes=b"",
+        ),
+        parsed=parsed, index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
+
+    search = await tools_mod.search_bill_text(
+        None, congress=119, bill_type="s", number=1071,
+        queries=["icebreaker"], max_hits=999)
+    assert search["version_resolution_note"] is None, (
+        "a clamped argument is not a version issue and must not raise the version flag"
+    )
+    assert "clamped to 50" in search["request_note"]
+
+    section = await tools_mod.get_bill_section(
+        None, congress=119, bill_type="s", number=1071,
+        section_id=search["hits"][0]["section_id"], max_bytes=10)
+    assert section["version_resolution_note"] is None
+    assert "clamped to 1000" in section["request_note"]
 
 
 def test_merge_notes_drops_empties_without_inventing_separators():

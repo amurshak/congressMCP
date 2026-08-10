@@ -55,6 +55,17 @@ class BillTextEnvelope(BaseModel):
     version: str
     version_resolution: Literal["fresh", "cached", "cached_offline"] = "fresh"
     version_resolved_at: str
+    # VERSION ISSUES ONLY. Non-null means the served text is not simply the version the
+    # caller asked for: the latest listed version was unavailable and the server fell
+    # back, or the resolved code is NEGATIVE/ADMINISTRATIVE -- failed passage, laid on
+    # the table, a sponsor annotation -- rather than authoritative bill text.
+    #
+    # The invariant is `version_resolution_note != null <=> a version issue`, and it is
+    # load-bearing: a consumer can key on the field's PRESENCE without parsing it.
+    # Input-clamp advisories used to be merged in here, which broke that in both
+    # directions -- first by clobbering the version note (F17), then, once merged, by
+    # firing a false version warning on every over-large max_hits. Request-level
+    # advisories go in `request_note` instead.
     version_resolution_note: str | None = None
     source_format: Literal["bill_dtd"] = "bill_dtd"
     last_modified: str | None = None
@@ -114,6 +125,12 @@ class QueryDiagnostic(BaseModel):
 
 
 class SearchBillTextResponse(BillTextEnvelope):
+    # Benign advisory about how THIS REQUEST's arguments were adjusted -- a clamped
+    # max_hits or max_bytes. Separated from version_resolution_note so a caller can tell
+    # a safety disclosure from a parameter footnote WITHOUT parsing strings, the same
+    # discriminator pattern as node_kind and the amends {kind, cite} objects. Null when
+    # every argument was used as given.
+    request_note: str | None = None
     chunks_searched: int
     queries_used: list[str]
     # Present only for queries that matched nothing; null when every query hit.
@@ -130,6 +147,13 @@ class SectionChild(BaseModel):
 
 
 class BillSectionResponse(BillTextEnvelope):
+    # Benign advisory about how THIS REQUEST's arguments were adjusted -- a clamped
+    # max_hits or max_bytes. Separated from version_resolution_note so a caller can tell
+    # a safety disclosure from a parameter footnote WITHOUT parsing strings, the same
+    # discriminator pattern as node_kind and the amends {kind, cite} objects. Null when
+    # every argument was used as given.
+    request_note: str | None = None
+
     section_id: str
     node_kind: Literal["structural", "synthetic", "chunk"]
     ancestor_path: list[AncestorNode]
