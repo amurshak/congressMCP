@@ -503,6 +503,13 @@ Eight cloud-review findings on the **implementation** core. The spec owner canno
 this is triage — which touch the spec's contracts (recorded here) versus pure code defects
 (routed to the implementation session). Severity as the reviewer graded it.
 
+**Re-adjudicated 2026-08-10 after the review branch was rebuilt.** Final tally: **one
+spec-relevant (F17, fixed both in code and contract), three real code nits (fixed), and four
+refuted.** Three of the four refutations (`bug_002`, `bug_004`, `bug_008`) are **artifacts of
+the review slicing**, not of the software — see the measurement note at the end of this
+section. The lesson is on the review side, and it is the same one this directory keeps
+relearning: *a reading is only as sound as the tree it was taken against.*
+
 **Bill-text feature, spec-relevant:**
 
 - **F17 — `bug_003` (normal): `version_resolution_note` clobbered by the input-clamp note.**
@@ -519,23 +526,53 @@ this is triage — which touch the spec's contracts (recorded here) versus pure 
 
 - `bug_006` (nit): `sqlite_supports_fts5()` opens/closes a SQLite connection on every tool call to
   check a compile-time property — `@functools.cache` it (`bill_text/index.py`).
+  **FIXED in 950125d.**
 - `bug_005` (nit): `python -m congress_api` discards `main()`'s return, so cache-CLI exit codes
   (§10) are lost under `-m` but propagated by the console script — `raise SystemExit(main())`.
+  Real and confirmed: `-m` exited 0 on a refusal while the console script exited 1. **FIXED in
+  950125d** (both paths return 1 on refusal; `cache info` still 0). This is the only fix here
+  that touches a §10 contract observably — the CLI exit code is now consistent across both
+  entry points.
 
 **Out of the bill-text feature and out of this directory's authority (relay only):**
 
-- `bug_002` (normal) — **REFUTED 2026-08-10 by maintainer manual review.** The finding claimed
-  the default (non-`BILL_TEXT_ONLY`) server path is unstartable because 33 feature files import
-  `mcp.server.fastmcp`. **False:** the full server starts, and every surviving `fastmcp` import is
-  in **test** files, not runtime feature modules — the MCP-2 migration that predates this work
-  already converted the runtime path. Verified on this branch **and** on `master`. The reviewer's
-  file attribution (naming `congress_api/features/*.py`) and its "reproduced on this checkout"
-  repro did not survive manual review plus actually starting the server — the grep-vs-run lesson,
-  on the review side. **No action; the default path is not broken.**
-- `bug_008` (normal): `ctx.error()` is async in mcp 2.x and called without `await` in
-  `make_api_request` — coroutine leak + dropped error notifications. **Bill-text tools are
-  unaffected** (they use their own client), per the reviewer.
-- `bug_004` (nit): `pyproject.toml` still allows `mcp>=1.26` though the code is 2.x-only.
+- `bug_002` (normal) — **REFUTED 2026-08-10.** *(The 2026-08-09 refutation reached the right
+  conclusion for the wrong reason; corrected here.)* The finding claimed the default
+  (non-`BILL_TEXT_ONLY`) server path is unstartable because 33 feature files import
+  `mcp.server.fastmcp`. **False, and the "33" is a slicing artifact.** Measured `fastmcp`-import
+  counts (`git grep -l 'mcp\.server\.fastmcp'`, `*.py`) across the trees:
+
+  | tree | fastmcp imports | `mcp` pin |
+  |---|---|---|
+  | merge-base `c6428f6` (pre-migration) | **35** | `mcp>=1.26.0` |
+  | `0ab182c` (MCP-2 migration) | **0** | `mcp>=2.0.0,<3` |
+  | feature branch `950125d` (real) | **0** | `mcp>=2.0.0,<3` |
+  | `review/bill-text-core` `7b09ae2` (slice) | **33** | `mcp>=2.0.0,<3` |
+
+  The real branch has **zero** `fastmcp` imports — so my earlier "surviving in test files" reason
+  was itself wrong; there are none, anywhere. The reviewer's 33 matches the **review slice**, whose
+  overlay froze ~74 out-of-scope files at the pre-migration base. The reviewer read a stale tree and
+  reported it accurately — about the slice, not the software. **No action; the default path starts.**
+- `bug_004` (nit) — **REFUTED 2026-08-10, same cause.** "`pyproject.toml` still allows
+  `mcp>=1.26`" was true only of the *original* slice's frozen `pyproject`; the real branch has
+  pinned `mcp>=2.0.0,<3` since the migration (`0ab182c`), and the rebuilt slice now carries the
+  correct pin too (table above). No action.
+- `bug_008` (normal) — **REFUTED 2026-08-10 on its own premise** (implementer determination,
+  relayed). The finding assumed `ctx.error()` is a coroutine in mcp 2.x; `Context.error` is **sync**
+  in the installed `mcp` 2.0.0, so calling it without `await` is correct — no coroutine leak.
+  Bill-text tools were unaffected regardless (own client). No action.
 - `bug_007` (nit): `MCP_TRANSPORT` removed from code but still documented in `README.md:92`
-  (repo root, not `documentation/fulltext/`). My `16-user-guide.md` does not carry transport
-  config, so no drift on my side; the README fix is the implementation/README owner's.
+  (repo root, not `documentation/fulltext/`). **FIXED in 950125d** (stale row removed). My
+  `16-user-guide.md` never carried transport config, so there was no drift on my side.
+
+**Measurement note — 3 of 8 findings were review-slicing artifacts.** The review branch is built
+by overlaying only the in-scope paths onto the branch point, so every out-of-scope file (here ~74)
+sits at pre-branch state. A reviewer reading whole files sees that stale content and reports it
+faithfully — a true statement about the *slice*, a false one about the *shipped software*. The
+rebuilt slices (`7b09ae2`, `d10eccd`) each carry a root `REVIEW-SCOPE.md` naming the staleness and
+the in-scope paths, and slice 1 now folds in `pyproject.toml` / `requirements.txt` / `README.md` /
+`.gitignore` to remove the most common trigger. That mitigates but does not eliminate the class: it
+depends on the reviewer reading the marker. **The clean fix is to review a diff, not a worktree** —
+then no out-of-scope file is present to be misread. This is the §16/§17 discipline turned on the
+review process itself: *a finding is only as valid as the tree it was measured against; when reader
+scope ≠ change scope, the reader will manufacture false positives from the gap.*
