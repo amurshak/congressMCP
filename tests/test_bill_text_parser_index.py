@@ -1755,6 +1755,77 @@ def test_undivided_body_unit_resolves_on_input_like_the_other_synthetic_shapes()
     assert "undivided body" in res.get("text", "")
 
 
+@pytest.mark.asyncio
+async def test_clamp_note_does_not_clobber_the_version_resolution_note(monkeypatch):
+    # F17. The sites wrote `note or loaded.resolved.version_resolution_note`, which is
+    # not a merge: the first truthy note wins. The clamp note is always the trivial one
+    # ("Value 999 was clamped to 50"); version_resolution_note is the substantive one --
+    # it says the served text fell back to another version, or resolved to a
+    # failed-passage code that is not authoritative bill text. So an out-of-range
+    # argument silently destroyed a safety disclosure, and only for callers who passed
+    # one, who are least likely to notice.
+    #
+    # The pre-existing wrapper test could not catch this: its fixture resolves with
+    # version_resolution_note=None, so `or` and a real merge are indistinguishable
+    # there. BOTH notes have to be present for the collision to exist at all.
+    import congress_api.features.bill_text.tools as tools_mod
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    version_note = (
+        "Resolved to 'fps', which records a negative or terminated action rather than "
+        "authoritative bill text; no authoritative version was listed."
+    )
+    parsed = parse_fixture("bill_text_trimmed.xml")
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText(
+            package_id="BILLS-119s1071enr", version="fps",
+            version_resolved_at="2026-08-10T00:00:00Z",
+            version_resolution_note=version_note, last_modified=None, xml_bytes=b"",
+        ),
+        parsed=parsed, index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
+
+    # search_bill_text: max_hits out of range -> clamp note fires alongside the version note.
+    search = await tools_mod.search_bill_text(
+        None, congress=119, bill_type="s", number=1071,
+        queries=["icebreaker"], max_hits=999)
+    assert "error" not in search
+    assert "failed-passage" in search["version_resolution_note"] or \
+        "negative or terminated" in search["version_resolution_note"], search["version_resolution_note"]
+    assert "clamped to 50" in search["version_resolution_note"]
+
+    # get_bill_section: max_bytes out of range, same collision.
+    section = await tools_mod.get_bill_section(
+        None, congress=119, bill_type="s", number=1071,
+        section_id=search["hits"][0]["section_id"], max_bytes=10)
+    assert "error" not in section
+    assert "negative or terminated" in section["version_resolution_note"]
+    assert "clamped to 1000" in section["version_resolution_note"]
+
+    # And with no clamp, the version note still stands alone -- the merge must not
+    # introduce stray separators or drop the sole note.
+    clean = await tools_mod.search_bill_text(
+        None, congress=119, bill_type="s", number=1071, queries=["icebreaker"])
+    assert clean["version_resolution_note"] == version_note
+
+
+def test_merge_notes_drops_empties_without_inventing_separators():
+    from congress_api.features.bill_text.tools import _merge_notes
+
+    assert _merge_notes(None, None) is None
+    assert _merge_notes("", "   ") is None
+    assert _merge_notes("only one", None) == "only one"
+    assert _merge_notes(None, "only one") == "only one"
+    assert _merge_notes("first.", "second.") == "first. second."
+
+
 def test_zero_hit_diagnostic_separates_absent_from_merely_phrased_otherwise():
     # F10, the whole point. Both queries return zero hits and are indistinguishable in
     # the response without this. One is answerable by rephrasing; the other is not, and

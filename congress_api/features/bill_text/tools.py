@@ -186,6 +186,24 @@ def _query_diagnostic(index, normalized: str, shown: str) -> QueryDiagnostic:
     )
 
 
+def _merge_notes(*parts: str | None) -> str | None:
+    """Join caller-facing notes, so none can silently replace another (F17).
+
+    The sites below previously wrote `note or loaded.resolved.version_resolution_note`,
+    which is not a merge -- the first truthy note wins and the other is dropped. The
+    clamp note is always the trivial one ("Value 999 was clamped to 50"), and
+    version_resolution_note is the substantive one: it says the served text fell back to
+    a different version, or that it resolved to a failed-passage or administrative code
+    that is not authoritative bill text. So the collision destroyed a safety disclosure
+    in favour of a parameter footnote, and only when a caller passed an out-of-range
+    argument -- which is exactly when they are least likely to notice.
+
+    Document-level notes come first; the clamp is an addendum about the request.
+    """
+    kept = [part.strip() for part in parts if part and part.strip()]
+    return " ".join(kept) or None
+
+
 def _clamp(value: int, low: int, high: int) -> tuple[int, str | None]:
     clamped = min(high, max(low, value))
     if clamped == value:
@@ -266,7 +284,7 @@ async def search_bill_text(
         ]
         response = SearchBillTextResponse(
             **_envelope(loaded),
-            version_resolution_note=note or loaded.resolved.version_resolution_note,
+            version_resolution_note=_merge_notes(loaded.resolved.version_resolution_note, note),
             timing=_timing(loaded, started, search_ms=search_ms),
             chunks_searched=len(loaded.parsed.units),
             queries_used=[display[item] for item in normalized],
@@ -401,7 +419,7 @@ async def get_bill_section(
         )
         return BillSectionResponse(
             **_envelope(loaded),
-            version_resolution_note=note or loaded.resolved.version_resolution_note,
+            version_resolution_note=_merge_notes(loaded.resolved.version_resolution_note, note),
             timing=_timing(loaded, started),
             section_id=unit.section_id,
             node_kind=node_kind_for(unit.section_id),
@@ -534,7 +552,7 @@ def _container_response(
         truncated = True
     return BillSectionResponse(
         **_envelope(loaded),
-        version_resolution_note=note or loaded.resolved.version_resolution_note,
+        version_resolution_note=_merge_notes(loaded.resolved.version_resolution_note, note),
         timing=_timing(loaded, started),
         section_id=container.section_id,
         node_kind=node_kind_for(container.section_id),
