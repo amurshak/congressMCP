@@ -289,6 +289,30 @@ response to learn what happened:
   suppressed when hidden-section advice is present, because `hidden_note` phrases its remedy in
   terms of the depth *served* and alone reads as though the request was honored.
 
+**Generalized contract — one disclosure condition, one field; never `or`-substitute two notes.**
+`get_bill_toc` is the model: the depth clamp gets `toc_note`, and `version_resolution_note` is left
+untouched for version disclosure. Every tool must follow it.
+
+> **F17 (ultrareview `bug_003`, 2026-08-09) — `version_resolution_note` is clobbered by the
+> input-clamp note in the other three tools.** `search_bill_text`, `get_bill_section`, and
+> `_container_response` set `version_resolution_note = note or loaded.resolved.version_resolution_note`.
+> Python's `or` is a fallback, not a merge: when a caller trips the `max_hits`/`max_bytes` clamp on
+> a bill that **also** carries a version warning (an unrecognized GPO code alongside `enr`), the
+> version disclosure is **silently dropped** and the caller sees only *"Value 999 was clamped to
+> 50."* The `_envelope` comment even says each tool "merges in the input-clamp note" — the intent
+> was merge, the code substitutes. **This is the A3/§3 disclosure — the mechanism that warns a
+> model it may be reading a silently-older version, the worst failure class — defeated on an input
+> as ordinary as "asked for more hits than allowed,"** and the callers who trip the clamp are the
+> least-experienced ones who most need it. It is also an instance of the *active disclosures must
+> propagate* principle (F6): the propagation is what breaks.
+>
+> **Fix contract (implementation session; not a spec-source change):** give the input clamp its
+> **own field** (`input_note`/`clamp_note`, mirroring `toc_note`) — which also stops a hit/byte-cap
+> advisory occupying a field *named* for version resolution — **or** concatenate,
+> `" ".join(filter(None, [note, version_resolution_note])) or None`, never `or`. Add a test on the
+> **both-notes-populated** path; today's tests pass only because each fixture populates exactly one
+> note. Severity: normal — a live safety-disclosure loss, not a crash.
+
 ---
 
 ## Amendment A6 — `timing` ships one field, not two (2026-08-06)

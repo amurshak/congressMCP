@@ -494,3 +494,40 @@ distinguishing inline from block). **F12 fixed `5a54833`; F13 closed separately.
 
 **Already landed:** F9 (query semantics) and F7 (codified-law-is-not-bill-location) shipped
 in `07f3889`.
+
+---
+
+## Post-review triage — ultrareview `review/bill-text-core → master`, 2026-08-09
+
+Eight cloud-review findings on the **implementation** core. The spec owner cannot fix source;
+this is triage — which touch the spec's contracts (recorded here) versus pure code defects
+(routed to the implementation session). Severity as the reviewer graded it.
+
+**Bill-text feature, spec-relevant:**
+
+- **F17 — `bug_003` (normal): `version_resolution_note` clobbered by the input-clamp note.**
+  `note or version_resolution_note` in `search_bill_text` / `get_bill_section` / `_container_response`
+  silently drops the §3 version warning whenever a `max_hits`/`max_bytes` clamp also fires.
+  **Recorded and contract-hardened in §4** (one condition, one field; never `or`-substitute — the
+  `toc_note`/F11 pattern). This is the important one: a live safety-disclosure loss.
+
+**Bill-text feature, code-only (route to implementation session; no spec change):**
+
+- `bug_006` (nit): `sqlite_supports_fts5()` opens/closes a SQLite connection on every tool call to
+  check a compile-time property — `@functools.cache` it (`bill_text/index.py`).
+- `bug_005` (nit): `python -m congress_api` discards `main()`'s return, so cache-CLI exit codes
+  (§10) are lost under `-m` but propagated by the console script — `raise SystemExit(main())`.
+
+**Out of the bill-text feature and out of this directory's authority (relay only):**
+
+- `bug_002` (normal): the **default** (non-`BILL_TEXT_ONLY`) server path is unstartable — 33
+  feature files still import `mcp.server.fastmcp` (gone in mcp 2.x). The isolation gate is
+  currently the *only* working path. Broad MCP-2 migration, tracked as D9 in
+  `../tool-defect-register.md` (outside this directory).
+- `bug_008` (normal): `ctx.error()` is async in mcp 2.x and called without `await` in
+  `make_api_request` — coroutine leak + dropped error notifications. **Bill-text tools are
+  unaffected** (they use their own client), per the reviewer.
+- `bug_004` (nit): `pyproject.toml` still allows `mcp>=1.26` though the code is 2.x-only.
+- `bug_007` (nit): `MCP_TRANSPORT` removed from code but still documented in `README.md:92`
+  (repo root, not `documentation/fulltext/`). My `16-user-guide.md` does not carry transport
+  config, so no drift on my side; the README fix is the implementation/README owner's.
