@@ -510,6 +510,10 @@ this is triage — which touch the spec's contracts (recorded here) versus pure 
   silently drops the §3 version warning whenever a `max_hits`/`max_bytes` clamp also fires.
   **Recorded and contract-hardened in §4** (one condition, one field; never `or`-substitute — the
   `toc_note`/F11 pattern). This is the important one: a live safety-disclosure loss.
+  **Schema ruling (2026-08-10, implementer-routed):** the interim merge stops the loss but leaves
+  `version_resolution_note` carrying two kinds of notice, which breaks its presence-as-signal (it
+  now fires on clamps too). **Adopt a dedicated `request_note`** for the input clamp, keeping
+  `version_resolution_note` version-only — free now, and the reasoning is in §4.
 
 **Bill-text feature, code-only (route to implementation session; no spec change):**
 

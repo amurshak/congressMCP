@@ -306,12 +306,27 @@ untouched for version disclosure. Every tool must follow it.
 > least-experienced ones who most need it. It is also an instance of the *active disclosures must
 > propagate* principle (F6): the propagation is what breaks.
 >
-> **Fix contract (implementation session; not a spec-source change):** give the input clamp its
-> **own field** (`input_note`/`clamp_note`, mirroring `toc_note`) — which also stops a hit/byte-cap
-> advisory occupying a field *named* for version resolution — **or** concatenate,
-> `" ".join(filter(None, [note, version_resolution_note])) or None`, never `or`. Add a test on the
-> **both-notes-populated** path; today's tests pass only because each fixture populates exactly one
-> note. Severity: normal — a live safety-disclosure loss, not a crash.
+> **Fix — two steps, both ruled (2026-08-10):**
+>
+> 1. **Stop the loss (done).** Never `or`-substitute; the interim merge
+>    (`" ".join(filter(None, [note, version_resolution_note])) or None`) preserves the data. Ship it.
+> 2. **Then split into a dedicated field — RULED, adopt it.** Move the input-parameter clamp
+>    advisory (`max_hits`/`max_bytes`) to its own **`request_note`** on `SearchBillTextResponse` and
+>    `BillSectionResponse` (and the container response), leaving `version_resolution_note` to carry
+>    **only** version disclosures. This is a design call the implementer routed to the spec owner,
+>    and the merge alone does not settle it — because the merge *breaks the field's presence signal*:
+>    after it, `version_resolution_note != null` fires on clamps too, so a model keying on presence
+>    gets a **false version-warning on every clamp** (F17 in reverse). The split restores the clean
+>    biconditional and separates a **safety** disclosure from a **benign** advisory, so the model
+>    need not parse the string to tell which — the same reason `node_kind` (§5) and the `amends`
+>    kind-discriminator (§6) exist, and the same orthogonality `toc_note`/`depth_reduced` already
+>    have (F11). **Not speculative width** (§6): F17 proved the two notices co-occur, so separating
+>    them is correctness. **Free now, permanent once a consumer depends on the shape** — do it while
+>    nothing has shipped. `request_note` is the implementer's name and generalizes to any input
+>    advisory; the name is the cheap, revisable part, the separation is the ruling.
+>
+> Add a test on the **both-notes-populated** path — today's tests pass only because each fixture
+> populates exactly one note. Severity: normal — a live safety-disclosure loss, not a crash.
 
 ---
 
