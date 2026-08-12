@@ -549,13 +549,13 @@ class _Chunker:
         if unit.byte_length <= MAX_UNIT_BYTES:
             self.units.append(unit)
             return
-        children = self._subdivide(elem, path)
+        subdivided_tag, children = self._subdivide(elem, path)
         if children:
             parent = Unit(
                 section_id=section_id,
                 ancestor_path=path[:-1],
                 header=node.header,
-                segments=extract_intro_segments(elem, node.header),
+                segments=extract_own_segments(elem, node.header, subdivided_tag),
                 child_ids=[child.section_id for child in children],
             )
             self.units.append(parent)
@@ -563,7 +563,7 @@ class _Chunker:
         else:
             self.units.extend(byte_split_unit(unit))
 
-    def _subdivide(self, elem: ET.Element, path: list[AncestorNode]) -> list[Unit]:
+    def _subdivide(self, elem: ET.Element, path: list[AncestorNode]) -> tuple[str | None, list[Unit]]:
         for child_name in FALLBACK_CHAIN:
             # Path 3 of the carve-out: a struck subsection/paragraph inside a live
             # section must not become a child unit either.
@@ -594,8 +594,8 @@ class _Chunker:
                     units.extend(byte_split_unit(child_unit))
                 else:
                     units.append(child_unit)
-            return units
-        return []
+            return child_name, units
+        return None, []
 
 
 def byte_split_unit(unit: Unit) -> list[Unit]:
@@ -691,13 +691,27 @@ def _chunk_unit(unit: Unit, idx: int, pieces: list[tuple[str, str]]) -> Unit:
     )
 
 
-def extract_intro_segments(elem: ET.Element, header: str | None) -> list[Segment]:
+def extract_own_segments(elem: ET.Element, header: str | None, subdivided_tag: str | None) -> list[Segment]:
+    """Segments of a subdivided section's OWN text: everything that did NOT become a
+    child unit -- the intro matter before the first subdivision AND any flush/closing
+    text after the last one. Only children with `subdivided_tag` (the tag _subdivide
+    carved into child units) are skipped; skipping by tag also drops struck instances
+    of it, which _subdivide already excluded.
+
+    The previous behaviour stopped at the first FALLBACK_CHAIN child, so a section's
+    trailing text -- the classic flush/hanging paragraph after the last subsection --
+    was captured by neither the parent nor any child. It then existed in no unit: not
+    in the FTS index, not returned by get_bill_section, with truncated=false and no
+    disclosure. That is the "content silently absent" failure the struck-text note
+    exists to prevent, occurring with no note at all, on exactly the oversized
+    sections that take this subdivide path.
+    """
     segments = []
     if header:
         segments.append(Segment("header", header))
     for child in list(elem):
-        if local_name(child) in FALLBACK_CHAIN:
-            break
+        if local_name(child) == subdivided_tag:
+            continue
         if local_name(child) in {"enum", "header"}:
             continue
         # Delegate to extract_segments rather than flattening to a hard-coded

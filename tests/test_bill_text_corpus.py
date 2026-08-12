@@ -60,7 +60,7 @@ def audit(xml_bytes: bytes, pkg: str, version: str):
     subdivided: list[ET.Element] = []
     captured: dict[str, ET.Element] = {}
     state = {"in_intro": False}
-    orig_from, orig_seg, orig_intro = P.ET.fromstring, P.extract_segments, P.extract_intro_segments
+    orig_from, orig_seg, orig_intro = P.ET.fromstring, P.extract_segments, P.extract_own_segments
 
     def cap_fromstring(data, *a, **k):
         r = orig_from(data, *a, **k)
@@ -74,20 +74,20 @@ def audit(xml_bytes: bytes, pkg: str, version: str):
             return orig_seg(elem, unit_header, False)
         return orig_seg(elem, unit_header, in_quote)   # recursion
 
-    def wrap_intro(elem, header):
+    def wrap_intro(elem, header, subdivided_tag=None):
         emitted.add(id(elem))                       # the section elem is the unit source
         subdivided.append(elem)
         state["in_intro"] = True
         try:
-            return orig_intro(elem, header)
+            return orig_intro(elem, header, subdivided_tag)
         finally:
             state["in_intro"] = False
 
-    P.ET.fromstring, P.extract_segments, P.extract_intro_segments = cap_fromstring, wrap_seg, wrap_intro
+    P.ET.fromstring, P.extract_segments, P.extract_own_segments = cap_fromstring, wrap_seg, wrap_intro
     try:
         parsed = P.parse_bill_xml(xml_bytes, pkg, version, None)
     finally:
-        P.ET.fromstring, P.extract_segments, P.extract_intro_segments = orig_from, orig_seg, orig_intro
+        P.ET.fromstring, P.extract_segments, P.extract_own_segments = orig_from, orig_seg, orig_intro
 
     root = captured["root"]
     parent = {c: par for par in root.iter() for c in par}

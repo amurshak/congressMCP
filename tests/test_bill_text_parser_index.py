@@ -195,6 +195,49 @@ def test_oversized_leaf_byte_fallback_uses_chunk_ids():
     assert all(chunk.byte_length <= 8_000 for chunk in chunks)
 
 
+def test_trailing_text_after_last_subdivision_is_captured():
+    # Regression: an oversized section subdivided into subsections also carries flush
+    # text after the last subsection (the classic hanging paragraph). The old parent
+    # captured only the intro (it stopped at the first subdivision), so the trailing
+    # text existed in no unit -- absent from the index and get_bill_section, with no
+    # disclosure. It must now live in the parent's own segments.
+    big = ("lorem ipsum dolor sit amet " * 400).encode()
+    xml = (
+        b"<bill><legis-body>"
+        b"<section><enum>101</enum><header>Sec 101</header>"
+        b"<text>INTRO MATTER HERE</text>"
+        b"<subsection><enum>a</enum><header>ss a</header><text>" + big + b"</text></subsection>"
+        b"<subsection><enum>b</enum><header>ss b</header><text>" + big + b"</text></subsection>"
+        b"<text>TRAILING CLOSING TEXT THAT MATTERS</text>"
+        b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119hr1ih", "ih", None)
+    parent = _resolve_unit(parsed.units, "S:101")
+    own = " ".join(seg.text for seg in parent.segments)
+    assert "INTRO MATTER HERE" in own
+    assert "TRAILING CLOSING TEXT THAT MATTERS" in own
+    # And it is searchable, not merely stored.
+    index = BillTextIndex(parsed)
+    hits = index.search([normalized_query("trailing closing text that matters")], 5)
+    assert hits and hits[0].unit.section_id == "S:101"
+
+
+def test_trailing_text_capture_does_not_resurrect_struck_matter():
+    # The dual guard: a STRUCK trailing element must stay excluded -- capturing the
+    # section's own text must not become a hole in the struck-text carve-out.
+    big = ("lorem ipsum dolor sit amet " * 400).encode()
+    xml = (
+        b"<bill><legis-body>"
+        b"<section><enum>101</enum><header>Sec 101</header>"
+        b"<subsection><enum>a</enum><header>ss a</header><text>" + big + b"</text></subsection>"
+        b'<text changed="deleted">STRUCK TRAILING MUST NOT APPEAR</text>'
+        b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119hr1ih", "ih", None)
+    alltext = " ".join(seg.text for u in parsed.units for seg in u.segments)
+    assert "STRUCK TRAILING MUST NOT APPEAR" not in alltext
+
+
 def test_preamble_whereas_become_addressable_pre_units():
     # Real GovInfo simple resolutions nest <whereas> inside a top-level
     # <preamble> that is a sibling of <resolution-body>. Those clauses are the
