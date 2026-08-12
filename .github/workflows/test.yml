@@ -19,28 +19,26 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install pytest pytest-asyncio
+          # Install the project itself so `import congress_api` resolves. requirements.txt
+          # does not include the package, and the bare `pytest` console script does not
+          # put the repo root on sys.path (only `python -m pytest` does) -- without this,
+          # the test files that lack a sys.path shim fail at collection. --no-deps keeps
+          # the versions pinned above; -e . just makes the package importable.
+          pip install -e . --no-deps
 
       - name: Run test suite
         env:
           CONGRESS_API_KEY: ci-placeholder-key
         run: |
-          # --ignore: pre-existing, already-broken legacy tests unrelated to the
-          # current architecture (stale hosted-SaaS registration/email tests, and
-          # hub-bucket tests importing the wrong third-party `fastmcp` package and
-          # a module that no longer exists). Not introduced by or in scope for
-          # this workflow; tracked separately.
-          pytest tests/ -q \
-            --ignore=tests/test_committee_intelligence_hub_bucket.py \
-            --ignore=tests/test_records_communications_hub_bucket.py \
-            --ignore=tests/test_legislation_hub_bucket.py \
-            --ignore=tests/test_people_relationships_hub_bucket.py \
-            --ignore=tests/test_voting_political_hub_bucket.py \
-            --ignore=tests/test_research_professional_hub_bucket.py \
-            --ignore=tests/test_email_service.py \
-            --ignore=tests/test_email_templates.py \
-            --ignore=tests/test_upgrade_email.py \
-            --ignore=tests/test_user_creation.py \
-            --ignore=tests/test_registration_endpoint.py
+          # The suite carries a known-failing baseline (legacy hosted-SaaS
+          # registration/email tests, and hub-bucket tests importing a package/module
+          # that no longer exist); see tests/KNOWN_FAILURES.md. check_known_failures.py
+          # runs the WHOLE suite and exits 0 iff the live failing set exactly equals that
+          # baseline -- so a new failure (regression) OR a silently-fixed one both fail
+          # the build. This replaces a hand-maintained --ignore list that omitted
+          # test_bucket_double_conversion.py (4 baseline failures), which made every run
+          # exit non-zero regardless of the code under test.
+          python tests/check_known_failures.py
 
       - name: Audit tool schemas for drift
         env:
