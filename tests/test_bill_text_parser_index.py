@@ -131,6 +131,56 @@ def test_toc_flags_sections_hidden_below_returned_depth():
     assert _hidden_section_count(parsed.units, 3) == 0
 
 
+def test_hidden_section_count_sees_byte_split_sections_below_depth():
+    # Regression: a section that exceeds MAX_UNIT_BYTES with no subdivision is emitted
+    # ONLY as `.../S:101/CHUNK:n` units. Keying "is this a section?" off the emitted
+    # leaf (CHUNK) hid it from the completeness check, so a depth-2 TOC returned
+    # children:[] with toc_truncated=false -- asserting a completeness that wasn't
+    # there. Classify from the id (strip the byte-cut CHUNK), and dedupe so the three
+    # chunks of one section count as one hidden section, not three.
+    big = ("lorem ipsum dolor sit amet " * 400).encode()
+    xml = (
+        b"<bill><legis-body>"
+        b"<title><enum>I</enum><header>First</header>"
+        b"<subtitle><enum>A</enum><header>Sub A</header>"
+        b"<section><enum>101</enum><header>Big Sec</header><text>" + big + b"</text></section>"
+        b"</subtitle></title></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    # Only CHUNK units exist for S:101; there is no plain `.../S:101` unit.
+    ids = [u.section_id for u in parsed.units]
+    assert ids and all(i.endswith(("/CHUNK:1", "/CHUNK:2", "/CHUNK:3")) for i in ids)
+    assert _max_section_depth(parsed.units) == 3  # the section sits at depth 3, not 1
+    _, node_capped, actual, _ = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
+    assert not node_capped
+    assert _hidden_section_count(parsed.units, actual) == 1  # one section, deduped
+    assert _hidden_section_count(parsed.units, 3) == 0  # revealed at its own depth
+    assert _hidden_section_note(parsed.units, actual, 2, parsed.subtree_bytes) is not None
+
+
+def test_hidden_section_count_excludes_subsection_byte_chunks():
+    # The dual of the above: a byte chunk of a SUBSECTION (`.../S:101/SS:a/CHUNK:n`)
+    # is sub-section navigation noise and must NOT be advertised as a hidden section.
+    # Only the real S:101 (emitted as a subdivided parent) counts.
+    big = ("lorem ipsum dolor sit amet " * 400).encode()
+    xml = (
+        b"<bill><legis-body>"
+        b"<title><enum>I</enum><header>First</header>"
+        b"<subtitle><enum>A</enum><header>Sub A</header>"
+        b"<section><enum>101</enum><header>Sec 101</header>"
+        b"<subsection><enum>a</enum><header>ss a</header><text>" + big + b"</text></subsection>"
+        b"<subsection><enum>b</enum><header>ss b</header><text>small</text></subsection>"
+        b"</section></subtitle></title></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    ids = [u.section_id for u in parsed.units]
+    assert "T:I/ST:A/S:101" in ids  # the subdivided parent is a real section
+    assert any(i.startswith("T:I/ST:A/S:101/SS:a/CHUNK:") for i in ids)  # noise present
+    assert _max_section_depth(parsed.units) == 3  # S:101 at depth 3; SS/CHUNK excluded
+    _, _, actual, _ = _toc_nodes(parsed.units, 2, parsed.subtree_bytes)
+    assert _hidden_section_count(parsed.units, actual) == 1  # just S:101, not its chunks
+
+
 def test_oversized_leaf_byte_fallback_uses_chunk_ids():
     # A byte cut enumerates nothing, so it is addressed CHUNK:{n}, never PARA:{n}
     # (which is reserved for a real <paragraph> enum) -- spec §5, decision 1.

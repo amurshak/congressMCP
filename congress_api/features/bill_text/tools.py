@@ -796,22 +796,47 @@ def _count_toc(nodes: list[TocNode]) -> int:
 _SECTION_TYPES = {"S", "PRE", "RC", "U"}
 
 
-def _section_unit_depth(unit: Unit) -> int:
-    return len(unit.ancestor_path) + 1
+def _section_prefix(section_id: str) -> str | None:
+    """The section-level id a unit stands for, or None if it is sub-section noise.
+
+    Classify from the id, not the emitted leaf. A section that exceeds
+    MAX_UNIT_BYTES with no structural subdivision is emitted ONLY as
+    `.../S:101/CHUNK:n` units -- no plain `.../S:101` unit exists -- so the section
+    component is the SECOND-to-last, and keying off the leaf (`CHUNK`) hides the
+    section from the completeness check entirely. Strip a trailing byte-cut
+    `/CHUNK:n`, then keep the id only when what remains is itself section-level. A
+    subdivision unit (`.../SS:a`, `.../PARA:3`) or a byte chunk of one
+    (`.../SS:a/CHUNK:n`) collapses to a non-section leaf and returns None -- it is
+    navigation noise, never a "hidden section" worth advertising a deeper depth for.
+    """
+    components = section_id.split("/")
+    if len(components) > 1 and components[-1].split(":", 1)[0] == "CHUNK":
+        components = components[:-1]
+    if components[-1].split(":", 1)[0] not in _SECTION_TYPES:
+        return None
+    return "/".join(components)
 
 
-def _is_section_level(unit: Unit) -> bool:
-    typ = unit.section_id.split("/")[-1].split(":", 1)[0]
-    return typ in _SECTION_TYPES
+def _section_depths(units: list[Unit]) -> dict[str, int]:
+    """Distinct section-level ids -> depth (component count), deduped by prefix so a
+    byte-split section counts once, not once per CHUNK. Depth comes from the id, which
+    matches ancestor-path depth for a plain section and stays correct for a chunk that
+    inherits the section's (not the chunk's) ancestor_path."""
+    depths: dict[str, int] = {}
+    for unit in units:
+        prefix = _section_prefix(unit.section_id)
+        if prefix is not None:
+            depths[prefix] = len(prefix.split("/"))
+    return depths
 
 
 def _max_section_depth(units: list[Unit]) -> int:
-    depths = [_section_unit_depth(unit) for unit in units if _is_section_level(unit)]
+    depths = _section_depths(units).values()
     return max(depths) if depths else 1
 
 
 def _hidden_section_count(units: list[Unit], shown_depth: int) -> int:
-    return sum(1 for unit in units if _is_section_level(unit) and _section_unit_depth(unit) > shown_depth)
+    return sum(1 for depth in _section_depths(units).values() if depth > shown_depth)
 
 
 def _hidden_section_note(
