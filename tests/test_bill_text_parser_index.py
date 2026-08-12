@@ -238,6 +238,42 @@ def test_trailing_text_capture_does_not_resurrect_struck_matter():
     assert "STRUCK TRAILING MUST NOT APPEAR" not in alltext
 
 
+def test_sections_under_non_structural_container_are_not_duplicated_as_whole_body_unit():
+    # Regression: <chapter>/<subchapter>/<subpart> are real DTD levels but not
+    # STRUCTURE_TYPES keys. The old whole-body U:1 guard sniffed only the body's direct
+    # children for a structural tag; with sections nested under a chapter it saw none,
+    # fired U:1 over the entire body, and duplicated every section verbatim under a
+    # spurious citable root (also inflating sections_indexed).
+    xml = (
+        b"<bill><legis-body>"
+        b"<chapter><enum>1</enum><header>Chap</header>"
+        b"<section><enum>101</enum><header>S1</header><text>alpha content</text></section>"
+        b"<section><enum>102</enum><header>S2</header><text>beta content</text></section>"
+        b"</chapter></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119hr2ih", "ih", None)
+    ids = [u.section_id for u in parsed.units]
+    assert ids == ["S:101", "S:102"]  # no spurious U:1
+    assert parsed.sections_indexed == 2  # not 3
+
+
+def test_whole_body_unit_still_emitted_for_unstructured_body_but_not_when_all_struck():
+    # The positive case survives: a body of loose text with no addressable structure is
+    # captured as U:1 so nothing is lost.
+    loose = parse_bill_xml(
+        b"<bill><legis-body><text>loose body text, no sections</text></legis-body></bill>",
+        "BILLS-119hr3ih", "ih", None,
+    )
+    assert [u.section_id for u in loose.units] == ["U:1"]
+    # But an all-struck body (a reported substitute striking the entire prior text) has
+    # nothing to capture -- U:1 would be empty -- so it must not be emitted at all.
+    struck = parse_bill_xml(
+        b'<bill><legis-body><section changed="deleted"><enum>1</enum><text>gone</text></section></legis-body></bill>',
+        "BILLS-119hr4ih", "ih", None,
+    )
+    assert all(u.section_id != "U:1" for u in struck.units)
+
+
 def test_preamble_whereas_become_addressable_pre_units():
     # Real GovInfo simple resolutions nest <whereas> inside a top-level
     # <preamble> that is a sibling of <resolution-body>. Those clauses are the

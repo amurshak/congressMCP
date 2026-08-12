@@ -506,17 +506,30 @@ class _Chunker:
                     self.walk(child, path)
             return
         if name in {"resolution-body", "legis-body", "engrossed-amendment-body"}:
-            emitted = False
+            before = len(self.units)
             for child in list(elem):
                 if local_name(child) == "whereas":
-                    emitted = True
                     self._emit_synthetic(child, "PRE", path)
                 elif local_name(child) == "resolving-clause":
-                    emitted = True
                     self._emit_synthetic(child, "RC", path)
                 else:
                     self.walk(child, path)
-            if not emitted and not any(local_name(child) in STRUCTURE_TYPES for child in list(elem)):
+            # U:1 is the last resort for a body with no addressable structure at all;
+            # its span is the WHOLE body, so it must fire only when the recursion above
+            # emitted nothing AND there is non-struck content left to capture. Two ways
+            # the old single-clause guard was wrong:
+            #  - It sniffed the body's DIRECT children for a STRUCTURE_TYPES tag, but
+            #    sections can sit under a container that is not itself a STRUCTURE_TYPES
+            #    key (chapter/subchapter/subpart, all real DTD levels per
+            #    _QUOTED_BLOCK_LEVEL). There the recursion emitted S units yet the sniff
+            #    saw no structural child, so U:1 fired anyway and duplicated every
+            #    section verbatim under a spurious root. Ask what the walk produced.
+            #  - When a reported substitute strikes the ENTIRE prior text, every body
+            #    section is struck; the recursion emits nothing, but there is nothing to
+            #    wrap either -- extract_segments drops the struck matter, so a U:1 built
+            #    from it is an empty, contentless synthetic root that also inflates
+            #    sections_indexed (observed on 119s4726rs). Suppress it.
+            if len(self.units) == before and extract_segments(elem, None):
                 self._emit_synthetic(elem, "U", path)
             return
         for child in list(elem):
