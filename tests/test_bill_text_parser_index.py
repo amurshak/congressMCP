@@ -87,6 +87,23 @@ def test_govinfo_xml_link_accepts_api_endpoint_shape():
     assert _xml_url_from_summary({"download": {"xmlLink": "https://api.govinfo.gov/packages/BILLS-x/xml"}}).endswith("/xml")
 
 
+def test_govinfo_summary_never_returns_metadata_links_as_bill_text():
+    # MODS/PREMIS are package metadata, not Bill DTD text. When no xmlLink exists the
+    # extractor must return None (so bill_dtd_unavailable fires), never a metadata .xml
+    # -- which parse_bill_xml would silently turn into an empty "successful" bill.
+    assert _xml_url_from_summary({"download": {
+        "modsLink": "https://api.govinfo.gov/packages/BILLS-x/mods.xml",
+        "premisLink": "https://api.govinfo.gov/packages/BILLS-x/premis.xml",
+        "pdfLink": "https://api.govinfo.gov/packages/BILLS-x/pdf",
+    }}) is None
+    # xmlLink still wins even when metadata links are also present.
+    assert _xml_url_from_summary({"download": {
+        "xmlLink": "https://api.govinfo.gov/packages/BILLS-x/xml",
+        "modsLink": "https://api.govinfo.gov/packages/BILLS-x/mods.xml",
+    }}).endswith("/xml")
+    assert _xml_url_from_summary({"download": {}}) is None
+
+
 def test_rrf_dedupes_duplicate_queries():
     parsed = parse_fixture("bill_text_trimmed.xml")
     index = BillTextIndex(parsed)

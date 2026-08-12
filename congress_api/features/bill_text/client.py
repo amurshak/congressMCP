@@ -479,17 +479,18 @@ def _retry_after(value: str | None) -> float | None:
 
 
 def _xml_url_from_summary(data: dict[str, Any]) -> str | None:
+    # Only the Bill DTD link (xmlLink / xml) is bill text. The former fallbacks --
+    # modsLink, then ANY download value ending in .xml -- would return metadata: MODS
+    # and PREMIS are package metadata XML, present on essentially every package, so the
+    # catch-all made the bill_dtd_unavailable error below unreachable. A package with
+    # no Bill DTD then downloaded its MODS, parse_bill_xml found no <section>, and the
+    # caller got a SUCCESS envelope (source_format "bill_dtd", sections_indexed 0, empty
+    # TOC, zero hits) instead of the honest error. Return None when there is no Bill DTD
+    # link so bill_dtd_unavailable fires.
     download = data.get("download") or {}
     for key in ("xmlLink", "xml"):
         value = download.get(key)
         if isinstance(value, str):
-            return value
-    for key in ("modsLink",):
-        value = download.get(key)
-        if isinstance(value, str) and value.lower().endswith(".xml"):
-            return value
-    for value in download.values():
-        if isinstance(value, str) and value.lower().endswith(".xml"):
             return value
     return None
 
