@@ -188,6 +188,22 @@ class BillTextIndex:
         ]
         return QueryDiagnosis(terms=terms, absent=absent)
 
+    def query_matches(self, query: str) -> bool:
+        """Whether `query` matches any segment at all, independent of ranking or the
+        max_hits cap. The zero-hit diagnostic (F10) must key off THIS, not off the
+        truncated result list: a query whose only matches were outranked out of the
+        top max_hits is not a zero-hit query, and diagnosing it would assert the
+        caller-facing falsehood 'every term is present but not phrased this way'
+        (verdict `phrasing`) about a query that in fact matched a section. Uses the
+        same phrase-literal MATCH the ranked search runs, so 'matched' means here what
+        it means there."""
+        if not has_token(query):
+            return False
+        row = self.conn.execute(
+            "SELECT 1 FROM seg_fts WHERE seg_fts MATCH ? LIMIT 1", (fts_literal(query),)
+        ).fetchone()
+        return row is not None
+
     def search(self, queries: Iterable[str], max_hits: int) -> list[RankedHit]:
         query_list = list(queries)
         limit = min(200, max(50, max_hits * 5))

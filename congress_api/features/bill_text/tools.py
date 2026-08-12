@@ -276,11 +276,14 @@ async def search_bill_text(
         # F10: diagnose every query that matched nothing -- which covers the all-zero
         # response and the individually-dead query in an otherwise successful call,
         # since both leave the caller unable to tell "absent" from "worded otherwise".
-        productive = {item for hit in ranked for item in hit.matched_queries}
+        # Key off whether the query matched ANY segment, not off `ranked`: ranked is
+        # already truncated to max_hits, so a query whose only hits were outranked out
+        # of the window would be diagnosed as zero-hit and told (falsely) its terms are
+        # present but mis-phrased -- a query that in fact matched a section.
         diagnostics = [
             _query_diagnostic(loaded.index, item, display[item])
             for item in normalized
-            if item not in productive
+            if not loaded.index.query_matches(item)
         ]
         response = SearchBillTextResponse(
             **_envelope(loaded),

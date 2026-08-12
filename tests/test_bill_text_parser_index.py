@@ -2090,6 +2090,71 @@ async def test_search_response_diagnoses_only_the_queries_that_died(monkeypatch)
     assert clean["hits"] and clean["query_diagnostics"] is None
 
 
+def test_query_matches_ignores_ranking_and_the_max_hits_cap():
+    # A query whose only matches are outranked out of the top max_hits window still
+    # "matched" -- query_matches must say so, independent of the ranked result list.
+    secs = b"".join(
+        b"<section><enum>%d</enum><header>Approps</header><text>appropriations fiscal year</text></section>" % i
+        for i in range(1, 9)
+    )
+    secs += b"<section><enum>9</enum><header>Ships</header><text>the polar icebreaker program</text></section>"
+    parsed = parse_bill_xml(b"<bill><legis-body>" + secs + b"</legis-body></bill>", "BILLS-119hr1ih", "ih", None)
+    index = BillTextIndex(parsed)
+    assert index.query_matches(normalized_query("icebreaker")) is True   # matched S:9
+    assert index.query_matches(normalized_query("submarine")) is False   # truly absent
+    assert index.query_matches("   ") is False                           # no token
+    # It is truncated out of a max_hits=1 ranked window, proving the two disagree.
+    ranked = index.search([normalized_query("appropriations"), normalized_query("icebreaker")], 1)
+    assert "S:9" not in [h.unit.section_id for h in ranked]
+
+
+@pytest.mark.asyncio
+async def test_matched_query_outranked_by_max_hits_is_not_diagnosed(monkeypatch):
+    # Regression: query_diagnostics was derived from the truncated result list, so a
+    # query whose only hits fell outside the max_hits window was reported as zero-hit
+    # and told (falsely) 'terms present but not phrased this way' -- a query that DID
+    # match a section. Diagnose off query_matches, not off `ranked`.
+    import congress_api.features.bill_text.tools as tools_mod
+    from congress_api.features.bill_text.client import ResolvedBillText
+    from congress_api.features.bill_text.service import LoadedBillText
+
+    secs = b"".join(
+        b"<section><enum>%d</enum><header>Approps</header><text>appropriations fiscal year</text></section>" % i
+        for i in range(1, 9)
+    )
+    secs += b"<section><enum>9</enum><header>Ships</header><text>the polar icebreaker program</text></section>"
+    parsed = parse_bill_xml(b"<bill><legis-body>" + secs + b"</legis-body></bill>", "BILLS-119hr1ih", "ih", None)
+    loaded = LoadedBillText(
+        resolved=ResolvedBillText(
+            package_id="BILLS-119hr1ih", version="ih",
+            version_resolved_at="2026-08-08T00:00:00Z", version_resolution_note=None,
+            last_modified=None, xml_bytes=b"",
+        ),
+        parsed=parsed, index=BillTextIndex(parsed),
+        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+    )
+
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+
+    monkeypatch.setattr(tools_mod, "load_bill_text", fake_load)
+
+    # max_hits=1: icebreaker's only hit (S:9) is outranked out of the window, but it
+    # matched -- so no diagnostic may be emitted for it.
+    resp = await tools_mod.search_bill_text(
+        None, congress=119, bill_type="hr", number=1,
+        queries=["appropriations", "icebreaker"], max_hits=1)
+    assert len(resp["hits"]) == 1
+    assert resp["query_diagnostics"] is None
+
+    # A genuinely absent query is still diagnosed in the same call.
+    resp2 = await tools_mod.search_bill_text(
+        None, congress=119, bill_type="hr", number=1,
+        queries=["icebreaker", "submarine"], max_hits=1)
+    assert [d["query"] for d in resp2["query_diagnostics"]] == ["submarine"]
+    assert resp2["query_diagnostics"][0]["verdict"] == "absent_term"
+
+
 def test_toc_depth_reduced_is_false_when_the_depth_was_honored():
     # F11, the case toc_truncated cannot express. The tree is complete to the depth
     # asked for; sections merely nest deeper. toc_truncated is TRUE here and always
