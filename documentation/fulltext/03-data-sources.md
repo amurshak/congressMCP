@@ -178,6 +178,53 @@ enr           → 90      enrolled
 
    `pp` is absent while its sibling `pap` sits at 30; they are peers.
 
+   > **Digit-suffixed reissues (`pcs2`, `rh2`, `eas2`) — ruling, F20 follow-on, 2026-08-14.**
+   > When F20 fixed the enumeration regex so digit-suffixed codes survive, it exposed a ranking
+   > question the table had never answered: `pcs2` is not a table entry, so `order_versions` scored
+   > it as an **unknown code** and the superseded `pcs` print won "latest" (now with a note rather
+   > than silently). The path asymmetry is closed; this is the residual. It is a §3 ruling, so it is
+   > recorded here rather than left to the resolver.
+   >
+   > **1. A code of the form `<known-base><digits>` is a *reissue of that base*, not an unknown
+   > code.** It **inherits the base's precedence rank and category** and is tagged `REISSUE` — the
+   > same principle as `renr`/`reah`/`res` (a reissue must outrank the version it reissues), reached
+   > by **decomposition** rather than by minting a table row for every `pcsN`/`rhN`/`easN`. This
+   > alone kills the F20 residual: `pcs2` now ranks *at* `pcs`, never below it as an unknown.
+   >
+   > **2. Order within a base by the suffix, above date.** The numeric suffix denotes a later
+   > reprint, so the reissue outranks the base print. Implement as a sort key **`reissue_number DESC`
+   > placed above `date DESC`** in the existing `(precedence DESC, …, date DESC, code ASC)` order —
+   > so the reissue wins even when the date is equal, missing, or null. This is the **same
+   > no-date-dependence rationale that earned `renr` an explicit rank above `enr`**; relying on date
+   > alone would reintroduce the A3 null-date fragility for reissues.
+   >
+   > **3. The suffix semantics are OWED, not asserted.** GovInfo's published "Common Versions"
+   > table does **not** document the numeric suffix at all (checked 2026-08-14,
+   > `https://www.govinfo.gov/help/bills`). So point 2 rests on the GPO reprint convention plus a
+   > single confirming observation (the F20 test's `pcs2` dated 2025-06-02, after `pcs` 2025-05-01),
+   > **not** on the authoritative source. *Preregistration:* expected — every `<base>N` in the
+   > corpus/GovInfo is dated no earlier than its base and represents a later print of the same stage;
+   > **falsifier** — any `<base>N` dated *earlier* than its base, or a suffix that marks a different
+   > stage, which inverts the tiebreak and reopens this. One cheap scan settles it. **Until it runs,
+   > the dated case is already correct via `date DESC`**, so the unresolved risk is confined to a
+   > *null-dated* reissue — rank the reissue by suffix there only after the scan confirms direction.
+   >
+   > **4. Do not use a single flat `REISSUE` rank.** `rh2` is a reprint of a *committee-report*
+   > stage and `pcs2` of a *calendar* stage; a flat reissue rank would make them comparable to — or
+   > let them outrank — `enr`. **Cross-stage order must come from the base's precedence; the suffix
+   > orders only within a stage.**
+   >
+   > **5. No `version_resolution_note` for a recognized-base reissue.** Once `pcs2` resolves as a
+   > reissue of the known `pcs`, it is understood, not unknown — the note must **not** fire (that was
+   > the false partial-unknown warning the F20 fix surfaced; same F17 "don't cry wolf" discipline).
+   > Reserve the unknown-code note for a genuinely unknown **base** (`<unknown><digits>` or a bare
+   > unrecognized code).
+   >
+   > **6. Completeness test extension.** For each of the 53 base codes, assert `<base>2` **decomposes
+   > to that base** (inherits its rank+category, is not scored unknown) and **outranks `<base>`**; a
+   > future genuinely-new *base* still falls to the unknown path and fails F1's completeness pin
+   > loudly. Route back to the implementer: this ruling is the acceptance test for the residual.
+
    **Keep the unknown-code warning after the audit.** GovInfo adds codes; the note is the
    safety net for what an audit cannot anticipate, not a substitute for doing one.
 5. Construct the packageId and fetch from GovInfo.

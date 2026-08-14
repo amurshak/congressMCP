@@ -632,6 +632,18 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   superseded print can win, or `bill_not_found` for a bill that exists"* — both **P0-class**
   (wrong-document-as-final, the F1 harm; and false non-existence). **F20 is the most severe of
   F18–F22** and the one I'd fix first.
+  **PATH ASYMMETRY FIXED 2026-08-14** (reported, artifact-verified; commit pending). One shared
+  `VERSION_CODE_PATTERN = r"[a-z][a-z0-9]*"` on both enumeration paths — and **letter-initial by
+  design**, which also closes a contamination trap the acceptance criterion missed: a bare
+  `[a-z0-9]+` would read `5eh` off bill 12345's packageId as a version of bill 1234. Before/after
+  *sets* differ through a mocked HTTP response (not a mocked regex): `{ih, pcs}` → `{pcs2, pcs, ih}`;
+  a `pcs2`-only bill went `bill_not_found` → resolves. Both P0 outcomes closed **for the enumeration
+  path.** **Residual RULED (mine, §3):** with `pcs2`/`rh2`/`eas2` absent from the table they scored
+  as *unknown* and the superseded `pcs` still won "latest." Ruling in `03-data-sources.md`
+  (2026-08-14): a `<known-base><digits>` code is a **reissue of that base** — inherit the base's
+  rank+category (not unknown), order within-base by suffix above date, no unknown-code note for a
+  recognized base. Dated case is already correct; the suffix-as-later semantics are **owed one scan**
+  (GovInfo does not document the suffix). Routed back to the implementer as the acceptance test.
 
 - **F21 — `client.py:349` unguarded `response.json()` bypasses the GovInfo fallback and mislabels
   `[REVIEW, unverified]`.** A `JSONDecodeError` in `congress_text_versions` escapes before
