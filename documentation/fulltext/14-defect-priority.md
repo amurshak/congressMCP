@@ -576,3 +576,101 @@ depends on the reviewer reading the marker. **The clean fix is to review a diff,
 then no out-of-scope file is present to be misread. This is the §16/§17 discipline turned on the
 review process itself: *a finding is only as valid as the tree it was measured against; when reader
 scope ≠ change scope, the reader will manufacture false positives from the gap.*
+
+---
+
+## Post-review triage — code review (high), 2026-08-14
+
+Ten findings across the repo. Spec-owner triage only: **which touch a `documentation/fulltext/`
+contract** (recorded below as F18–F22, cross-referenced to the invariant each threatens) versus
+**pure code / other-feature defects** (routed to the implementation session). These are the
+reviewer's claims about source I do not read; I have **not** verified them at the code level.
+Each is marked `[REVIEW, unverified]`, and each bill-text entry names the spec property that
+tells the implementer what "fixed" has to satisfy — the spec is the acceptance test, not the
+fix. **None is a wrong-document / false-assertion P0** on its face, so by §17's stated rule
+none blocks merge; F19 and F21/F22 are the ones whose *failure class* (silent oversize unit;
+error masquerading as empty/success) the spec cares about most.
+
+**Shared root worth stating first.** Findings 1, 7, 8-in-list (committee, bills, treaties) are
+the *same* defect wearing three faces: a **new `validate_operation_kwargs` guard** now hard-fails
+any parameter a tool advertises in its schema/docstring but no routed operation accepts. The guard
+is working — it converts latent schema/impl drift into a loud error — but three tools ship stale
+schemas. That is a guard-adoption cleanup, not three unrelated bugs. Two are outside this feature;
+one (bills `version`) may be an *unwired bill-text seam* — flagged below for a requirements call.
+
+### Bill-text feature — spec-relevant (routed to implementation; spec is the acceptance test)
+
+- **F18 — `parser.py:975` `strip_quote_delimiters` strips leading and trailing quote chars
+  independently, not as a wrapping pair `[REVIEW, unverified]`.** Deletes a legitimate trailing
+  apostrophe from quoted-block text. **Violates §6's V16 contract:** the defensive strip exists
+  only to remove the 0.1%-class *source-embedded wrapping delimiters* so the rendering function
+  stays total, and §6's post-condition is that **`segments.text` stays canonical and clean** and
+  no `display_text` carries doubled delimiters. A strip that removes a trailing `'` that is *content*
+  (e.g. a plural possessive, or the inner mark of a nested quote) makes `segments.text` lossy — the
+  one stored source of truth, corrupted. Acceptance: strip only a *matched* opening+closing pair;
+  an unpaired trailing mark is text and must survive. This is the V16 half of the same delimiter
+  work already tracked at §6 line 92.
+
+- **F19 — `parser.py:574` a subdivided parent unit's own segments are never byte-bounded
+  `[REVIEW, unverified]`.** A unit can exceed `MAX_UNIT_BYTES` with no `CHUNK` split. **Violates the
+  §5 chunking invariant** (units over `MAX_UNIT_BYTES` are `CHUNK`-split; the "parent-fits-`max_bytes`"
+  rule the §17 B1/C1 runs relied on). If a subdivided parent's intro/trailing text is exempt from the
+  byte bound, an oversize unit ships whole — the failure the CHUNK mechanism exists to prevent,
+  reappearing on the one path (subdivided parents) the bound skips. Acceptance: **every** unit,
+  subdivided or not, is subject to `MAX_UNIT_BYTES`; a parent's own segments split like any other.
+  This is the sibling of the two chunk-boundary fixes already on the branch (`ab6ca62`, `f9fa7ec`).
+
+- **F20 — `client.py:310` GovInfo fallback version regex `([a-z]+)$` drops digit-suffixed codes
+  `[REVIEW, unverified]`.** `pcs2`, `eas2`, `rh2` — accepted by the primary path's `[a-z0-9]+` —
+  are silently dropped by the fallback's letter-only anchor. **Touches §3 version resolution:** the
+  two enumeration paths must recognize the *same* code alphabet, or the fallback resolves a bill to a
+  different (older) version than the primary would, with nothing disclosed — an F1-family asymmetry,
+  now between paths rather than within the table. Acceptance: fallback and primary accept identical
+  code shapes; digit-suffixed reissues are not lost. (Whether `pcs2`/`rh2` are among §3's 53 canonical
+  codes is a separate table question; the *path asymmetry* is the defect regardless.)
+
+- **F21 — `client.py:349` unguarded `response.json()` bypasses the GovInfo fallback and mislabels
+  `[REVIEW, unverified]`.** A `JSONDecodeError` in `congress_text_versions` escapes before
+  `_resolve_versions` can fall through to GovInfo, surfacing as `internal_error` (or, worse,
+  `invalid_request`). **Touches §3's fallback contract and the error taxonomy:** the fallback is the
+  recovery path, and letting a decode error jump over it turns a recoverable upstream hiccup into a
+  hard failure wearing the wrong label — the "a scan that errors must not look like one that found
+  nothing" principle, here as "must not skip the recovery it was built to trigger." Acceptance: a
+  malformed `text-versions` body routes into the GovInfo fallback, and any residual failure is
+  labeled for its true cause.
+
+- **F22 — `client.py:466` `_follow_with_key` returns an already-closed 3xx after exhausting
+  `max_redirects`; callers treat any status `<400` as success `[REVIEW, unverified]`.** A redirect
+  loop that never terminates is read as a successful fetch — an **error masquerading as success**,
+  the most dangerous shape in this feature because downstream parse/index runs on a redirect body and
+  reports a clean (empty/wrong) result. **Touches the fetch-robustness safety property** the spec
+  leans on wherever it says a failed fetch must be legible, not silently empty. Acceptance:
+  redirect exhaustion is an explicit error, never a `<400` success; callers cannot mistake it for a
+  document.
+
+### Bill-text feature — already recorded, not a new defect
+
+- **`service.py:24` — every tool call re-fetches, re-parses, re-indexes the whole bill, no in-process
+  cache.** This is the **known PR 2 caching deferral**, not a new finding: already logged under
+  "Not defects" above (~4.4 s/call, full re-index; §10 marked `[PR2]`; V11 cache inert). The review
+  independently rediscovered it. **No new action — it is PR 2 by design**; the §16 completion report
+  and §17 A4 over-work note already hinge on PR 2 setting the real per-call cost. This is the clearest
+  "out of scope of PR 1" item in the set.
+
+### Out of the bill-text feature and out of this directory's authority (relay only)
+
+- **`committee_meetings.py:302`** — `get_committee_meeting_details` dropped its documented
+  `committee_code` param while the `committee_intelligence` docstring still advertises it, so the
+  legacy call shape now hard-fails the new guard. Guard-adoption drift; route.
+- **`bills_tool.py:199`** — bills schema advertises `version` ("Text version for content operations")
+  but no routed bills operation accepts it → `ToolError` under the guard. **Flag for a requirements
+  call, not just a delete:** the param's description reads like an *intended bill-text seam* (route a
+  `bills` content request to the bill-text feature by version). If that wiring was planned, this is an
+  unfinished integration; if not, the param is vestigial and should leave the schema. **Which one is
+  a decision for the maintainer, not a code nit** — I'm surfacing it, not ruling it.
+- **`treaties_and_summaries_tool.py:66`** — `offset` advertised but no routed operation accepts it →
+  pagination tool-wide always `ToolError`. Guard-adoption drift; route.
+- **`buckets/voting_and_nominations.py:24`** — first-balanced-brace `_extract_json` can silently
+  replace a markdown response that embeds valid JSON with a near-empty success envelope. Not
+  bill-text, but note the **same failure class as F22** — a success envelope hiding a dropped
+  payload; worth the implementer treating the two together. Route.
