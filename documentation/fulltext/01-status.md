@@ -25,7 +25,7 @@ are **PR 2** by decision.
 
 | # | Gate | State |
 |---|---|---|
-| 1 | **F20** — fallback version regex drops digit-suffixed codes (`client.py:310`) | **path asymmetry FIXED 2026-08-14** (shared letter-initial pattern; artifact-verified, commit pending). Residual — how digit-suffixed reissues *rank* — **ruled in §3** (reissue-of-base) and routed back as the acceptance test; needs one scan to confirm suffix-means-later. |
+| 1 | **F20** — fallback version regex drops digit-suffixed codes (`client.py:310`) | **path asymmetry FIXED 2026-08-14** (shared letter-initial pattern; the anchor also blocks the real `5eh`-from-bill-12345 cross-bill collision). Residual (reissue ranking) **ruled in §3 but gated on existence** — **no real digit-suffixed BILLS package has been observed** (GovInfo documents none; the `pcs2` in play was a mocked test). Owed first: the GovInfo `billVersion` facet check; if no numbered code, the ranking is dead-defensive and "superseded print can win" was never a real P0. |
 | 2 | **F19 / F21 / F22** — oversize-unit no-split; JSON-guard fallback bypass; redirect-as-success | open — dangerous failure classes (silent oversize; error-as-empty/success) |
 | 3 | **F23 / F24** — §17 harness scores an un-exercised run clean; guard routers ship untested | open — measurement-integrity guards; land **before** trusting any further §17 re-run |
 | 4 | **§17 re-run** of affected cells (implementer-scripted CLI, §17) once F23/F24 are in | pending F23/F24 |

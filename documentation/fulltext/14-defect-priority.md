@@ -637,13 +637,22 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   design**, which also closes a contamination trap the acceptance criterion missed: a bare
   `[a-z0-9]+` would read `5eh` off bill 12345's packageId as a version of bill 1234. Before/after
   *sets* differ through a mocked HTTP response (not a mocked regex): `{ih, pcs}` → `{pcs2, pcs, ih}`;
-  a `pcs2`-only bill went `bill_not_found` → resolves. Both P0 outcomes closed **for the enumeration
-  path.** **Residual RULED (mine, §3):** with `pcs2`/`rh2`/`eas2` absent from the table they scored
-  as *unknown* and the superseded `pcs` still won "latest." Ruling in `03-data-sources.md`
-  (2026-08-14): a `<known-base><digits>` code is a **reissue of that base** — inherit the base's
-  rank+category (not unknown), order within-base by suffix above date, no unknown-code note for a
-  recognized base. Dated case is already correct; the suffix-as-later semantics are **owed one scan**
-  (GovInfo does not document the suffix). Routed back to the implementer as the acceptance test.
+  a `pcs2`-only bill went `bill_not_found` → resolves. Both outcomes closed **for the enumeration
+  path** — but note both were shown **on synthetic/mocked data**; see the existence caveat below.
+  The **letter-initial anchor is the real-world win regardless**: it blocks the `5eh`-from-bill-12345
+  cross-bill collision, which does not depend on digit-suffixed *version* codes existing.
+  **Residual RULED (mine, §3) — but CONTINGENT on existence, corrected 2026-08-14.** With
+  `pcs2`/`rh2`/`eas2` absent from the table they scored as *unknown* and the superseded `pcs` would
+  win "latest." Ruling in `03-data-sources.md`: a `<known-base><digits>` code is a **reissue of its
+  base** (inherit rank+category, not unknown; order within-base by suffix above date; no unknown-code
+  note for a recognized base). **But no real digit-suffixed BILLS package has been observed** —
+  GovInfo's documented ~53-code set carries none, two web searches found none, and the `pcs2` in play
+  is the reviewer's hypothetical + a mocked test with a fabricated date. *(I initially cited that mock
+  date in §3 as a real observation — an error, corrected: a fixture is not evidence.)* **Owed first is
+  existence, not direction:** the GovInfo `billVersion` search facet enumerates codes actually
+  present; if none is numbered, the ranking ruling is dead-defensive and "superseded print can win"
+  was never a real-world P0. Routed to the implementer: run the facet check before building the
+  ranking machinery.
 
 - **F21 — `client.py:349` unguarded `response.json()` bypasses the GovInfo fallback and mislabels
   `[REVIEW, unverified]`.** A `JSONDecodeError` in `congress_text_versions` escapes before

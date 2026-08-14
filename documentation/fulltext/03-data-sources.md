@@ -178,12 +178,14 @@ enr           → 90      enrolled
 
    `pp` is absent while its sibling `pap` sits at 30; they are peers.
 
-   > **Digit-suffixed reissues (`pcs2`, `rh2`, `eas2`) — ruling, F20 follow-on, 2026-08-14.**
-   > When F20 fixed the enumeration regex so digit-suffixed codes survive, it exposed a ranking
-   > question the table had never answered: `pcs2` is not a table entry, so `order_versions` scored
-   > it as an **unknown code** and the superseded `pcs` print won "latest" (now with a note rather
-   > than silently). The path asymmetry is closed; this is the residual. It is a §3 ruling, so it is
-   > recorded here rather than left to the resolver.
+   > **Digit-suffixed reissues (`pcs2`, `rh2`, `eas2`) — CONTINGENT ruling, F20 follow-on,
+   > 2026-08-14. Existence unconfirmed; read the grounding note (point 3) first.**
+   > When F20 fixed the enumeration regex so digit-suffixed codes *survive*, it raised a ranking
+   > question: if such a code appeared, it is not a table entry, so `order_versions` would score it
+   > as an **unknown code** and the superseded base print (`pcs`) would win "latest." This block
+   > rules how they *would* rank — but **no real digit-suffixed BILLS package has been observed**
+   > (point 3), so this governs a case that may never occur. It is a §3 ruling recorded here rather
+   > than left to the resolver; it is **gated on existence**, not a live P0.
    >
    > **1. A code of the form `<known-base><digits>` is a *reissue of that base*, not an unknown
    > code.** It **inherits the base's precedence rank and category** and is tagged `REISSUE` — the
@@ -198,16 +200,31 @@ enr           → 90      enrolled
    > no-date-dependence rationale that earned `renr` an explicit rank above `enr`**; relying on date
    > alone would reintroduce the A3 null-date fragility for reissues.
    >
-   > **3. The suffix semantics are OWED, not asserted.** GovInfo's published "Common Versions"
-   > table does **not** document the numeric suffix at all (checked 2026-08-14,
-   > `https://www.govinfo.gov/help/bills`). So point 2 rests on the GPO reprint convention plus a
-   > single confirming observation (the F20 test's `pcs2` dated 2025-06-02, after `pcs` 2025-05-01),
-   > **not** on the authoritative source. *Preregistration:* expected — every `<base>N` in the
-   > corpus/GovInfo is dated no earlier than its base and represents a later print of the same stage;
-   > **falsifier** — any `<base>N` dated *earlier* than its base, or a suffix that marks a different
-   > stage, which inverts the tiebreak and reopens this. One cheap scan settles it. **Until it runs,
-   > the dated case is already correct via `date DESC`**, so the unresolved risk is confined to a
-   > *null-dated* reissue — rank the reissue by suffix there only after the scan confirms direction.
+   > **3. Grounding — the owed measurement is EXISTENCE, before direction. No real example is in
+   > hand.** The `pcs2`/`rh2`/`eas2` names trace to two sources, **neither a corpus sighting**: the
+   > code reviewer listing them as strings the *primary* regex `[a-z0-9]+` would admit, and the
+   > implementer's F20 test using a **mocked** `BILLS-119hr1234pcs2` with a **fabricated** date
+   > (`2025-06-02`). An earlier draft of this ruling cited that mock date as "a confirming
+   > observation" — **that was an error, corrected here: a test fixture is not evidence.** Positive
+   > checks run 2026-08-14: GovInfo's documented version-code set (`/help/bills`, ~53 codes incl.
+   > the prefix reissues `renr`/`reah`/`res`) contains **no digit-suffixed code**; two web searches
+   > surfaced **no real `<base>N` package**. Absence of evidence is not proof of absence — GovInfo
+   > says its list is non-exhaustive — but there is currently **zero** evidence these occur.
+   >
+   > **The decisive existence check** (hand to the maintainer): the GovInfo search **`billVersion`
+   > facet** enumerates the version codes actually present in the BILLS collection — if no
+   > digit-suffixed value appears there, points 1–2 are **dead-defensive** and this ruling is moot
+   > until GPO mints one. *Only if a real `<base>N` is found* does the direction question open:
+   > *expected* — it is dated no earlier than its base and is a later print of the same stage;
+   > *falsifier* — any `<base>N` dated earlier, or a suffix marking a different stage, which inverts
+   > the tiebreak. Even then the dated case is already correct via `date DESC`; the suffix key
+   > matters only for a *null-dated* reissue.
+   >
+   > **Net for the implementer:** the F20 *fix* is still right — admitting the codes and the
+   > letter-initial anchor (which also blocks the real `5eh`-from-bill-12345 cross-bill collision)
+   > are correct regardless. But do not treat "superseded print can win" as a demonstrated P0: it
+   > was shown only on synthetic data. Run the facet check before building the ranking machinery in
+   > points 1–2; if the facet has no numbered code, log that and stop.
    >
    > **4. Do not use a single flat `REISSUE` rank.** `rh2` is a reprint of a *committee-report*
    > stage and `pcs2` of a *calendar* stage; a flat reissue rank would make them comparable to — or
