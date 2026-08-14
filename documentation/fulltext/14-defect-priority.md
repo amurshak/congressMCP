@@ -688,22 +688,32 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
 
 Findings 1–10 above are the first slice; 11–34 follow. Same discipline — spec-relevant get an
 F-number and the invariant they threaten; the rest are routed. **The two most important new items
-are measurement-integrity defects (F23, F24): they threaten the validity of the evidence this
-whole directory rests on, which outranks any single content bug.**
+are measurement-integrity defects (F23, F24), and they outrank any single content bug — not because
+they invalidate past evidence (they do not; every §17 run was executed in a proper venv,
+maintainer-confirmed 2026-08-14) but because they let a *future* empty or untested run pass for a
+clean one: F23 lets a run that called no tools score as clean, F24 lets the guard changes ship with
+their tests un-collected. Both are prospective guards on the instrument, not re-adjudications.**
 
 **Bill-text / evidence-base — spec-relevant (F23–F27):**
 
-- **F23 — `tests/e2e/run_suite.py:111` the §17 harness runs an *uninstrumented* interpreter
+- **F23 — `tests/e2e/run_suite.py:111` the §17 harness scores an *un-exercised* run as clean
   `[REVIEW, unverified]`.** It hardcodes `.venv/bin/python` while preflight probes `sys.executable`;
   with no repo `.venv`, all 70 prompts complete with **zero trace records and read as a clean run.**
-  **This is the §17 harness turning "measured nothing" into "measured clean"** — the exact
-  *a-scan-that-errors-must-not-look-like-one-that-found-nothing* failure, aimed at the instrument
-  the completion report trusts. **Acceptance / new §17 harness contract:** a cell that should emit
-  trace records and emits **zero** is a **hard harness failure**, never a pass; the interpreter that
-  runs the prompts must be the same one preflight instrumented (`sys.executable`), asserted at
-  startup. **This does not retroactively invalidate the certified cells** — the isolation A-run and
-  the A4 audit were adjudicated against traces with *non-zero* records I read directly — but any
-  cell reported clean with a zero record-count must be re-run before it counts.
+  **Corrected mechanism (maintainer, 2026-08-14):** the earlier "runs an *uninstrumented*
+  interpreter" reading was wrong. A server outside a proper venv **cannot start** — it needs
+  non-stdlib modules and crashes rather than running untraced — so **the tools are never called at
+  all.** *Zero traces means "never called," not "called but not recorded."* The tools cannot secretly
+  run-untraced (a bad-venv server fails loudly); the **only** thing that swallows the failure is the
+  harness's own pass/fail logic, which marks a run with no tool activity as complete. So this is a
+  *reporting* bug (empty run scored as clean), not a stealth-execution bug — the
+  *a-scan-that-errors-must-not-look-like-one-that-found-nothing* failure, one layer up in the harness.
+  **Acceptance / new §17 harness contract:** a cell that should exercise the tools and emits **zero**
+  trace records is a **hard harness failure**, never a pass; and the prompts must run under the same
+  interpreter preflight validated (`sys.executable`, not a hardcoded path), asserted at startup.
+  **No existing run is affected — the maintainer confirms every §17 run was executed in a proper
+  venv (2026-08-14)**, and the certified cells (isolation A-run, A4 audit) were adjudicated against
+  traces with non-zero records read directly. This contract is therefore a **prospective guard**, not
+  a re-adjudication: there is no zero-record "pass" in the record to revisit.
 
 - **F24 — `tests/check_known_failures.py:27` six bucket test files ship untested behind a
   baselined collection error `[REVIEW, unverified]`.** They `import fastmcp` (the standalone package,
