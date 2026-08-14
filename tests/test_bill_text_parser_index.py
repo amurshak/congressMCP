@@ -1383,6 +1383,62 @@ async def test_resolve_versions_falls_back_only_when_congress_unavailable(monkey
 
 
 @pytest.mark.asyncio
+async def test_govinfo_fallback_accepts_digit_suffixed_version_codes(monkeypatch):
+    # F20 (spec §18): the fallback's packageId regex must accept the same code
+    # alphabet as the primary path, or digit-suffixed reissues (pcs2, rh2, eas2)
+    # are silently dropped -- a superseded print wins, or a real bill resolves
+    # to bill_not_found.
+    import congress_api.features.bill_text.client as client_mod
+    from congress_api.features.bill_text.client import govinfo_search_versions
+
+    import httpx
+
+    payload = {
+        "results": [
+            {"packageId": "BILLS-119hr1234pcs2", "dateIssued": "2025-06-02"},
+            {"packageId": "BILLS-119hr1234pcs", "dateIssued": "2025-05-01"},
+            {"packageId": "BILLS-119hr1234ih", "dateIssued": "2025-01-03"},
+            # A different, longer-numbered bill: its remainder after the
+            # bill-1234 prefix is "5eh", which must not parse as a version code.
+            {"packageId": "BILLS-119hr12345eh", "dateIssued": "2025-04-01"},
+        ]
+    }
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, url, json=None, headers=None):
+            return httpx.Response(200, json=payload, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(client_mod.httpx, "AsyncClient", FakeAsyncClient)
+
+    versions = await govinfo_search_versions(119, "hr", 1234)
+    by_code = {v.code: v for v in versions}
+    assert set(by_code) == {"pcs2", "pcs", "ih"}  # pcs2 kept, bill 12345 excluded
+    assert by_code["pcs2"].date == "2025-06-02"
+
+    # A bill whose ONLY package is digit-suffixed must resolve, not 404.
+    payload = {"results": [{"packageId": "BILLS-119hr1234pcs2", "dateIssued": "2025-06-02"}]}
+    versions = await govinfo_search_versions(119, "hr", 1234)
+    assert [v.code for v in versions] == ["pcs2"]
+
+
+def test_primary_and_fallback_use_identical_version_code_alphabet():
+    # F20 acceptance: the two enumeration paths recognize the same code shapes.
+    from congress_api.features.bill_text.client import _version_code_from_item
+
+    item = {"formats": [{"url": "https://www.govinfo.gov/content/pkg/BILLS-119hr1234pcs2/xml/BILLS-119hr1234pcs2.xml"}]}
+    assert _version_code_from_item(119, "hr", 1234, item) == "pcs2"
+
+
+@pytest.mark.asyncio
 async def test_resolve_notes_partial_unknown_code_to_the_caller(monkeypatch):
     # §3 ruling: an unrecognized code sorts last, so if it marks a newer stage a
     # genuinely older version wins -- a wrong answer inside a success envelope. The

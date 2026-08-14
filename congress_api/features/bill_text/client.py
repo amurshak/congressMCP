@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 
 GOVINFO_BASE_URL = "https://api.govinfo.gov"
 MAX_XML_BYTES = 50 * 1024 * 1024
+# The one version-code alphabet, shared by both enumeration paths (spec §3):
+# digit-suffixed reissues (pcs2, rh2, eas2) are valid codes, but the code must
+# start with a letter so a longer bill number sharing the queried prefix
+# (BILLS-119hr12345eh matched against bill 1234) cannot bleed digits into it.
+VERSION_CODE_PATTERN = r"[a-z][a-z0-9]*"
 # Version codes: (precedence rank, category). Complete against GovInfo's published
 # list of 53 bill version codes (govinfo.gov/help/bills), not a 17-code subset.
 #
@@ -307,7 +312,7 @@ async def govinfo_search_versions(congress: int, bill_type: str, number: int) ->
             "Retry later, or pin an explicit version if known.",
         )
     prefix = f"BILLS-{congress}{bill_type.lower()}{number}"
-    pattern = re.compile(rf"^{re.escape(prefix)}([a-z]+)$", re.IGNORECASE)
+    pattern = re.compile(rf"^{re.escape(prefix)}({VERSION_CODE_PATTERN})$", re.IGNORECASE)
     by_code: dict[str, TextVersion] = {}
     for item in response.json().get("results") or []:
         match = pattern.match(str(item.get("packageId") or ""))
@@ -497,7 +502,7 @@ def _xml_url_from_summary(data: dict[str, Any]) -> str | None:
 
 def _version_code_from_item(congress: int, bill_type: str, number: int, item: dict[str, Any]) -> str | None:
     payload = str(item)
-    pattern = rf"BILLS-{congress}{re.escape(bill_type)}{number}([a-z0-9]+)"
+    pattern = rf"BILLS-{congress}{re.escape(bill_type)}{number}({VERSION_CODE_PATTERN})"
     match = re.search(pattern, payload, re.IGNORECASE)
     return match.group(1) if match else None
 
