@@ -628,6 +628,10 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   now between paths rather than within the table. Acceptance: fallback and primary accept identical
   code shapes; digit-suffixed reissues are not lost. (Whether `pcs2`/`rh2` are among §3's 53 canonical
   codes is a separate table question; the *path asymmetry* is the defect regardless.)
+  **Severity raised by the full-list detail:** the reviewer states the two live outcomes are *"a
+  superseded print can win, or `bill_not_found` for a bill that exists"* — both **P0-class**
+  (wrong-document-as-final, the F1 harm; and false non-existence). **F20 is the most severe of
+  F18–F22** and the one I'd fix first.
 
 - **F21 — `client.py:349` unguarded `response.json()` bypasses the GovInfo fallback and mislabels
   `[REVIEW, unverified]`.** A `JSONDecodeError` in `congress_text_versions` escapes before
@@ -637,7 +641,10 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   hard failure wearing the wrong label — the "a scan that errors must not look like one that found
   nothing" principle, here as "must not skip the recovery it was built to trigger." Acceptance: a
   malformed `text-versions` body routes into the GovInfo fallback, and any residual failure is
-  labeled for its true cause.
+  labeled for its true cause. **Full-list detail:** the concrete trigger is an **HTTP 200 with an
+  HTML body** (not a 5xx) — which is why it slips past status checks into `response.json()`. **Root
+  cause is #15** (`congress_text_versions` bypasses `make_api_request`, so it never gets that
+  wrapper's JSON-decode guard); fixing the bypass fixes F21 structurally.
 
 - **F22 — `client.py:466` `_follow_with_key` returns an already-closed 3xx after exhausting
   `max_redirects`; callers treat any status `<400` as success `[REVIEW, unverified]`.** A redirect
@@ -646,7 +653,9 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   reports a clean (empty/wrong) result. **Touches the fetch-robustness safety property** the spec
   leans on wherever it says a failed fetch must be legible, not silently empty. Acceptance:
   redirect exhaustion is an explicit error, never a `<400` success; callers cannot mistake it for a
-  document.
+  document. **Full-list detail sharpens the failure mode:** callers then **crash on the empty/closed
+  body** — so it is not silent-wrong-content but a delayed crash at parse time, still with the wrong
+  proximate cause. Related client-lifecycle finding: **#16** (fresh `AsyncClient` per request).
 
 ### Bill-text feature — already recorded, not a new defect
 
@@ -674,3 +683,116 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   replace a markdown response that embeds valid JSON with a near-empty success envelope. Not
   bill-text, but note the **same failure class as F22** — a success envelope hiding a dropped
   payload; worth the implementer treating the two together. Route.
+
+### Findings 11–34 (the full list arrived after the first 10; same review, 2026-08-14)
+
+Findings 1–10 above are the first slice; 11–34 follow. Same discipline — spec-relevant get an
+F-number and the invariant they threaten; the rest are routed. **The two most important new items
+are measurement-integrity defects (F23, F24): they threaten the validity of the evidence this
+whole directory rests on, which outranks any single content bug.**
+
+**Bill-text / evidence-base — spec-relevant (F23–F27):**
+
+- **F23 — `tests/e2e/run_suite.py:111` the §17 harness runs an *uninstrumented* interpreter
+  `[REVIEW, unverified]`.** It hardcodes `.venv/bin/python` while preflight probes `sys.executable`;
+  with no repo `.venv`, all 70 prompts complete with **zero trace records and read as a clean run.**
+  **This is the §17 harness turning "measured nothing" into "measured clean"** — the exact
+  *a-scan-that-errors-must-not-look-like-one-that-found-nothing* failure, aimed at the instrument
+  the completion report trusts. **Acceptance / new §17 harness contract:** a cell that should emit
+  trace records and emits **zero** is a **hard harness failure**, never a pass; the interpreter that
+  runs the prompts must be the same one preflight instrumented (`sys.executable`), asserted at
+  startup. **This does not retroactively invalidate the certified cells** — the isolation A-run and
+  the A4 audit were adjudicated against traces with *non-zero* records I read directly — but any
+  cell reported clean with a zero record-count must be re-run before it counts.
+
+- **F24 — `tests/check_known_failures.py:27` six bucket test files ship untested behind a
+  baselined collection error `[REVIEW, unverified]`.** They `import fastmcp` (the standalone package,
+  absent here) → collection error → **baselined as permanent known failures** — and they are exactly
+  the routers whose `validate_operation_kwargs` behavior findings 1/4/5/10 turn on. So the new
+  `raise` path ships with its tests un-run, wearing a green baseline. **Reconciled against bug_002:**
+  this is *not* the `mcp.server.fastmcp` runtime import bug_002 refuted (measured **0** on the real
+  branch); it is the **standalone `fastmcp`** package in **6 test files** (measured, listed) — a
+  genuinely separate, real defect. Same greenwash class as F23: an errored check baselined as handled
+  reads as coverage that does not exist. **Acceptance:** the guard's `raise` path is exercised by a
+  test that actually collects; a baselined collection error over changed code is not acceptable
+  coverage. **Sub-finding #20** (`check_known_failures.py:42` — baseline recorded twice, prose +
+  Python set, no link, can desync) compounds this: the greenwash is also un-synchronized.
+
+- **F25 — `client.py:498` `_version_code_from_item` regexes over `str(item)` (the dict repr) instead
+  of reading `formats[].url` structurally `[REVIEW, unverified]`.** A version-code match can be
+  captured from *any* field of the dict's string form. **Violates §3 read-by-structure and the
+  standing identity-over-string-matching convention** — the version code is a structural property of
+  the format URL, not a substring of a repr. **Acceptance:** read the code from the `formats[].url`
+  field by path, never by scanning a stringified object.
+
+- **F26 — `index.py:72` the whitespace-collapse idiom is re-implemented at four coupled sites**
+  (parser, index ×2, tools) `[REVIEW, unverified]`. Changing one silently desyncs **search from
+  display**. **Directly threatens §6's load-bearing invariant** — *"one stored string, one pure
+  rendering function, no drift"* — the guarantee that FTS-indexed `segments.text` and rendered
+  `display_text` cannot diverge. Four independent normalizers is four chances for the drift V4/§6
+  exist to prevent. **Acceptance:** one normalization function, shared by index and display paths, so
+  they cannot desynchronize.
+
+- **F27 — `tools.py:59` bill-text ships a *second* structured-error system (`_error`/`ErrorEnvelope`)
+  alongside `core/exceptions.py` `[REVIEW, unverified]`.** Clients get **two incompatible error
+  shapes from one server.** **§9 deliberately specifies the bill-text envelope** (`error.code` /
+  `message` / `detail` / `remediation`) — so this is **not drift on the spec side**; the finding is a
+  real cross-server *consistency* concern. **This is a requirements call, surfaced not ruled:** if the
+  server should present one error shape, §9's envelope is the better convergence target (it carries
+  `remediation`/`detail` the core lacks) — but whether to converge, and which way, is the maintainer's
+  to decide. Related: **#23** (`tools.py:219`, bill-text validates ids by network 404 instead of the
+  shared `ParameterValidator`, losing standard suggestions) and **#25** (`tools.py:207`, `_clamp`
+  re-implements `validate_limit_range` with different wording — the clamp advisory in **F17**'s
+  `request_note` should read the same as the shared validator). All three are the same theme: the
+  bill-text surface diverging from the shared one.
+
+**§10 / PR 2 — spec updates I am making (see `08-cache-storage.md`):**
+
+- **#13 (`__main__.py:96` comment says refusal "exits 2"; code returns 1)** — bug_005 already made
+  the CLI exit code an observable §10 contract (refusal → 1, both entry points; `cache info` → 0), but
+  §10 never pinned it, so the source comment had nothing to conform to. **Pinning it in §10 now;** the
+  "exits 2" comment is source drift against the stated contract.
+- **#21 (`__main__.py:49` the cache CLI hardcodes PR 2's entire cache layout — dirs, glob, cap env
+  var, schema version — with no cache module owning it).** Recording as a **PR 2 forward constraint in
+  §10**: the persistent-cache module PR 2 introduces must **own or exactly reproduce** these literals,
+  because a PR-1 CLI already ships depending on them. This is a real PR1→PR2 coordination hazard, not
+  a nit.
+
+**Bill-text — routed, no fulltext contract (efficiency / reuse / dead code):**
+
+- **#15** `client.py:330` — `congress_text_versions` bypasses `make_api_request`, losing its JSON
+  guard, `DEFAULT_REQUEST_PARAMS`, **request counting**, and `SimpleCache`. **This is the root cause of
+  F21**, and the lost request-counting is why some GovInfo traffic escapes the §17 request tally —
+  route as the structural fix behind F21.
+- **#16** `client.py:382`/`:293` — fresh `httpx.AsyncClient` (new TLS handshake) per GovInfo request;
+  pool it in `app_lifespan`. Part of the ~4.4 s/call budget PR 2 cares about.
+- **#17** `client.py:192` — pinned-version calls still await `_resolve_versions` (a congress.gov
+  round-trip) just to pre-validate membership; GovInfo's 404 is definitive. **Touches §3's
+  pinned-version path** — is the extra round-trip worth its better error message, or wasteful? A §3
+  design refinement, surfaced for the maintainer, not ruled.
+- **#27** `index.py:254` buffers every matching row per unit; snippet logic uses only the first
+  preferred row + one context lookup. **#28** `tools.py:286` `query_matches` re-probes each FTS
+  `MATCH` `search()` just ran (the zero-hit diagnosis from `77d9277`; modest cost). **#29**
+  `trace.py:310` redaction `str()`-converts every non-string log arg even with tracing off; skip
+  primitives. All efficiency; route.
+- **Dead code / simplification, route:** **#30** `parser.py:464` `quotes_seen` is dead state (never
+  mutated or read — this closes the long-open `quotes_seen` question: it is inert, remove it). **#31**
+  `tools.py:155` `_normalize_queries` returns an always-empty notes list the caller discards; unused
+  `fts_literal` import. **#32** `tools.py:189` `_merge_notes(*parts)` is varargs but every call passes
+  one arg — reduces to `note.strip() or None`; **this is consistent with the F17 ruling** (notes are
+  separate fields now, not merged, so the merge machinery is vestigial). **#33** `parser.py:745`
+  `name == "toc"` redundant alongside `name in SKIP_NAMES`. **#34** `parser.py:552` `_emit_synthetic`
+  re-implements `_synthetic_enum` inline.
+
+**Out of the bill-text feature — routed (relay only):**
+
+- **#12** `test_invoke_all_operations_with_defaults.py:132` — the `(tool, operation, "*")` allowlist
+  skip never fires; documented exclusion is dead code. Test quality.
+- **#18** `bills_tool.py:24` — `validate_operation_kwargs` is hand-pasted at 81 call sites across 7
+  routers with nothing enforcing coverage; a forgotten call regresses to the opaque `TypeError` the
+  guard exists to prevent. **This is the systemic root of the guard-drift trio (findings 1, 4, 5)** —
+  worth a coverage test or a decorator, not 81 hand-copies. Relay as the meta-fix.
+- **#22** `committee_reports.py:424` — param-name drift fixed in *opposite* directions in the same
+  diff (camelCase→snake_case here, the reverse in summaries/treaties), permanently mixing
+  `from_date_time` and `fromDateTime` on the public MCP surface. A public-surface consistency defect;
+  relay to the maintainer.

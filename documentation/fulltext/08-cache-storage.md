@@ -152,6 +152,22 @@ congressmcp cache info      # path, total bytes, cap, per-package listing, schem
 congressmcp cache clear     # with --yes for non-interactive
 ```
 
+**Exit-code contract (pinned after §18 `bug_005`).** `cache clear` **refused** for want of `--yes`
+in a non-interactive context exits **`1`**; a completed `cache clear` and any `cache info` exit
+**`0`**. This must hold on **both** entry points — the `congressmcp` console script *and*
+`python -m congress_api` (the latter previously discarded `main()`'s return and exited `0` on a
+refusal). Recorded here because it is an observable contract a caller can script against, and there
+was nothing for the source to conform to before. *(§18 finding #13: a source comment claiming
+refusal "exits 2" is drift against this — the contract is `1`.)*
+
+**PR 2 forward constraint (§18 finding #21).** The PR-1 `cache` CLI already hardcodes the *entire*
+persistent-cache layout it does not yet own — cache directory, package glob, disk-cap env var, and
+schema-version literal — because it ships before the cache module exists. **When PR 2 introduces the
+persistent-cache module, that module must own these literals, and the CLI must read them from it**
+(not re-declare them). If PR 2 instead reproduces the literals independently, the two must match
+exactly or `cache info`/`clear` will point at a different path than the cache writes to. This is a
+real PR1→PR2 coordination hazard; the clean resolution is single ownership in the cache module.
+
 Rationale, for the PR description: every MCP tool's description occupies context in
 every session, and cache administration is never something the model should decide to
 do; `cache clear` is destructive and should not be in a model's reach; if the cache is
