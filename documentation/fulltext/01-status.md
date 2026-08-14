@@ -1,6 +1,51 @@
 *(congressMCP bill-text spec — see `00-INDEX.md` for the file map, conventions, and settled decisions.)*
 
-## Status — PR 1 landed, live validation run 2026-08-03
+## Status — 2026-08-14 (current) — PR 1 in defect burndown
+
+Branch `feature/bill-text-search-index`; spec tip `d75a548`, implementation tip `950125d`.
+**The core feature is built and validated; PR 1 is not "done" — it is working down a defect
+queue from two code-review rounds.** The dated log below (from 2026-08-03 onward) is the
+decision history and stays as-is; this block is the authoritative *current* picture.
+
+**Where the feature stands.** All acceptance V-steps are closed (V4/V5/V12–V16/V18/V20/V21;
+V5 **PASS** `de3149e`; V20 **hold k=60**; V21 **F6 ruled**), the §17 adversarial suite ran at
+ceiling and floor with **Group A clean in both cells**, Haiku added as a capability-floor cell,
+and both PR-1 deliverables exist in draft: `15-completion-report.md` (§16 skeleton, still written
+last) and `16-user-guide.md` (§12). Defects F1–F17 are addressed (most fixed and live-verified;
+F17's `request_note` split shipped `8167124`). V11 (cache) and the obscure-bill cross-version diff
+are **PR 2** by decision.
+
+**The live queue is `14-defect-priority.md` §18 — read it there, not here.** Two reviews landed:
+- **ultrareview (2026-08-09/10):** `bug_005/006/007` **fixed** (`950125d`); `bug_002/004/008`
+  **refuted** (three were review-slicing artifacts — a reviewer reading a stale overlay tree).
+- **code review (2026-08-14, 34 findings):** triaged to **F18–F27** plus routed nits. A fresh
+  implementation session has the handoff.
+
+**The real bar for "PR 1 done," in order:**
+
+| # | Gate | State |
+|---|---|---|
+| 1 | **F20** — fallback version regex drops digit-suffixed codes (`client.py:310`) | **P0, open** — superseded print can win / `bill_not_found` for a real bill. Fix first. |
+| 2 | **F19 / F21 / F22** — oversize-unit no-split; JSON-guard fallback bypass; redirect-as-success | open — dangerous failure classes (silent oversize; error-as-empty/success) |
+| 3 | **F23 / F24** — §17 harness scores an un-exercised run clean; guard routers ship untested | open — measurement-integrity guards; land **before** trusting any further §17 re-run |
+| 4 | **§17 re-run** of affected cells (implementer-scripted CLI, §17) once F23/F24 are in | pending F23/F24 |
+| 5 | **F18 / F25 / F26** — quote-pair strip; `str(item)` version regex; whitespace-collapse desync | open — fidelity/robustness |
+| 6 | **§16 completion report finalized** from `15-completion-report.md` | last, after 1–5 |
+
+**No past evidence is invalidated** — every §17 run to date was executed in a proper venv
+(maintainer-confirmed); F23/F24 are prospective guards, not re-adjudications.
+
+**Requirements calls parked with the maintainer** (implementer must not decide): **#4** bills
+`version` seam (unwired or delete?), **F27/#24** whether the server converges on one error shape,
+**#17** pinned-version pre-validation round-trip. **Group F** (§17) still has zero verbatim rows.
+
+**§10 gained two contracts on 2026-08-14:** the CLI exit-code contract (refusal → `1` on both
+entry points; `info` → `0`) and a PR1→PR2 constraint that PR 2's cache module must own the layout
+literals the PR-1 CLI already hardcodes. See `08-cache-storage.md`.
+
+---
+
+## Status — PR 1 landed, live validation run 2026-08-03 *(historical — superseded by the 2026-08-14 block above; kept as decision history)*
 
 Branch `feature/bill-text-search-index`, commit `bb235ac`. Unit suite: 8 passed,
 1 skipped. V-steps below run **live against real APIs**, not fixtures.
@@ -49,6 +94,10 @@ falsified, invariant measured clean across 19,234 units. `to read as follows` to
 to `AMENDATORY_RE` only, after enumerating all 18 instances. See §6 and §14.
 
 ### Definition of done for PR 1 — in order
+
+> **Superseded 2026-08-14.** This table tracked the *original* PR-1 close-out and its items are
+> all done; the current bar for "PR 1 done" is the F18–F27 burndown table in the top block. Kept
+> for the item-2 correction note below, which is a recorded process lesson.
 
 §16 is written **last**, not next. It reports results; anything unfinished when it is
 written either gets omitted or gets amended in afterwards, and both defeat the point.
