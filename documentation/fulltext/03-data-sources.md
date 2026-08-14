@@ -179,7 +179,8 @@ enr           → 90      enrolled
    `pp` is absent while its sibling `pap` sits at 30; they are peers.
 
    > **Digit-suffixed reissues (`pcs2`, `rh2`, `eas2`) — CONTINGENT ruling, F20 follow-on,
-   > 2026-08-14. Existence unconfirmed; read the grounding note (point 3) first.**
+   > 2026-08-14. Existence CHECKED — GovInfo search returns **zero** for `ih2`/`pcs2`/`enr2`;
+   > confirmed dead-defensive. Read the grounding note (point 3) first.**
    > When F20 fixed the enumeration regex so digit-suffixed codes *survive*, it raised a ranking
    > question: if such a code appeared, it is not a table entry, so `order_versions` would score it
    > as an **unknown code** and the superseded base print (`pcs`) would win "latest." This block
@@ -225,6 +226,13 @@ enr           → 90      enrolled
    > are correct regardless. But do not treat "superseded print can win" as a demonstrated P0: it
    > was shown only on synthetic data. Run the facet check before building the ranking machinery in
    > points 1–2; if the facet has no numbered code, log that and stop.
+   >
+   > **RESOLVED 2026-08-14 (maintainer ran the check).** GovInfo search returns **zero** results for
+   > `ih2` / `pcs2` / `enr2` — no digit-suffixed version code occurs in the BILLS collection. Points
+   > 1–2 are therefore **dead-defensive: do not build the ranking machinery.** The F20 *fix* stands
+   > (shared pattern + letter-initial collision guard); this ruling is retained only as a contingency
+   > should GPO ever mint such a code, and "superseded print can win" is confirmed to have been a
+   > synthetic-only outcome, never reachable in production.
    >
    > **4. Do not use a single flat `REISSUE` rank.** `rh2` is a reprint of a *committee-report*
    > stage and `pcs2` of a *calendar* stage; a flat reissue rank would make them comparable to — or

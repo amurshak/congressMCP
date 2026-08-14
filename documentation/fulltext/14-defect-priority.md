@@ -651,8 +651,10 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   date in §3 as a real observation — an error, corrected: a fixture is not evidence.)* **Owed first is
   existence, not direction:** the GovInfo `billVersion` search facet enumerates codes actually
   present; if none is numbered, the ranking ruling is dead-defensive and "superseded print can win"
-  was never a real-world P0. Routed to the implementer: run the facet check before building the
-  ranking machinery.
+  was never a real-world P0. **RESOLVED 2026-08-14: the maintainer ran it — GovInfo returns zero for
+  `ih2`/`pcs2`/`enr2`, so no digit-suffixed code exists.** The ranking machinery is dead-defensive;
+  **do NOT build it.** "Superseded print can win" was synthetic-only. **F20 disposed:** keep the fix
+  (shared pattern + letter-initial collision guard); skip the ranking logic.
 
 - **F21 — `client.py:349` unguarded `response.json()` bypasses the GovInfo fallback and mislabels
   `[REVIEW, unverified]`.** A `JSONDecodeError` in `congress_text_versions` escapes before
