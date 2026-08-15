@@ -17,6 +17,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from ...mcp_app import mcp
 from ...core.api_wrapper import safe_congressional_request
+from ...core.operation_routing import validate_operation_kwargs
 from ...core.validators import ParameterValidator
 from .bills.formatters import BillsFormatter
 
@@ -37,7 +38,7 @@ def _normalize_law_type(law_type: Optional[str]) -> Optional[str]:
 
 async def get_laws(
     ctx: Context,
-    congress: int,
+    congress: Optional[int] = None,
     law_type: Optional[str] = None,
     limit: int = 20,
     offset: Optional[int] = None,
@@ -69,9 +70,9 @@ async def get_laws(
 
 async def get_law_details(
     ctx: Context,
-    congress: int,
-    law_type: str,
-    law_number: int,
+    congress: Optional[int] = None,
+    law_type: Optional[str] = None,
+    law_number: Optional[int] = None,
 ) -> str:
     """Get detail for a specific enacted law."""
     if congress is None or law_type is None or law_number is None:
@@ -96,22 +97,18 @@ async def get_law_details(
 
 
 async def route_laws_operation(ctx: Context, operation: str, **kwargs) -> str:
-    """Route a laws operation to its impl with only the params it accepts."""
+    """Route a laws operation to its impl.
+
+    Standard bucket pattern (core/operation_routing.py): the guard rejects a
+    parameter belonging to a sibling operation with a ToolError naming it,
+    instead of the old cherry-picking route that silently dropped it.
+    """
     if operation == "get_laws":
-        return await get_laws(
-            ctx,
-            congress=kwargs.get("congress"),
-            law_type=kwargs.get("law_type"),
-            limit=kwargs.get("limit") or 20,
-            offset=kwargs.get("offset"),
-        )
+        validate_operation_kwargs(get_laws, kwargs, operation)
+        return await get_laws(ctx, **kwargs)
     elif operation == "get_law_details":
-        return await get_law_details(
-            ctx,
-            congress=kwargs.get("congress"),
-            law_type=kwargs.get("law_type"),
-            law_number=kwargs.get("law_number"),
-        )
+        validate_operation_kwargs(get_law_details, kwargs, operation)
+        return await get_law_details(ctx, **kwargs)
     else:
         raise ToolError(f"Unknown laws operation: {operation}")
 
@@ -152,15 +149,21 @@ async def laws(
         {"operation": "get_law_details", "congress": 119, "law_type": "pub", "law_number": 1}
     """
     try:
-        return await route_laws_operation(
-            ctx,
-            operation,
-            congress=congress,
-            law_type=law_type,
-            law_number=law_number,
-            limit=limit,
-            offset=offset,
-        )
+        # Forward only the parameters the caller actually set, like the other
+        # bucket tools: the routing guard reads presence as intent, so an unset
+        # None must not reach it.
+        kwargs = {
+            key: value
+            for key, value in {
+                "congress": congress,
+                "law_type": law_type,
+                "law_number": law_number,
+                "limit": limit,
+                "offset": offset,
+            }.items()
+            if value is not None
+        }
+        return await route_laws_operation(ctx, operation, **kwargs)
     except ToolError:
         raise
     except Exception as e:

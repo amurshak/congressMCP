@@ -10,26 +10,25 @@ Run `python tests/check_known_failures.py` to verify the live set still equals t
 recorded here. It fails if the set **grows** (a regression) or **shrinks** (something
 was fixed and this file was not updated). Neither direction is silent.
 
+**The fenced code blocks below ARE the baseline.** `check_known_failures.py` parses
+them directly -- an entry with a `::` node id is a known test failure, a bare path is a
+known collection error. There is deliberately no second copy of the set anywhere: two
+unlinked records of a baseline desync (F24 sub-finding #20). Edit the fences, and the
+check follows.
+
 **None of these involve `congress_api/features/bill_text/`.** They pre-date the
 bill-text branch; verified by running the same suite on the base commit.
 
-## Collection errors (10 files, 0 tests run)
+**Removed 2026-08-14 (F24):** the six `test_*_hub_bucket.py` files that failed
+collection on the undeclared standalone `fastmcp` package were deleted, not fixed.
+They tested the removed tier-era architecture (`congress_api.core.auth.auth`,
+`FREE_OPERATIONS`/`PAID_OPERATIONS`, bucket modules since renamed or replaced), so no
+import fix could make them collect. The territory they claimed -- operation routing
+and parameter validation in the bucket tools -- is now covered by
+`tests/test_bucket_operation_guard.py`, which collects and sweeps every live router
+branch's `validate_operation_kwargs` raise path.
 
-### Undeclared dependency: `fastmcp` (6 files)
-
-```
-tests/test_committee_intelligence_hub_bucket.py
-tests/test_legislation_hub_bucket.py
-tests/test_people_relationships_hub_bucket.py
-tests/test_records_communications_hub_bucket.py
-tests/test_research_professional_hub_bucket.py
-tests/test_voting_political_hub_bucket.py
-```
-
-`ModuleNotFoundError: No module named 'fastmcp'`. These import `fastmcp`, which is
-not declared in `pyproject.toml` and is not installed. The package under test imports
-`mcp.server.mcpserver`, so this looks like test files left behind by a migration off
-fastmcp rather than a missing install.
+## Collection errors (4 files, 0 tests run)
 
 ### Stale import: `congress_api.core.services` (4 files)
 

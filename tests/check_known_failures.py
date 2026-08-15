@@ -15,40 +15,38 @@ Exits 0 when the live set matches, 1 otherwise, printing the symmetric differenc
 """
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+BASELINE_DOC = Path(__file__).resolve().parent / "KNOWN_FAILURES.md"
 
-# Files that cannot even be imported. Recorded per FILE because a collection error
-# runs zero tests, so there are no node ids to name.
-KNOWN_COLLECTION_ERRORS = {
-    # ModuleNotFoundError: No module named 'fastmcp' -- undeclared dependency
-    "tests/test_committee_intelligence_hub_bucket.py",
-    "tests/test_legislation_hub_bucket.py",
-    "tests/test_people_relationships_hub_bucket.py",
-    "tests/test_records_communications_hub_bucket.py",
-    "tests/test_research_professional_hub_bucket.py",
-    "tests/test_voting_political_hub_bucket.py",
-    # ModuleNotFoundError: No module named 'congress_api.core.services' -- gone
-    "tests/test_email_service.py",
-    "tests/test_email_templates.py",
-    "tests/test_upgrade_email.py",
-    "tests/test_user_creation.py",
-}
 
-KNOWN_FAILURES = {
-    # 'Mock' object is not subscriptable -- bucket test harness
-    "tests/test_bucket_double_conversion.py::test_committee_intelligence_does_not_double_convert",
-    "tests/test_bucket_double_conversion.py::test_records_and_hearings_does_not_double_convert",
-    "tests/test_bucket_double_conversion.py::test_research_and_professional_does_not_double_convert",
-    "tests/test_bucket_double_conversion.py::test_voting_and_nominations_does_not_double_convert",
-    # async def with no asyncio marker and no asyncio_mode configured
-    "tests/test_registration_endpoint.py::test_registration_endpoint",
-    "tests/test_registration_endpoint.py::test_health_endpoint",
-}
+def parse_baseline(text: str) -> tuple[set[str], set[str]]:
+    """Extract (failures, collection_errors) from KNOWN_FAILURES.md.
+
+    The fenced code blocks of that document ARE the baseline -- the one record
+    (#20). This script used to carry its own Python copy of the same set with
+    no link to the prose one; two unlinked copies of a baseline will desync,
+    and a desynced baseline greenwashes exactly like the stale entries it
+    exists to catch. An entry with a `::` node id is a test failure; a bare
+    path is a file-level collection error (a collection error runs zero tests,
+    so there is no node id to name).
+    """
+    failures: set[str] = set()
+    collection_errors: set[str] = set()
+    in_fence = False
+    for line in text.splitlines():
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if not in_fence:
+            continue
+        entry = line.strip()
+        if entry:
+            (failures if "::" in entry else collection_errors).add(entry)
+    return failures, collection_errors
 
 
 def run_suite() -> tuple[set[str], set[str]]:
@@ -84,13 +82,23 @@ def report(label: str, live: set[str], known: set[str]) -> bool:
 
 
 def main() -> int:
+    known_failures, known_collection_errors = parse_baseline(BASELINE_DOC.read_text())
+    if not (known_failures or known_collection_errors):
+        # An empty parse is far more likely a broken document (or a reformat that
+        # dropped the fences) than a suite that suddenly runs clean. Say so
+        # rather than reporting every live failure as a regression against
+        # nothing.
+        print(f"FATAL: no baseline entries parsed from {BASELINE_DOC}. If the suite "
+              "is genuinely clean now, delete this check; otherwise the fenced "
+              "blocks were lost in an edit.")
+        return 1
     failures, collection_errors = run_suite()
-    ok = report("failure", failures, KNOWN_FAILURES)
-    ok &= report("collection error", collection_errors, KNOWN_COLLECTION_ERRORS)
+    ok = report("failure", failures, known_failures)
+    ok &= report("collection error", collection_errors, known_collection_errors)
     if ok:
         print(
-            f"Baseline matches: {len(KNOWN_FAILURES)} known failures, "
-            f"{len(KNOWN_COLLECTION_ERRORS)} known collection errors, nothing new."
+            f"Baseline matches: {len(known_failures)} known failures, "
+            f"{len(known_collection_errors)} known collection errors, nothing new."
         )
         return 0
     print("\nThe known-failing set changed. Investigate, then update KNOWN_FAILURES.md.")
