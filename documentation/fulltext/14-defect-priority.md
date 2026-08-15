@@ -837,6 +837,16 @@ their tests un-collected. Both are prospective guards on the instrument, not re-
   standing identity-over-string-matching convention** — the version code is a structural property of
   the format URL, not a substring of a repr. **Acceptance:** read the code from the `formats[].url`
   field by path, never by scanning a stringified object.
+  **FIXED 2026-08-14 (`b464957`).** Now iterates `item["formats"]` and matches the anchored package-id
+  pattern against each entry's `url` only. Artifact — the sharpest wrong-document demonstration in the
+  set: an item whose `note` said *"supersedes BILLS-119hr1234ih"* while its URLs pointed at
+  `…hr1234rh` resolved to **`ih`** (the very version it supersedes) via a repr scrape that hit the
+  prose note first by dict order; now resolves to `rh`. Shape hardening: no `formats` / a string
+  `formats` / a non-dict entry / a non-string `url` all degrade to `None` — so **§3 step 2's
+  type-label fallback takes over instead of a repr scrape**, composing correctly with the resolution
+  algorithm. **F20's cross-path guarantee preserved:** it reuses the shared `VERSION_CODE_PATTERN`,
+  so the change is *where* the pattern is applied (the url field), not the alphabet — no F20
+  regression.
 
 - **F26 — `index.py:72` the whitespace-collapse idiom is re-implemented at four coupled sites**
   (parser, index ×2, tools) `[REVIEW, unverified]`. Changing one silently desyncs **search from
