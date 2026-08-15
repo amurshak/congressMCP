@@ -677,6 +677,16 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   HTML body** (not a 5xx) — which is why it slips past status checks into `response.json()`. **Root
   cause is #15** (`congress_text_versions` bypasses `make_api_request`, so it never gets that
   wrapper's JSON-decode guard); fixing the bypass fixes F21 structurally.
+  **FIXED 2026-08-14 (`5dd3c69`), and #15 resolved with it.** `congress_text_versions` now routes
+  through `make_api_request` and translates its error dicts: 404 → `bill_not_found` (definitive,
+  fallback not consulted, call-counter asserted); everything else (5xx / non-JSON 200 / network) →
+  `congress_unavailable`, the recoverable code that triggers the GovInfo fallback. Artifact: an
+  HTTP-200 `<html>Service temporarily unavailable</html>` body went from a raw `JSONDecodeError` →
+  `internal_error` to recovering via GovInfo. Restored what #15 flagged: request-counting toward the
+  §17 tally and the `SimpleCache` path. Contract recorded in §3 (fallback-trigger) and §9 (codes).
+  **Surfaced F28** (below): the implementer flagged that `make_api_request`'s `limit: 20` caps version
+  enumeration — pre-existing, latent, but an F1-family wrong-document risk if any bill has >20
+  versions. Recorded in §3 with an owed measurement.
 
 - **F22 — `client.py:466` `_follow_with_key` returns an already-closed 3xx after exhausting
   `max_redirects`; callers treat any status `<400` as success `[REVIEW, unverified]`.** A redirect

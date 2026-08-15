@@ -52,6 +52,18 @@ spec claimed otherwise; that was wrong.
 
 1. `GET congress.gov /bill/{congress}/{type}/{number}/text` — enumerates text versions
    with type, date, and format URLs.
+
+   > **F28 (latent, surfaced by the F21 work, 2026-08-14) — the enumeration is capped at 20 and
+   > the cap is undisclosed.** `make_api_request` applies `DEFAULT_REQUEST_PARAMS` incl. `limit: 20`
+   > (the same implicit server default the pre-F21 bypass got, so **F21 changed nothing here** — it
+   > is pre-existing, not a regression). But if a bill has **more than 20 text versions**, the
+   > resolver sees only 20, and if the true-latest (`enr`) falls outside that page, `version=None`
+   > **resolves to a superseded version with nothing disclosed** — the F1 wrong-document class, via
+   > pagination rather than precedence. *Owed measurement, not a claimed P0* (the F20 lesson): count
+   > the max text-versions per bill across a broad sample and confirm whether the endpoint paginates;
+   > **if no real bill exceeds ~20 versions this is dead-defensive**, if any does it is a live
+   > wrong-document risk needing pagination or an explicit `limit`. Route to the implementer with the
+   > measurement; do not rank until it runs.
 2. Extract the GovInfo version code from each entry's XML/PDF URL (the URLs embed
    `BILLS-{congress}{type}{number}{code}`). If a code cannot be extracted from a URL,
    map it from the version-type string using a documented lookup table; log unmapped
@@ -264,6 +276,24 @@ congress.gov has no such bill → "no such bill." If it has the bill but not tha
 **Fallback if congress.gov is unavailable:** GovInfo search service, POST `/search` with
 `collection:BILLS congress:{c} billtype:{t} docnumber:{n}`, which returns all versions as
 separate packages. Secondary path only.
+
+> **Fallback-trigger contract (operationalized by F21, `5dd3c69`).** "Unavailable" is decided by
+> **error code, not exception type**, and the resolution step routes through `make_api_request`:
+> - **`bill_not_found` (congress.gov 404)** is *definitive* — the bill does not exist. The GovInfo
+>   fallback is **not consulted** (asserted by a call counter), preserving "existence comes from
+>   step 1, not GovInfo."
+> - **`congress_unavailable`** covers everything else that denies a usable answer — **5xx, a
+>   non-JSON 200 (e.g. an HTML `Service unavailable` body), and network failure** — and is the
+>   **one code `_resolve_versions` treats as recoverable**, so it triggers the GovInfo fallback.
+> - A raw `JSONDecodeError` must **never** escape the resolution step (the F21 defect: it jumped the
+>   fallback and surfaced as `internal_error`). A malformed body is a `congress_unavailable`, not an
+>   internal error.
+> - If **both** paths fail, the residual error keeps its **true label** ("Congress.gov was
+>   unreachable and the GovInfo search fallback also failed"), never a mislabel.
+>
+> `congress_unavailable` and `bill_not_found` are therefore load-bearing error codes; see §9's
+> envelope. Routing through `make_api_request` also restores request-counting toward the §17 tally
+> and the `SimpleCache` path (the #15 concern) — the direct-client bypass had lost both.
 
 ### Rate limits
 

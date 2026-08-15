@@ -164,6 +164,11 @@ navigation aid useful for deciding where to descend.
 {
   "error": {
     "code": "version_not_available",     // stable machine-readable string
+    // load-bearing codes incl. (see §3 for the resolution/fallback contract):
+    //   bill_not_found       — congress.gov 404; definitive, GovInfo fallback NOT consulted
+    //   congress_unavailable — 5xx / non-JSON 200 / network; recoverable → triggers GovInfo fallback
+    //   version_not_available — bill exists, requested version does not (lists available)
+    //   internal_error       — a genuine server fault; NOT a masked upstream/decode failure (F21)
     "message": "S. 1071 exists but has no 'ih' version.",
     "detail": {"available_versions": ["is", "es", "enr"]},
     "remediation": "Retry with one of the listed versions, or omit version."
