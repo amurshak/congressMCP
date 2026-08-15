@@ -83,6 +83,76 @@ Fill `result` and `finding` from `01-status.md`; this table is largely complete 
 
 ## E. §17 — consumer-layer results
 
+### COMPLETE RE-RUN — `2026-08-15T033553Z`, build `9224726`. The authoritative post-fix measurement.
+
+**Integrity — solid.** Build `9224726` is on-branch and **all nine fixes (F18–F26) are confirmed
+git-ancestors**; `working_tree_clean: true`; `zero_trace_cell_failures: []` (the F23 guard ran and
+found no all-zero cell). Four cells exactly per §17 design: floor (Sonnet-5, crowded, full surface),
+ceiling (Opus-5, fresh, full surface), capability (Haiku, Group A only, single-step), isolation
+(Sonnet-5, `bill_text_only=true`, A–E — the fully-attributable cell). 70 results. Haiku **adopted the
+tools** (6 traces / 4 prompts), so the withdrawn F23 Haiku-amendment stays moot. The two per-prompt
+zero-call cases (F3 floor + ceiling) sit in cells with live siblings → consumer findings, not harness
+faults — the ratified F23 behavior, working.
+
+**Results by group** (scored against pinned criteria; the four invariants applied to every answer):
+
+- **Group A — 16/16 PASS across all four cells. The merge gate is met.** A1 (478-aircraft amendatory
+  trap) passes everywhere and the **ceiling frame now survives past the first sentence** ("conforms
+  paragraph (2) by striking the old 'below 466' trigger") — the first-run weakness, fixed. A2 (struck
+  "96 A-10" text) and A3 (§804 VAWA) show struck-text/`amends` handling reaching the consumer, **Haiku
+  included**. A4: no cell claims false completeness; ceiling is exemplary (reads text not index,
+  enumerates four completeness caveats). **Isolation A4 verified grounded** — 42 `get_bill_section`
+  reads, every distinctive cite present in the trace; the prior-run A4 fabrication concern does not
+  reproduce on the fully-attributable cell.
+- **Group B — PASS (B2/isolation marginal).** The **B1 `CHUNK`-as-enumeration defect is fixed in all
+  three cells** (each cites the enclosing `§3111(a)` / "to be codified at 10 U.S.C. § 6141", none
+  invents an enum or leaks `CHUNK:`). B2/isolation marginal: says "PRE:1 notes…" framed as "whereas
+  clauses" — one word short of the pinned fail "*Section* PRE:1 states…".
+- **Group C — all PASS.** C3 shows `depth_reduced: false` / `toc_truncated: false` — **the F11 depth
+  disclosure reaching the consumer**. C1/C2 answer from aggregated subtree sizes without full fetches.
+- **Group D — 12 PASS, 3 MARGINAL, 0 FAIL.** **D5 confirms the F2 trailing-period / `ambiguous_section_id`
+  fix reached the consumer** — verified: 0 false "no section matched" negatives, all three cells
+  surface the three "section 804"s (Div. W/X/E) via `get_bill_toc` + 4 section fetches. The old false
+  negative is gone. D4 marginal in all three cells: each resolves "H.R. 1" to the 119th and names it
+  but **none volunteers that the bare reference was ambiguous** — a consumer response-shape gap, not a
+  tool defect (grounding note: no tool-side default).
+- **Group E — all 9 PASS.** E3 fetches and names both `rh` and `eh`, reporting a real difference — the
+  version-resolution path. **E2's pre-registered behavior recurs exactly**: ceiling surfaces the
+  `housing`→`hous` stemming caveat, floor drops it — "the context caveat does not survive at the
+  floor," the passive-disclosure prediction, confirmed. No FTS5 operator error in any cell.
+- **Group F — INDICATIVE ONLY, and this run cannot close its gap.** The manifest self-flags
+  (`group_f_caveat`) that the six questions were **spec-derived, not verbatim from naive sources, and
+  below the count minimum** — they inherit the adversarial bias the rule exists to exclude. On the
+  four invariants: F1/floor marginal (a confident false-negative on enacted law — grounded only in
+  pending S.243, missing the enacted HR 1 §100203 the ceiling found); the rest pass. **F3/ceiling is
+  UNRESOLVABLE, not a fabrication** — see the correction below. **The Group-F-verbatim gap remains
+  open**; replace with naive-source questions AND run them in isolation before any F finding counts.
+
+**Fixes confirmed reaching the consumer:** F2 (D5, all cells, no false negative) · F11 (C3 depth
+flags) · the segment/`amends`/struck-text model (Group A, all cells incl. Haiku) · B1 `CHUNK`-as-enum
+(fixed all cells) · version resolution `rh`/`eh` (E3). This is what the re-run was for: the burndown
+changed consumer behavior, not just the tests.
+
+**Consumer/model findings (not tool defects — no implementation fix applies):** D4 disambiguation-caveat
+gap (all cells, no tool-side default to disambiguate a bare bill number across Congresses); synthetic-id
+leakage (`PRE:`/`S:`) into user-facing answers in the weaker/isolated cells on whereas/resolution
+prompts (B2, C3) while the ceiling stays clean — the "passive fields depend on the reader" pattern;
+E2's floor caveat-drop (pre-registered).
+
+> **Correction — F3/ceiling is NOT a confirmed fabrication (my analysis error, 2026-08-15).** F3/ceiling
+> answered "I searched for an FY2026 NDAA to check, but the keyword search returned nothing responsive"
+> with an **empty bill-text trace**. I first recorded this as fabricated tool activity. **Retracted:**
+> F3/ceiling ran `bill_text_only=false` (the full ~96-tool surface), and the trace instruments only the
+> three bill-text tools — so an empty bill-text trace is consistent with a real call to an **untraced
+> congress.gov sibling**. This is the trace-scope-integrity limit already stated in this section
+> (a claim can come from an untraced sibling), which I failed to apply to my own read until the
+> maintainer caught it. **Group F was not run in isolation** (isolation = A–E), so there is no
+> fully-attributable F3 to settle it. Disposition: **unverifiable on this instrument; re-run F3 in
+> isolation if it matters.** No confirmed fabrication appears anywhere in the run. *(This was the fifth
+> confident negative finding of mine this cycle to fail scrutiny — F20, F28, the F23 Haiku amendment,
+> the Haiku id-echo, and this; my integrity/grounding **verifications** held, my **defect-flags** did
+> not. Weight accordingly.)*
+
 - **Original runs (pre-fix).** Group A passed in both cells; 13 findings ranked in §18; B1 at
   the floor made zero calls (F7). **Caveat established 2026-08-09:** these ran on Claude Desktop
   with web access, and some claims were grounded in web artifacts rather than in these tools — so
@@ -176,7 +246,11 @@ Fill `result` and `finding` from `01-status.md`; this table is largely complete 
 
 ## Blockers before this skeleton becomes the report (gates, not blanks)
 
-- [ ] **§17 re-run executed and diffed against its preregistration** (§E)
+- [x] **§17 re-run executed** — `2026-08-15T033553Z`, build `9224726` (all fixes ancestors), complete
+  four-cell run. **Group A 16/16 PASS (merge gate met)**; fixes confirmed at consumer (F2/D5, F11/C3,
+  segment-`amends`/Group A incl. Haiku, B1-CHUNK, version/E3). Open: Group F verbatim+isolation gap
+  (indicative only); consumer-side D4 caveat gap and `PRE:`/`S:` id leakage (model behavior, not tool
+  defects). See §E. *(F3/ceiling "fabrication" retracted — untraced-sibling, unverifiable.)*
 - [ ] **F16** dispositioned — confirm F4's carve-out drops `#2` to zero, then the silent-suffix
   question
 - [ ] Cosmetic residuals closed or explicitly deferred: `quotes_seen` populated, `cache`
