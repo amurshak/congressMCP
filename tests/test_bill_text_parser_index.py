@@ -953,6 +953,36 @@ def test_no_addressable_unit_emitted_from_inside_quoted_block():
     assert hits[0].match_contexts == ["quoted"]
 
 
+def test_whitespace_collapse_is_single_sourced():
+    # F26 (spec §18 / §6 no-drift): the whitespace-collapse idiom was
+    # re-implemented at four coupled sites (stored text, FTS query, snippet
+    # window, query display echo). Editing one desyncs search from display.
+    # One function -- parser.collapse_ws -- and every path routes through it.
+    import re as re_mod
+    from pathlib import Path
+
+    import congress_api.features.bill_text as bill_text_pkg
+    from congress_api.features.bill_text.index import _window
+    from congress_api.features.bill_text.parser import collapse_ws, normalize_text
+
+    raw = "  polar\t security\n\n cutter\u00a0 procurement "
+    collapsed = "polar security cutter procurement"
+    assert collapse_ws(raw) == collapsed
+    # Every consumer agrees with the shared collapse, plus its own wrapper only.
+    assert normalize_text(raw) == collapsed  # + _tighten_punct
+    assert normalized_query(raw) == collapsed.casefold()  # + casefold
+    assert _window(raw, 320) == collapsed  # + truncation
+    # The idiom exists ONCE in the package. A re-implementation at a call site
+    # is the drift §6 forbids, even if its behavior matches today.
+    pkg_dir = Path(bill_text_pkg.__file__).parent
+    sites = [
+        path.name
+        for path in sorted(pkg_dir.glob("*.py"))
+        for _ in re_mod.finditer(r're\.sub\(\s*r"\\s\+"', path.read_text())
+    ]
+    assert sites == ["parser.py"], f"whitespace collapse re-implemented in: {sites}"
+
+
 def test_strip_quote_delimiters_strips_only_a_matched_wrapping_pair():
     # F18 (spec §18 / §6 V16): the defensive strip exists ONLY for the 0.1%
     # class of source-embedded wrapping delimiters. Leading and trailing marks

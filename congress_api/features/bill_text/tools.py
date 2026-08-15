@@ -28,7 +28,7 @@ from .models import (
     Timing,
     TocNode,
 )
-from .parser import Unit, node_kind_for, render_segments
+from .parser import Unit, collapse_ws, node_kind_for, render_segments
 from .service import LoadedBillText, load_bill_text
 
 
@@ -168,7 +168,7 @@ def _normalize_queries(queries: list[str]) -> tuple[list[str], dict[str, str], l
         if norm not in seen:
             seen.add(norm)
             normalized.append(norm)
-            display[norm] = re.sub(r"\s+", " ", query).strip()
+            display[norm] = collapse_ws(query)
     if not normalized:
         raise ValueError("At least one non-empty query is required.")
     return normalized, display, notes

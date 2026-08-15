@@ -1078,6 +1078,17 @@ def element_text(elem: ET.Element, exclude: set[str] | None = None) -> str:
     return normalize_text(text)
 
 
+def collapse_ws(text: str) -> str:
+    """THE whitespace collapse (§6 no-drift, F26). Every path that flattens
+    whitespace -- stored segment text (normalize_text), FTS query normalization
+    (index.normalized_query), snippet windows (index._window), the query
+    display echo (tools) -- routes through this one function. Re-implementing
+    the idiom at a call site reintroduces the search-vs-display desync §6
+    exists to prevent, even if the copy's behavior matches today.
+    """
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _tighten_punct(text: str) -> str:
     # Remove spaces/tabs (never newlines -- they carry the segment join) that the
     # element_text / inline-join space-joining orphaned around brackets and
@@ -1088,7 +1099,7 @@ def _tighten_punct(text: str) -> str:
 
 
 def normalize_text(text: str) -> str:
-    return _tighten_punct(re.sub(r"\s+", " ", text).strip())
+    return _tighten_punct(collapse_ws(text))
 
 
 def _join_inline(run: str, text: str) -> str:

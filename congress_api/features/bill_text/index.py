@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from .models import AncestorNode
-from .parser import ParsedBill, Unit
+from .parser import ParsedBill, Unit, collapse_ws
 
 
 CONTEXT_ORDER = {"operative": 0, "quoted": 1, "header": 2}
@@ -69,7 +69,7 @@ def fts_literal(q: str) -> str:
 
 
 def normalized_query(q: str) -> str:
-    return re.sub(r"\s+", " ", q).strip().casefold()
+    return collapse_ws(q).casefold()
 
 
 def has_token(q: str) -> bool:
@@ -296,7 +296,7 @@ class BillTextIndex:
 
 
 def _window(text: str, max_chars: int) -> str:
-    compact = re.sub(r"\s+", " ", text).strip()
+    compact = collapse_ws(text)
     if len(compact) <= max_chars:
         return compact
     return compact[: max_chars - 1].rstrip() + "…"
