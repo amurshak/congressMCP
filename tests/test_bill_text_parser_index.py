@@ -953,6 +953,51 @@ def test_no_addressable_unit_emitted_from_inside_quoted_block():
     assert hits[0].match_contexts == ["quoted"]
 
 
+def test_strip_quote_delimiters_strips_only_a_matched_wrapping_pair():
+    # F18 (spec §18 / §6 V16): the defensive strip exists ONLY for the 0.1%
+    # class of source-embedded wrapping delimiters. Leading and trailing marks
+    # must be stripped together as a matched pair or not at all -- an unpaired
+    # mark is content, and deleting it makes segments.text (the one stored
+    # source of truth) lossy.
+    from congress_api.features.bill_text.parser import strip_quote_delimiters
+
+    # The 0.1% class: a genuine wrapping pair is stripped, inner marks kept.
+    assert strip_quote_delimiters("“The term ‘covered entity’ has meaning.”") == \
+        "The term ‘covered entity’ has meaning."
+    assert strip_quote_delimiters('"State means each State."') == "State means each State."
+    # Unpaired trailing mark: a plural possessive is content and must survive.
+    assert strip_quote_delimiters("amounts available under the Secretaries'") == \
+        "amounts available under the Secretaries'"
+    # Unpaired leading mark survives too.
+    assert strip_quote_delimiters('"State means each of the several States') == \
+        '"State means each of the several States'
+    # Mismatched styles are not a pair; both marks are content.
+    assert strip_quote_delimiters("“mixed wrapping'") == "“mixed wrapping'"
+    # A lone mark is content, not a pair.
+    assert strip_quote_delimiters('"') == '"'
+
+
+def test_quoted_block_content_apostrophe_survives_into_segments():
+    # F18 end-to-end: a quoted block whose text END is a possessive apostrophe
+    # (no wrapping marks in source -- the 99.9% case) must reach segments.text
+    # intact, or the FTS-indexed source of truth is silently lossy.
+    xml = (
+        b"<bill><legis-body>"
+        b"<section><enum>7</enum><header>Amendment</header>"
+        b"<text>Section 4 is amended to read as follows:</text>"
+        b"<quoted-block>"
+        b"<section><enum>4</enum><header>Duties</header>"
+        b"<text>The funds shall remain available at the Secretaries&#8217;</text></section>"
+        b"</quoted-block>"
+        b"</section>"
+        b"</legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119s1071enr", "enr", None)
+    s7 = next(u for u in parsed.units if u.section_id == "S:7")
+    quoted = " ".join(seg.text for seg in s7.segments if seg.context == "quoted")
+    assert "Secretaries’" in quoted  # the apostrophe is content, not a delimiter
+
+
 def test_subdivided_section_intro_preserves_quoted_context():
     # V14-class: when an over-size section is subdivided, its intro (the matter before
     # the first subdivision) is emitted by extract_intro_segments. A <quote> there --

@@ -880,8 +880,9 @@ def coalesce_segments(segments: list[Segment]) -> list[Segment]:
 # V16: the source carries no delimiters in 99.9% of cases (the tag is the
 # delimiter), but a 0.1% class does -- strip those at extraction so segments.text
 # is always clean and rendering can wrap unconditionally without doubling.
-_OPEN_QUOTE_CHARS = "\"“‘`"       # " “ ‘ `
-_CLOSE_QUOTE_CHARS = "\"”’'"      # " ” ’ '
+# Opening mark -> the ONE closing mark that pairs with it. A leading/trailing
+# combination outside this table is not a wrapping pair and must not strip.
+_WRAP_PAIRS = {'"': '"', "“": "”", "‘": "’", "`": "'"}  # "" “” ‘’ `'
 _QUOTE_OPEN = '"'
 _QUOTE_CLOSE = '"'
 # Leading punctuation that hugs the previous piece with no separator, so a
@@ -993,13 +994,19 @@ def flatten_quoted(elem: ET.Element) -> str:
 
 
 def strip_quote_delimiters(text: str) -> str:
-    """Remove one leading + one trailing source quote mark (the wrapping pair)."""
+    """Remove ONE source-embedded wrapping quote pair -- and only a pair.
+
+    This exists solely for the 0.1% class of quoting elements whose character
+    data carries its own wrapping marks (V16: the tag is the delimiter; §6
+    post-condition: no doubled delimiters on render). The marks are stripped
+    together, as a type-matched pair, or not at all: an unpaired mark -- a
+    trailing possessive apostrophe, the inner mark of a nested quote -- is
+    content, and stripping it makes segments.text lossy (F18).
+    """
     stripped = text.strip()
-    if stripped[:1] in _OPEN_QUOTE_CHARS:
-        stripped = stripped[1:]
-    if stripped[-1:] in _CLOSE_QUOTE_CHARS:
-        stripped = stripped[:-1]
-    return stripped.strip()
+    if len(stripped) >= 2 and _WRAP_PAIRS.get(stripped[0]) == stripped[-1]:
+        stripped = stripped[1:-1].strip()
+    return stripped
 
 
 def join_segments(segments: list[Segment], render: bool) -> str:
