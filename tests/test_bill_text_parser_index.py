@@ -1418,6 +1418,74 @@ async def test_resolve_versions_falls_back_only_when_congress_unavailable(monkey
 
 
 @pytest.mark.asyncio
+async def test_malformed_congress_body_routes_to_govinfo_fallback(monkeypatch):
+    # F21 (spec §18): congress.gov answering HTTP 200 with an HTML body must not
+    # escape as a JSONDecodeError that jumps over the GovInfo fallback and
+    # surfaces as internal_error. Root cause #15: congress_text_versions bypassed
+    # make_api_request and so missed its JSON-decode guard.
+    import httpx
+
+    import congress_api.core.client_handler as handler_mod
+    import congress_api.features.bill_text.client as client_mod
+    from congress_api.features.bill_text.client import (
+        BillTextError,
+        _resolve_versions,
+        congress_text_versions,
+    )
+
+    class FakeHttpClient:
+        def __init__(self, response):
+            self._response = response
+
+        async def get(self, endpoint, params=None):
+            return self._response
+
+    class FakeAppContext:
+        def __init__(self, response):
+            self.client = FakeHttpClient(response)
+            self.api_key = "test-key"
+            self.request_count = 0
+            self.cache = None
+
+    def serve(response):
+        app_ctx = FakeAppContext(response)
+        monkeypatch.setattr(handler_mod, "get_app_context", lambda: app_ctx)
+        # Pre-fix path read the app context through client.py's own import; patch
+        # both so the test exercises whichever wiring is live.
+        monkeypatch.setattr(client_mod, "get_app_context", lambda: app_ctx, raising=False)
+
+    request = httpx.Request("GET", "https://api.congress.gov/v3/bill/119/hr/1234/text")
+    serve(httpx.Response(200, text="<html>Service temporarily unavailable</html>", request=request))
+
+    # The decode failure surfaces as the recoverable taxonomy code, not a raw
+    # JSONDecodeError and not bill_not_found...
+    with pytest.raises(BillTextError) as exc:
+        await congress_text_versions(None, 119, "hr", 1234)
+    assert exc.value.code == "congress_unavailable"
+
+    # ...so _resolve_versions reaches the GovInfo fallback and recovers.
+    async def fake_search(congress, bill_type, number):
+        return [TextVersion(code="ih", date="2025-01-03", type_label="ih")]
+
+    monkeypatch.setattr(client_mod, "govinfo_search_versions", fake_search)
+    versions = await _resolve_versions(None, 119, "hr", 1234)
+    assert [v.code for v in versions] == ["ih"]
+
+    # A 404 stays definitive: bill_not_found, fallback never consulted (spec §3).
+    serve(httpx.Response(404, text="", request=request))
+    consulted = {"n": 0}
+
+    async def counting_search(congress, bill_type, number):
+        consulted["n"] += 1
+        return []
+
+    monkeypatch.setattr(client_mod, "govinfo_search_versions", counting_search)
+    with pytest.raises(BillTextError) as exc:
+        await _resolve_versions(None, 119, "hr", 999999)
+    assert exc.value.code == "bill_not_found" and consulted["n"] == 0
+
+
+@pytest.mark.asyncio
 async def test_govinfo_fallback_accepts_digit_suffixed_version_codes(monkeypatch):
     # F20 (spec §18): the fallback's packageId regex must accept the same code
     # alphabet as the primary path, or digit-suffixed reissues (pcs2, rh2, eas2)

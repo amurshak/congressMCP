@@ -16,7 +16,7 @@ import httpx
 from mcp.server.mcpserver import Context
 
 from ...core.api_config import API_KEY
-from ...core.client_handler import get_app_context
+from ...core.client_handler import make_api_request
 
 
 logger = logging.getLogger(__name__)
@@ -332,26 +332,28 @@ async def govinfo_search_versions(congress: int, bill_type: str, number: int) ->
 
 
 async def congress_text_versions(ctx: Context, congress: int, bill_type: str, number: int) -> list[TextVersion]:
-    app_ctx = ctx.request_context.lifespan_context if ctx is not None else get_app_context()
-    response = await app_ctx.client.get(
-        f"/bill/{congress}/{bill_type}/{number}/text",
-        params={"format": "json", "api_key": app_ctx.api_key},
-    )
-    if response.status_code == 404:
-        raise BillTextError(
-            "bill_not_found",
-            f"No such bill: {congress} {bill_type.upper()} {number}.",
-            None,
-            "Check congress, bill_type, and number.",
-        )
-    if response.status_code >= 400:
+    # Go through make_api_request rather than app_ctx.client directly (#15/F21):
+    # the wrapper carries the JSON-decode guard -- a congress.gov 200 with an HTML
+    # body must become an error dict, not a JSONDecodeError that jumps over the
+    # GovInfo fallback -- plus request counting and the shared response cache.
+    data = await make_api_request(f"/bill/{congress}/{bill_type}/{number}/text", ctx)
+    if "error" in data:
+        if data.get("status_code") == 404:
+            raise BillTextError(
+                "bill_not_found",
+                f"No such bill: {congress} {bill_type.upper()} {number}.",
+                None,
+                "Check congress, bill_type, and number.",
+            )
+        # Everything else -- a 5xx, a non-JSON 200 body, a network failure -- means
+        # "congress.gov did not give us version metadata", which _resolve_versions
+        # treats as recoverable via the GovInfo fallback (spec §3).
         raise BillTextError(
             "congress_unavailable",
             "Congress.gov text-version metadata could not be retrieved.",
-            {"status_code": response.status_code},
+            {key: data[key] for key in ("status_code", "error") if key in data},
             "Retry later, or pin an explicit version if known.",
         )
-    data = response.json()
     text_versions = data.get("textVersions") or data.get("text_versions") or []
     versions = []
     for item in text_versions:
