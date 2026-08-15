@@ -24,12 +24,14 @@ sys.path.insert(0, str(REPO / "tests" / "e2e"))
 from run_suite import (  # noqa: E402
     DISALLOWED_BUILTINS,
     FORBIDDEN_IN_PROMPT,
+    Meta,
     assert_config_carries_no_secret,
     assert_no_secret_in_trace,
     assert_prompt_is_cold,
     make_cold_cwd,
     resolve_prompt,
     write_mcp_config,
+    zero_trace_cells,
 )
 
 MANIFEST = json.loads((REPO / "tests" / "e2e" / "prompts.json").read_text())
@@ -225,6 +227,56 @@ def test_web_and_file_builtins_are_disallowed():
     # went through Claude Desktop, where these built-ins were not present at all.
     for tool in ("WebSearch", "WebFetch", "Bash", "Read"):
         assert tool in DISALLOWED_BUILTINS
+
+
+# --------------------------------------------------------------------------- #
+# F23: an un-exercised run must never score as clean.
+# --------------------------------------------------------------------------- #
+def _meta(prompt_id: str, cell: str, trace_records: int, harness_failure=None) -> Meta:
+    return Meta(
+        prompt_id=prompt_id, group="A", cell=cell, model="m", thinking="none",
+        context="fresh", bill_text_only=False, single_step_variant=False,
+        build_sha="x", document=None, document_sha256_16=None, prompt_sent="p",
+        started_utc="", finished_utc="", duration_s=0.0, exit_status=0,
+        harness_failure=harness_failure, trace_records=trace_records,
+    )
+
+
+def test_mcp_config_pins_the_preflight_interpreter(tmp_path):
+    # F23, interpreter half: preflight imports the GovInfo client under
+    # sys.executable, so the stdio server must launch under that SAME interpreter.
+    # A hardcoded .venv path can point at nothing (no repo .venv) while preflight
+    # passes -- the server then never starts and every prompt completes with zero
+    # trace records.
+    server = json.loads(
+        write_mcp_config(tmp_path, tmp_path / "t", False).read_text()
+    )["mcpServers"]["congress"]
+    assert server["command"] == sys.executable
+
+
+def test_a_cell_with_zero_trace_records_everywhere_is_a_harness_failure():
+    # F23, reporting half (§17 harness contract): zero traces means "never
+    # called", and a cell where EVERY invocation recorded zero -- exit 0, answers
+    # present -- is an instrument that never ran, not seventy consumers who all
+    # chose not to call. It must be reported as a harness failure, not a clean run.
+    dead = [_meta("A1", "floor", 0), _meta("A2", "floor", 0), _meta("B1", "floor", 0)]
+    live = [_meta("A1", "ceiling", 4), _meta("A2", "ceiling", 0), _meta("B1", "ceiling", 2)]
+    assert zero_trace_cells(dead + live, dry_run=False) == ["floor"]
+
+
+def test_a_single_zero_call_prompt_among_live_siblings_stays_a_finding():
+    # The B1 precedent: one prompt with zero calls in a cell whose siblings have
+    # traces is a real consumer finding. Only the cell-wide zero is the
+    # cannot-distinguish-from-a-dead-server case.
+    results = [_meta("A1", "floor", 3), _meta("B1", "floor", 0)]
+    assert zero_trace_cells(results, dry_run=False) == []
+
+
+def test_dry_runs_are_exempt_from_the_zero_trace_check():
+    # A dry run calls nothing by design; flagging it would train operators to
+    # ignore the failure that matters.
+    results = [_meta("A1", "floor", 0)]
+    assert zero_trace_cells(results, dry_run=True) == []
 
 
 # --------------------------------------------------------------------------- #

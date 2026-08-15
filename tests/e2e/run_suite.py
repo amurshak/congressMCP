@@ -108,7 +108,13 @@ def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool) -> Path:
     config = {
         "mcpServers": {
             "congress": {
-                "command": str(REPO / ".venv" / "bin" / "python"),
+                # sys.executable, never a hardcoded venv path (F23): preflight
+                # validates imports under THIS interpreter, and the server must run
+                # under the same one or the validation attaches to nothing. A path
+                # that points at a different (or absent) environment makes every
+                # prompt complete with zero trace records -- the empty run the
+                # zero-trace check exists to catch, created by the harness itself.
+                "command": sys.executable,
                 "args": ["-m", "congress_api", "--transport", "stdio"],
                 "cwd": str(REPO),
                 "env": {
@@ -334,6 +340,27 @@ def assert_no_secret_in_trace(lines: list[str], secrets: list[str], where: str) 
                 )
 
 
+def zero_trace_cells(results: list[Meta], dry_run: bool) -> list[str]:
+    """F23, the reporting half of the §17 harness contract.
+
+    Zero trace records means the tools were NEVER CALLED -- a server outside a
+    working environment fails loudly rather than running untraced -- so a cell
+    where every invocation recorded zero traces is an instrument that never ran,
+    not a set of consumers who all chose not to call. The aggregate is per CELL,
+    not per prompt: a single zero-call prompt among live siblings is a real
+    consumer finding (B1 at the floor), proven readable as such precisely because
+    its siblings' traces show the instrument was live. When a cell is zero
+    everywhere -- including a deliberate single-prompt run -- the two cases are
+    indistinguishable, and indistinguishable-from-broken must read as broken.
+    """
+    if dry_run:
+        return []
+    totals: dict[str, int] = {}
+    for meta in results:
+        totals[meta.cell] = totals.get(meta.cell, 0) + meta.trace_records
+    return sorted(cell for cell, total in totals.items() if total == 0)
+
+
 def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
             runner: list[str], sha: str, docs: dict, dry_run: bool) -> Meta:
     prompt_id = entry["id"]
@@ -490,6 +517,19 @@ def main() -> int:
         return 1
 
     if not args.dry_run:
+        # F23: assert at startup that the interpreter the MCP configs will name can
+        # actually load the server package from the repo. Preflight validates under
+        # sys.executable and the config now launches under sys.executable, so this
+        # is the one check that keeps "validated" and "executed" the same thing.
+        probe = subprocess.run([sys.executable, "-c", "import congress_api"],
+                               cwd=REPO, capture_output=True, text=True)
+        if probe.returncode != 0:
+            print(f"FATAL: {sys.executable} cannot import congress_api from {REPO}: "
+                  f"{probe.stderr.strip()[-300:]}\n"
+                  "The stdio server would never start and every prompt would complete "
+                  "with zero trace records -- an empty run wearing a clean table. Fix "
+                  "the environment (or run the harness under the right interpreter).")
+            return 1
         problem = preflight_credentials()
         if problem:
             print(f"FATAL: {problem}")
@@ -544,6 +584,14 @@ def main() -> int:
               f"{'+'.join(dict.fromkeys(meta.tool_calls)) or '-'}"
               f"{flag}")
 
+    # F23: a cell with zero trace records across EVERY invocation is an instrument
+    # that never ran, scored here as a harness failure -- never a clean run. It does
+    # not stop anything: all planned invocations have already executed, every other
+    # cell's results stand, and the failure is recorded in the manifest and the exit
+    # code rather than by aborting.
+    dead_cells = zero_trace_cells(results, args.dry_run)
+    failures += len(dead_cells)
+
     (run_dir / "run-manifest.json").write_text(json.dumps({
         "build_sha": sha,
         "working_tree_clean": working_tree_clean(),
@@ -554,17 +602,27 @@ def main() -> int:
         "dry_run": args.dry_run,
         "prompts": manifest["prompts"],
         "group_f_caveat": manifest["_group_f_caveat"],
+        "zero_trace_cell_failures": dead_cells,
         "results": [asdict(m) for m in results],
     }, indent=2) + "\n")
 
     # A dry run calls nothing, so every row has zero trace records. Reporting those as
     # "the consumer chose not to call" would be the harness committing the exact error
     # its own invariant forbids -- an absence of calls that is really an absence of a run.
+    # A prompt inside a dead cell is excluded for the same reason: with the whole cell
+    # at zero there is no live sibling to prove the instrument ran, so it is part of the
+    # cell's harness failure, not a consumer finding.
     zero_call = [] if args.dry_run else [
-        m for m in results if m.trace_records == 0 and not m.harness_failure
+        m for m in results
+        if m.trace_records == 0 and not m.harness_failure and m.cell not in dead_cells
     ]
     print(f"\nwrote {len(results)} result dirs to {run_dir}")
     print(f"harness failures: {failures}  (these are NOT consumer results)")
+    for cell_name in dead_cells:
+        n = sum(1 for m in results if m.cell == cell_name)
+        print(f"  HARNESS FAILURE: cell {cell_name!r} recorded ZERO trace records across "
+              f"all {n} invocation(s). The tools were never called -- this is an empty "
+              "run, not a clean one. Do not score it.")
     if zero_call:
         print(f"zero-tool-call runs that COMPLETED cleanly: "
               f"{[m.prompt_id + '/' + m.cell for m in zero_call]}")
