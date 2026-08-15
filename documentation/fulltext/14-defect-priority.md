@@ -771,6 +771,17 @@ their tests un-collected. Both are prospective guards on the instrument, not re-
   consumer result. (2) A harness-invalid cell is **flagged and skipped, never fatal** — the remaining
   cells still run; one cell's broken environment is not the others'. *"Harness failure" means this
   cell's measurement is void, not "abort the suite."* Contract lives in §17.
+  **FIXED 2026-08-14 (`27be6e4`), both halves, and RATIFIED with one amendment.** Interpreter pinned
+  to `sys.executable` + a startup import probe that refuses to start (naming the consequence);
+  `zero_trace_cells` flags a cell whose every invocation recorded zero traces (`exit 1`, post-hoc,
+  **non-aborting** — other cells stand), with a lone zero-call prompt beside live siblings kept as a
+  B1-style consumer finding. Ratified: cell is the failure unit, dry-runs exempt, dead cells excluded
+  from consumer findings, single-prompt edge reads as broken (safe direction). **Amendment (§17):**
+  the **Haiku capability cell** breaks the sibling heuristic — total abstention is a *legitimate*
+  outcome there, so an all-zero Haiku cell would be misflagged as a harness failure (the model-vs-tool
+  conflation the cell exists to prevent). That cell needs an **independent liveness proof** (a canary
+  call or a planted control prompt), not siblings; the import probe proves importability, not
+  end-to-end callability. Routed back to the implementer as the Haiku-cell condition.
   **No existing run is affected — the maintainer confirms every §17 run was executed in a proper
   venv (2026-08-14)**, and the certified cells (isolation A-run, A4 audit) were adjudicated against
   traces with non-zero records read directly. This contract is therefore a **prospective guard**, not

@@ -499,6 +499,33 @@ to a second artifact, and the same process-side-effect channel F15 named.
   >    canary failed is recorded as void **and the suite continues** — one cell's broken environment,
   >    timeout, or crash is not the others'. "Harness failure" above means *this cell's measurement is
   >    void*, never *abort the run*. A single unreachable cell must never cost the other cells' data.
+  >
+  > **Implemented and RATIFIED 2026-08-14 (`27be6e4`), with one amendment.** The shipped design
+  > realizes rule 1 without a separate canary call: the interpreter is pinned to `sys.executable`, a
+  > **startup import probe** refuses to start if that interpreter can't import `congress_api` from the
+  > config's cwd (naming the consequence), and liveness is then proved **per cell by its own live
+  > siblings** — a cell where *every* invocation recorded zero traces is `zero_trace_cell_failures`
+  > (exit 1, post-hoc, non-aborting), while a lone zero-call prompt beside live siblings stays a
+  > consumer finding (B1 preserved). Ratified: the **cell** is the failure unit; dry-runs are exempt;
+  > a dead cell's prompts are excluded from the "chose not to call" findings so it can't manufacture
+  > fake consumer results; and the single-prompt edge (`--prompts B1` with no sibling) reads as broken,
+  > because with nothing to prove liveness, *indistinguishable-from-broken must read as broken* — the
+  > safe direction (never greenwash).
+  >
+  > **Amendment — the capability (Haiku) cell needs an independent liveness proof; siblings are not
+  > enough there.** The sibling heuristic assumes the model is *expected* to call tools, so all-zero
+  > means broken. That holds for floor/ceiling. It **fails for the Haiku cell**, whose whole purpose
+  > is to measure whether the weakest model adopts the tools at all — **total abstention (every
+  > single-step prompt at zero calls, answering from priors) is a legitimate capability finding
+  > there**, the B1 fabrication shape at cell scale. Under the shipped rule that all-zero Haiku cell
+  > is flagged `HARNESS FAILURE` — **misattributing a model limitation to the instrument, the exact
+  > conflation this cell was added to prevent** (see "The capability floor" above). So the Haiku cell
+  > (and any cell where total abstention is an expected outcome) **must carry an independent liveness
+  > proof that does not depend on the model calling anything** — a harness-issued canary tool call, or
+  > a **planted control prompt the instrument must answer with a call**. With liveness proven that way,
+  > an all-zero Haiku cell reads as *"Haiku abstained"* (kept as a finding), not a harness fault. The
+  > startup import probe is necessary but not sufficient here: it proves *importability*, not
+  > end-to-end tool-callability, and the Haiku cell is exactly where that gap is load-bearing.
 - **Record inputs; do not assume deterministic outputs.** Models are stochastic. The harness
   captures verbatim answer + trace + full config so a result is re-scorable, and leans — as the
   method already does — on findings that recur across independent prompts rather than on a single
