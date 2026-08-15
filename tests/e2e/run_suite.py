@@ -200,6 +200,10 @@ class Meta:
     context: str
     bill_text_only: bool
     single_step_variant: bool
+    # True when --prompts forced this prompt into a cell whose groups would not
+    # normally include it -- a deliberate diagnostic run, not part of the standard
+    # grid. Recorded so the result can never be read back as a grid cell.
+    outside_cell_groups: bool
     build_sha: str
     document: str | None
     document_sha256_16: str | None
@@ -362,7 +366,8 @@ def zero_trace_cells(results: list[Meta], dry_run: bool) -> list[str]:
 
 
 def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
-            runner: list[str], sha: str, docs: dict, dry_run: bool) -> Meta:
+            runner: list[str], sha: str, docs: dict, dry_run: bool,
+            outside_cell_groups: bool = False) -> Meta:
     prompt_id = entry["id"]
     dest = out_root / cell_name / entry["group"] / prompt_id
     dest.mkdir(parents=True, exist_ok=True)
@@ -446,6 +451,7 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
         context=cell.get("context", "unspecified"),
         bill_text_only=bool(cell.get("bill_text_only")),
         single_step_variant=bool(cell.get("use_single_step_variant")),
+        outside_cell_groups=outside_cell_groups,
         build_sha=sha,
         document=doc,
         document_sha256_16=(docs.get(doc) or {}).get("sha256_16") if doc else None,
@@ -475,7 +481,12 @@ def main() -> int:
     ap.add_argument("--run-dir", default=None, help="output root (default runs/<utc-date>)")
     ap.add_argument("--cells", default="floor,ceiling, capability, isolation", help="comma-separated cell names")
     ap.add_argument("--groups", default=None, help="restrict to these groups, e.g. A,B")
-    ap.add_argument("--prompts", default=None, help="restrict to these prompt ids")
+    ap.add_argument("--prompts", default=None,
+                    help="restrict to these prompt ids. An id named here runs in every "
+                         "selected cell EVEN IF the cell's groups exclude it -- an "
+                         "explicit request is a deliberate diagnostic, and the result "
+                         "is marked outside_cell_groups so it cannot be read back as "
+                         "part of the standard grid.")
     ap.add_argument("--runner", default="claude -p --model {model}",
                     help="command template; {model} is substituted. The harness appends "
                          "--strict-mcp-config, --mcp-config, --allowed-tools and "
@@ -539,19 +550,33 @@ def main() -> int:
             return 1
         print("preflight  : GovInfo reachable with the configured key.")
 
+    if want_prompts:
+        known = {p["id"] for p in manifest["prompts"]}
+        missing = sorted(want_prompts - known)
+        if missing:
+            print(f"FATAL: --prompts names unknown id(s) {missing}; manifest defines "
+                  f"{sorted(known)}")
+            return 1
+
     docs = manifest["documents"]
-    planned: list[tuple[dict, str, dict]] = []
+    planned: list[tuple[dict, str, dict, bool]] = []
     for cell_name in cells:
         cell = manifest["cells"][cell_name]
         allowed = set(cell["groups"])
         for entry in manifest["prompts"]:
-            if entry["group"] not in allowed:
+            # An id named in --prompts is a deliberate diagnostic request and runs even
+            # in a cell whose groups exclude it (e.g. F3 in the isolation cell). The
+            # cell-group filter exists to shape the standard grid, not to forbid
+            # investigation; the off-grid status is recorded, not silently normalized.
+            explicitly_requested = bool(want_prompts) and entry["id"] in want_prompts
+            off_cell = entry["group"] not in allowed
+            if off_cell and not explicitly_requested:
                 continue
             if want_groups and entry["group"] not in want_groups:
                 continue
-            if want_prompts and entry["id"] not in want_prompts:
+            if want_prompts and not explicitly_requested:
                 continue
-            planned.append((entry, cell_name, cell))
+            planned.append((entry, cell_name, cell, off_cell))
 
     if not planned:
         print("FATAL: zero prompts selected. Refusing to write a run directory that "
@@ -564,19 +589,27 @@ def main() -> int:
     print(f"invocations: {len(planned)}   (one fresh process each -- never batched)")
     print(f"runner     : {' '.join(runner)}{'   [DRY RUN]' if args.dry_run else ''}\n")
 
+    off_cell_planned = [(e["id"], c) for e, c, _, off in planned if off]
+    for pid, cell_name in off_cell_planned:
+        print(f"  note: {pid} will run in cell {cell_name!r} OUTSIDE that cell's normal "
+              "groups (explicit --prompts request; marked outside_cell_groups in meta)")
+    if off_cell_planned:
+        print()
+
     results: list[Meta] = []
     failures = 0
-    for entry, cell_name, cell in planned:
+    for entry, cell_name, cell, off_cell in planned:
         try:
-            meta = run_one(entry, cell_name, cell, run_dir, runner, sha, docs, args.dry_run)
+            meta = run_one(entry, cell_name, cell, run_dir, runner, sha, docs,
+                           args.dry_run, outside_cell_groups=off_cell)
         except ValueError as exc:
             print(f"  {entry['id']:4s} {cell_name:11s} MANIFEST ERROR: {exc}")
             failures += 1
             continue
         results.append(meta)
-        flag = ""
+        flag = "  [outside cell groups]" if meta.outside_cell_groups else ""
         if meta.harness_failure:
-            flag = f"  HARNESS FAILURE: {meta.harness_failure[:60]}"
+            flag += f"  HARNESS FAILURE: {meta.harness_failure[:60]}"
             failures += 1
         print(f"  {meta.prompt_id:4s} {cell_name:11s} {meta.duration_s:6.1f}s  "
               f"{meta.trace_records:>3} trace records  "
