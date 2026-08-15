@@ -148,7 +148,19 @@ E2's floor caveat-drop (pre-registered).
 > (a claim can come from an untraced sibling), which I failed to apply to my own read until the
 > maintainer caught it. **Group F was not run in isolation** (isolation = A–E), so there is no
 > fully-attributable F3 to settle it. Disposition: **unverifiable on this instrument; re-run F3 in
-> isolation if it matters.** No confirmed fabrication appears anywhere in the run. *(This was the fifth
+> isolation if it matters.** No confirmed fabrication appears anywhere in the run.
+>
+> **Isolation re-run of F3 (maintainer, 2026-08-15) — F3 is clean; the ceiling claim stays an
+> unadjudicable outlier.** Run in the `bill_text_only=true` cell (trace scope == tool surface, so zero
+> calls now *means* zero calls): **zero tool calls, and a sane answer** — *"Which bill are you
+> referring to? … I'll need the specific bill … to pull the exact text."* This is the **correct**
+> response: the bill-text tools require a bill identifier (congress/type/number) and F3 names none, so
+> recognizing that and asking — rather than inventing a bill to search — is right, not a gap. Floor did
+> the same. So F3 is invariant-clean in the attributable cell and is **not a defect**. The ceiling's
+> "I searched for an FY2026 NDAA" is now an outlier against three clean references (floor, isolation,
+> and the expected behavior), but the isolation run cannot reach back to adjudicate a *different*
+> model on the *full* surface — it remains unverifiable, neither confirmed-fabrication nor
+> confirmed-honest, and is left there. *(This was the fifth
 > confident negative finding of mine this cycle to fail scrutiny — F20, F28, the F23 Haiku amendment,
 > the Haiku id-echo, and this; my integrity/grounding **verifications** held, my **defect-flags** did
 > not. Weight accordingly.)*
