@@ -855,6 +855,12 @@ their tests un-collected. Both are prospective guards on the instrument, not re-
   `display_text` cannot diverge. Four independent normalizers is four chances for the drift V4/§6
   exist to prevent. **Acceptance:** one normalization function, shared by index and display paths, so
   they cannot desynchronize.
+  **FIXED 2026-08-14 (`995d3cf`).** All four sites collapse to a single `parser.collapse_ws` (in the
+  layer index and tools already import from), each keeping only its own wrapper. The test **pins the
+  source scan** so a re-implementation at any site fails CI *even if it matches today* — the "not two
+  copies that happen to agree" guarantee, structural rather than conventional. Behavioral half feeds
+  tabs/newlines/NBSP through all four consumers. Zero behavior change (the four copies were
+  byte-identical today); the value is that they now *cannot* drift.
 
 - **F27 — `tools.py:59` bill-text ships a *second* structured-error system (`_error`/`ErrorEnvelope`)
   alongside `core/exceptions.py` `[REVIEW, unverified]`.** Clients get **two incompatible error

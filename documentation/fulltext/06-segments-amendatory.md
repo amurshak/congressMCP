@@ -86,6 +86,15 @@ computed against one would not map onto the other, and §8 requires snippets be 
 **quoted segments specifically** — offset drift there reintroduces exactly the failure V4
 guards. One stored string, one pure rendering function, no drift.
 
+> **F26 (2026-08-14, `995d3cf`) made the "no drift" structural, not conventional.** The
+> whitespace-collapse idiom (`re.sub(r"\s+", " ", …)`) had been re-implemented at **four** coupled
+> sites — stored text, the FTS query path, snippet windows, and the query display echo — so any one
+> edit could silently desync search from display. It is now a single `parser.collapse_ws` that all
+> four import (each adding only its own wrapper: casefold for search, `_tighten_punct` for stored
+> text, truncation for snippets), and a test **pins the source scan** so a re-implementation anywhere
+> fails CI *even if its behavior matches that day*. The invariant no longer rests on every
+> contributor re-typing the same regex identically.
+
 `unicode61` strips punctuation, so leaving delimiters out of the index costs nothing in
 recall; that is a happy consequence, not the reason.
 
