@@ -1,10 +1,9 @@
 # congressMCP — pre-existing tool defect register
 
 Defects in the **existing** tools, found during end-to-end testing of the bill-text
-feature. Separate artifact from `spec/` — that directory specifies `get_bill_content`;
-this one tracks the surface it landed on.
+feature. Separate artifact from `fulltext/` — that directory specifies the three new tools;
+this one tracks the surface they landed on.
 
-Found 2026-08-04. Nothing committed.
 
 ---
 
@@ -246,7 +245,7 @@ Do not bundle these into the bill-text PR. Separate PRs keep review honest and k
 
 ## Two process items
 
-**Add a wire-format verification step — V17, now specified in `spec/10-fixtures-verification.md`.**
+**Add a wire-format verification step — V17, now specified in `fulltext/10-fixtures-verification.md`.**
 V1–V16 verify the parser and index; none asserts that emitted responses conform to §9.
 
 **Correcting the first draft of this proposal, because D2 is its own counterexample.**
