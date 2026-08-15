@@ -619,6 +619,15 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   reappearing on the one path (subdivided parents) the bound skips. Acceptance: **every** unit,
   subdivided or not, is subject to `MAX_UNIT_BYTES`; a parent's own segments split like any other.
   This is the sibling of the two chunk-boundary fixes already on the branch (`ab6ca62`, `f9fa7ec`).
+  **FIXED 2026-08-14 (`e17ee04`).** The subdivided-parent branch of `_emit_addressable` was the one
+  unit-emitting path with no `MAX_UNIT_BYTES` check; it now byte-splits its own segments into `CHUNK`
+  children prepended ahead of the structural children (reading order preserved). Artifacts:
+  before `{S:1: 10506}` → after every unit ≤ 8,000; all 300 intro-word occurrences retrievable from
+  the chunks; `subtree_bytes[S:1]` still = own + Σ descendants; corpus scan of 18 bills shows **0
+  units over cap and 0 inventory change** (latent, as framed). **Spec follow-through:** the read-time
+  contract (§5 line 90) needed a refinement — the parent's own-intro chunks assemble **inline** as
+  "intro text," not as descriptors, or F19 would regress the "never return only the first chunk"
+  clause. Recorded in §5.
 
 - **F20 — `client.py:310` GovInfo fallback version regex `([a-z]+)$` drops digit-suffixed codes
   `[REVIEW, unverified]`.** `pcs2`, `eas2`, `rh2` — accepted by the primary path's `[a-z0-9]+` —

@@ -91,6 +91,20 @@ bill enumerates**; it may be fetched and must never be cited.
 | Bare enum, unique match | Resolve — accepted convenience |
 | Bare enum, multiple matches | Error listing every qualified match. **Never guess.** |
 
+> **F19 refinement (2026-08-14, `e17ee04`) — a subdivided parent's own intro can itself be
+> chunked, and that must not change the row above.** When a parent's own header+intro alone
+> exceeds `MAX_UNIT_BYTES` (the **index-time** unit cap, 8 KB — distinct from the read-time
+> `max_bytes`), the intro is split into the parent's **own** `CHUNK` children (`S:1/CHUNK:1…`),
+> ordered **ahead of** the structural children so reading order is preserved. Those own-text
+> chunks *are* "the section's own intro text": `get_bill_section` **assembles them inline up to
+> `max_bytes`**, exactly as when the intro was one blob — only the **structural** children
+> (subsections) are returned as descriptors. **Inline assembly here is required, not optional** —
+> returning the own-intro chunks as descriptors would force a re-fetch of the section's own prose
+> and could surface only the first chunk, the precise failure the row above forbids. This closes
+> the model gap that allowed F19: **every** unit-emitting path, the subdivided parent included, is
+> now bound by `MAX_UNIT_BYTES`. Latent when fixed — 0 of 18 corpus bills had an oversize parent
+> intro; `subtree_byte_length` conservation and inline reading order both verified preserved.
+
 ### Locate structural units by element name, not by expected parent path
 
 > **Amendment A4 (spec error, found live).** §5 said "preamble / whereas clauses →

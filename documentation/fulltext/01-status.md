@@ -26,7 +26,7 @@ are **PR 2** by decision.
 | # | Gate | State |
 |---|---|---|
 | 1 | **F20** — fallback version regex drops digit-suffixed codes (`client.py:310`) | **path asymmetry FIXED 2026-08-14** (shared letter-initial pattern; the anchor also blocks the real `5eh`-from-bill-12345 cross-bill collision). Residual (reissue ranking) **ruled in §3 but gated on existence** — **no real digit-suffixed BILLS package has been observed** (GovInfo documents none; the `pcs2` in play was a mocked test). Existence check DONE 2026-08-14: GovInfo returns **zero** for `ih2`/`pcs2`/`enr2` — no digit-suffixed code exists, so the ranking is dead-defensive (**do not build**) and "superseded print can win" was synthetic-only. **F20 disposed** — keep the fix, skip the ranking logic. |
-| 2 | **F19 / F21 / F22** — oversize-unit no-split; JSON-guard fallback bypass; redirect-as-success | open — dangerous failure classes (silent oversize; error-as-empty/success) |
+| 2 | **F19 / F21 / F22** — oversize-unit no-split; JSON-guard fallback bypass; redirect-as-success | **F19 FIXED `e17ee04`** (subdivided parent now byte-bounded; latent, 0/18 corpus; §5 line-90 read contract refined so own-intro chunks assemble inline). F21/F22 open. |
 | 3 | **F23 / F24** — §17 harness scores an un-exercised run clean; guard routers ship untested | open — measurement-integrity guards; land **before** trusting any further §17 re-run |
 | 4 | **§17 re-run** of affected cells (implementer-scripted CLI, §17) once F23/F24 are in | pending F23/F24 |
 | 5 | **F18 / F25 / F26** — quote-pair strip; `str(item)` version regex; whitespace-collapse desync | open — fidelity/robustness |
