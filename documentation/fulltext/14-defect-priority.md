@@ -686,7 +686,9 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   §17 tally and the `SimpleCache` path. Contract recorded in §3 (fallback-trigger) and §9 (codes).
   **Surfaced F28** (below): the implementer flagged that `make_api_request`'s `limit: 20` caps version
   enumeration — pre-existing, latent, but an F1-family wrong-document risk if any bill has >20
-  versions. Recorded in §3 with an owed measurement.
+  versions. Recorded in §3 with an owed measurement. **F28 RESOLVED 2026-08-14 — dead-defensive:**
+  500-bill sample (250 each, 118th/119th) showed max 5 versions vs the cap of 20 (4× margin). No
+  change required; optional cap-hit disclosure noted in §3 but not needed at that margin.
 
 - **F22 — `client.py:466` `_follow_with_key` returns an already-closed 3xx after exhausting
   `max_redirects`; callers treat any status `<400` as success `[REVIEW, unverified]`.** A redirect

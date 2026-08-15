@@ -64,6 +64,16 @@ spec claimed otherwise; that was wrong.
    > **if no real bill exceeds ~20 versions this is dead-defensive**, if any does it is a live
    > wrong-document risk needing pagination or an explicit `limit`. Route to the implementer with the
    > measurement; do not rank until it runs.
+   >
+   > **RESOLVED 2026-08-14 (maintainer ran it) — dead-defensive.** Sample: **250 bills each from the
+   > 118th and 119th congresses (500 total), max = 5 text versions.** Against the `limit: 20` cap
+   > that is a **4× margin**, so the truncation is theory, not practice — no change required. *Scope
+   > caveat, minor:* the sample is two recent congresses and did not probe a pathological historical
+   > tail, but a bill with >20 distinct version stages is essentially unheard of and the 4× headroom
+   > absorbs a large error. **Optional near-zero hardening if ever wanted:** disclose on cap-hit —
+   > if the enumeration ever returns *exactly* `limit`, set a truncation note — which converts the
+   > (currently unreachable) silent wrong-document risk into a disclosed one per the "no silent caps"
+   > convention. Not required at a 4× margin.
 2. Extract the GovInfo version code from each entry's XML/PDF URL (the URLs embed
    `BILLS-{congress}{type}{number}{code}`). If a code cannot be extracted from a URL,
    map it from the version-type string using a documented lookup table; log unmapped
