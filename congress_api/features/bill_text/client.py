@@ -470,7 +470,18 @@ async def _follow_with_key(
             current = location
             continue
         return response
-    return response
+    # Redirect exhaustion is an explicit error, never a returned response (F22):
+    # the last 3xx is already closed, and callers treat any <400 status as a
+    # document -- they would crash later on the closed body with the wrong
+    # proximate cause. Report the next hop without its query string, which on a
+    # CDN/S3 redirect can carry signed tokens.
+    next_hop = httpx.URL(current)
+    raise BillTextError(
+        "govinfo_unavailable",
+        f"GovInfo redirect chain exceeded {max_redirects} redirects without reaching a document.",
+        {"max_redirects": max_redirects, "next_location": f"{next_hop.scheme}://{next_hop.host}{next_hop.path}"},
+        "Retry later; if this persists the GovInfo download endpoint is misbehaving.",
+    )
 
 
 def _retry_after(value: str | None) -> float | None:

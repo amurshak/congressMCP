@@ -1418,6 +1418,52 @@ async def test_resolve_versions_falls_back_only_when_congress_unavailable(monkey
 
 
 @pytest.mark.asyncio
+async def test_redirect_exhaustion_is_an_explicit_error_not_a_success(monkeypatch):
+    # F22 (spec §18): a redirect chain that never terminates must surface as an
+    # explicit error. Before the fix, _follow_with_key exhausted max_redirects and
+    # returned the last 3xx -- already aclose()d -- which callers read as a <400
+    # success and then crashed on the closed body.
+    import httpx
+
+    import congress_api.features.bill_text.client as client_mod
+    from congress_api.features.bill_text.client import (
+        BillTextError,
+        _follow_with_key,
+        fetch_govinfo_package,
+    )
+
+    def endless_redirect(request):
+        return httpx.Response(302, headers={"location": str(request.url)})
+
+    real_async_client = httpx.AsyncClient
+
+    def redirecting_client(*args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(endless_redirect)
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(client_mod.httpx, "AsyncClient", redirecting_client)
+
+    # Caller level: the explicit error, never a "success" wearing a 3xx.
+    with pytest.raises(BillTextError) as exc:
+        await fetch_govinfo_package("BILLS-119hr1234ih")
+    assert exc.value.code == "govinfo_unavailable"
+    assert "redirect" in exc.value.message.lower()
+
+    # A bounded chain still resolves: two hops then a document.
+    hops = {"n": 0}
+
+    def two_hops_then_ok(request):
+        if hops["n"] < 2:
+            hops["n"] += 1
+            return httpx.Response(302, headers={"location": str(request.url)})
+        return httpx.Response(200, json={"ok": True})
+
+    async with real_async_client(transport=httpx.MockTransport(two_hops_then_ok)) as bounded:
+        response = await _follow_with_key(bounded, "GET", "https://api.govinfo.gov/x", "key")
+    assert response.status_code == 200 and hops["n"] == 2
+
+
+@pytest.mark.asyncio
 async def test_malformed_congress_body_routes_to_govinfo_fallback(monkeypatch):
     # F21 (spec §18): congress.gov answering HTTP 200 with an HTML body must not
     # escape as a JSONDecodeError that jumps over the GovInfo fallback and
