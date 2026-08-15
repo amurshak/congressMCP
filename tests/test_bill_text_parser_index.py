@@ -1632,6 +1632,32 @@ def test_primary_and_fallback_use_identical_version_code_alphabet():
     assert _version_code_from_item(119, "hr", 1234, item) == "pcs2"
 
 
+def test_version_code_read_from_formats_url_not_the_dict_repr():
+    # F25 (spec §18 / §3 read-by-structure): the version code is a structural
+    # property of formats[].url, never a substring of str(item). A code-shaped
+    # string in ANY other field must not win over (or substitute for) the URL.
+    from congress_api.features.bill_text.client import _version_code_from_item
+
+    # A non-URL field mentions a different package id; the URL carries the truth.
+    item = {
+        "note": "supersedes BILLS-119hr1234ih",
+        "formats": [
+            {"type": "PDF", "url": "https://www.govinfo.gov/content/pkg/BILLS-119hr1234rh/pdf/BILLS-119hr1234rh.pdf"},
+            {"type": "Formatted XML", "url": "https://www.govinfo.gov/content/pkg/BILLS-119hr1234rh/xml/BILLS-119hr1234rh.xml"},
+        ],
+    }
+    assert _version_code_from_item(119, "hr", 1234, item) == "rh"
+
+    # No formats at all: no code, regardless of what other fields mention.
+    assert _version_code_from_item(
+        119, "hr", 1234, {"type": "See BILLS-119hr1234eh elsewhere"}
+    ) is None
+
+    # Malformed shapes degrade to None, not a repr scan.
+    assert _version_code_from_item(119, "hr", 1234, {"formats": "BILLS-119hr1234eh"}) is None
+    assert _version_code_from_item(119, "hr", 1234, {"formats": [{"url": 42}, "junk"]}) is None
+
+
 @pytest.mark.asyncio
 async def test_resolve_notes_partial_unknown_code_to_the_caller(monkeypatch):
     # §3 ruling: an unrecognized code sorts last, so if it marks a newer stage a

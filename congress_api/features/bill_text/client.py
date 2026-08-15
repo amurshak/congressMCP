@@ -514,10 +514,28 @@ def _xml_url_from_summary(data: dict[str, Any]) -> str | None:
 
 
 def _version_code_from_item(congress: int, bill_type: str, number: int, item: dict[str, Any]) -> str | None:
-    payload = str(item)
-    pattern = rf"BILLS-{congress}{re.escape(bill_type)}{number}({VERSION_CODE_PATTERN})"
-    match = re.search(pattern, payload, re.IGNORECASE)
-    return match.group(1) if match else None
+    # The version code is a structural property of formats[].url -- the GovInfo
+    # package id embedded in the download link -- so read exactly that field
+    # (F25). Scanning str(item) let a code-shaped string in ANY field win: a
+    # prose note mentioning a superseded package id could beat the URL's true
+    # code purely on dict order.
+    formats = item.get("formats")
+    if not isinstance(formats, list):
+        return None
+    pattern = re.compile(
+        rf"BILLS-{congress}{re.escape(bill_type)}{number}({VERSION_CODE_PATTERN})",
+        re.IGNORECASE,
+    )
+    for fmt in formats:
+        if not isinstance(fmt, dict):
+            continue
+        url = fmt.get("url")
+        if not isinstance(url, str):
+            continue
+        match = pattern.search(url)
+        if match:
+            return match.group(1)
+    return None
 
 
 def order_versions(versions: list[TextVersion]) -> list[TextVersion]:
