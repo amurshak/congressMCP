@@ -29,7 +29,7 @@ are **PR 2** by decision.
 | 2 | **F19 / F21 / F22** — oversize-unit no-split; JSON-guard fallback bypass; redirect-as-success | **F19 FIXED `e17ee04`** (§5 line-90 read contract refined). **F21 FIXED `5dd3c69`** (routed through `make_api_request`; #15 resolved; fallback-trigger contract §3, codes §9; **F28 RESOLVED dead-defensive** — 500-bill sample maxed at 5). **F22 FIXED `cfd459e`** (redirect exhaustion now raises `govinfo_unavailable`; surfaced a §9 contract — error `detail` must strip secret-bearing URL query strings, F15 generalized). **This whole row is now closed.** |
 | 3 | **F23 / F24** — §17 harness scores an un-exercised run clean; guard routers ship untested | **F23 FIXED `27be6e4`** (fully ratified; Haiku amendment withdrawn). **F24 FIXED `880cb53`** (six dead SaaS-tier tests deleted; guard `raise` path now swept over all live branches — also addresses #18; #20 single-sourced; surfaced a silent-param-drop bug in the `laws` router, relayed). **Row 3 closed.** *Relayed:* 4 more `core.services` baselined collection errors, same greenwash, out of scope. |
 | 4 | **§17 re-run** of affected cells (implementer-scripted CLI, §17) once F23/F24 are in | pending F23/F24 |
-| 5 | **F18 / F25 / F26** — quote-pair strip; `str(item)` version regex; whitespace-collapse desync | open — fidelity/robustness |
+| 5 | **F18 / F25 / F26** — quote-pair strip; `str(item)` version regex; whitespace-collapse desync | **F18 FIXED `449d38b`** (matched-pair-only strip; content-over-doubled-delimiter priority ruled in §6; latent, 0/18 corpus). F25/F26 open. |
 | 6 | **§16 completion report finalized** from `15-completion-report.md` | last, after 1–5 |
 
 **No past evidence is invalidated** — every §17 run to date was executed in a proper venv

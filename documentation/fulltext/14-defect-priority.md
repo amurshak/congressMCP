@@ -610,6 +610,13 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   one stored source of truth, corrupted. Acceptance: strip only a *matched* opening+closing pair;
   an unpaired trailing mark is text and must survive. This is the V16 half of the same delimiter
   work already tracked at §6 line 92.
+  **FIXED 2026-08-14 (`449d38b`).** Type-matched `_WRAP_PAIRS` table replaces the two independent
+  char-set checks — both marks strip as a pair or neither. Artifacts: `the Secretaries'` survives at
+  both unit and segment level (the E2E test asserts the `'` stays in `segments.text`); nested inner
+  marks preserved; genuine pairs still strip. Corpus scan: 0/18 bills' quoted segments change
+  (latent, as V16 predicted). **One priority ruling recorded in §6:** on a *mismatched* wrap both
+  marks survive, so a render would double the delimiter — content preservation beats the
+  no-doubled-delimiter post-condition there (the class is empty per V16, so the cost is never paid).
 
 - **F19 — `parser.py:574` a subdivided parent unit's own segments are never byte-bounded
   `[REVIEW, unverified]`.** A unit can exceed `MAX_UNIT_BYTES` with no `CHUNK` split. **Violates the

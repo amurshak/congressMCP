@@ -99,6 +99,24 @@ recall; that is a happy consequence, not the reason.
 > not stripped. Strip defensively at extraction; it is a few characters of code and it
 > makes the rendering function total rather than correct-at-99.9%.
 >
+> **F18 ruling (2026-08-14, `449d38b`) — strip only a *matched* wrapping pair; an unpaired mark is
+> content.** The defensive strip must never delete a mark independently: the original code checked an
+> open-set and a close-set separately and so deleted a legitimate trailing apostrophe (`the
+> Secretaries'` → `the Secretaries`), corrupting `segments.text` — **the FTS-indexed source of
+> truth.** The rule is a type-matched pair table (`" "`, `“ ”`, `‘ ’`, `' '`): both marks strip
+> together or neither does; nested inner marks (`‘covered entity’`) are preserved; a lone, leading,
+> trailing, or **mismatched** mark is text and survives. **Priority ruling for the mismatched class,
+> where this collides with the post-condition above:** a source-embedded *mismatched* wrap (open of
+> one type, close of another, e.g. `“…'`) keeps **both** marks, so a render of that segment would show
+> a **doubled delimiter** — the one case where content-preservation and "no doubled delimiters"
+> diverge. **Content wins:** `segments.text` is canonical and indexed, so a cosmetic doubled delimiter
+> on render is strictly preferable to deleting a character from the source of truth. This does not
+> weaken the post-condition in practice — V16 measured the mismatched class **empty** (0.0%
+> everywhere; the only real source marks are the 0.1% NDAA *well-formed pairs*, which still strip) —
+> so the doubled-delimiter cost is never actually paid. **Do not "fix" a future doubled delimiter by
+> reintroducing independent stripping; that trades a cosmetic blemish for content loss.** Corpus scan:
+> 0 of 18 bills' quoted segments change under the new rule — latent, as V16 predicted.
+>
 > **The `S 3548` orphaned `" .` was not a source delimiter** — those do not exist in the
 > data — and the earlier reading of it in this spec was an inference from a single repro
 > that measurement overturned. It is the separate spacing artifact named below.
