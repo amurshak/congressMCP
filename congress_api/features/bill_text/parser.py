@@ -571,7 +571,32 @@ class _Chunker:
                 segments=extract_own_segments(elem, node.header, subdivided_tag),
                 child_ids=[child.section_id for child in children],
             )
+            own_chunks: list[Unit] = []
+            if parent.byte_length > MAX_UNIT_BYTES:
+                # §5's post-condition binds EVERY unit (F19): a subdivided parent's
+                # own intro/trailing matter is byte-bounded like any other unit's
+                # text. The parent keeps only its header segment (the container
+                # model, §4) and the body moves into CHUNK children listed before
+                # the structural children, so read-time assembly order is
+                # unchanged. A body within the cap on its own still becomes
+                # CHUNK:1 -- byte_split_unit would return it under the parent's
+                # id, colliding with the container unit.
+                head = parent.segments[:1] if parent.segments and parent.segments[0].context == "header" else []
+                body = parent.segments[len(head):]
+                if body:
+                    body_unit = Unit(section_id, path[:-1], node.header, body)
+                    own_chunks = byte_split_unit(body_unit)
+                    if own_chunks == [body_unit]:
+                        own_chunks = [Unit(f"{section_id}/CHUNK:1", path[:-1], node.header, body)]
+                    parent = Unit(
+                        section_id=section_id,
+                        ancestor_path=path[:-1],
+                        header=node.header,
+                        segments=head,
+                        child_ids=[chunk.section_id for chunk in own_chunks] + parent.child_ids,
+                    )
             self.units.append(parent)
+            self.units.extend(own_chunks)
             self.units.extend(children)
         else:
             self.units.extend(byte_split_unit(unit))

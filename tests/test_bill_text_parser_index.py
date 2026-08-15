@@ -175,6 +175,41 @@ def test_hidden_section_count_sees_byte_split_sections_below_depth():
     assert _hidden_section_note(parsed.units, actual, 2, parsed.subtree_bytes) is not None
 
 
+def test_subdivided_parent_own_segments_are_byte_bounded():
+    # F19 (spec §18; §5 post-condition "no emitted chunk exceeds the threshold"):
+    # EVERY unit is subject to MAX_UNIT_BYTES, including a subdivided parent's own
+    # intro/trailing segments. Before the fix, a section whose matter before the
+    # first subsection exceeded the cap shipped whole -- the one path exempt from
+    # the bound that chunking exists to enforce.
+    big_intro = ("intro matter before any subsection " * 300).encode()  # ~10.5 KB
+    xml = (
+        b"<bill><legis-body>"
+        b"<section><enum>1</enum><header>Sec 1</header>"
+        b"<text>" + big_intro + b"</text>"
+        b"<subsection><enum>a</enum><header>ss a</header><text>alpha</text></subsection>"
+        b"<subsection><enum>b</enum><header>ss b</header><text>beta</text></subsection>"
+        b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119hr1ih", "ih", None)
+    by_id = {u.section_id: u for u in parsed.units}
+    oversize = {u.section_id: u.byte_length for u in parsed.units if u.byte_length > MAX_UNIT_BYTES}
+    assert oversize == {}
+    # The parent survives as a container: header only, with its body in CHUNK
+    # children listed BEFORE the structural children (assembly order unchanged).
+    parent = by_id["S:1"]
+    chunk_ids = [cid for cid in parent.child_ids if "/CHUNK:" in cid]
+    assert chunk_ids == [f"S:1/CHUNK:{i}" for i in range(1, len(chunk_ids) + 1)]
+    assert len(chunk_ids) >= 2  # 10.5 KB of intro cannot fit one 8 KB chunk
+    assert parent.child_ids == chunk_ids + ["S:1/SS:a", "S:1/SS:b"]
+    assert all(cid in by_id for cid in parent.child_ids)
+    # No content lost: every word of the intro is retrievable from the chunks.
+    chunk_text = " ".join(by_id[cid].display_text for cid in chunk_ids)
+    assert chunk_text.split().count("matter") == 300
+    # Subtree accounting stays exact: own + sum of descendants.
+    descendants = sum(by_id[cid].byte_length for cid in parent.child_ids)
+    assert parsed.subtree_bytes["S:1"] == parent.byte_length + descendants
+
+
 def test_hidden_section_count_excludes_subsection_byte_chunks():
     # The dual of the above: a byte chunk of a SUBSECTION (`.../S:101/SS:a/CHUNK:n`)
     # is sub-section navigation noise and must NOT be advertised as a hidden section.
