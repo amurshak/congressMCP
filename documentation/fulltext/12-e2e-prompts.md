@@ -512,20 +512,21 @@ to a second artifact, and the same process-side-effect channel F15 named.
   > because with nothing to prove liveness, *indistinguishable-from-broken must read as broken* — the
   > safe direction (never greenwash).
   >
-  > **Amendment — the capability (Haiku) cell needs an independent liveness proof; siblings are not
-  > enough there.** The sibling heuristic assumes the model is *expected* to call tools, so all-zero
-  > means broken. That holds for floor/ceiling. It **fails for the Haiku cell**, whose whole purpose
-  > is to measure whether the weakest model adopts the tools at all — **total abstention (every
-  > single-step prompt at zero calls, answering from priors) is a legitimate capability finding
-  > there**, the B1 fabrication shape at cell scale. Under the shipped rule that all-zero Haiku cell
-  > is flagged `HARNESS FAILURE` — **misattributing a model limitation to the instrument, the exact
-  > conflation this cell was added to prevent** (see "The capability floor" above). So the Haiku cell
-  > (and any cell where total abstention is an expected outcome) **must carry an independent liveness
-  > proof that does not depend on the model calling anything** — a harness-issued canary tool call, or
-  > a **planted control prompt the instrument must answer with a call**. With liveness proven that way,
-  > an all-zero Haiku cell reads as *"Haiku abstained"* (kept as a finding), not a harness fault. The
-  > startup import probe is necessary but not sufficient here: it proves *importability*, not
-  > end-to-end tool-callability, and the Haiku cell is exactly where that gap is load-bearing.
+  > **Amendment considered and WITHDRAWN 2026-08-14 (maintainer).** I briefly ruled the Haiku cell
+  > needed an independent liveness proof (canary / planted control), on the premise that *total
+  > abstention is a legitimate expected outcome* there and the sibling heuristic would misflag it. That
+  > premise is false, for three reasons: (1) **the Haiku cell measures disclosure-*reading*, not tool-
+  > adoption** — a single-step Group A prompt tests whether the active signal is prominent enough for
+  > Haiku to *read and act on the tool's response*, which presumes a response exists; zero calls yields
+  > no measurement regardless of cause, so nothing legitimate is lost by flagging it. (2) **The Haiku
+  > prompts are engineered to encourage adoption and to remove the "reason about whether to call"
+  > pathway**, so abstention is not an expected mode. (3) **Empirically Haiku adopted the tools in the
+  > last run.** An all-zero Haiku cell is therefore not the sought finding but "no measurable data —
+  > investigate," which the flag says correctly whether the cause is a dead instrument or a
+  > catastrophic failure to adopt adoption-designed prompts (itself worth a loud flag, never a silent
+  > score). **The shipped sibling heuristic is correct for the Haiku cell too; no carve-out is needed.**
+  > This is the third defensive contract (with F20, F28) dissolved by the design or the data — the
+  > pattern in my own rulings, recorded rather than quietly dropped.
 - **Record inputs; do not assume deterministic outputs.** Models are stochastic. The harness
   captures verbatim answer + trace + full config so a result is re-scorable, and leans — as the
   method already does — on findings that recur across independent prompts rather than on a single

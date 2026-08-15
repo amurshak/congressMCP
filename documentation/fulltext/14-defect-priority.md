@@ -776,12 +776,12 @@ their tests un-collected. Both are prospective guards on the instrument, not re-
   `zero_trace_cells` flags a cell whose every invocation recorded zero traces (`exit 1`, post-hoc,
   **non-aborting** — other cells stand), with a lone zero-call prompt beside live siblings kept as a
   B1-style consumer finding. Ratified: cell is the failure unit, dry-runs exempt, dead cells excluded
-  from consumer findings, single-prompt edge reads as broken (safe direction). **Amendment (§17):**
-  the **Haiku capability cell** breaks the sibling heuristic — total abstention is a *legitimate*
-  outcome there, so an all-zero Haiku cell would be misflagged as a harness failure (the model-vs-tool
-  conflation the cell exists to prevent). That cell needs an **independent liveness proof** (a canary
-  call or a planted control prompt), not siblings; the import probe proves importability, not
-  end-to-end callability. Routed back to the implementer as the Haiku-cell condition.
+  from consumer findings, single-prompt edge reads as broken (safe direction). **The Haiku amendment
+  I first added was WITHDRAWN 2026-08-14** — the Haiku cell measures disclosure-*reading* (presumes a
+  response), its prompts are engineered to encourage adoption, and Haiku adopted the tools last run,
+  so total abstention is not a legitimate expected outcome there; an all-zero Haiku cell is correctly
+  flagged. **F23 fully ratified as shipped, no carve-out.** (Third defensive contract of mine dissolved
+  by design/data, after F20 and F28; see §17.)
   **No existing run is affected — the maintainer confirms every §17 run was executed in a proper
   venv (2026-08-14)**, and the certified cells (isolation A-run, A4 audit) were adjudicated against
   traces with non-zero records read directly. This contract is therefore a **prospective guard**, not
