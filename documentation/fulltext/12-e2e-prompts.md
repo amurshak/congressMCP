@@ -483,6 +483,22 @@ to a second artifact, and the same process-side-effect channel F15 named.
   Assert the invocation completed before recording "zero calls" — the
   scan-that-errors-must-not-look-like-one-that-found-nothing discipline (`00-INDEX`), applied to
   the harness itself.
+
+  > **F23 sharpening (2026-08-14) — the discriminator is tool-callability, not the call count, and
+  > one bad cell must not stop the rest.** The bug that named F23 hardcoded `.venv/bin/python`, which
+  > left the tool server *unstartable*, so **every** cell logged zero calls and all scored clean. Two
+  > rules close it without conflating instrument failure with consumer behavior:
+  > 1. **Pin the interpreter and prove callability out of band.** Run the prompts under
+  >    `sys.executable` (never a hardcoded venv path), and assert **once at startup, via a canary
+  >    tool call that must produce a trace record**, that the tools are actually invocable. A failing
+  >    canary marks the affected cells **harness-invalid** — the *instrument* failed, not the
+  >    consumer. A passing canary means a later **zero-call cell is a genuine consumer result** (the
+  >    model chose not to call — a tool-adoption finding like B1), recorded as such, never as a
+  >    harness fault. The raw zero-count is not the signal; the canary is what tells the two apart.
+  > 2. **Harness-invalid is flagged and skipped, not fatal.** A cell whose invocation errored or whose
+  >    canary failed is recorded as void **and the suite continues** — one cell's broken environment,
+  >    timeout, or crash is not the others'. "Harness failure" above means *this cell's measurement is
+  >    void*, never *abort the run*. A single unreachable cell must never cost the other cells' data.
 - **Record inputs; do not assume deterministic outputs.** Models are stochastic. The harness
   captures verbatim answer + trace + full config so a result is re-scorable, and leans — as the
   method already does — on findings that recur across independent prompts rather than on a single

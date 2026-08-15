@@ -760,9 +760,17 @@ their tests un-collected. Both are prospective guards on the instrument, not re-
   harness's own pass/fail logic, which marks a run with no tool activity as complete. So this is a
   *reporting* bug (empty run scored as clean), not a stealth-execution bug — the
   *a-scan-that-errors-must-not-look-like-one-that-found-nothing* failure, one layer up in the harness.
-  **Acceptance / new §17 harness contract:** a cell that should exercise the tools and emits **zero**
-  trace records is a **hard harness failure**, never a pass; and the prompts must run under the same
-  interpreter preflight validated (`sys.executable`, not a hardcoded path), asserted at startup.
+  **Acceptance / §17 harness contract (corrected 2026-08-14 — the discriminator is
+  *tool-callability*, not the raw call count):** the fix is **not** "zero trace records → fail," because
+  a zero-call cell has two indistinguishable causes — the harness couldn't invoke the tools (env
+  broken) *or the model chose not to call them*, which is a **legitimate consumer result** (a
+  tool-adoption finding, like B1 at the floor), not a defect. So: (1) run the prompts under
+  `sys.executable` (never a hardcoded venv path), and **prove callability out of band** — a startup
+  **canary** tool call that must emit a trace record; a failing canary marks the affected cells
+  **harness-invalid** (the instrument failed), a passing canary means a later zero-call cell is a real
+  consumer result. (2) A harness-invalid cell is **flagged and skipped, never fatal** — the remaining
+  cells still run; one cell's broken environment is not the others'. *"Harness failure" means this
+  cell's measurement is void, not "abort the suite."* Contract lives in §17.
   **No existing run is affected — the maintainer confirms every §17 run was executed in a proper
   venv (2026-08-14)**, and the certified cells (isolation A-run, A4 audit) were adjudicated against
   traces with non-zero records read directly. This contract is therefore a **prospective guard**, not
