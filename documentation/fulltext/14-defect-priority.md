@@ -799,6 +799,30 @@ their tests un-collected. Both are prospective guards on the instrument, not re-
   test that actually collects; a baselined collection error over changed code is not acceptable
   coverage. **Sub-finding #20** (`check_known_failures.py:42` — baseline recorded twice, prose +
   Python set, no link, can desync) compounds this: the greenwash is also un-synchronized.
+  **FIXED 2026-08-14 (`880cb53`).** The six files were **verified dead and deleted, not repaired** —
+  beyond the standalone `fastmcp` import they imported `congress_api.core.auth.auth`,
+  `check_operation_access`/`FREE_OPERATIONS`/`PAID_OPERATIONS`, and 5/6 target modules under gone
+  names: they tested the **deleted SaaS-tier architecture**, so no import fix could make them collect
+  (KNOWN_FAILURES.md had itself guessed "left behind by a migration off fastmcp"). This closes the
+  bug_002 loop — the standalone-`fastmcp` tests were migration debris, distinct from the (0)
+  `mcp.server.fastmcp` runtime imports. **Acceptance met, and exceeded:** the guard `raise` path is
+  now exercised by `tests/test_bucket_operation_guard.py` — 4 unit tests plus a **parametrized sweep
+  over every live router branch** (84 cases, non-vacuity floor ≥40) that asserts a sibling parameter
+  raises the guard's `ToolError`; **a new branch without a guard call fails automatically as the raw
+  `TypeError`**, which is the coverage-enforcement mechanism **#18** asked for (see below — now
+  addressed, not just relayed). **#20 resolved:** the Python copy of the baseline is gone; the
+  `KNOWN_FAILURES.md` fenced blocks are the single machine-read source, the checker **refuses an empty
+  parse instead of reporting everything as regressions** (the scan-that-errors discipline), and a new
+  test rejects baselined entries whose files no longer exist and blocks the six from returning.
+  **The sweep caught a real gap first run — routed, non-bill-text:** the `laws` router predated the
+  convention and **silently dropped** sibling params via `kwargs.get(...)` (`get_laws`,
+  `get_law_details`) — no error at all, a *different* bug from the guard-drift `TypeError`. Now raises
+  the honest rejection. **Behavior change to relay:** a caller who sent an inapplicable param to
+  `laws` used to get silent results and now gets a `ToolError` — the documented guard contract, but a
+  visible change on that one public tool. **F24-adjacent, relayed for disposition (not bill-text, out
+  of scope):** 4 more baselined collection errors remain (`core.services` email/user) — the **same
+  greenwash pattern**; they need the same verify-dead-then-delete-or-repair disposition the six got,
+  but they are non-bill-text and non-blocking. Do not assume dead without the check the six received.
 
 - **F25 — `client.py:498` `_version_code_from_item` regexes over `str(item)` (the dict repr) instead
   of reading `formats[].url` structurally `[REVIEW, unverified]`.** A version-code match can be
@@ -874,6 +898,11 @@ their tests un-collected. Both are prospective guards on the instrument, not re-
   routers with nothing enforcing coverage; a forgotten call regresses to the opaque `TypeError` the
   guard exists to prevent. **This is the systemic root of the guard-drift trio (findings 1, 4, 5)** —
   worth a coverage test or a decorator, not 81 hand-copies. Relay as the meta-fix.
+  **ADDRESSED 2026-08-14 by F24's sweep (`880cb53`).** `test_bucket_operation_guard.py` walks every
+  live router branch and fails any branch missing its guard call (as the raw `TypeError`) — the
+  coverage enforcement this asked for, so a forgotten hand-paste now fails a test instead of silently
+  regressing. The 81 call sites remain hand-written (a decorator would still be cleaner), but they are
+  no longer *unguarded* against omission.
 - **#22** `committee_reports.py:424` — param-name drift fixed in *opposite* directions in the same
   diff (camelCase→snake_case here, the reverse in summaries/treaties), permanently mixing
   `from_date_time` and `fromDateTime` on the public MCP surface. A public-surface consistency defect;
