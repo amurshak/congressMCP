@@ -700,6 +700,15 @@ one (bills `version`) may be an *unwired bill-text seam* — flagged below for a
   document. **Full-list detail sharpens the failure mode:** callers then **crash on the empty/closed
   body** — so it is not silent-wrong-content but a delayed crash at parse time, still with the wrong
   proximate cause. Related client-lifecycle finding: **#16** (fresh `AsyncClient` per request).
+  **FIXED 2026-08-14 (`cfd459e`).** The fall-through `return response` at redirect exhaustion is now
+  a raised `BillTextError("govinfo_unavailable", …)` carrying `max_redirects` and the next hop; the
+  429/503 backoff loop propagates it immediately (a redirect loop is not a rate limit). Artifact: a
+  forever-302 chain went from a closed 302 read as `<400` success → later `JSONDecodeError` from
+  `summary.json()`, to an explicit `govinfo_unavailable`. **A spec contract came out of it:** the
+  next-hop URL is stripped to `scheme+host+path` before entering the error `detail`, because a CDN/S3
+  redirect target can carry a **signed token** in its query string — the F15 credential-in-URL rule
+  hitting a new surface. Generalized in §9 (error `detail` must never carry secret-bearing URLs) and
+  the code added to §9's taxonomy. #16 (pooled client) stays a routed nit, untouched.
 
 ### Bill-text feature — already recorded, not a new defect
 

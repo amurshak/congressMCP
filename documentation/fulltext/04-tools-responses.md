@@ -167,10 +167,11 @@ navigation aid useful for deciding where to descend.
     // load-bearing codes incl. (see §3 for the resolution/fallback contract):
     //   bill_not_found       — congress.gov 404; definitive, GovInfo fallback NOT consulted
     //   congress_unavailable — 5xx / non-JSON 200 / network; recoverable → triggers GovInfo fallback
+    //   govinfo_unavailable  — GovInfo fetch failed definitively (incl. redirect-chain exhaustion, F22)
     //   version_not_available — bill exists, requested version does not (lists available)
-    //   internal_error       — a genuine server fault; NOT a masked upstream/decode failure (F21)
+    //   internal_error       — a genuine server fault; NOT a masked upstream/decode failure (F21/F22)
     "message": "S. 1071 exists but has no 'ih' version.",
-    "detail": {"available_versions": ["is", "es", "enr"]},
+    "detail": {"available_versions": ["is", "es", "enr"]},   // MUST NOT carry secrets — see below
     "remediation": "Retry with one of the listed versions, or omit version."
   }
 }
@@ -193,7 +194,17 @@ reader to notice.
 
 **Field decisions:** `ancestor_path` is an **array of typed nodes**, not a string.
 `amends` is a **list**. `score` is the RRF score. `govinfo_url` is the **public details
-page**, never the API URL (which would carry the key). `cache.index_hit` and
+page**, never the API URL (which would carry the key).
+
+> **Error `detail` must not carry secret-bearing URLs — the F15 rule, generalized (F22,
+> `cfd459e`).** `govinfo_url`'s no-key rule is one instance of a wider contract: **any URL that
+> reaches a response `detail` or a log must be stripped to `scheme+host+path`**, because it can carry
+> secrets in its query string that are not the api_key. F22 surfaced the new vector concretely — a
+> GovInfo redirect can target a CDN/S3 URL whose query string holds a **signed access token**, and
+> F22 puts the next-hop URL into the error envelope's `detail`, so it strips the query before
+> including it. Treat this as the standing rule for the whole error surface, not a per-field fix:
+> the api_key was the first secret-in-URL (F15, §11); signed redirect targets are the second; assume
+> a third. Cross-reference §11's credential hygiene. `cache.index_hit` and
 `cache.version_hit` are separate — version resolution can hit the network while the
 index is cached.
 
