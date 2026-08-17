@@ -9,6 +9,7 @@ judgment, and Group A should be scored by someone with no project history.
     CONGRESS_API_KEY=... GOVINFO_API_KEY=... \
         python -m tests.e2e.run_suite --run-dir runs/2026-08-09 --cells floor,ceiling
 
+    python -m tests.e2e.run_suite --agent codex --cells floor    # drive the Codex CLI
     python -m tests.e2e.run_suite --dry-run     # validate manifest + layout, call nothing
 
 The harness writes its own MCP config per prompt, pointing the CLI at this repo's server
@@ -18,6 +19,21 @@ registered -- and so the isolation cell's three tools and the floor/ceiling full
 are real settings. The config names NO credential in any form -- the stdio child
 inherits the environment, and an unset ${VAR} would arrive as that literal string and
 override the working key.
+
+--agent selects the driver: `claude` (default) or `codex`. The measurement is
+agent-agnostic BY CONSTRUCTION -- the trace is the SERVER's JSONL, not the model's own
+account -- so switching drivers changes who is being measured without changing how. Only
+the invocation differs, and each driver's flags encode the SAME two guarantees the
+Claude path does: (1) the operator's own tool surface is shut out (Claude
+--strict-mcp-config; Codex --ignore-user-config, which drops the operator's config.toml --
+and its MCP servers, including an unrelated `congressmcp-dev` pointed at a different
+install -- while still loading auth from CODEX_HOME), and (2) the only way to answer is
+the traced congress tools. Claude enforces (2) by denying its built-ins; Codex has no
+per-tool deny, so it runs in the read-only sandbox with approvals off -- its shell cannot
+write or reach the network, and the cold working directory is empty, so a grounded answer
+has nowhere to come from but the MCP server. Codex model ids differ from Claude's, so a
+codex run expects the cells' `model` values to be codex models (the {model} substitution
+is identical); a Claude model id handed to codex fails loudly at the CLI, never silently.
 
 The CLI runs in an empty temp directory OUTSIDE this repo. It resolves project context by
 walking up from its working directory, so anywhere inside the repo -- including the
@@ -74,6 +90,127 @@ DISALLOWED_BUILTINS = (
     "WebSearch", "WebFetch", "Bash", "Read", "Write", "Edit",
     "Glob", "Grep", "Task", "NotebookEdit",
 )
+
+# The default command template per driver. {model} is substituted from the cell exactly
+# as for Claude; the harness appends the driver-specific isolation flags in build_command.
+DEFAULT_RUNNERS = {
+    "claude": "claude -p --model {model}",
+    "codex": "codex exec -m {model}",
+}
+
+
+def toml_quote(value: str) -> str:
+    """Quote a string as a TOML basic string, for Codex `-c key=value` overrides.
+
+    Codex parses the value of `-c key=value` as TOML and falls back to a literal only when
+    that parse fails. A path or arg is therefore ambiguous unquoted (a value that happens to
+    look like a TOML number/array/bool would be coerced), so every string is quoted and its
+    backslashes and quotes escaped -- the argv is passed as a list, so there is no shell
+    layer, only TOML's.
+    """
+    return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def codex_server_spec(trace_dir: Path, bill_text_only: bool) -> dict:
+    """The single congress MCP server Codex is given -- the exact analog of the Claude JSON.
+
+    Same server, same interpreter rule (sys.executable, per F23), same two per-prompt env
+    vars and NO credential (see write_mcp_config for why naming one would be a bug, not a
+    convenience). The whole surface is one server, and --ignore-user-config guarantees it is
+    the ONLY one.
+    """
+    return {
+        "command": sys.executable,
+        "args": ["-m", "congress_api", "--transport", "stdio"],
+        "cwd": str(REPO),
+        "env": {
+            "CONGRESSMCP_TRACE_DIR": str(trace_dir),
+            "CONGRESSMCP_BILL_TEXT_ONLY": "1" if bill_text_only else "",
+        },
+    }
+
+
+def codex_config_overrides(spec: dict) -> list[str]:
+    """Flatten the server spec into Codex `-c mcp_servers.congress.*` argv flags.
+
+    Codex has no `--mcp-config <file>`; the surface is passed as config overrides. Built
+    from the SAME dict written to the on-disk artifact, so the file the run directory keeps
+    and the flags actually executed cannot drift.
+    """
+    flags: list[str] = []
+
+    def add(key: str, toml_value: str) -> None:
+        flags.extend(["-c", f"{key}={toml_value}"])
+
+    add("mcp_servers.congress.command", toml_quote(spec["command"]))
+    add("mcp_servers.congress.args", "[" + ", ".join(toml_quote(a) for a in spec["args"]) + "]")
+    add("mcp_servers.congress.cwd", toml_quote(spec["cwd"]))
+    for name, value in spec["env"].items():
+        add(f"mcp_servers.congress.env.{name}", toml_quote(value))
+    return flags
+
+
+def write_codex_mcp_config(dest: Path, spec: dict) -> Path:
+    """Write the Codex MCP surface as config.toml -- the run-directory record and the thing
+    the no-secret assertion scans, mirroring write_mcp_config's mcp-config.json for Claude.
+
+    This file documents the surface; codex_config_overrides passes it to the CLI. Both come
+    from `spec`, so the audit that clears this file clears what actually ran.
+    """
+    lines = [
+        "[mcp_servers.congress]",
+        f"command = {toml_quote(spec['command'])}",
+        "args = [" + ", ".join(toml_quote(a) for a in spec["args"]) + "]",
+        f"cwd = {toml_quote(spec['cwd'])}",
+        "",
+        "[mcp_servers.congress.env]",
+    ]
+    for name, value in spec["env"].items():
+        lines.append(f"{name} = {toml_quote(value)}")
+    path = dest / "mcp-config.toml"
+    path.write_text("\n".join(lines) + "\n")
+    return path
+
+
+def build_command(agent: str, runner: list[str], model: str, config_path: Path | None,
+                  codex_overrides: list[str], cold_cwd: Path, answer_file: Path | None) -> list[str]:
+    """Assemble the full argv for the selected driver.
+
+    Both branches append flags that shut out the operator's tool surface and leave the
+    traced congress tools as the only answer path -- the two invariants §17 turns into
+    configuration -- but the mechanisms are different and each is spelled out where it lives.
+    """
+    base = [part.replace("{model}", model) for part in runner]
+    if agent == "claude":
+        return base + [
+            "--strict-mcp-config",          # ignore every config the operator happens to have
+            "--mcp-config", str(config_path),
+            "--permission-mode", "acceptEdits",
+            "--allowed-tools", "mcp__congress",
+            "--disallowed-tools", ",".join(DISALLOWED_BUILTINS),
+        ]
+    # codex
+    return base + [
+        # --ignore-user-config is the --strict-mcp-config analog: it drops the operator's
+        # $CODEX_HOME/config.toml -- and with it every MCP server they have registered,
+        # including a `congressmcp-dev` pointed at a DIFFERENT install that would answer
+        # untraced -- while auth still loads from CODEX_HOME, so a logged-in operator stays
+        # authenticated. The congress server is then supplied entirely by the -c overrides.
+        "--ignore-user-config",
+        # Read-only sandbox with approvals off is how the "traced tools are the only way to
+        # answer" invariant is met without a per-tool deny list: the model's own shell can
+        # neither write nor reach the network, and MCP tool calls run in their own server
+        # process outside the sandbox, so they still work. Never --dangerously-bypass-*:
+        # that reopens the network and turns the isolation cell into a non-comparison.
+        "-s", "read-only",
+        "-c", 'approval_policy="never"',
+        "--skip-git-repo-check",           # the cold cwd is deliberately not a git repo
+        "--ephemeral",                     # persist no session state between prompts
+        "-C", str(cold_cwd),
+        "-o", str(answer_file),            # final agent message, clean, separate from logs
+        *codex_overrides,
+        "-",                               # read the prompt from stdin (never argv)
+    ]
 
 
 def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool) -> Path:
@@ -190,11 +327,29 @@ def assert_config_carries_no_secret(path: Path, secrets: list[str]) -> None:
         )
 
 
+def assert_argv_carries_no_secret(cmd: list[str], secrets: list[str]) -> None:
+    """The Codex surface travels in argv (-c overrides), not only in a file, so scan it too.
+
+    The file audit (assert_config_carries_no_secret) covers the on-disk record; this covers
+    what is actually executed. Same rule for both drivers: a credential reaches the server by
+    inheritance, never by being named on a command line (where it would also land in the
+    process table and this run's meta.json `command`).
+    """
+    joined = "\n".join(cmd)
+    for secret in secrets:
+        if secret in joined:
+            raise SystemExit(
+                "FATAL: a live credential appears in the runner argv. Credentials must reach "
+                "the server by inheritance, never on the command line. Run halted."
+            )
+
+
 @dataclass
 class Meta:
     prompt_id: str
     group: str
     cell: str
+    agent: str
     model: str
     thinking: str
     context: str
@@ -366,7 +521,7 @@ def zero_trace_cells(results: list[Meta], dry_run: bool) -> list[str]:
 
 
 def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
-            runner: list[str], sha: str, docs: dict, dry_run: bool,
+            runner: list[str], agent: str, sha: str, docs: dict, dry_run: bool,
             outside_cell_groups: bool = False) -> Meta:
     prompt_id = entry["id"]
     dest = out_root / cell_name / entry["group"] / prompt_id
@@ -384,14 +539,26 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
 
     doc = entry.get("document")
     secrets = secret_values()
-    # Unique per (run, cell, group, prompt) so no two invocations can share a trace and
-    # be mistaken for one session -- the batching failure, made structurally impossible.
-    config_path = write_mcp_config(dest, trace_dir, bool(cell.get("bill_text_only")))
+    bill_text_only = bool(cell.get("bill_text_only"))
+    # The MCP surface is written per (run, cell, group, prompt) so no two invocations can
+    # share a trace and be mistaken for one session -- the batching failure, made
+    # structurally impossible. Each driver names the surface its own way (Claude a JSON file
+    # it reads; Codex a config.toml record plus -c overrides), but both are audited to carry
+    # no credential, and the answer for Codex comes from --output-last-message, not stdout.
+    codex_overrides: list[str] = []
+    answer_file: Path | None = None
+    if agent == "claude":
+        config_path = write_mcp_config(dest, trace_dir, bill_text_only)
+    else:
+        spec = codex_server_spec(trace_dir, bill_text_only)
+        config_path = write_codex_mcp_config(dest, spec)
+        codex_overrides = codex_config_overrides(spec)
+        answer_file = dest / "agent-last-message.txt"
     assert_config_carries_no_secret(config_path, secrets)
 
     env = dict(os.environ)
     env["CONGRESSMCP_TRACE_DIR"] = str(trace_dir)
-    env["CONGRESSMCP_BILL_TEXT_ONLY"] = "1" if cell.get("bill_text_only") else ""
+    env["CONGRESSMCP_BILL_TEXT_ONLY"] = "1" if bill_text_only else ""
 
     started = datetime.now(timezone.utc)
     t0 = time.perf_counter()
@@ -399,25 +566,30 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     exit_status = -1
     answer = ""
 
-    cmd = [part.replace("{model}", cell["model"]) for part in runner] + [
-        "--strict-mcp-config",          # ignore every config the operator happens to have
-        "--mcp-config", str(config_path),
-        "--permission-mode", "acceptEdits",
-        "--allowed-tools", "mcp__congress",
-        "--disallowed-tools", ",".join(DISALLOWED_BUILTINS),
-    ]
+    cmd = build_command(agent, runner, cell["model"], config_path, codex_overrides,
+                        cold_cwd, answer_file)
+    assert_argv_carries_no_secret(cmd, secrets)
 
     if dry_run:
         exit_status, answer = 0, "[dry-run: no model was called]"
     else:
         try:
-            # The prompt goes in on STDIN, not argv. --mcp-config is variadic and will
-            # swallow a trailing positional; stdin also keeps the prompt out of the
-            # process table. cwd is the neutral directory, never the repo.
+            # The prompt goes in on STDIN, not argv (Claude's --mcp-config is variadic and
+            # would swallow a trailing positional; Codex reads stdin when the prompt arg is
+            # `-`). stdin also keeps the prompt out of the process table. cwd is the neutral
+            # directory, never the repo.
             proc = subprocess.run(cmd, cwd=cold_cwd, env=env, input=text,
                                   capture_output=True, text=True, timeout=900)
             exit_status = proc.returncode
-            answer = proc.stdout
+            # Claude prints the final result to stdout; Codex prints progress there and
+            # writes the final message to the -o file, so take the answer from whichever
+            # the driver uses (and keep Codex's stdout as a debugging artifact).
+            if agent == "codex":
+                (dest / "runner-stdout.txt").write_text(proc.stdout)
+                answer = (answer_file.read_text() if answer_file and answer_file.exists()
+                          else proc.stdout)
+            else:
+                answer = proc.stdout
             if exit_status != 0:
                 harness_failure = f"runner exited {exit_status}: {proc.stderr[-800:]}"
             elif not answer.strip():
@@ -446,6 +618,7 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
         prompt_id=prompt_id,
         group=entry["group"],
         cell=cell_name,
+        agent=agent,
         model=cell["model"],
         thinking=cell.get("thinking", "unspecified"),
         context=cell.get("context", "unspecified"),
@@ -487,10 +660,15 @@ def main() -> int:
                          "explicit request is a deliberate diagnostic, and the result "
                          "is marked outside_cell_groups so it cannot be read back as "
                          "part of the standard grid.")
-    ap.add_argument("--runner", default="claude -p --model {model}",
-                    help="command template; {model} is substituted. The harness appends "
-                         "--strict-mcp-config, --mcp-config, --allowed-tools and "
-                         "--disallowed-tools, and feeds the prompt on stdin.")
+    ap.add_argument("--agent", default="claude", choices=sorted(DEFAULT_RUNNERS),
+                    help="which CLI to drive (default claude). Selects the default runner and "
+                         "the isolation flags appended to it; the measurement is identical "
+                         "because it reads the server trace, not the model's output.")
+    ap.add_argument("--runner", default=None,
+                    help="command template; {model} is substituted. Defaults per --agent "
+                         "(claude: 'claude -p --model {model}'; codex: 'codex exec -m {model}'). "
+                         "The harness appends the driver-specific isolation flags and feeds the "
+                         "prompt on stdin.")
     ap.add_argument("--dry-run", action="store_true",
                     help="validate manifest, cells, and layout without calling any model")
     ap.add_argument("--allow-dirty", action="store_true",
@@ -522,7 +700,7 @@ def main() -> int:
         return 1
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    runner = args.runner.split()
+    runner = (args.runner or DEFAULT_RUNNERS[args.agent]).split()
     if not args.dry_run and shutil.which(runner[0]) is None:
         print(f"FATAL: runner {runner[0]!r} not on PATH. Pass --runner, or --dry-run.")
         return 1
@@ -587,6 +765,7 @@ def main() -> int:
     print(f"run dir    : {run_dir}")
     print(f"cells      : {', '.join(cells)}")
     print(f"invocations: {len(planned)}   (one fresh process each -- never batched)")
+    print(f"agent      : {args.agent}")
     print(f"runner     : {' '.join(runner)}{'   [DRY RUN]' if args.dry_run else ''}\n")
 
     off_cell_planned = [(e["id"], c) for e, c, _, off in planned if off]
@@ -600,7 +779,7 @@ def main() -> int:
     failures = 0
     for entry, cell_name, cell, off_cell in planned:
         try:
-            meta = run_one(entry, cell_name, cell, run_dir, runner, sha, docs,
+            meta = run_one(entry, cell_name, cell, run_dir, runner, args.agent, sha, docs,
                            args.dry_run, outside_cell_groups=off_cell)
         except ValueError as exc:
             print(f"  {entry['id']:4s} {cell_name:11s} MANIFEST ERROR: {exc}")
@@ -631,6 +810,7 @@ def main() -> int:
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "cells": {c: manifest["cells"][c] for c in cells},
         "documents": docs,
+        "agent": args.agent,
         "runner": " ".join(runner),
         "dry_run": args.dry_run,
         "prompts": manifest["prompts"],

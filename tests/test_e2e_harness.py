@@ -22,14 +22,20 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "tests" / "e2e"))
 
 from run_suite import (  # noqa: E402
+    DEFAULT_RUNNERS,
     DISALLOWED_BUILTINS,
     FORBIDDEN_IN_PROMPT,
     Meta,
+    assert_argv_carries_no_secret,
     assert_config_carries_no_secret,
     assert_no_secret_in_trace,
     assert_prompt_is_cold,
+    build_command,
+    codex_config_overrides,
+    codex_server_spec,
     make_cold_cwd,
     resolve_prompt,
+    write_codex_mcp_config,
     write_mcp_config,
     zero_trace_cells,
 )
@@ -234,10 +240,10 @@ def test_web_and_file_builtins_are_disallowed():
 # --------------------------------------------------------------------------- #
 def _meta(prompt_id: str, cell: str, trace_records: int, harness_failure=None) -> Meta:
     return Meta(
-        prompt_id=prompt_id, group="A", cell=cell, model="m", thinking="none",
+        prompt_id=prompt_id, group="A", cell=cell, agent="claude", model="m", thinking="none",
         context="fresh", bill_text_only=False, single_step_variant=False,
-        build_sha="x", document=None, document_sha256_16=None, prompt_sent="p",
-        started_utc="", finished_utc="", duration_s=0.0, exit_status=0,
+        outside_cell_groups=False, build_sha="x", document=None, document_sha256_16=None,
+        prompt_sent="p", started_utc="", finished_utc="", duration_s=0.0, exit_status=0,
         harness_failure=harness_failure, trace_records=trace_records,
     )
 
@@ -252,6 +258,88 @@ def test_mcp_config_pins_the_preflight_interpreter(tmp_path):
         write_mcp_config(tmp_path, tmp_path / "t", False).read_text()
     )["mcpServers"]["congress"]
     assert server["command"] == sys.executable
+
+
+def test_codex_command_shuts_out_the_operator_surface_and_reads_stdin(tmp_path):
+    # The Codex driver must encode the SAME two guarantees as Claude with its own flags:
+    # (1) --ignore-user-config drops the operator's config.toml and every MCP server in it
+    # (a real hazard here -- the operator has a `congressmcp-dev` pointed at a different
+    # install that would answer untraced); (2) a read-only sandbox with approvals off is the
+    # only-the-traced-tools guarantee, since Codex has no per-tool deny. The prompt is read
+    # from stdin (trailing `-`), never argv.
+    spec = codex_server_spec(tmp_path / "trace", bill_text_only=True)
+    cmd = build_command("codex", ["codex", "exec", "-m", "{model}"], "gpt-5-codex",
+                        tmp_path / "mcp.toml", codex_config_overrides(spec),
+                        tmp_path / "cold", tmp_path / "last.txt")
+    assert cmd[:4] == ["codex", "exec", "-m", "gpt-5-codex"]   # {model} substituted
+    assert "--ignore-user-config" in cmd
+    assert cmd[cmd.index("-s") + 1] == "read-only"
+    assert 'approval_policy="never"' in cmd
+    assert "--skip-git-repo-check" in cmd                      # cold cwd is not a git repo
+    assert cmd[-1] == "-"                                      # prompt on stdin
+    assert cmd[cmd.index("-o") + 1] == str(tmp_path / "last.txt")
+    # The congress server, and only it, is supplied via -c overrides.
+    assert any(part.startswith("mcp_servers.congress.command=") for part in cmd)
+    # None of the Claude-only flags leak into the Codex argv.
+    for claude_flag in ("--strict-mcp-config", "--mcp-config", "--allowed-tools",
+                        "--disallowed-tools", "--permission-mode"):
+        assert claude_flag not in cmd
+    # NEVER the sandbox-bypass flag: it would reopen the network and make the isolation
+    # cell a non-comparison.
+    assert "--dangerously-bypass-approvals-and-sandbox" not in cmd
+
+
+def test_codex_never_bypasses_the_sandbox_for_any_cell(tmp_path):
+    spec = codex_server_spec(tmp_path / "trace", bill_text_only=False)
+    cmd = build_command("codex", DEFAULT_RUNNERS["codex"].split(), "gpt-5-codex",
+                        tmp_path / "mcp.toml", codex_config_overrides(spec),
+                        tmp_path / "cold", tmp_path / "last.txt")
+    assert "-s" in cmd and cmd[cmd.index("-s") + 1] == "read-only"
+    # Check the exact flag, not a loose "bypass" substring: pytest's tmp_path embeds this
+    # test's own name, so the cold-cwd path contains "bypass" and a substring scan would
+    # false-positive on the harness rather than the argv.
+    assert "--dangerously-bypass-approvals-and-sandbox" not in cmd
+    assert "--dangerously-bypass-hook-trust" not in cmd
+
+
+def test_codex_config_and_argv_name_no_credential(tmp_path):
+    # Parity with the Claude JSON: neither the config.toml record nor the -c overrides may
+    # carry a credential -- the server inherits it. Both audits must fire on a planted key.
+    spec = codex_server_spec(tmp_path / "trace", bill_text_only=False)
+    toml_path = write_codex_mcp_config(tmp_path, spec)
+    text = toml_path.read_text()
+    assert "command" in text and "${" not in text
+    fake = "ZEirgEryNcncMKowiNBW8Uqv6Z6xMh6Tvd6uQyoa"
+    # The clean surface passes both audits.
+    assert_config_carries_no_secret(toml_path, [fake])
+    assert_argv_carries_no_secret(codex_config_overrides(spec), [fake])
+    # A credential smuggled into the argv is caught.
+    poisoned = codex_config_overrides(spec) + ["-c", f'mcp_servers.congress.env.X="{fake}"']
+    with pytest.raises(SystemExit):
+        assert_argv_carries_no_secret(poisoned, [fake])
+
+
+def test_codex_server_spec_pins_the_preflight_interpreter(tmp_path):
+    # F23 parity: the Codex server, like the Claude one, must launch under sys.executable,
+    # the interpreter preflight validated -- not a hardcoded path that can point at nothing.
+    spec = codex_server_spec(tmp_path / "trace", bill_text_only=False)
+    assert spec["command"] == sys.executable
+    assert spec["args"] == ["-m", "congress_api", "--transport", "stdio"]
+    assert set(spec["env"]) == {"CONGRESSMCP_TRACE_DIR", "CONGRESSMCP_BILL_TEXT_ONLY"}
+
+
+def test_claude_command_is_unchanged_by_the_codex_addition(tmp_path):
+    # Regression: adding the driver switch must not alter the Claude argv the prior runs
+    # were produced under, or a re-run stops being comparable with them.
+    cmd = build_command("claude", ["claude", "-p", "--model", "{model}"], "opus",
+                        tmp_path / "mcp.json", [], tmp_path / "cold", None)
+    assert cmd == [
+        "claude", "-p", "--model", "opus",
+        "--strict-mcp-config", "--mcp-config", str(tmp_path / "mcp.json"),
+        "--permission-mode", "acceptEdits",
+        "--allowed-tools", "mcp__congress",
+        "--disallowed-tools", ",".join(DISALLOWED_BUILTINS),
+    ]
 
 
 def test_a_cell_with_zero_trace_records_everywhere_is_a_harness_failure():
