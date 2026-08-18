@@ -42,20 +42,8 @@ tests/test_user_creation.py
 `ModuleNotFoundError: No module named 'congress_api.core.services'`. The module does
 not exist anywhere in the tree, so these test a package layout that is gone.
 
-## Test failures (6)
+## Test failures (2)
 
-### `'Mock' object is not subscriptable` (4)
-
-```
-tests/test_bucket_double_conversion.py::test_committee_intelligence_does_not_double_convert
-tests/test_bucket_double_conversion.py::test_records_and_hearings_does_not_double_convert
-tests/test_bucket_double_conversion.py::test_research_and_professional_does_not_double_convert
-tests/test_bucket_double_conversion.py::test_voting_and_nominations_does_not_double_convert
-```
-
-The mock returned by the patched client is indexed by the bucket implementation and
-raises `TypeError`, surfacing as `ToolError`. A test-harness problem in the bucket
-features, unrelated to their production behavior.
 
 ### Async tests with no async plugin (2)
 
