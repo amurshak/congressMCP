@@ -464,6 +464,75 @@ def test_shim_fails_loudly_on_a_missing_secrets_file(tmp_path):
     assert "cannot stat" in proc.stderr
 
 
+# --------------------------------------------------------------------------- #
+# F29 (amending F23's no-canary ratification): a new driver's cell is gated by a
+# forced-call canary BEFORE any prompt is spent, and the verdict is written into the
+# artifacts -- never only an exit code. The void Codex run reproduced F23's defining
+# state (dead cell scored clean) on the path the sibling heuristic cannot protect:
+# when the DRIVER kills every call client-side, there are no live siblings.
+# --------------------------------------------------------------------------- #
+def test_canary_is_required_for_codex_and_not_for_the_ratified_claude_path():
+    from run_suite import CANARY_REQUIRED_DRIVERS
+
+    assert "codex" in CANARY_REQUIRED_DRIVERS
+    # The 2026-08-14 ratification stands for Claude: sibling liveness, no canary.
+    assert "claude" not in CANARY_REQUIRED_DRIVERS
+
+
+def test_canary_entry_forces_one_call_on_a_corpus_grounded_document():
+    from run_suite import CANARY_ENTRY
+
+    # A forced call, deliberately not cold: it names the tool and the arguments,
+    # because it measures the instrument, never the consumer.
+    assert "get_bill_toc" in CANARY_ENTRY["prompt"]
+    assert CANARY_ENTRY["document"] in MANIFEST["documents"], (
+        "the canary must target a document the corpus manifest pins, or its own "
+        "failure could be a missing fixture rather than a dead instrument"
+    )
+    # Its group must not collide with any real cell's groups, so it can never be
+    # planned as a prompt.
+    for cell in MANIFEST["cells"].values():
+        assert CANARY_ENTRY["group"] not in cell["groups"]
+
+
+def test_canary_verdict_is_live_only_on_a_server_side_trace():
+    from run_suite import canary_verdict
+
+    live = _meta("CANARY", "cross-vendor-floor", trace_records=2)
+    assert canary_verdict(live)[0] == "live"
+    # Zero traces with a clean exit is exactly the void run's shape: client-side
+    # denial or server startup failure, invisible to the exit status.
+    dead = _meta("CANARY", "cross-vendor-floor", trace_records=0)
+    verdict, reason = canary_verdict(dead)
+    assert verdict == "void"
+    assert "BEFORE its prompts were spent" in reason
+    # A crashed canary invocation is void too, never scored as an instrument check
+    # that passed.
+    crashed = _meta("CANARY", "cross-vendor-floor", trace_records=3,
+                    harness_failure="runner exited 1")
+    assert canary_verdict(crashed)[0] == "void"
+
+
+def test_a_canary_proven_cell_with_all_zero_prompts_is_adoption_not_death():
+    # F23 rule 1, realized: a passing canary means a later zero-call cell is a genuine
+    # consumer result (mass abstention -- a loud adoption finding), never flagged as a
+    # dead instrument. Without the canary proof the same shape stays dead.
+    rows = [_meta("A1", "cv", 0), _meta("A2", "cv", 0), _meta("A3", "cv", 0)]
+    assert zero_trace_cells(rows, dry_run=False, live_cells=frozenset({"cv"})) == []
+    assert zero_trace_cells(rows, dry_run=False) == ["cv"]
+
+
+def test_cell_void_marker_lands_in_the_cell_directory(tmp_path):
+    from run_suite import write_cell_void
+
+    write_cell_void(tmp_path, "cross-vendor-floor", "canary", "no trace record")
+    marker = tmp_path / "cross-vendor-floor" / "CELL-VOID.json"
+    assert marker.exists(), "the verdict must be IN the artifacts, not only an exit code"
+    data = json.loads(marker.read_text())
+    assert data["verdict"] == "void" and data["source"] == "canary"
+    assert "Do not score" in data["scoring_rule"]
+
+
 def test_claude_command_is_unchanged_by_the_codex_addition(tmp_path):
     # Regression: adding the driver switch must not alter the Claude argv the prior runs
     # were produced under, or a re-run stops being comparable with them.

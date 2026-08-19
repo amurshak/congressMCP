@@ -728,7 +728,8 @@ def assert_no_secret_in_trace(lines: list[str], secrets: list[str], where: str) 
                 )
 
 
-def zero_trace_cells(results: list[Meta], dry_run: bool) -> list[str]:
+def zero_trace_cells(results: list[Meta], dry_run: bool,
+                     live_cells: frozenset[str] = frozenset()) -> list[str]:
     """F23, the reporting half of the §17 harness contract.
 
     Zero trace records means the tools were NEVER CALLED -- a server outside a
@@ -740,13 +741,81 @@ def zero_trace_cells(results: list[Meta], dry_run: bool) -> list[str]:
     its siblings' traces show the instrument was live. When a cell is zero
     everywhere -- including a deliberate single-prompt run -- the two cases are
     indistinguishable, and indistinguishable-from-broken must read as broken.
+
+    `live_cells` (F29 amendment): a cell whose pre-cell canary produced a
+    server-side trace record has PROVEN its instrument live out of band, so an
+    all-zero prompt set there is a set of genuine adoption findings, not a dead
+    cell -- exactly the F23 rule-1 distinction the canary exists to draw.
     """
     if dry_run:
         return []
     totals: dict[str, int] = {}
     for meta in results:
         totals[meta.cell] = totals.get(meta.cell, 0) + meta.trace_records
-    return sorted(cell for cell, total in totals.items() if total == 0)
+    return sorted(cell for cell, total in totals.items()
+                  if total == 0 and cell not in live_cells)
+
+
+# F29 (amending F23's no-canary ratification, maintainer 2026-08-19): the ratified
+# sibling-liveness heuristic assumed the Claude driver's failure modes; the first Codex
+# run reproduced F23's defining state -- a dead cell scored clean row by row -- on a
+# path the sibling heuristic cannot protect, because when the DRIVER kills every call
+# client-side (approval auto-deny, MCP startup failure) there are no live siblings to
+# tell instrument death from mass abstention. So a NEW driver's cells are gated by a
+# forced-call canary BEFORE any prompt is spent: one invocation whose prompt explicitly
+# demands a single MCP call, asserted to have produced a server-side trace record. The
+# Claude cells keep the ratified sibling heuristic unchanged.
+CANARY_REQUIRED_DRIVERS = frozenset({"codex"})
+
+# The canary's one call targets the smallest corpus package -- the same document the
+# credential preflight fetches, so its availability is already proven out of band.
+# This prompt is deliberately NOT cold: it names the tool and the arguments, because
+# the canary measures the instrument (can a call get through?), never the consumer.
+CANARY_ENTRY = {
+    "id": "CANARY",
+    "group": "_canary",
+    "prompt": (
+        "Use the get_bill_toc tool from the congress MCP server with congress=119, "
+        'bill_type="hres", number=463, and reply with the number of top-level '
+        "entries in the table of contents it returns."
+    ),
+    "document": "BILLS-119hres463ih",
+    "title": "forced-call canary -- instrument liveness, not a consumer measurement",
+    "grounding": "same package the credential preflight fetches; smallest in the corpus",
+}
+
+
+def canary_verdict(meta: Meta) -> tuple[str, str]:
+    """(verdict, reason) for a canary invocation: live only on a server-side trace."""
+    if meta.harness_failure:
+        return "void", f"canary invocation failed: {meta.harness_failure}"
+    if meta.trace_records == 0:
+        return "void", (
+            "canary produced no server-side trace record: the driver's MCP channel is "
+            "dead (client-side approval denial, server startup failure, or total "
+            "adoption collapse -- runner-stderr.txt has the driver's own account). "
+            "The cell was voided BEFORE its prompts were spent."
+        )
+    return "live", f"canary produced {meta.trace_records} server-side trace record(s)"
+
+
+def write_cell_void(run_dir: Path, cell_name: str, source: str, reason: str) -> None:
+    """The cell-level verdict marker, written INTO the artifacts (F29).
+
+    The void Codex run was scored clean because the verdict lived only in the exit
+    code and a top-level manifest field: every row a scorer opened said
+    harness_failure: null. This marker sits in the cell directory itself, where no
+    per-row reading can miss the directory listing.
+    """
+    dest = run_dir / cell_name
+    dest.mkdir(parents=True, exist_ok=True)
+    (dest / "CELL-VOID.json").write_text(json.dumps({
+        "cell": cell_name,
+        "verdict": "void",
+        "source": source,
+        "reason": reason,
+        "scoring_rule": "Do not score any row of this cell as a consumer result.",
+    }, indent=2) + "\n")
 
 
 def plan_invocations(manifest: dict, cells: list[str],
@@ -1097,34 +1166,74 @@ def main() -> int:
                     if "codex" in drivers and not args.dry_run else None)
 
     results: list[Meta] = []
+    canaries: list[Meta] = []
+    canary_by_cell: dict[str, dict] = {}
+    voided: dict[str, str] = {}
+    live_by_canary: set[str] = set()
     failures = 0
     try:
-        for entry, cell_name, cell, off_cell in planned:
-            try:
-                meta = run_one(entry, cell_name, cell, run_dir, runners, driver_versions,
-                               sha, docs, args.dry_run, outside_cell_groups=off_cell,
-                               secrets_file=secrets_file)
-            except ValueError as exc:
-                print(f"  {entry['id']:4s} {cell_name:11s} MANIFEST ERROR: {exc}")
-                failures += 1
+        for run_cell_name in cells:
+            run_cell = manifest["cells"][run_cell_name]
+            cell_planned = [p for p in planned if p[1] == run_cell_name]
+            if not cell_planned:
                 continue
-            results.append(meta)
-            flag = "  [outside cell groups]" if meta.outside_cell_groups else ""
-            if meta.harness_failure:
-                flag += f"  HARNESS FAILURE: {meta.harness_failure[:60]}"
-                failures += 1
-            if meta.web_activity_suspected:
-                # An open web channel is an instrument breach, not a consumer behavior:
-                # the row's claims are no longer tool-attributable, so it counts as a
-                # harness failure even when the invocation itself exited cleanly (F30).
-                flag += (f"  WEB ACTIVITY SUSPECTED ({','.join(meta.web_activity_suspected)})"
-                         " -- claims not tool-attributable")
-                failures += 1
-            print(f"  {meta.prompt_id:4s} {cell_name:11s} {meta.duration_s:6.1f}s  "
-                  f"{meta.trace_records:>3} trace records  "
-                  f"{meta.answer_chars:>6} chars  "
-                  f"{'+'.join(dict.fromkeys(meta.tool_calls)) or '-'}"
-                  f"{flag}")
+            # F29: a new driver's cell is gated by a forced-call canary BEFORE any
+            # prompt is spent. The verdict is written into the artifacts (canary.json,
+            # and CELL-VOID.json on failure), never only into an exit code -- the void
+            # run was scored clean because every row a scorer opened looked clean.
+            if (run_cell.get("driver", "claude") in CANARY_REQUIRED_DRIVERS
+                    and not args.dry_run):
+                canary_meta = run_one(CANARY_ENTRY, run_cell_name, run_cell, run_dir,
+                                      runners, driver_versions, sha, docs, False,
+                                      secrets_file=secrets_file)
+                canaries.append(canary_meta)
+                verdict, reason = canary_verdict(canary_meta)
+                canary_by_cell[run_cell_name] = {
+                    "verdict": verdict, "reason": reason,
+                    "trace_records": canary_meta.trace_records,
+                }
+                (run_dir / run_cell_name / "canary.json").write_text(
+                    json.dumps(canary_by_cell[run_cell_name], indent=2) + "\n")
+                print(f"  CANARY {run_cell_name}: {verdict.upper()}  "
+                      f"({canary_meta.trace_records} trace records)")
+                if verdict == "void":
+                    write_cell_void(run_dir, run_cell_name, "canary", reason)
+                    voided[run_cell_name] = reason
+                    failures += 1
+                    print(f"  CELL VOIDED before spending prompts: {run_cell_name} -- "
+                          f"{len(cell_planned)} prompt(s) skipped. See "
+                          f"{run_dir / run_cell_name / 'CELL-VOID.json'} and the "
+                          "canary's runner-stderr.txt.")
+                    continue
+                live_by_canary.add(run_cell_name)
+            for entry, cell_name, cell, off_cell in cell_planned:
+                try:
+                    meta = run_one(entry, cell_name, cell, run_dir, runners, driver_versions,
+                                   sha, docs, args.dry_run, outside_cell_groups=off_cell,
+                                   secrets_file=secrets_file)
+                except ValueError as exc:
+                    print(f"  {entry['id']:4s} {cell_name:11s} MANIFEST ERROR: {exc}")
+                    failures += 1
+                    continue
+                results.append(meta)
+                flag = "  [outside cell groups]" if meta.outside_cell_groups else ""
+                if meta.harness_failure:
+                    flag += f"  HARNESS FAILURE: {meta.harness_failure[:60]}"
+                    failures += 1
+                if meta.web_activity_suspected:
+                    # An open web channel is an instrument breach, not a consumer
+                    # behavior: the row's claims are no longer tool-attributable, so it
+                    # counts as a harness failure even when the invocation itself
+                    # exited cleanly (F30).
+                    flag += (f"  WEB ACTIVITY SUSPECTED "
+                             f"({','.join(meta.web_activity_suspected)})"
+                             " -- claims not tool-attributable")
+                    failures += 1
+                print(f"  {meta.prompt_id:4s} {cell_name:11s} {meta.duration_s:6.1f}s  "
+                      f"{meta.trace_records:>3} trace records  "
+                      f"{meta.answer_chars:>6} chars  "
+                      f"{'+'.join(dict.fromkeys(meta.tool_calls)) or '-'}"
+                      f"{flag}")
     finally:
         # The credential file outlives nothing: deleted on success, failure, and ^C
         # alike. The shim's stat-time check means a server started after this point
@@ -1136,9 +1245,25 @@ def main() -> int:
     # that never ran, scored here as a harness failure -- never a clean run. It does
     # not stop anything: all planned invocations have already executed, every other
     # cell's results stand, and the failure is recorded in the manifest and the exit
-    # code rather than by aborting.
-    dead_cells = zero_trace_cells(results, args.dry_run)
+    # code rather than by aborting. A cell whose canary proved the instrument live is
+    # exempt: its zero-call prompts are genuine adoption findings (F23 rule 1).
+    dead_cells = zero_trace_cells(results, args.dry_run, frozenset(live_by_canary))
     failures += len(dead_cells)
+    for dead in dead_cells:
+        # F29: the verdict goes INTO the artifacts, never only into the exit code and
+        # a top-level manifest field -- the void run was scored clean because every
+        # row a scorer opened said harness_failure: null. The cell directory gets the
+        # unmissable marker, and every row of the dead cell is stamped post hoc.
+        reason = ("every invocation in this cell recorded zero trace records: the "
+                  "instrument never ran (post-hoc sibling-liveness check, F23)")
+        write_cell_void(run_dir, dead, "zero_trace_post_hoc", reason)
+        for m in results:
+            if m.cell != dead:
+                continue
+            row_path = run_dir / m.cell / m.group / m.prompt_id / "meta.json"
+            row = json.loads(row_path.read_text())
+            row["cell_void"] = reason
+            row_path.write_text(json.dumps(row, indent=2) + "\n")
 
     # The per-cell records adopt the §17 driver-axis shape for ALL drivers. Each cell's
     # builtins_disabled comes from its own executed argv (any of its results -- the
@@ -1151,14 +1276,18 @@ def main() -> int:
         "build_sha": sha,
         "working_tree_clean": working_tree_clean(),
         "generated_utc": datetime.now(timezone.utc).isoformat(),
-        "cells": {c: cell_record(c, manifest["cells"][c], driver_versions,
-                                 builtins_by_cell.get(c)) for c in cells},
+        "cells": {c: {**cell_record(c, manifest["cells"][c], driver_versions,
+                                    builtins_by_cell.get(c)),
+                      **({"canary": canary_by_cell[c]} if c in canary_by_cell else {})}
+                  for c in cells},
         "documents": docs,
         "runners": {d: " ".join(runners[d]) for d in sorted(drivers)},
         "dry_run": args.dry_run,
         "prompts": manifest["prompts"],
         "group_f_caveat": manifest["_group_f_caveat"],
         "zero_trace_cell_failures": dead_cells,
+        "voided_cells": voided,
+        "canaries": [asdict(m) for m in canaries],
         "results": [asdict(m) for m in results],
     }, indent=2) + "\n")
 
