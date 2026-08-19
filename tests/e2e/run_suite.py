@@ -9,7 +9,7 @@ judgment, and Group A should be scored by someone with no project history.
     CONGRESS_API_KEY=... GOVINFO_API_KEY=... \
         python -m tests.e2e.run_suite --run-dir runs/2026-08-09 --cells floor,ceiling
 
-    python -m tests.e2e.run_suite --agent codex --cells floor    # drive the Codex CLI
+    python -m tests.e2e.run_suite --cells cross-vendor-floor    # the Codex Luna cell
     python -m tests.e2e.run_suite --dry-run     # validate manifest + layout, call nothing
 
 The harness writes its own MCP config per prompt, pointing the CLI at this repo's server
@@ -20,20 +20,28 @@ are real settings. The config names NO credential in any form -- the stdio child
 inherits the environment, and an unset ${VAR} would arrive as that literal string and
 override the working key.
 
---agent selects the driver: `claude` (default) or `codex`. The measurement is
-agent-agnostic BY CONSTRUCTION -- the trace is the SERVER's JSONL, not the model's own
+THE DRIVER IS PART OF THE INSTRUMENT (§17 driver-axis ruling, 2026-08-18). Each cell in
+the manifest declares its own `driver` (claude or codex), and a cell is identified by
+(driver, model, effort, surface, context condition, prompt variant) -- two cells that
+differ in driver also differ in system prompt, tool-call formatting, and client-side
+behavior the server trace cannot see, so a Claude-Codex disagreement is a cross-instrument
+observation, never attributed to the model alone. The measurement itself is
+driver-agnostic BY CONSTRUCTION -- the trace is the SERVER's JSONL, not the model's own
 account -- so switching drivers changes who is being measured without changing how. Only
-the invocation differs, and each driver's flags encode the SAME two guarantees the
-Claude path does: (1) the operator's own tool surface is shut out (Claude
---strict-mcp-config; Codex --ignore-user-config, which drops the operator's config.toml --
-and its MCP servers, including an unrelated `congressmcp-dev` pointed at a different
-install -- while still loading auth from CODEX_HOME), and (2) the only way to answer is
-the traced congress tools. Claude enforces (2) by denying its built-ins; Codex has no
-per-tool deny, so it runs in the read-only sandbox with approvals off -- its shell cannot
-write or reach the network, and the cold working directory is empty, so a grounded answer
-has nowhere to come from but the MCP server. Codex model ids differ from Claude's, so a
-codex run expects the cells' `model` values to be codex models (the {model} substitution
-is identical); a Claude model id handed to codex fails loudly at the CLI, never silently.
+the invocation differs, and each driver's flags encode the SAME two guarantees:
+(1) the operator's own tool surface is shut out (Claude --strict-mcp-config; Codex
+--ignore-user-config, which drops the operator's config.toml -- and its MCP servers,
+including an unrelated `congressmcp-dev` pointed at a different install -- while still
+loading auth from CODEX_HOME), and (2) the only way to answer is the traced congress
+tools. Claude enforces (2) by denying its built-ins; Codex has no per-tool deny, so it
+runs in the read-only sandbox with approvals off and web search explicitly disabled --
+its shell cannot write or reach the network, and the cold working directory is empty, so
+a grounded answer has nowhere to come from but the MCP server. Both configurations are
+ASSERTED against the argv actually executed and recorded per cell as `builtins_disabled`,
+in each driver's own vocabulary (never translated -- Codex `reasoning_effort` is not a
+Claude thinking budget, and no mapping between the scales is recorded anywhere). Codex
+model ids differ from Claude's; a Claude model id handed to codex fails loudly at the
+CLI, never silently.
 
 The CLI runs in an empty temp directory OUTSIDE this repo. It resolves project context by
 walking up from its working directory, so anywhere inside the repo -- including the
@@ -148,6 +156,141 @@ def codex_config_overrides(spec: dict) -> list[str]:
     for name, value in spec["env"].items():
         add(f"mcp_servers.congress.env.{name}", toml_quote(value))
     return flags
+
+
+def codex_knob_overrides(cell: dict) -> list[str]:
+    """Codex knobs as explicit -c overrides: effort verbatim, web search OFF.
+
+    `tools.web_search=false` is written even though it is Codex's default, because §17's
+    builtins ruling demands the effective configuration be configuration, not an
+    assumption about a default that a CLI upgrade could flip -- a live web search is
+    exactly the untraced channel the ruling closes (codified law standing in for bill
+    location, the F7 shape). `model_reasoning_effort` carries the cell's
+    `reasoning_effort` verbatim -- Codex's own vocabulary, never a translation of a
+    Claude thinking budget.
+    """
+    flags = ["-c", "tools.web_search=false"]
+    effort = cell.get("reasoning_effort")
+    if effort:
+        flags += ["-c", f"model_reasoning_effort={toml_quote(effort)}"]
+    return flags
+
+
+def builtins_disabled_record(driver: str, cmd: list[str]) -> dict:
+    """The per-cell `builtins_disabled` record, ASSERTED from the argv actually executed.
+
+    §17 driver-axis rule 3: the record carries the effective configuration in the
+    driver's own keys, asserted rather than assumed. So this function does not describe
+    what the harness intends -- it scans the command line run_one is about to execute
+    and halts if any required flag is missing, then returns what it verified. A record
+    produced any other way could drift from the argv and report a closed channel that
+    was open.
+    """
+    def missing(what: str) -> SystemExit:
+        return SystemExit(
+            f"FATAL: the {driver} argv lacks {what}. The builtins_disabled record must "
+            "be asserted from the executed command, and this command does not close "
+            "the channel it claims to. Harness bug; run halted."
+        )
+
+    if driver == "claude":
+        if "--strict-mcp-config" not in cmd:
+            raise missing("--strict-mcp-config")
+        try:
+            disallowed = cmd[cmd.index("--disallowed-tools") + 1].split(",")
+            allowed = cmd[cmd.index("--allowed-tools") + 1]
+        except (ValueError, IndexError):
+            raise missing("--disallowed-tools/--allowed-tools") from None
+        for tool in ("WebSearch", "WebFetch", "Bash", "Read"):
+            if tool not in disallowed:
+                raise missing(f"{tool} in --disallowed-tools")
+        return {
+            "strict_mcp_config": True,
+            "allowed_tools": allowed,
+            "disallowed_tools": disallowed,
+        }
+
+    # codex: no per-tool deny exists, so the closed channels are the read-only sandbox
+    # (no writes, no network for the model's own shell), approvals off, the operator's
+    # config dropped, and web search explicitly disabled.
+    try:
+        sandbox = cmd[cmd.index("-s") + 1]
+    except (ValueError, IndexError):
+        raise missing("-s <sandbox_mode>") from None
+    if sandbox != "read-only":
+        raise missing(f"-s read-only (got {sandbox!r})")
+    if 'approval_policy="never"' not in cmd:
+        raise missing('-c approval_policy="never"')
+    if "--ignore-user-config" not in cmd:
+        raise missing("--ignore-user-config")
+    if "tools.web_search=false" not in cmd:
+        raise missing("-c tools.web_search=false")
+    return {
+        "sandbox_mode": "read-only",
+        "approval_policy": "never",
+        "ignore_user_config": True,
+        "tools.web_search": False,
+    }
+
+
+def cli_version(executable: str) -> str:
+    """The driver CLI's version string, recorded at run time -- never assumed.
+
+    §17's per-cell record requires it: two runs of "the same" cell under different CLI
+    versions are different instruments, and the difference is invisible unless captured
+    when it is true.
+    """
+    try:
+        out = subprocess.run([executable, "--version"], capture_output=True,
+                             text=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"UNKNOWN (--version failed: {type(exc).__name__})"
+    first = ((out.stdout or out.stderr).strip().splitlines() or ["UNKNOWN"])[0]
+    return first.strip() or "UNKNOWN"
+
+
+def cell_id_of(cell: dict) -> str:
+    """(driver, model, effort, surface) as one id -- §17's cell identity, one formula.
+
+    Shared by the per-prompt meta row and the per-cell manifest record so the two can
+    never disagree about which instrument produced a result.
+    """
+    driver = cell.get("driver", "claude")
+    effort = cell.get("reasoning_effort", cell.get("thinking", "unspecified"))
+    iso = bool(cell.get("bill_text_only"))
+    return f"{driver}/{cell['model']}/{effort}/{'iso' if iso else 'full'}"
+
+
+def cell_record(name: str, cell: dict, driver_versions: dict,
+                builtins: dict | None) -> dict:
+    """The per-cell record for run-manifest.json, in the §17 driver-axis shape.
+
+    All drivers, one shape -- the Claude cells adopt it too. `reasoning_effort` is the
+    cell's knob in its driver's native vocabulary, verbatim: Claude cells carry their
+    `thinking` value, codex cells their `reasoning_effort`, and no translation between
+    the scales exists here or anywhere.
+    """
+    driver = cell.get("driver", "claude")
+    effort = cell.get("reasoning_effort", cell.get("thinking", "unspecified"))
+    iso = bool(cell.get("bill_text_only"))
+    record = {
+        "cell_id": cell_id_of(cell),
+        "driver": {"name": driver, "cli_version": driver_versions.get(driver)},
+        "model": cell["model"],
+        "reasoning_effort": effort,
+        "surface": "bill_text_only" if iso else "full",
+        "context_condition": cell.get("context", "unspecified"),
+        "prompt_variant": "single_step" if cell.get("use_single_step_variant") else "standard",
+        "groups": cell["groups"],
+        "role": cell["role"],
+        "merge_gating": bool(cell.get("merge_gating", False)),
+        "builtins_disabled": builtins if builtins is not None else {},
+    }
+    if cell.get("prompts"):
+        record["prompts"] = cell["prompts"]
+    if cell.get("notes"):
+        record["notes"] = cell["notes"]
+    return record
 
 
 def write_codex_mcp_config(dest: Path, spec: dict) -> Path:
@@ -349,12 +492,18 @@ class Meta:
     prompt_id: str
     group: str
     cell: str
-    agent: str
+    # The full cell identity, driver included (§17 driver-axis ruling): the driver is
+    # part of the instrument, so a row that named only the model would under-identify
+    # the measurement that produced it.
+    cell_id: str
+    driver: dict  # {"name": ..., "cli_version": <recorded at run time, never assumed>}
     model: str
-    thinking: str
+    # The cell's knob in its driver's native vocabulary, verbatim -- a Claude thinking
+    # budget or a Codex effort level, never a translation of one into the other.
+    reasoning_effort: str
     context: str
     bill_text_only: bool
-    single_step_variant: bool
+    prompt_variant: str  # "single_step" | "standard"
     # True when --prompts forced this prompt into a cell whose groups would not
     # normally include it -- a deliberate diagnostic run, not part of the standard
     # grid. Recorded so the result can never be read back as a grid cell.
@@ -377,6 +526,9 @@ class Meta:
     # Where the CLI ran. Must be outside the repo, or the model reads the project.
     cold_cwd: str = ""
     criteria: dict = field(default_factory=dict)
+    # The effective closed-channel configuration, asserted from `command` by
+    # builtins_disabled_record -- driver-native keys, per §17 driver-axis rule 3.
+    builtins_disabled: dict = field(default_factory=dict)
 
 
 def build_sha() -> str:
@@ -520,9 +672,58 @@ def zero_trace_cells(results: list[Meta], dry_run: bool) -> list[str]:
     return sorted(cell for cell, total in totals.items() if total == 0)
 
 
+def plan_invocations(manifest: dict, cells: list[str],
+                     want_groups: set[str] | None,
+                     want_prompts: set[str] | None) -> list[tuple[dict, str, dict, bool]]:
+    """The (prompt x cell) grid, honoring each cell's group scope AND prompt allowlist.
+
+    A cell may carry an explicit `prompts` list (the Terra A4 probe is a single-prompt
+    cell by ruling); prompts outside it are off-grid for that cell exactly as an
+    out-of-scope group is. An id named in --prompts still runs anywhere as a deliberate
+    diagnostic, marked outside_cell_groups so it can never be read back as part of the
+    standard grid.
+    """
+    planned: list[tuple[dict, str, dict, bool]] = []
+    for cell_name in cells:
+        cell = manifest["cells"][cell_name]
+        allowed = set(cell["groups"])
+        cell_prompts = set(cell.get("prompts") or [])
+        for entry in manifest["prompts"]:
+            explicitly_requested = bool(want_prompts) and entry["id"] in want_prompts
+            off_cell = (entry["group"] not in allowed
+                        or (bool(cell_prompts) and entry["id"] not in cell_prompts))
+            if off_cell and not explicitly_requested:
+                continue
+            if want_groups and entry["group"] not in want_groups:
+                continue
+            if want_prompts and not explicitly_requested:
+                continue
+            planned.append((entry, cell_name, cell, off_cell))
+    return planned
+
+
+def resolve_runners(drivers: set[str], runner_arg: str | None) -> dict[str, list[str]]:
+    """One command template per driver in use.
+
+    --runner is a single template, so it is only meaningful when the selected cells
+    share one driver; applying it across drivers would hand a Claude invocation to the
+    Codex CLI (or vice versa) and the failure would arrive as seventy harness errors
+    rather than one clear refusal here.
+    """
+    if runner_arg and len(drivers) > 1:
+        raise SystemExit(
+            f"FATAL: --runner given but the selected cells span drivers "
+            f"{sorted(drivers)}. A single template cannot serve both CLIs; select "
+            "cells of one driver, or drop --runner to use each driver's default."
+        )
+    return {d: (runner_arg or DEFAULT_RUNNERS[d]).split() for d in sorted(drivers)}
+
+
 def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
-            runner: list[str], agent: str, sha: str, docs: dict, dry_run: bool,
-            outside_cell_groups: bool = False) -> Meta:
+            runners: dict[str, list[str]], driver_versions: dict, sha: str,
+            docs: dict, dry_run: bool, outside_cell_groups: bool = False) -> Meta:
+    agent = cell.get("driver", "claude")
+    runner = runners[agent]
     prompt_id = entry["id"]
     dest = out_root / cell_name / entry["group"] / prompt_id
     dest.mkdir(parents=True, exist_ok=True)
@@ -552,7 +753,9 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     else:
         spec = codex_server_spec(trace_dir, bill_text_only)
         config_path = write_codex_mcp_config(dest, spec)
-        codex_overrides = codex_config_overrides(spec)
+        # The cell's knobs (effort verbatim, web search off) travel in the same -c
+        # channel as the MCP surface, so the argv audit below covers them too.
+        codex_overrides = codex_config_overrides(spec) + codex_knob_overrides(cell)
         answer_file = dest / "agent-last-message.txt"
     assert_config_carries_no_secret(config_path, secrets)
 
@@ -569,6 +772,9 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     cmd = build_command(agent, runner, cell["model"], config_path, codex_overrides,
                         cold_cwd, answer_file)
     assert_argv_carries_no_secret(cmd, secrets)
+    # Asserted from the argv about to be executed, never assumed (§17 driver-axis rule
+    # 3): halts here if the command does not actually close the untraced channels.
+    builtins = builtins_disabled_record(agent, cmd)
 
     if dry_run:
         exit_status, answer = 0, "[dry-run: no model was called]"
@@ -614,16 +820,18 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     merged = dest / "trace.jsonl"
     merged.write_text("\n".join(lines) + ("\n" if lines else ""))
 
+    effort = cell.get("reasoning_effort", cell.get("thinking", "unspecified"))
     meta = Meta(
         prompt_id=prompt_id,
         group=entry["group"],
         cell=cell_name,
-        agent=agent,
+        cell_id=cell_id_of(cell),
+        driver={"name": agent, "cli_version": driver_versions.get(agent)},
         model=cell["model"],
-        thinking=cell.get("thinking", "unspecified"),
+        reasoning_effort=effort,
         context=cell.get("context", "unspecified"),
-        bill_text_only=bool(cell.get("bill_text_only")),
-        single_step_variant=bool(cell.get("use_single_step_variant")),
+        bill_text_only=bill_text_only,
+        prompt_variant="single_step" if cell.get("use_single_step_variant") else "standard",
         outside_cell_groups=outside_cell_groups,
         build_sha=sha,
         document=doc,
@@ -643,6 +851,7 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
         # and so editing one after seeing a result is visible in the diff.
         criteria={k: entry.get(k) for k in ("title", "pass", "fail", "watch",
                                             "grounding", "sourcing", "substitution")},
+        builtins_disabled=builtins,
     )
     (dest / "meta.json").write_text(json.dumps(asdict(meta), indent=2) + "\n")
     return meta
@@ -652,7 +861,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run-dir", default=None, help="output root (default runs/<utc-date>)")
-    ap.add_argument("--cells", default="floor,ceiling, capability, isolation", help="comma-separated cell names")
+    # terra-a4-probe is deliberately NOT in the default grid: it is the optional
+    # single-prompt characterization probe, run on explicit maintainer call or as the
+    # upgrade path after a cross-vendor-floor failure (§17, maintainer 2026-08-18).
+    ap.add_argument("--cells", default="floor,ceiling,capability,isolation,cross-vendor-floor",
+                    help="comma-separated cell names")
     ap.add_argument("--groups", default=None, help="restrict to these groups, e.g. A,B")
     ap.add_argument("--prompts", default=None,
                     help="restrict to these prompt ids. An id named here runs in every "
@@ -660,15 +873,17 @@ def main() -> int:
                          "explicit request is a deliberate diagnostic, and the result "
                          "is marked outside_cell_groups so it cannot be read back as "
                          "part of the standard grid.")
-    ap.add_argument("--agent", default="claude", choices=sorted(DEFAULT_RUNNERS),
-                    help="which CLI to drive (default claude). Selects the default runner and "
-                         "the isolation flags appended to it; the measurement is identical "
-                         "because it reads the server trace, not the model's output.")
+    ap.add_argument("--agent", default=None, choices=sorted(DEFAULT_RUNNERS),
+                    help="restrict the selected cells to this driver (each cell declares "
+                         "its own driver in the manifest -- the driver is part of the "
+                         "instrument, so it is a cell property, not a run property). "
+                         "E.g. --agent codex runs only the codex cells.")
     ap.add_argument("--runner", default=None,
-                    help="command template; {model} is substituted. Defaults per --agent "
+                    help="command template; {model} is substituted. Defaults per driver "
                          "(claude: 'claude -p --model {model}'; codex: 'codex exec -m {model}'). "
-                         "The harness appends the driver-specific isolation flags and feeds the "
-                         "prompt on stdin.")
+                         "Only valid when the selected cells share one driver. The harness "
+                         "appends the driver-specific isolation flags and feeds the prompt "
+                         "on stdin.")
     ap.add_argument("--dry-run", action="store_true",
                     help="validate manifest, cells, and layout without calling any model")
     ap.add_argument("--allow-dirty", action="store_true",
@@ -689,9 +904,30 @@ def main() -> int:
         print(f"FATAL: unknown cell(s) {unknown}; manifest defines "
               f"{sorted(manifest['cells'])}")
         return 1
+    if args.agent:
+        dropped = [c for c in cells
+                   if manifest["cells"][c].get("driver", "claude") != args.agent]
+        cells = [c for c in cells if c not in dropped]
+        if dropped:
+            print(f"note: --agent {args.agent} drops cell(s) {dropped} (other driver)")
+        if not cells:
+            print(f"FATAL: --agent {args.agent} leaves zero cells. Each cell declares "
+                  "its driver in the manifest; select cells of that driver instead.")
+            return 1
 
     want_groups = {g.strip() for g in args.groups.split(",")} if args.groups else None
     want_prompts = {p.strip() for p in args.prompts.split(",")} if args.prompts else None
+
+    # Resolve and validate the drivers BEFORE creating the run directory, so an
+    # argument error leaves no empty run dir behind.
+    drivers = {manifest["cells"][c].get("driver", "claude") for c in cells}
+    runners = resolve_runners(drivers, args.runner)
+    if not args.dry_run:
+        for d in sorted(drivers):
+            if shutil.which(runners[d][0]) is None:
+                print(f"FATAL: {d} runner {runners[d][0]!r} not on PATH. Install it, "
+                      "narrow --cells to one driver, or --dry-run.")
+                return 1
 
     run_dir = Path(args.run_dir or (REPO / "runs" / datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%SZ")))
     if run_dir.exists() and any(run_dir.iterdir()):
@@ -699,11 +935,11 @@ def main() -> int:
               "one directory -- the diff by prompt id is what gives a re-run its meaning.")
         return 1
     run_dir.mkdir(parents=True, exist_ok=True)
-
-    runner = (args.runner or DEFAULT_RUNNERS[args.agent]).split()
-    if not args.dry_run and shutil.which(runner[0]) is None:
-        print(f"FATAL: runner {runner[0]!r} not on PATH. Pass --runner, or --dry-run.")
-        return 1
+    # The CLI version is part of the instrument identity and is recorded AT RUN TIME,
+    # never assumed (§17 driver-axis ruling). A dry run invokes no CLI, so it records
+    # none rather than a guess.
+    driver_versions = ({d: None for d in drivers} if args.dry_run
+                       else {d: cli_version(runners[d][0]) for d in sorted(drivers)})
 
     if not args.dry_run:
         # F23: assert at startup that the interpreter the MCP configs will name can
@@ -737,24 +973,11 @@ def main() -> int:
             return 1
 
     docs = manifest["documents"]
-    planned: list[tuple[dict, str, dict, bool]] = []
-    for cell_name in cells:
-        cell = manifest["cells"][cell_name]
-        allowed = set(cell["groups"])
-        for entry in manifest["prompts"]:
-            # An id named in --prompts is a deliberate diagnostic request and runs even
-            # in a cell whose groups exclude it (e.g. F3 in the isolation cell). The
-            # cell-group filter exists to shape the standard grid, not to forbid
-            # investigation; the off-grid status is recorded, not silently normalized.
-            explicitly_requested = bool(want_prompts) and entry["id"] in want_prompts
-            off_cell = entry["group"] not in allowed
-            if off_cell and not explicitly_requested:
-                continue
-            if want_groups and entry["group"] not in want_groups:
-                continue
-            if want_prompts and not explicitly_requested:
-                continue
-            planned.append((entry, cell_name, cell, off_cell))
+    # An id named in --prompts is a deliberate diagnostic request and runs even in a
+    # cell whose groups (or prompt allowlist) exclude it -- e.g. F3 in the isolation
+    # cell. The filters shape the standard grid, not forbid investigation; the off-grid
+    # status is recorded, not silently normalized.
+    planned = plan_invocations(manifest, cells, want_groups, want_prompts)
 
     if not planned:
         print("FATAL: zero prompts selected. Refusing to write a run directory that "
@@ -765,8 +988,11 @@ def main() -> int:
     print(f"run dir    : {run_dir}")
     print(f"cells      : {', '.join(cells)}")
     print(f"invocations: {len(planned)}   (one fresh process each -- never batched)")
-    print(f"agent      : {args.agent}")
-    print(f"runner     : {' '.join(runner)}{'   [DRY RUN]' if args.dry_run else ''}\n")
+    for d in sorted(drivers):
+        version = driver_versions[d] or "(not recorded: dry run)"
+        print(f"driver     : {d}  {' '.join(runners[d])}  [{version}]"
+              f"{'   [DRY RUN]' if args.dry_run else ''}")
+    print()
 
     off_cell_planned = [(e["id"], c) for e, c, _, off in planned if off]
     for pid, cell_name in off_cell_planned:
@@ -779,8 +1005,8 @@ def main() -> int:
     failures = 0
     for entry, cell_name, cell, off_cell in planned:
         try:
-            meta = run_one(entry, cell_name, cell, run_dir, runner, args.agent, sha, docs,
-                           args.dry_run, outside_cell_groups=off_cell)
+            meta = run_one(entry, cell_name, cell, run_dir, runners, driver_versions,
+                           sha, docs, args.dry_run, outside_cell_groups=off_cell)
         except ValueError as exc:
             print(f"  {entry['id']:4s} {cell_name:11s} MANIFEST ERROR: {exc}")
             failures += 1
@@ -804,14 +1030,21 @@ def main() -> int:
     dead_cells = zero_trace_cells(results, args.dry_run)
     failures += len(dead_cells)
 
+    # The per-cell records adopt the §17 driver-axis shape for ALL drivers. Each cell's
+    # builtins_disabled comes from its own executed argv (any of its results -- the
+    # record is identical across a cell by construction); a cell that produced no result
+    # rows gets an empty record rather than an invented one.
+    builtins_by_cell = {}
+    for m in results:
+        builtins_by_cell.setdefault(m.cell, m.builtins_disabled)
     (run_dir / "run-manifest.json").write_text(json.dumps({
         "build_sha": sha,
         "working_tree_clean": working_tree_clean(),
         "generated_utc": datetime.now(timezone.utc).isoformat(),
-        "cells": {c: manifest["cells"][c] for c in cells},
+        "cells": {c: cell_record(c, manifest["cells"][c], driver_versions,
+                                 builtins_by_cell.get(c)) for c in cells},
         "documents": docs,
-        "agent": args.agent,
-        "runner": " ".join(runner),
+        "runners": {d: " ".join(runners[d]) for d in sorted(drivers)},
         "dry_run": args.dry_run,
         "prompts": manifest["prompts"],
         "group_f_caveat": manifest["_group_f_caveat"],

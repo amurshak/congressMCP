@@ -1,39 +1,76 @@
 {
   "_about": "§17 end-to-end prompt manifest. The harness executes these verbatim and records results BESIDE the pinned criteria; it never scores. Pinning `pass`/`fail` here, before the run, is §17's preregistration-of-scoring rule -- so do not edit a criterion after seeing a result.",
   "_substitution_rule": "§17 requires concrete phrases substituted from harness output, and requires every prompt asserting a document property to cite its evidence. A3 and B3 were both invalidated by phrases written from plausibility rather than from the record. Each `grounding` below is a measured property of the cached document named in `document`, reproducible with tests/e2e/verify_grounding.py.",
+  "_cells_note": "Per the §17 driver-axis ruling (2026-08-18): a cell is identified by (driver, model, effort, surface, context condition, prompt variant). `role` is the short matrix role -- floor/ceiling/capability-floor/isolation are Claude-matrix roles, and every codex cell carries a cross-vendor role, so a codex result can never silently substitute for a Claude gate cell. Knobs are recorded in the driver's native vocabulary, verbatim, never translated: Claude cells carry `thinking`, codex cells carry `reasoning_effort`, and no mapping between the two scales exists or is defensible. Model ids and knobs are operator parameters defaulting to this table.",
   "cells": {
     "floor": {
-      "role": "attention floor -- the merge-relevant result",
+      "driver": "claude",
+      "role": "floor",
+      "notes": "attention floor -- the merge-relevant result",
       "model": "claude-sonnet-5",
       "thinking": "none",
       "context": "crowded: asked mid-task, full tool surface registered",
       "bill_text_only": false,
+      "merge_gating": true,
       "groups": ["A", "B", "C", "D", "E", "F"]
     },
     "ceiling": {
-      "role": "reasoning headroom -- whether the data supports a correct answer at all",
+      "driver": "claude",
+      "role": "ceiling",
+      "notes": "reasoning headroom -- whether the data supports a correct answer at all",
       "model": "claude-opus-5",
       "thinking": "high",
       "context": "fresh, question first, full tool surface registered",
       "bill_text_only": false,
+      "merge_gating": true,
       "groups": ["A", "B", "C", "D", "E", "F"]
     },
     "capability": {
-      "role": "capability floor -- Haiku will not reliably chain, so prompts are single-step BY CONSTRUCTION and Group A only. A multi-hop failure here would be equally explained by the model not chaining, which would conflate model limitation with tool defect.",
+      "driver": "claude",
+      "role": "capability-floor",
+      "notes": "capability floor -- Haiku will not reliably chain, so prompts are single-step BY CONSTRUCTION and Group A only. A multi-hop failure here would be equally explained by the model not chaining, which would conflate model limitation with tool defect.",
       "model": "claude-haiku-4-5-20251001",
       "thinking": "none",
       "context": "fresh",
       "bill_text_only": false,
+      "merge_gating": true,
       "groups": ["A"],
       "use_single_step_variant": true
     },
     "isolation": {
-      "role": "isolated surface -- exactly the three bill-text tools, to separate tool-selection noise from tool-design defects",
+      "driver": "claude",
+      "role": "isolation",
+      "notes": "isolated surface -- exactly the three bill-text tools, to separate tool-selection noise from tool-design defects. The only cell where trace scope == tool surface, so attribution-dependent conclusions hold only here.",
       "model": "claude-sonnet-5",
       "thinking": "none",
       "context": "fresh",
       "bill_text_only": true,
+      "merge_gating": true,
       "groups": ["A", "B", "C", "D", "E"]
+    },
+    "cross-vendor-floor": {
+      "driver": "codex",
+      "role": "cross-vendor-floor",
+      "notes": "The Haiku cell's cross-vendor twin (maintainer selection 2026-08-18): Luna, Group A only, single-step variant, isolation surface. Tests whether the active safety signal is read by the weakest cross-vendor consumer -- a chaining limitation is never scored as a tool defect because the prompts pre-perform the navigation. A failure with the per-hit note present in the trace is a prominence finding about the response shape, never a tier artifact. Non-gating: the Group A gate remains the Claude cells. Preregistration (§17, before the run): expected Group A pass; falsifier is inserted text presented as enacted while match_contexts and the per-hit note were in the trace.",
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "medium",
+      "context": "fresh",
+      "bill_text_only": true,
+      "merge_gating": false,
+      "groups": ["A"],
+      "use_single_step_variant": true
+    },
+    "terra-a4-probe": {
+      "driver": "codex",
+      "role": "cross-vendor",
+      "notes": "OPTIONAL single-prompt A4 characterization probe (maintainer, 2026-08-18) -- not part of the default grid; run on explicit maintainer call, or as the full-Group-A upgrade trigger after a cross-vendor-floor failure. Purpose is characterization, not pass/fail: which failure mode does the tier most users get choose when the data runs out? Outcome rubric pinned in §17 BEFORE any result, four classes: (a) exhaustive walk (legitimate; score what correction cost), (b) incomplete with caveat (the cheap desired behavior), (c) incomplete and silent, (d) fabrication -- citations absent from the trace AND failing independent verification; trace-absence alone never scores as fabrication. Isolation surface is mandatory: class (d) is attribution-dependent. Single-prompt edge per F23: a zero-trace run of this cell reads as BROKEN, never as abstention.",
+      "model": "gpt-5.6-terra",
+      "reasoning_effort": "medium",
+      "context": "fresh",
+      "bill_text_only": true,
+      "merge_gating": false,
+      "groups": ["A"],
+      "prompts": ["A4"]
     }
   },
   "documents": {

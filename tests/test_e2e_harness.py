@@ -31,10 +31,16 @@ from run_suite import (  # noqa: E402
     assert_no_secret_in_trace,
     assert_prompt_is_cold,
     build_command,
+    builtins_disabled_record,
+    cell_id_of,
+    cell_record,
     codex_config_overrides,
+    codex_knob_overrides,
     codex_server_spec,
     make_cold_cwd,
+    plan_invocations,
     resolve_prompt,
+    resolve_runners,
     write_codex_mcp_config,
     write_mcp_config,
     zero_trace_cells,
@@ -240,8 +246,10 @@ def test_web_and_file_builtins_are_disallowed():
 # --------------------------------------------------------------------------- #
 def _meta(prompt_id: str, cell: str, trace_records: int, harness_failure=None) -> Meta:
     return Meta(
-        prompt_id=prompt_id, group="A", cell=cell, agent="claude", model="m", thinking="none",
-        context="fresh", bill_text_only=False, single_step_variant=False,
+        prompt_id=prompt_id, group="A", cell=cell, cell_id="claude/m/none/full",
+        driver={"name": "claude", "cli_version": "test"}, model="m",
+        reasoning_effort="none", context="fresh", bill_text_only=False,
+        prompt_variant="standard",
         outside_cell_groups=False, build_sha="x", document=None, document_sha256_16=None,
         prompt_sent="p", started_utc="", finished_utc="", duration_s=0.0, exit_status=0,
         harness_failure=harness_failure, trace_records=trace_records,
@@ -430,3 +438,162 @@ def test_every_cell_declares_what_it_establishes():
     for name, cell in MANIFEST["cells"].items():
         assert cell.get("role"), f"cell {name} does not say what it establishes"
         assert cell.get("model") and cell.get("groups")
+
+
+# --------------------------------------------------------------------------- #
+# The driver axis (§17 ruling, 2026-08-18): a cell is identified by (driver, model,
+# effort, surface, context condition, prompt variant), knobs are recorded verbatim in
+# the driver's native vocabulary, and a codex result can never silently substitute for
+# a Claude gate cell.
+# --------------------------------------------------------------------------- #
+def test_every_cell_declares_its_driver():
+    # The driver is part of the instrument. A cell without one would silently default,
+    # and a Claude-Codex disagreement could then be misattributed to the model alone.
+    for name, cell in MANIFEST["cells"].items():
+        assert cell.get("driver") in ("claude", "codex"), f"cell {name} names no driver"
+
+
+def test_no_codex_cell_is_merge_gating_and_all_carry_cross_vendor_roles():
+    # Rule 1: floor/ceiling/capability-floor are Claude-matrix roles; every codex cell
+    # carries a cross-vendor role and merge_gating false, whatever its tier -- landing
+    # in PR 1 is not gating, and the Group A gate remains the Claude cells.
+    codex_cells = {n: c for n, c in MANIFEST["cells"].items() if c["driver"] == "codex"}
+    assert codex_cells, "the cross-vendor cells are missing from the manifest"
+    for name, cell in codex_cells.items():
+        assert cell["role"] in ("cross-vendor", "cross-vendor-floor"), (
+            f"{name}: a codex cell must carry a cross-vendor role, never a "
+            f"Claude-matrix one (got {cell['role']!r})"
+        )
+        assert cell.get("merge_gating") is False, f"{name} must not gate the merge"
+
+
+def test_codex_cells_default_to_the_isolation_surface_and_group_a():
+    # Rule 2: the three-tool surface is the cheap form of this cell, and A4's
+    # fabrication check is attribution-dependent, which only trace-scope == tool-surface
+    # supports.
+    for name, cell in MANIFEST["cells"].items():
+        if cell["driver"] != "codex":
+            continue
+        assert cell["bill_text_only"] is True, f"{name} must run the isolation surface"
+        assert cell["groups"] == ["A"], f"{name} must be scoped to Group A"
+
+
+def test_cross_vendor_floor_is_the_haiku_cells_twin():
+    # Maintainer selection 2026-08-18: Luna, Group A only, single-step variant --
+    # so a chaining limitation is never scored as a tool defect, exactly as the Haiku
+    # cell dissolved the same confound.
+    cell = MANIFEST["cells"]["cross-vendor-floor"]
+    haiku = MANIFEST["cells"]["capability"]
+    assert cell["use_single_step_variant"] is True
+    assert cell["role"] == "cross-vendor-floor"
+    assert cell["groups"] == haiku["groups"] == ["A"]
+    # Knobs stay in each driver's native vocabulary: the codex cell must carry
+    # reasoning_effort and must NOT carry a Claude thinking budget.
+    assert cell.get("reasoning_effort") and "thinking" not in cell
+
+
+def test_terra_probe_is_a_single_prompt_a4_cell_outside_the_default_grid():
+    # Maintainer 2026-08-18: Terra, if run at all, is a single-prompt A4
+    # characterization probe on the STANDARD variant, never a group cell.
+    cell = MANIFEST["cells"]["terra-a4-probe"]
+    assert cell["prompts"] == ["A4"]
+    assert cell["role"] == "cross-vendor"
+    assert not cell.get("use_single_step_variant"), (
+        "the A4 probe runs the standard variant -- its question is which failure mode "
+        "the tier chooses when the data runs out, not disclosure-reading"
+    )
+
+
+def test_plan_honors_a_cell_prompt_allowlist():
+    planned = plan_invocations(MANIFEST, ["terra-a4-probe"], None, None)
+    assert [(e["id"], off) for e, _, _, off in planned] == [("A4", False)], (
+        "the probe must plan exactly A4, on-grid"
+    )
+    # Forcing another id in via --prompts is a deliberate diagnostic and must be marked
+    # off-grid, never silently normalized into the cell.
+    forced = plan_invocations(MANIFEST, ["terra-a4-probe"], None, {"A1"})
+    assert [(e["id"], off) for e, _, _, off in forced] == [("A1", True)]
+
+
+def test_plan_covers_group_a_in_the_cross_vendor_floor_cell():
+    planned = plan_invocations(MANIFEST, ["cross-vendor-floor"], None, None)
+    assert [e["id"] for e, _, _, off in planned if not off] == ["A1", "A2", "A3", "A4"]
+
+
+def test_cell_id_carries_driver_model_effort_and_surface():
+    assert cell_id_of(MANIFEST["cells"]["cross-vendor-floor"]) == "codex/gpt-5.6-luna/medium/iso"
+    assert cell_id_of(MANIFEST["cells"]["floor"]) == "claude/claude-sonnet-5/none/full"
+    assert cell_id_of(MANIFEST["cells"]["isolation"]) == "claude/claude-sonnet-5/none/iso"
+
+
+def test_cell_record_keeps_knobs_verbatim_and_never_translates():
+    # Codex reasoning_effort "medium" is NOT "the floor", and a Claude thinking budget
+    # is not an effort level: each record carries its own driver's value verbatim.
+    versions = {"claude": "claude 2.0 (test)", "codex": "codex-cli 0.99 (test)"}
+    codex = cell_record("cross-vendor-floor", MANIFEST["cells"]["cross-vendor-floor"],
+                        versions, {"sandbox_mode": "read-only"})
+    claude = cell_record("floor", MANIFEST["cells"]["floor"], versions, {})
+    assert codex["reasoning_effort"] == "medium"          # codex vocabulary, verbatim
+    assert claude["reasoning_effort"] == "none"           # Claude's thinking value, verbatim
+    assert codex["driver"] == {"name": "codex", "cli_version": "codex-cli 0.99 (test)"}
+    assert claude["driver"] == {"name": "claude", "cli_version": "claude 2.0 (test)"}
+    assert codex["prompt_variant"] == "single_step" and claude["prompt_variant"] == "standard"
+    assert codex["surface"] == "bill_text_only" and claude["surface"] == "full"
+    assert codex["merge_gating"] is False and claude["merge_gating"] is True
+    for key in ("cell_id", "driver", "model", "reasoning_effort", "surface",
+                "context_condition", "prompt_variant", "groups", "role",
+                "merge_gating", "builtins_disabled"):
+        assert key in codex and key in claude, f"per-cell record lacks {key}"
+
+
+def test_codex_knob_overrides_carry_effort_verbatim_and_web_search_off():
+    flags = codex_knob_overrides(MANIFEST["cells"]["cross-vendor-floor"])
+    assert "tools.web_search=false" in flags
+    assert 'model_reasoning_effort="medium"' in flags
+
+
+def test_builtins_disabled_is_asserted_from_the_claude_argv(tmp_path):
+    cmd = build_command("claude", ["claude", "-p", "--model", "{model}"], "m",
+                        tmp_path / "mcp.json", [], tmp_path / "cold", None)
+    record = builtins_disabled_record("claude", cmd)
+    assert record["strict_mcp_config"] is True
+    assert record["allowed_tools"] == "mcp__congress"
+    assert set(DISALLOWED_BUILTINS) <= set(record["disallowed_tools"])
+    # The planted positive: a command that does not close the channel must halt the
+    # run, because a record produced from intent rather than the argv could report a
+    # closed channel that was open.
+    stripped = [part for part in cmd if part != "--strict-mcp-config"]
+    with pytest.raises(SystemExit, match="strict-mcp-config"):
+        builtins_disabled_record("claude", stripped)
+
+
+def test_builtins_disabled_is_asserted_from_the_codex_argv(tmp_path):
+    cell = MANIFEST["cells"]["cross-vendor-floor"]
+    spec = codex_server_spec(tmp_path / "trace", bill_text_only=True)
+    overrides = codex_config_overrides(spec) + codex_knob_overrides(cell)
+    cmd = build_command("codex", ["codex", "exec", "-m", "{model}"], "m",
+                        tmp_path / "mcp.toml", overrides, tmp_path / "cold",
+                        tmp_path / "last.txt")
+    record = builtins_disabled_record("codex", cmd)
+    assert record == {"sandbox_mode": "read-only", "approval_policy": "never",
+                      "ignore_user_config": True, "tools.web_search": False}
+    # Web search left to its default is an assumption, not configuration: the override
+    # must be present in the argv or the record must refuse to exist.
+    no_web = [part for part in cmd if part != "tools.web_search=false"]
+    with pytest.raises(SystemExit, match="web_search"):
+        builtins_disabled_record("codex", no_web)
+    # A sandbox other than read-only reopens the network.
+    loose = ["full-access" if part == "read-only" else part for part in cmd]
+    with pytest.raises(SystemExit, match="read-only"):
+        builtins_disabled_record("codex", loose)
+
+
+def test_runner_override_refuses_a_mixed_driver_selection():
+    # A single --runner template handed to both CLIs would arrive as seventy harness
+    # errors mid-run; the refusal belongs at argument time.
+    with pytest.raises(SystemExit, match="one driver|span"):
+        resolve_runners({"claude", "codex"}, "some-cli -x {model}")
+    both = resolve_runners({"claude", "codex"}, None)
+    assert both["claude"][0] == "claude" and both["codex"][0] == "codex"
+    solo = resolve_runners({"codex"}, "my-codex exec -m {model}")
+    assert solo["codex"][0] == "my-codex"
