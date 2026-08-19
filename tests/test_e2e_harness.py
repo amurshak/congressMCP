@@ -281,12 +281,16 @@ def test_codex_command_shuts_out_the_operator_surface_and_reads_stdin(tmp_path):
                         tmp_path / "cold", tmp_path / "last.txt")
     assert cmd[:4] == ["codex", "exec", "-m", "gpt-5-codex"]   # {model} substituted
     assert "--ignore-user-config" in cmd
-    assert cmd[cmd.index("-s") + 1] == "read-only"
     # F29: approval_policy="never" means "never ASK", which auto-DENIES MCP calls
     # client-side in a headless run -- the dead-cell shape. Approvals are auto-reviewed
     # instead (measured to work on codex-cli 0.147.0).
     assert "--approve-for-me" in cmd
     assert 'approval_policy="never"' not in cmd
+    # --approve-for-me is mutually exclusive with -s (the CLI rejects the pair, observed
+    # live 2026-08-19); the invariant that matters -- no network for the model's shell --
+    # is pinned explicitly instead of riding the imposed sandbox's default.
+    assert "-s" not in cmd and "--sandbox" not in cmd
+    assert "sandbox_workspace_write.network_access=false" in cmd
     assert "--skip-git-repo-check" in cmd                      # cold cwd is not a git repo
     assert cmd[-1] == "-"                                      # prompt on stdin
     assert cmd[cmd.index("-o") + 1] == str(tmp_path / "last.txt")
@@ -306,7 +310,9 @@ def test_codex_never_bypasses_the_sandbox_for_any_cell(tmp_path):
     cmd = build_command("codex", DEFAULT_RUNNERS["codex"].split(), "gpt-5-codex",
                         tmp_path / "mcp.toml", codex_config_overrides(spec),
                         tmp_path / "cold", tmp_path / "last.txt")
-    assert "-s" in cmd and cmd[cmd.index("-s") + 1] == "read-only"
+    # The shell's network stays closed by explicit configuration under the sandbox
+    # --approve-for-me imposes.
+    assert "sandbox_workspace_write.network_access=false" in cmd
     # Check the exact flag, not a loose "bypass" substring: pytest's tmp_path embeds this
     # test's own name, so the cold-cwd path contains "bypass" and a substring scan would
     # false-positive on the harness rather than the argv.
@@ -792,22 +798,32 @@ def test_builtins_disabled_is_asserted_from_the_codex_argv(tmp_path):
                         tmp_path / "mcp.toml", overrides, tmp_path / "cold",
                         tmp_path / "last.txt")
     record = builtins_disabled_record("codex", cmd)
-    assert record["sandbox_mode"] == "read-only"
+    assert record["sandbox_mode"].startswith("workspace-write")
     assert record["approvals"] == "approve-for-me"
     assert record["ignore_user_config"] is True
-    # F30: the web-search entry must read as configuration, never as verified effect --
-    # the void run recorded a bare `false` while the model self-reported web.run.
+    # F30: the closed-channel entries must read as configuration, never as verified
+    # effect -- the void run recorded a bare `false` while the model self-reported
+    # web.run.
     assert "configured" in record["tools.web_search"]
     assert "NOT assumed" in record["tools.web_search"]
+    assert "configured" in record["sandbox_workspace_write.network_access"]
     # Web search left to its default is an assumption, not configuration: the override
     # must be present in the argv or the record must refuse to exist.
     no_web = [part for part in cmd if part != "tools.web_search=false"]
     with pytest.raises(SystemExit, match="web_search"):
         builtins_disabled_record("codex", no_web)
-    # A sandbox other than read-only reopens the network.
-    loose = ["full-access" if part == "read-only" else part for part in cmd]
-    with pytest.raises(SystemExit, match="read-only"):
-        builtins_disabled_record("codex", loose)
+    # Same for the shell's network: workspace-write happens to default to no-network,
+    # and a default is not a closed channel.
+    no_net = [part for part in cmd
+              if part != "sandbox_workspace_write.network_access=false"]
+    with pytest.raises(SystemExit, match="network_access"):
+        builtins_disabled_record("codex", no_net)
+    # A stray -s would make the CLI reject the whole argv ("cannot be used with
+    # '--approve-for-me'", observed live) -- caught here with the why, instead of
+    # surfacing as a canary-voided cell with a usage error in its stderr.
+    with_sandbox = cmd + ["-s", "read-only"]
+    with pytest.raises(SystemExit, match="workspace-write sandbox"):
+        builtins_disabled_record("codex", with_sandbox)
     # Approvals silently reverting to "never ask" (= auto-deny) is the dead-cell shape.
     no_approve = [part for part in cmd if part != "--approve-for-me"]
     with pytest.raises(SystemExit, match="approve-for-me"):

@@ -34,8 +34,9 @@ the invocation differs, and each driver's flags encode the SAME two guarantees:
 including an unrelated `congressmcp-dev` pointed at a different install -- while still
 loading auth from CODEX_HOME), and (2) the only way to answer is the traced congress
 tools. Claude enforces (2) by denying its built-ins; Codex has no per-tool deny, so it
-runs in the read-only sandbox with approvals off and web search explicitly disabled --
-its shell cannot write or reach the network, and the cold working directory is empty, so
+runs under --approve-for-me (auto-reviewed approvals; imposes the workspace-write
+sandbox) with shell network access and web search both explicitly configured off -- its
+shell can write only into the empty disposable cold cwd and cannot reach the network, so
 a grounded answer has nowhere to come from but the MCP server. Both configurations are
 ASSERTED against the argv actually executed and recorded per cell as `builtins_disabled`,
 in each driver's own vocabulary (never translated -- Codex `reasoning_effort` is not a
@@ -262,9 +263,10 @@ def builtins_disabled_record(driver: str, cmd: list[str]) -> dict:
             "disallowed_tools": disallowed,
         }
 
-    # codex: no per-tool deny exists, so the closed channels are the read-only sandbox
-    # (no writes, no network for the model's own shell), auto-reviewed approvals, the
-    # operator's config dropped, and web search explicitly configured off.
+    # codex: no per-tool deny exists, so the closed channels are the sandbox's network
+    # block (pinned explicitly -- the shell may write, but only into the empty cold
+    # cwd), auto-reviewed approvals, the operator's config dropped, and web search
+    # explicitly configured off.
     #
     # F30 caveat, recorded in the value itself: this record is the CONFIGURATION the
     # argv carries, and for web search that is not yet proof of EFFECT -- the void run
@@ -272,22 +274,28 @@ def builtins_disabled_record(driver: str, cmd: list[str]) -> dict:
     # effect-level channels are the per-cell canary (MCP liveness, a server-side trace
     # record) and the per-row web_activity_suspected scan over the captured runner
     # stderr/answer; a scorer must read those, not this, for what actually happened.
-    try:
-        sandbox = cmd[cmd.index("-s") + 1]
-    except (ValueError, IndexError):
-        raise missing("-s <sandbox_mode>") from None
-    if sandbox != "read-only":
-        raise missing(f"-s read-only (got {sandbox!r})")
     if "--approve-for-me" not in cmd:
         raise missing("--approve-for-me (approval_policy=\"never\" auto-denies MCP "
                       "calls client-side, which is F29's dead-cell shape)")
+    if "-s" in cmd or "--sandbox" in cmd:
+        # The CLI rejects the pair; catching it here names the WHY instead of
+        # surfacing as a canary-voided cell with a usage error in its stderr.
+        raise missing("no -s/--sandbox flag: --approve-for-me imposes its own "
+                      "workspace-write sandbox and codex rejects the combination")
+    if "sandbox_workspace_write.network_access=false" not in cmd:
+        raise missing("-c sandbox_workspace_write.network_access=false (workspace-"
+                      "write defaults to no network, but the closed channel must be "
+                      "configuration, not an assumption about a default)")
     if "--ignore-user-config" not in cmd:
         raise missing("--ignore-user-config")
     if "tools.web_search=false" not in cmd:
         raise missing("-c tools.web_search=false")
     return {
-        "sandbox_mode": "read-only",
+        "sandbox_mode": "workspace-write (imposed by --approve-for-me; writes confined "
+                        "to the empty cold cwd)",
         "approvals": "approve-for-me",
+        "sandbox_workspace_write.network_access": "false (configured; effect NOT "
+                                                  "assumed)",
         "ignore_user_config": True,
         "tools.web_search": "false (configured; effect NOT assumed -- see canary and "
                             "per-row web_activity_suspected, F30)",
@@ -401,18 +409,23 @@ def build_command(agent: str, runner: list[str], model: str, config_path: Path |
         # untraced -- while auth still loads from CODEX_HOME, so a logged-in operator stays
         # authenticated. The congress server is then supplied entirely by the -c overrides.
         "--ignore-user-config",
-        # The read-only sandbox is how the "traced tools are the only way to answer"
-        # invariant is met without a per-tool deny list: the model's own shell can
-        # neither write nor reach the network, and MCP tool calls run in their own server
-        # process outside the sandbox, so they still work. Never --dangerously-bypass-*:
-        # that reopens the network and turns the isolation cell into a non-comparison.
-        "-s", "read-only",
         # F29's root cause candidate: `approval_policy="never"` means "never ASK", which
         # in a headless exec run auto-DENIES anything needing approval -- MCP tool calls
         # included -- and the denial is client-side, so the server trace records nothing.
         # --approve-for-me routes approvals through automatic review instead; measured to
         # work on codex-cli 0.147.0 (maintainer, 2026-08-19).
+        #
+        # It is mutually exclusive with -s: the CLI rejects the pair outright ("the
+        # argument '--sandbox <SANDBOX_MODE>' cannot be used with '--approve-for-me'",
+        # observed live 2026-08-19), because --approve-for-me imposes its own
+        # workspace-write sandbox. That sandbox lets the shell WRITE -- confined to the
+        # cold cwd, an empty disposable temp dir outside the repo, so nothing of value
+        # is writable -- and the property the isolation invariant actually needs, no
+        # network for the model's own shell, is pinned explicitly below rather than
+        # assumed from workspace-write's default. Never --dangerously-bypass-*: that
+        # reopens the network and turns the isolation cell into a non-comparison.
         "--approve-for-me",
+        "-c", "sandbox_workspace_write.network_access=false",
         "--skip-git-repo-check",           # the cold cwd is deliberately not a git repo
         "--ephemeral",                     # persist no session state between prompts
         "-C", str(cold_cwd),
