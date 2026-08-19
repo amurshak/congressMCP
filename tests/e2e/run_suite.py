@@ -34,14 +34,17 @@ the invocation differs, and each driver's flags encode the SAME two guarantees:
 including an unrelated `congressmcp-dev` pointed at a different install -- while still
 loading auth from CODEX_HOME), and (2) the only way to answer is the traced congress
 tools. Claude enforces (2) by denying its built-ins; Codex has no per-tool deny, so it
-runs under --approve-for-me (auto-reviewed approvals; imposes the workspace-write
-sandbox) with shell network access and web search both explicitly configured off -- its
-shell can write only into the empty disposable cold cwd and cannot reach the network, so
-a grounded answer has nowhere to come from but the MCP server. One channel sits above
-all of that configuration: under ChatGPT auth the backend attaches its own `web.run`
-tool, and NO client-side config removes it (measured 2026-08-20 -- see
-codex_auth_mode), so the harness refuses codex cells unless codex is logged in with an
-API key, where the toolset is client-built and carries no web tool. Both configurations are
+runs in the read-only sandbox with approval_policy="never" -- every escalation denied
+-- while the congress server's tools are pre-approved per-server
+(default_tools_approval_mode="approve"), so the only grant approval can ever make is a
+traced congress call. The web channel needed its own campaign, all of it measured (see
+CODEX_NOWEB_PROVIDER and the probe records): ChatGPT auth attaches the backend web.run
+tool nothing client-side removes; the builtin API provider registers the CLI's own web
+tool (functions.web__run) that survives every tools.* config; and --approve-for-me's
+automatic reviewer approves the model's own sandbox-escape requests. The resolution is
+a custom no-web provider over the Responses API plus "never" approvals -- so a grounded
+answer has nowhere to come from but the MCP server. The provider authenticates via
+OPENAI_API_KEY, resolved at preflight and delivered by process env only. Both configurations are
 ASSERTED against the argv actually executed and recorded per cell as `builtins_disabled`,
 in each driver's own vocabulary (never translated -- Codex `reasoning_effort` is not a
 Claude thinking budget, and no mapping between the scales is recorded anywhere). Codex
@@ -151,6 +154,14 @@ def codex_server_spec(trace_dir: Path, bill_text_only: bool,
         "command": sys.executable,
         "args": args,
         "cwd": str(REPO),
+        # Pre-approve this server's tools so approval_policy="never" can deny
+        # everything else. Measured (probe G, 2026-08-19): under plain "never" codex
+        # CANCELS MCP calls client-side ("user cancelled MCP tool call", zero server
+        # traces -- F29's dead-cell shape); with this per-server mode the same call
+        # produces a server-side trace record. This is what breaks the catch-22
+        # between "never" (kills MCP) and --approve-for-me (auto-approves the
+        # model's own shell-escalation requests, reopening the network).
+        "default_tools_approval_mode": "approve",
         "env": {
             "CONGRESSMCP_TRACE_DIR": str(trace_dir),
             "CONGRESSMCP_BILL_TEXT_ONLY": "1" if bill_text_only else "",
@@ -210,6 +221,8 @@ def codex_config_overrides(spec: dict) -> list[str]:
     add("mcp_servers.congress.command", toml_quote(spec["command"]))
     add("mcp_servers.congress.args", "[" + ", ".join(toml_quote(a) for a in spec["args"]) + "]")
     add("mcp_servers.congress.cwd", toml_quote(spec["cwd"]))
+    add("mcp_servers.congress.default_tools_approval_mode",
+        toml_quote(spec["default_tools_approval_mode"]))
     for name, value in spec["env"].items():
         add(f"mcp_servers.congress.env.{name}", toml_quote(value))
     return flags
@@ -231,6 +244,38 @@ def codex_knob_overrides(cell: dict) -> list[str]:
     if effort:
         flags += ["-c", f"model_reasoning_effort={toml_quote(effort)}"]
     return flags
+
+
+# The provider that closes the web channel, measured 2026-08-19/20 on codex-cli
+# 0.147.0 by listing the model-visible toolset under each candidate config:
+#
+#   * ChatGPT auth: the backend attaches `web.run`; nothing client-side removes it.
+#   * API-key auth, builtin `openai` provider: the CLI itself registers the web tool
+#     (functions.web__run) because ModelProviderInfo for the builtin declares
+#     `supports_standalone_web_search` -- and it survives tools.web_search=false,
+#     tools.web_search.mode="disabled", and --disable standalone_web_search. The live
+#     run 2026-08-19T045521Z answered every prompt from `web search:` events with
+#     zero MCP calls.
+#   * Builtin providers cannot be overridden (the CLI refuses `model_providers.openai`),
+#     but a CUSTOM provider pointing at the same Responses API does not declare the
+#     capability, and the web tool vanishes from the toolset (probe E6: 3 tools, no
+#     web__run).
+#
+# The custom provider authenticates via env_key, so the codex child needs
+# OPENAI_API_KEY in its environment -- resolve_codex_api_key() supplies it from the
+# operator's env or codex's own auth.json, and it reaches codex by process env only,
+# never an artifact.
+CODEX_NOWEB_PROVIDER = "openai-noweb"
+
+
+def codex_provider_overrides() -> list[str]:
+    return [
+        "-c", f'model_providers.{CODEX_NOWEB_PROVIDER}.name="OpenAI (no standalone web tool)"',
+        "-c", f'model_providers.{CODEX_NOWEB_PROVIDER}.base_url="https://api.openai.com/v1"',
+        "-c", f'model_providers.{CODEX_NOWEB_PROVIDER}.env_key="OPENAI_API_KEY"',
+        "-c", f'model_providers.{CODEX_NOWEB_PROVIDER}.wire_api="responses"',
+        "-c", f'model_provider={toml_quote(CODEX_NOWEB_PROVIDER)}',
+    ]
 
 
 def builtins_disabled_record(driver: str, cmd: list[str]) -> dict:
@@ -267,39 +312,49 @@ def builtins_disabled_record(driver: str, cmd: list[str]) -> dict:
             "disallowed_tools": disallowed,
         }
 
-    # codex: no per-tool deny exists, so the closed channels are the sandbox's network
-    # block (pinned explicitly -- the shell may write, but only into the empty cold
-    # cwd), auto-reviewed approvals, the operator's config dropped, and web search
-    # explicitly configured off.
+    # codex: no per-tool deny exists, so the closed channels are the read-only sandbox
+    # (no writes, no network for the model's shell), approval_policy="never" (denies
+    # every escalation; the congress tools are pre-approved per-server so MCP still
+    # flows -- probe G), the no-web provider (removes the CLI's own web tool from the
+    # toolset), the operator's config dropped, and web search config off as belt.
     #
     # F30 caveat, recorded in the value itself: this record is the CONFIGURATION the
-    # argv carries, and for web search that is not yet proof of EFFECT -- the void run
-    # recorded tools.web_search=false while the model still self-reported web.run. The
-    # effect-level channels are the per-cell canary (MCP liveness, a server-side trace
-    # record) and the per-row web_activity_suspected scan over the captured runner
-    # stderr/answer; a scorer must read those, not this, for what actually happened.
-    if "--approve-for-me" not in cmd:
-        raise missing("--approve-for-me (approval_policy=\"never\" auto-denies MCP "
-                      "calls client-side, which is F29's dead-cell shape)")
-    if "-s" in cmd or "--sandbox" in cmd:
-        # The CLI rejects the pair; catching it here names the WHY instead of
-        # surfacing as a canary-voided cell with a usage error in its stderr.
-        raise missing("no -s/--sandbox flag: --approve-for-me imposes its own "
-                      "workspace-write sandbox and codex rejects the combination")
-    if "sandbox_workspace_write.network_access=false" not in cmd:
-        raise missing("-c sandbox_workspace_write.network_access=false (workspace-"
-                      "write defaults to no network, but the closed channel must be "
-                      "configuration, not an assumption about a default)")
+    # argv carries. The effect-level channels are the per-cell canary (MCP liveness, a
+    # server-side trace record) and the per-row web_activity_suspected scan over the
+    # captured runner streams; a scorer must read those for what actually happened.
+    try:
+        sandbox = cmd[cmd.index("-s") + 1]
+    except (ValueError, IndexError):
+        raise missing("-s <sandbox_mode>") from None
+    if sandbox != "read-only":
+        raise missing(f"-s read-only (got {sandbox!r})")
+    if 'approval_policy="never"' not in cmd:
+        raise missing('-c approval_policy="never" (denies the model\'s escalation '
+                      "requests; MCP flows via the per-server approval mode)")
+    if "--approve-for-me" in cmd:
+        # Probe E7: the auto-reviewer APPROVED a shell escalation that then reached
+        # the network. This flag must never return.
+        raise missing("no --approve-for-me: its automatic reviewer approves the "
+                      "model's own sandbox-escape requests (observed reaching the "
+                      "network, probe E7)")
+    if f"model_provider={toml_quote(CODEX_NOWEB_PROVIDER)}" not in cmd:
+        raise missing(f"-c model_provider=\"{CODEX_NOWEB_PROVIDER}\" (the builtin "
+                      "provider registers the CLI's own web tool and no tools.* "
+                      "config removes it)")
+    if "mcp_servers.congress.default_tools_approval_mode=" + toml_quote("approve") not in cmd:
+        raise missing("-c mcp_servers.congress.default_tools_approval_mode=\"approve\" "
+                      "(without it, approval_policy=\"never\" cancels every MCP call "
+                      "client-side -- the F29 dead-cell shape, probe F)")
     if "--ignore-user-config" not in cmd:
         raise missing("--ignore-user-config")
     if "tools.web_search=false" not in cmd:
         raise missing("-c tools.web_search=false")
     return {
-        "sandbox_mode": "workspace-write (imposed by --approve-for-me; writes confined "
-                        "to the empty cold cwd)",
-        "approvals": "approve-for-me",
-        "sandbox_workspace_write.network_access": "false (configured; effect NOT "
-                                                  "assumed)",
+        "sandbox_mode": "read-only",
+        "approvals": 'never (escalations denied; congress MCP tools pre-approved '
+                     'per-server via default_tools_approval_mode="approve")',
+        "model_provider": f"{CODEX_NOWEB_PROVIDER} (custom Responses-API provider; "
+                          "does not register the CLI web tool)",
         "ignore_user_config": True,
         "tools.web_search": "false (configured; effect NOT assumed -- see canary and "
                             "per-row web_activity_suspected, F30)",
@@ -327,26 +382,39 @@ def codex_auth_mode() -> str | None:
         return None
 
 
-def assert_codex_auth_can_close_the_web(auth_mode: str | None) -> None:
-    """Refuse to run codex cells under an auth mode whose web channel cannot close.
+def resolve_codex_api_key() -> str:
+    """The OpenAI API key the no-web provider authenticates with, or a loud refusal.
 
-    A codex cell run with `web.run` attached is void by construction -- the model
-    answers from the web instead of adopting the traced tools (observed in the Luna
-    AND Sol runs of 2026-08-19/20), and no claim is tool-attributable. Since no
-    client-side configuration removes the backend tool under ChatGPT auth, the honest
-    instrument fails HERE, before any prompt or canary is spent, naming the fix.
+    The codex cells run through CODEX_NOWEB_PROVIDER, which authenticates via the
+    OPENAI_API_KEY env var of the codex process -- so a key must exist, whatever
+    auth mode codex is logged in with. Sources, in order: the operator's environment,
+    then codex's own auth.json (populated by `codex login --api-key`). The value
+    reaches codex by PROCESS ENV only -- never an argv, config file, or manifest,
+    which are all run artifacts.
+
+    Without a key the cells cannot run at all: ChatGPT auth attaches the backend
+    web.run tool that no client-side config removes (measured 2026-08-19/20), so
+    there is no fallback path worth failing into slowly.
     """
-    if auth_mode == "chatgpt":
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    if not key:
+        home = Path(os.getenv("CODEX_HOME", "") or (Path.home() / ".codex"))
+        try:
+            key = (json.loads((home / "auth.json").read_text())
+                   .get("OPENAI_API_KEY") or "").strip()
+        except (OSError, json.JSONDecodeError):
+            key = ""
+    if not key:
         raise SystemExit(
-            "FATAL: codex is logged in with ChatGPT auth (auth_mode=chatgpt), which "
-            "attaches the backend web.run tool to every session. No client-side "
-            "config removes it (measured 2026-08-20: tools.web_search=false and "
-            "tools.web_search.mode=\"disabled\" are both accepted and both "
-            "ineffective), so every codex cell would be void: the model answers from "
-            "the web instead of the traced tools. Fix: `codex login --api-key <key>` "
-            "(platform API key) -- API-key auth builds the toolset client-side and "
-            "carries no web tool unless --search asks for one."
+            "FATAL: the codex cells need an OpenAI platform API key and none was "
+            "found in OPENAI_API_KEY or in codex's auth.json. They run through a "
+            "custom no-web provider (the only measured way to keep the web tool out "
+            "of the toolset -- ChatGPT auth attaches backend web.run, and the builtin "
+            "API provider registers its own web tool); that provider authenticates "
+            "via OPENAI_API_KEY. Fix: `codex login --api-key <key>` or export "
+            "OPENAI_API_KEY."
         )
+    return key
 
 
 def cli_version(executable: str) -> str:
@@ -421,6 +489,7 @@ def write_codex_mcp_config(dest: Path, spec: dict) -> Path:
         f"command = {toml_quote(spec['command'])}",
         "args = [" + ", ".join(toml_quote(a) for a in spec["args"]) + "]",
         f"cwd = {toml_quote(spec['cwd'])}",
+        f"default_tools_approval_mode = {toml_quote(spec['default_tools_approval_mode'])}",
         "",
         "[mcp_servers.congress.env]",
     ]
@@ -456,23 +525,26 @@ def build_command(agent: str, runner: list[str], model: str, config_path: Path |
         # untraced -- while auth still loads from CODEX_HOME, so a logged-in operator stays
         # authenticated. The congress server is then supplied entirely by the -c overrides.
         "--ignore-user-config",
-        # F29's root cause candidate: `approval_policy="never"` means "never ASK", which
-        # in a headless exec run auto-DENIES anything needing approval -- MCP tool calls
-        # included -- and the denial is client-side, so the server trace records nothing.
-        # --approve-for-me routes approvals through automatic review instead; measured to
-        # work on codex-cli 0.147.0 (maintainer, 2026-08-19).
-        #
-        # It is mutually exclusive with -s: the CLI rejects the pair outright ("the
-        # argument '--sandbox <SANDBOX_MODE>' cannot be used with '--approve-for-me'",
-        # observed live 2026-08-19), because --approve-for-me imposes its own
-        # workspace-write sandbox. That sandbox lets the shell WRITE -- confined to the
-        # cold cwd, an empty disposable temp dir outside the repo, so nothing of value
-        # is writable -- and the property the isolation invariant actually needs, no
-        # network for the model's own shell, is pinned explicitly below rather than
-        # assumed from workspace-write's default. Never --dangerously-bypass-*: that
-        # reopens the network and turns the isolation cell into a non-comparison.
-        "--approve-for-me",
-        "-c", "sandbox_workspace_write.network_access=false",
+        # The approvals design, settled by probe after two wrong turns (both preserved
+        # in this file's history and in runs/):
+        #   * approval_policy="never" ALONE cancels MCP calls client-side ("user
+        #     cancelled MCP tool call", zero server traces -- probe F) => dead cell.
+        #   * --approve-for-me approves MCP but ALSO auto-approves the model's own
+        #     shell-escalation requests: a curl that failed in the sandbox was retried
+        #     "outside" on request and SUCCEEDED (probe E7) => open network.
+        # The pair below is the resolution: "never" denies every escalation, and the
+        # congress server's tools are pre-approved per-server in the MCP spec
+        # (default_tools_approval_mode="approve"), so the ONLY thing approval can ever
+        # grant is a traced congress call (probe G: 1 trace record, 0 cancellations).
+        # Never --dangerously-bypass-*: that reopens the network wholesale.
+        "-c", 'approval_policy="never"',
+        # Read-only sandbox: the shell can neither write nor reach the network, and
+        # with "never" there is no path to escalate out of it.
+        "-s", "read-only",
+        # The no-web provider: the builtin openai provider registers the CLI's own
+        # web tool (functions.web__run) under API-key auth and no tools.* config
+        # removes it -- see CODEX_NOWEB_PROVIDER for the probe record.
+        *codex_provider_overrides(),
         "--skip-git-repo-check",           # the cold cwd is deliberately not a git repo
         "--ephemeral",                     # persist no session state between prompts
         "-C", str(cold_cwd),
@@ -752,12 +824,21 @@ def assert_prompt_is_cold(text: str, prompt_id: str) -> None:
 # with live web citations while tools.web_search=false was recorded (F30) -- so the
 # harness scans the driver's own event output for web-tool activity and records what it
 # finds. This is detection over the driver's event stream, not scoring of the answer:
-# content-based judgment stays with the scorer.
-WEB_ACTIVITY_MARKERS = ("web.run", "web_search", "web-search")
+# content-based judgment stays with the scorer. "web search" (with the space) is the
+# literal event-line prefix codex 0.147.0 prints ("web search: <query>") -- the
+# 2026-08-19T045521Z run's searches were missed because only the underscore/dot forms
+# were listed, so the run scored web-silent while stderr said `web search:` six times
+# per prompt. Never remove the spaced form.
+WEB_ACTIVITY_MARKERS = ("web.run", "web_search", "web-search", "web search", "web__run")
 
 
 def scan_web_activity(*streams: str) -> list[str]:
-    """Which web-tool markers appear in the driver's captured output streams."""
+    """Which web-tool markers appear in the driver's captured output streams.
+
+    Callers pass EVENT streams only, never answer content -- for Claude that means
+    stderr alone (its stdout IS the answer, and an answer saying "I cannot perform a
+    web search" must not read as web activity); codex prints events to both streams.
+    """
     lowered = [(s or "").casefold() for s in streams]
     return [m for m in WEB_ACTIVITY_MARKERS if any(m in s for s in lowered)]
 
@@ -941,7 +1022,8 @@ def resolve_runners(drivers: set[str], runner_arg: str | None) -> dict[str, list
 def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
             runners: dict[str, list[str]], driver_versions: dict, sha: str,
             docs: dict, dry_run: bool, outside_cell_groups: bool = False,
-            secrets_file: Path | None = None) -> Meta:
+            secrets_file: Path | None = None,
+            codex_api_key: str | None = None) -> Meta:
     agent = cell.get("driver", "claude")
     runner = runners[agent]
     prompt_id = entry["id"]
@@ -982,6 +1064,10 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     env = dict(os.environ)
     env["CONGRESSMCP_TRACE_DIR"] = str(trace_dir)
     env["CONGRESSMCP_BILL_TEXT_ONLY"] = "1" if bill_text_only else ""
+    if agent == "codex" and codex_api_key:
+        # The no-web provider authenticates via env_key=OPENAI_API_KEY. Process env
+        # only: it appears in no config file, no argv, and no meta row.
+        env["OPENAI_API_KEY"] = codex_api_key
 
     started = datetime.now(timezone.utc)
     t0 = time.perf_counter()
@@ -1082,7 +1168,9 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
         criteria={k: entry.get(k) for k in ("title", "pass", "fail", "watch",
                                             "grounding", "sourcing", "substitution")},
         builtins_disabled=builtins,
-        web_activity_suspected=scan_web_activity(stdout_text, stderr_text),
+        web_activity_suspected=(scan_web_activity(stdout_text, stderr_text)
+                                if agent == "codex"
+                                else scan_web_activity(stderr_text)),
     )
     (dest / "meta.json").write_text(json.dumps(asdict(meta), indent=2) + "\n")
     return meta
@@ -1172,6 +1260,7 @@ def main() -> int:
     driver_versions = ({d: None for d in drivers} if args.dry_run
                        else {d: cli_version(runners[d][0]) for d in sorted(drivers)})
     codex_auth: str | None = None
+    codex_api_key: str | None = None
 
     if not args.dry_run:
         # F23: assert at startup that the interpreter the MCP configs will name can
@@ -1196,12 +1285,13 @@ def main() -> int:
             return 1
         print("preflight  : GovInfo reachable with the configured key.")
         if "codex" in drivers:
-            # F30 residual: under ChatGPT auth the backend attaches web.run and no
-            # client-side config removes it, so a codex cell would be void by
-            # construction. Fail here, before any canary or prompt is spent.
+            # F30 residual: the codex cells run through the no-web provider, which
+            # needs an OpenAI API key. Resolve it now -- before any canary or prompt
+            # is spent -- and record only the auth MODE, never the key.
             codex_auth = codex_auth_mode()
-            assert_codex_auth_can_close_the_web(codex_auth)
-            print(f"preflight  : codex auth_mode={codex_auth!r} -- web channel closable.")
+            codex_api_key = resolve_codex_api_key()
+            print(f"preflight  : codex auth_mode={codex_auth!r}; API key resolved for "
+                  f"the {CODEX_NOWEB_PROVIDER} provider (delivered by process env only).")
 
     if want_prompts:
         known = {p["id"] for p in manifest["prompts"]}
@@ -1266,7 +1356,8 @@ def main() -> int:
                     and not args.dry_run):
                 canary_meta = run_one(CANARY_ENTRY, run_cell_name, run_cell, run_dir,
                                       runners, driver_versions, sha, docs, False,
-                                      secrets_file=secrets_file)
+                                      secrets_file=secrets_file,
+                                      codex_api_key=codex_api_key)
                 canaries.append(canary_meta)
                 verdict, reason = canary_verdict(canary_meta)
                 canary_by_cell[run_cell_name] = {
@@ -1291,7 +1382,8 @@ def main() -> int:
                 try:
                     meta = run_one(entry, cell_name, cell, run_dir, runners, driver_versions,
                                    sha, docs, args.dry_run, outside_cell_groups=off_cell,
-                                   secrets_file=secrets_file)
+                                   secrets_file=secrets_file,
+                                   codex_api_key=codex_api_key)
                 except ValueError as exc:
                     print(f"  {entry['id']:4s} {cell_name:11s} MANIFEST ERROR: {exc}")
                     failures += 1
