@@ -495,6 +495,26 @@ def test_canary_entry_forces_one_call_on_a_corpus_grounded_document():
         assert CANARY_ENTRY["group"] not in cell["groups"]
 
 
+def test_canary_resolves_and_runs_in_every_canary_gated_cell(tmp_path):
+    # The regression that shipped: the canary rides through resolve_prompt, and the
+    # cross-vendor-floor cell requires the single-step variant -- which the canary
+    # entry did not define, so the gate CRASHED the live run instead of guarding it.
+    # Dry runs skip canaries, so only a direct exercise of this path can catch it:
+    # run the canary through run_one in dry-run mode for every cell whose driver
+    # requires a canary.
+    from run_suite import CANARY_ENTRY, CANARY_REQUIRED_DRIVERS, resolve_prompt, run_one
+
+    gated = {name: cell for name, cell in MANIFEST["cells"].items()
+             if cell.get("driver") in CANARY_REQUIRED_DRIVERS}
+    assert gated, "no canary-gated cells in the manifest -- the fixture is vacuous"
+    for name, cell in gated.items():
+        assert resolve_prompt(CANARY_ENTRY, cell) == CANARY_ENTRY["prompt"]
+        meta = run_one(CANARY_ENTRY, name, cell, tmp_path / name,
+                       {"codex": ["codex", "exec", "-m", "{model}"]},
+                       {"codex": "test"}, "sha", MANIFEST["documents"], dry_run=True)
+        assert meta.prompt_id == "CANARY" and meta.cell == name
+
+
 def test_canary_verdict_is_live_only_on_a_server_side_trace():
     from run_suite import canary_verdict
 

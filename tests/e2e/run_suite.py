@@ -778,14 +778,20 @@ CANARY_REQUIRED_DRIVERS = frozenset({"codex"})
 # credential preflight fetches, so its availability is already proven out of band.
 # This prompt is deliberately NOT cold: it names the tool and the arguments, because
 # the canary measures the instrument (can a call get through?), never the consumer.
+_CANARY_PROMPT = (
+    "Use the get_bill_toc tool from the congress MCP server with congress=119, "
+    'bill_type="hres", number=463, and reply with the number of top-level '
+    "entries in the table of contents it returns."
+)
 CANARY_ENTRY = {
     "id": "CANARY",
     "group": "_canary",
-    "prompt": (
-        "Use the get_bill_toc tool from the congress MCP server with congress=119, "
-        'bill_type="hres", number=463, and reply with the number of top-level '
-        "entries in the table of contents it returns."
-    ),
+    "prompt": _CANARY_PROMPT,
+    # The canary is single-step BY CONSTRUCTION -- it names the exact call -- so it is
+    # its own variant. Without this, a cell that requires the single-step variant
+    # (cross-vendor-floor does) refuses the canary at resolve_prompt and the gate
+    # crashes the run instead of guarding it.
+    "single_step_variant": _CANARY_PROMPT,
     "document": "BILLS-119hres463ih",
     "title": "forced-call canary -- instrument liveness, not a consumer measurement",
     "grounding": "same package the credential preflight fetches; smallest in the corpus",
