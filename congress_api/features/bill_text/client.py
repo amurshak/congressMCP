@@ -286,6 +286,31 @@ async def _resolve_versions(ctx: Context, congress: int, bill_type: str, number:
     return await govinfo_search_versions(congress, bill_type, number)
 
 
+def _govinfo_auth_error(api_key: str, status_code: int) -> BillTextError:
+    """The 401/403 branch, split by whether a key was sent at all (F31, §9).
+
+    A keyless server must not wear `govinfo_key_rejected`: "the existing key was
+    rejected" sends the operator hunting a stale key that never existed. Missing key
+    is its own code, naming the variables to set.
+    """
+    if not api_key:
+        return BillTextError(
+            "api_key_missing",
+            "No api.data.gov key is configured, and GovInfo refused the "
+            "unauthenticated request.",
+            {"status_code": status_code},
+            "Set CONGRESS_API_KEY in the server's environment (api.congress.gov and "
+            "api.govinfo.gov share one api.data.gov key), or GOVINFO_API_KEY to use "
+            "a separate GovInfo key.",
+        )
+    return BillTextError(
+        "govinfo_key_rejected",
+        "The existing api.data.gov key was rejected by GovInfo.",
+        {"status_code": status_code},
+        "api.congress.gov and api.govinfo.gov normally share one api.data.gov key; set GOVINFO_API_KEY to override.",
+    )
+
+
 async def govinfo_search_versions(congress: int, bill_type: str, number: int) -> list[TextVersion]:
     api_key = os.getenv("GOVINFO_API_KEY") or API_KEY or ""
     headers = {"X-Api-Key": api_key} if api_key else {}
@@ -298,12 +323,7 @@ async def govinfo_search_versions(congress: int, bill_type: str, number: int) ->
     async with httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=10.0)) as client:
         response = await client.post(f"{GOVINFO_BASE_URL}/search", json=body, headers=headers)
     if response.status_code in {401, 403}:
-        raise BillTextError(
-            "govinfo_key_rejected",
-            "The existing api.data.gov key was rejected by GovInfo.",
-            {"status_code": response.status_code},
-            "api.congress.gov and api.govinfo.gov normally share one api.data.gov key; set GOVINFO_API_KEY to override.",
-        )
+        raise _govinfo_auth_error(api_key, response.status_code)
     if response.status_code >= 400:
         raise BillTextError(
             "congress_unavailable",
@@ -391,12 +411,7 @@ async def fetch_govinfo_package(package_id: str) -> tuple[str | None, bytes]:
         if summary.status_code == 404:
             raise BillTextError("govinfo_not_found", f"GovInfo package {package_id} was not found.")
         if summary.status_code in {401, 403}:
-            raise BillTextError(
-                "govinfo_key_rejected",
-                "The existing api.data.gov key was rejected by GovInfo.",
-                {"status_code": summary.status_code},
-                "api.congress.gov and api.govinfo.gov normally share one api.data.gov key; set GOVINFO_API_KEY to override.",
-            )
+            raise _govinfo_auth_error(api_key, summary.status_code)
         if summary.status_code >= 400:
             raise BillTextError("govinfo_unavailable", "GovInfo package summary could not be retrieved.", {"status_code": summary.status_code})
         data = summary.json()

@@ -2583,3 +2583,54 @@ def test_toc_hidden_advice_does_not_recommend_a_depth_the_node_cap_blocks():
     required = _max_section_depth(parsed.units)
     assert f"call with depth={required}" not in note   # would be circular
     assert "search_bill_text" in note and "deepest listable depth" in note
+
+
+# ---------------------------------------------------------------------------
+# F31 (spec §9): a keyless server must not wear govinfo_key_rejected.
+# ---------------------------------------------------------------------------
+
+def test_keyless_auth_failure_is_api_key_missing_not_key_rejected():
+    # "The existing api.data.gov key was rejected" with NO key configured invents a
+    # key that never existed, and it sent an operator hunting a stale key for three
+    # probes. The two states demand different remediation, so they get different codes.
+    from congress_api.features.bill_text.client import _govinfo_auth_error
+
+    keyless = _govinfo_auth_error("", 401)
+    assert keyless.code == "api_key_missing"
+    assert "rejected by GovInfo" not in keyless.message
+    # The remediation must name the variables to set (§9 contract line).
+    assert "CONGRESS_API_KEY" in keyless.remediation
+    assert "GOVINFO_API_KEY" in keyless.remediation
+
+    rejected = _govinfo_auth_error("some-live-key", 401)
+    assert rejected.code == "govinfo_key_rejected"
+
+
+@pytest.mark.asyncio
+async def test_keyless_401_from_govinfo_search_raises_api_key_missing(monkeypatch):
+    # Wiring, not just the helper: with no key in the environment and GovInfo
+    # answering 401, the error that reaches the caller carries the keyless code.
+    import httpx
+
+    import congress_api.features.bill_text.client as client_mod
+    from congress_api.features.bill_text.client import BillTextError, govinfo_search_versions
+
+    monkeypatch.delenv("GOVINFO_API_KEY", raising=False)
+    monkeypatch.setattr(client_mod, "API_KEY", "")
+
+    real_async_client = httpx.AsyncClient
+
+    def unauthorized_client(*args, **kwargs):
+        kwargs["transport"] = httpx.MockTransport(lambda request: httpx.Response(401))
+        return real_async_client(*args, **kwargs)
+
+    monkeypatch.setattr(client_mod.httpx, "AsyncClient", unauthorized_client)
+    with pytest.raises(BillTextError) as exc:
+        await govinfo_search_versions(119, "hres", 463)
+    assert exc.value.code == "api_key_missing"
+
+    # And with a key configured, the same 401 stays govinfo_key_rejected.
+    monkeypatch.setattr(client_mod, "API_KEY", "a-configured-key")
+    with pytest.raises(BillTextError) as exc:
+        await govinfo_search_versions(119, "hres", 463)
+    assert exc.value.code == "govinfo_key_rejected"
