@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """Spawn shim: inject credentials from a 0600 file, then exec the MCP server.
 
+OPERATORS NEVER CREATE OR PASS THE SECRETS FILE. The interface is the same as the
+Claude driver's: export CONGRESS_API_KEY (optionally GOVINFO_API_KEY) in the shell
+that runs the harness. run_suite.write_secrets_file reads those from the harness's
+own environment, writes the transient 0600 file, wires its path into the generated
+codex config, and deletes it when the run ends. --secrets-file is plumbing between
+the harness and this shim, not an operator input.
+
 Why this exists (F29/F30 postmortem, maintainer directive 2026-08-19): Codex does NOT
 forward the parent environment to the MCP servers it spawns, so the inheritance channel
 the Claude driver uses delivers nothing there -- the server came up keyless and wore a

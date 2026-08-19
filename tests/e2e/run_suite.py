@@ -156,6 +156,13 @@ def codex_server_spec(trace_dir: Path, bill_text_only: bool,
 def write_secrets_file(run_dir: Path) -> Path | None:
     """The 0600 credentials file the spawn shim reads; None when no key is set.
 
+    Sourced from THE HARNESS'S OWN ENVIRONMENT -- the same CONGRESS_API_KEY /
+    GOVINFO_API_KEY exports the Claude driver inherits directly. Operators never
+    create or pass this file; the harness writes it, wires its path into the codex
+    config, and deletes it at run end. It exists only because codex strips its own
+    environment when spawning MCP servers, so the export cannot make the last hop
+    unaided.
+
     Written OUTSIDE both the run tree and the repo -- the run directory is exactly what
     an operator tars up and attaches to an issue, and the repo is what gets committed.
     mkstemp creates the file 0600; the shim independently refuses anything looser, so
