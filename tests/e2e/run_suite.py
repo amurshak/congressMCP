@@ -265,6 +265,12 @@ def codex_knob_overrides(cell: dict) -> list[str]:
 # OPENAI_API_KEY in its environment -- resolve_codex_api_key() supplies it from the
 # operator's env or codex's own auth.json, and it reaches codex by process env only,
 # never an artifact.
+#
+# Effect-level verification (probe H, 2026-08-19), under the FULL final config with a
+# prompt demanding live web data: zero web-search events, the sandboxed curl failed
+# DNS resolution, no escalation was granted, and the model answered "live web access
+# is unavailable in the current environment; I don't want to guess." The web channel
+# is closed in effect, not merely in configuration.
 CODEX_NOWEB_PROVIDER = "openai-noweb"
 
 
