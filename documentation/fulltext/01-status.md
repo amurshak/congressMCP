@@ -9,6 +9,7 @@ Branch `feature/bill-text-search-index`; spec tip `d75a548`, implementation tip 
 **The live queue is `14-defect-priority.md` §18 — read it there, not here.** Two reviews landed:
 - **ultrareview (2026-08-09/10):** `bug_005/006/007` **fixed** (`950125d`); `bug_002/004/008` **refuted** (three were review-slicing artifacts — a reviewer reading a stale overlay tree).
 - **code review (2026-08-14, 34 findings):** triaged to **F18–F27** plus routed nits. A fresh implementation session has the handoff.
+- **Codex driver (2026-08-18):** the maintainer had the implementation session add a Codex CLI driver to the §17 harness (`012bf8a`, a claim not yet adjudicated here). The cross-vendor cell (§17) is now cheap, and its manifest shape is **ruled 2026-08-18** in `12-e2e-prompts.md`: cells gain a `driver` axis; Codex knobs recorded verbatim, never mapped onto Claude roles; `role: cross-vendor`; isolation surface + Group A by default; **non-gating even though results land in PR 1**. Preregistration recorded there; when results report, §16 gains its own cross-vendor row.
 
 **The real bar for "PR 1 done," in order:**
 
