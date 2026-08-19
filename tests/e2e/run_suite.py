@@ -211,25 +211,34 @@ def builtins_disabled_record(driver: str, cmd: list[str]) -> dict:
         }
 
     # codex: no per-tool deny exists, so the closed channels are the read-only sandbox
-    # (no writes, no network for the model's own shell), approvals off, the operator's
-    # config dropped, and web search explicitly disabled.
+    # (no writes, no network for the model's own shell), auto-reviewed approvals, the
+    # operator's config dropped, and web search explicitly configured off.
+    #
+    # F30 caveat, recorded in the value itself: this record is the CONFIGURATION the
+    # argv carries, and for web search that is not yet proof of EFFECT -- the void run
+    # recorded tools.web_search=false while the model still self-reported web.run. The
+    # effect-level channels are the per-cell canary (MCP liveness, a server-side trace
+    # record) and the per-row web_activity_suspected scan over the captured runner
+    # stderr/answer; a scorer must read those, not this, for what actually happened.
     try:
         sandbox = cmd[cmd.index("-s") + 1]
     except (ValueError, IndexError):
         raise missing("-s <sandbox_mode>") from None
     if sandbox != "read-only":
         raise missing(f"-s read-only (got {sandbox!r})")
-    if 'approval_policy="never"' not in cmd:
-        raise missing('-c approval_policy="never"')
+    if "--approve-for-me" not in cmd:
+        raise missing("--approve-for-me (approval_policy=\"never\" auto-denies MCP "
+                      "calls client-side, which is F29's dead-cell shape)")
     if "--ignore-user-config" not in cmd:
         raise missing("--ignore-user-config")
     if "tools.web_search=false" not in cmd:
         raise missing("-c tools.web_search=false")
     return {
         "sandbox_mode": "read-only",
-        "approval_policy": "never",
+        "approvals": "approve-for-me",
         "ignore_user_config": True,
-        "tools.web_search": False,
+        "tools.web_search": "false (configured; effect NOT assumed -- see canary and "
+                            "per-row web_activity_suspected, F30)",
     }
 
 
@@ -340,13 +349,18 @@ def build_command(agent: str, runner: list[str], model: str, config_path: Path |
         # untraced -- while auth still loads from CODEX_HOME, so a logged-in operator stays
         # authenticated. The congress server is then supplied entirely by the -c overrides.
         "--ignore-user-config",
-        # Read-only sandbox with approvals off is how the "traced tools are the only way to
-        # answer" invariant is met without a per-tool deny list: the model's own shell can
+        # The read-only sandbox is how the "traced tools are the only way to answer"
+        # invariant is met without a per-tool deny list: the model's own shell can
         # neither write nor reach the network, and MCP tool calls run in their own server
         # process outside the sandbox, so they still work. Never --dangerously-bypass-*:
         # that reopens the network and turns the isolation cell into a non-comparison.
         "-s", "read-only",
-        "-c", 'approval_policy="never"',
+        # F29's root cause candidate: `approval_policy="never"` means "never ASK", which
+        # in a headless exec run auto-DENIES anything needing approval -- MCP tool calls
+        # included -- and the denial is client-side, so the server trace records nothing.
+        # --approve-for-me routes approvals through automatic review instead; measured to
+        # work on codex-cli 0.147.0 (maintainer, 2026-08-19).
+        "--approve-for-me",
         "--skip-git-repo-check",           # the cold cwd is deliberately not a git repo
         "--ephemeral",                     # persist no session state between prompts
         "-C", str(cold_cwd),
@@ -529,6 +543,10 @@ class Meta:
     # The effective closed-channel configuration, asserted from `command` by
     # builtins_disabled_record -- driver-native keys, per §17 driver-axis rule 3.
     builtins_disabled: dict = field(default_factory=dict)
+    # Web-tool markers found in the driver's captured stdout/stderr event streams
+    # (F30). Non-empty means the "web off" configuration was NOT effective for this
+    # invocation and its claims cannot be read as tool-attributable.
+    web_activity_suspected: list[str] = field(default_factory=list)
 
 
 def build_sha() -> str:
@@ -616,6 +634,20 @@ def assert_prompt_is_cold(text: str, prompt_id: str) -> None:
                 "measurement. Run those separately, failure-only, each in its own "
                 "fresh process."
             )
+
+
+# Tokens the Codex event stream uses for its web tool. The void run's model answered
+# with live web citations while tools.web_search=false was recorded (F30) -- so the
+# harness scans the driver's own event output for web-tool activity and records what it
+# finds. This is detection over the driver's event stream, not scoring of the answer:
+# content-based judgment stays with the scorer.
+WEB_ACTIVITY_MARKERS = ("web.run", "web_search", "web-search")
+
+
+def scan_web_activity(*streams: str) -> list[str]:
+    """Which web-tool markers appear in the driver's captured output streams."""
+    lowered = [(s or "").casefold() for s in streams]
+    return [m for m in WEB_ACTIVITY_MARKERS if any(m in s for s in lowered)]
 
 
 def read_trace(trace_dir: Path) -> tuple[int, list[str], list[str]]:
@@ -768,6 +800,8 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     harness_failure: str | None = None
     exit_status = -1
     answer = ""
+    stdout_text = ""
+    stderr_text = ""
 
     cmd = build_command(agent, runner, cell["model"], config_path, codex_overrides,
                         cold_cwd, answer_file)
@@ -787,17 +821,18 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
             proc = subprocess.run(cmd, cwd=cold_cwd, env=env, input=text,
                                   capture_output=True, text=True, timeout=900)
             exit_status = proc.returncode
+            stdout_text, stderr_text = proc.stdout, proc.stderr
             # Claude prints the final result to stdout; Codex prints progress there and
             # writes the final message to the -o file, so take the answer from whichever
             # the driver uses (and keep Codex's stdout as a debugging artifact).
             if agent == "codex":
-                (dest / "runner-stdout.txt").write_text(proc.stdout)
+                (dest / "runner-stdout.txt").write_text(stdout_text)
                 answer = (answer_file.read_text() if answer_file and answer_file.exists()
-                          else proc.stdout)
+                          else stdout_text)
             else:
-                answer = proc.stdout
+                answer = stdout_text
             if exit_status != 0:
-                harness_failure = f"runner exited {exit_status}: {proc.stderr[-800:]}"
+                harness_failure = f"runner exited {exit_status}: {stderr_text[-800:]}"
             elif not answer.strip():
                 # THE INVARIANT THAT MATTERS MOST HERE. B1 at the floor made zero tool
                 # calls and that was a real finding. A crashed invocation, a timeout, or
@@ -805,10 +840,17 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
                 # call anything -- an errored scan must not look like one that found
                 # nothing (00-INDEX).
                 harness_failure = "empty answer with exit 0 -- harness failure, NOT a consumer result"
-        except subprocess.TimeoutExpired:
+        except subprocess.TimeoutExpired as exc:
             harness_failure = "timeout after 900s -- harness failure, NOT a consumer result"
+            partial = exc.stderr
+            stderr_text = (partial.decode(errors="replace")
+                           if isinstance(partial, bytes) else (partial or ""))
         except FileNotFoundError as exc:
             harness_failure = f"runner not found: {exc}"
+        # F30: Codex reports MCP server startup failures ONLY on stderr, and the void
+        # run discarded it -- the one channel that named the defect. Keep it verbatim,
+        # for every driver, whatever the exit status.
+        (dest / "runner-stderr.txt").write_text(stderr_text)
 
     duration = round(time.perf_counter() - t0, 2)
     finished = datetime.now(timezone.utc)
@@ -852,6 +894,7 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
         criteria={k: entry.get(k) for k in ("title", "pass", "fail", "watch",
                                             "grounding", "sourcing", "substitution")},
         builtins_disabled=builtins,
+        web_activity_suspected=scan_web_activity(stdout_text, stderr_text),
     )
     (dest / "meta.json").write_text(json.dumps(asdict(meta), indent=2) + "\n")
     return meta
@@ -1015,6 +1058,13 @@ def main() -> int:
         flag = "  [outside cell groups]" if meta.outside_cell_groups else ""
         if meta.harness_failure:
             flag += f"  HARNESS FAILURE: {meta.harness_failure[:60]}"
+            failures += 1
+        if meta.web_activity_suspected:
+            # An open web channel is an instrument breach, not a consumer behavior:
+            # the row's claims are no longer tool-attributable, so it counts as a
+            # harness failure even when the invocation itself exited cleanly (F30).
+            flag += (f"  WEB ACTIVITY SUSPECTED ({','.join(meta.web_activity_suspected)})"
+                     " -- claims not tool-attributable")
             failures += 1
         print(f"  {meta.prompt_id:4s} {cell_name:11s} {meta.duration_s:6.1f}s  "
               f"{meta.trace_records:>3} trace records  "

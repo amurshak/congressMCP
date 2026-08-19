@@ -282,7 +282,11 @@ def test_codex_command_shuts_out_the_operator_surface_and_reads_stdin(tmp_path):
     assert cmd[:4] == ["codex", "exec", "-m", "gpt-5-codex"]   # {model} substituted
     assert "--ignore-user-config" in cmd
     assert cmd[cmd.index("-s") + 1] == "read-only"
-    assert 'approval_policy="never"' in cmd
+    # F29: approval_policy="never" means "never ASK", which auto-DENIES MCP calls
+    # client-side in a headless run -- the dead-cell shape. Approvals are auto-reviewed
+    # instead (measured to work on codex-cli 0.147.0).
+    assert "--approve-for-me" in cmd
+    assert 'approval_policy="never"' not in cmd
     assert "--skip-git-repo-check" in cmd                      # cold cwd is not a git repo
     assert cmd[-1] == "-"                                      # prompt on stdin
     assert cmd[cmd.index("-o") + 1] == str(tmp_path / "last.txt")
@@ -575,8 +579,13 @@ def test_builtins_disabled_is_asserted_from_the_codex_argv(tmp_path):
                         tmp_path / "mcp.toml", overrides, tmp_path / "cold",
                         tmp_path / "last.txt")
     record = builtins_disabled_record("codex", cmd)
-    assert record == {"sandbox_mode": "read-only", "approval_policy": "never",
-                      "ignore_user_config": True, "tools.web_search": False}
+    assert record["sandbox_mode"] == "read-only"
+    assert record["approvals"] == "approve-for-me"
+    assert record["ignore_user_config"] is True
+    # F30: the web-search entry must read as configuration, never as verified effect --
+    # the void run recorded a bare `false` while the model self-reported web.run.
+    assert "configured" in record["tools.web_search"]
+    assert "NOT assumed" in record["tools.web_search"]
     # Web search left to its default is an assumption, not configuration: the override
     # must be present in the argv or the record must refuse to exist.
     no_web = [part for part in cmd if part != "tools.web_search=false"]
@@ -586,6 +595,22 @@ def test_builtins_disabled_is_asserted_from_the_codex_argv(tmp_path):
     loose = ["full-access" if part == "read-only" else part for part in cmd]
     with pytest.raises(SystemExit, match="read-only"):
         builtins_disabled_record("codex", loose)
+    # Approvals silently reverting to "never ask" (= auto-deny) is the dead-cell shape.
+    no_approve = [part for part in cmd if part != "--approve-for-me"]
+    with pytest.raises(SystemExit, match="approve-for-me"):
+        builtins_disabled_record("codex", no_approve)
+
+
+def test_web_activity_scan_reads_the_driver_event_streams():
+    from run_suite import scan_web_activity
+
+    # The F30 evidence shape: the model self-reported web.run while the config said off.
+    assert scan_web_activity("", "tool call: web.run {query}") == ["web.run"]
+    assert scan_web_activity("event: web_search started", "") == ["web_search"]
+    # Case-insensitive, both streams scanned.
+    assert scan_web_activity("Using WEB.RUN now", "") == ["web.run"]
+    # Clean streams stay clean -- an MCP congress call must not trip it.
+    assert scan_web_activity("tool call: mcp__congress get_bill_toc", "") == []
 
 
 def test_runner_override_refuses_a_mixed_driver_selection():
