@@ -119,23 +119,68 @@ def toml_quote(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def codex_server_spec(trace_dir: Path, bill_text_only: bool) -> dict:
+def codex_server_spec(trace_dir: Path, bill_text_only: bool,
+                      secrets_file: Path | None = None) -> dict:
     """The single congress MCP server Codex is given -- the exact analog of the Claude JSON.
 
     Same server, same interpreter rule (sys.executable, per F23), same two per-prompt env
     vars and NO credential (see write_mcp_config for why naming one would be a bug, not a
     convenience). The whole surface is one server, and --ignore-user-config guarantees it is
     the ONLY one.
+
+    KEY DELIVERY (F31 postmortem, maintainer directive 2026-08-19): Codex does not
+    forward the parent environment to MCP servers, so the inheritance channel the Claude
+    driver relies on delivers nothing here -- the first live run's server came up keyless.
+    And both channels Codex does offer are artifacts: the config env table is written to
+    mcp-config.toml in the run directory, and -c overrides land verbatim in meta.json's
+    `command`. So with `secrets_file` set, the server is launched through the
+    spawn_server.py shim, which reads the 0600 file (outside the run tree, deleted at
+    run end) and execs the real server with the keys in its environment. Only the PATH
+    appears in any artifact.
     """
+    if secrets_file is not None:
+        args = [str(HERE / "spawn_server.py"), "--secrets-file", str(secrets_file)]
+    else:
+        args = ["-m", "congress_api", "--transport", "stdio"]
     return {
         "command": sys.executable,
-        "args": ["-m", "congress_api", "--transport", "stdio"],
+        "args": args,
         "cwd": str(REPO),
         "env": {
             "CONGRESSMCP_TRACE_DIR": str(trace_dir),
             "CONGRESSMCP_BILL_TEXT_ONLY": "1" if bill_text_only else "",
         },
     }
+
+
+def write_secrets_file(run_dir: Path) -> Path | None:
+    """The 0600 credentials file the spawn shim reads; None when no key is set.
+
+    Written OUTSIDE both the run tree and the repo -- the run directory is exactly what
+    an operator tars up and attaches to an issue, and the repo is what gets committed.
+    mkstemp creates the file 0600; the shim independently refuses anything looser, so
+    a chmod between write and spawn fails loudly rather than leaking quietly. The
+    harness deletes the file when the run ends.
+    """
+    values = {name: os.getenv(name, "").strip()
+              for name in ("CONGRESS_API_KEY", "GOVINFO_API_KEY")}
+    values = {k: v for k, v in values.items() if v}
+    if not values:
+        return None
+    fd, raw_path = tempfile.mkstemp(prefix="s17-secrets-", suffix=".env")
+    path = Path(raw_path).resolve()
+    for forbidden in (run_dir.resolve(), REPO.resolve()):
+        if path == forbidden or forbidden in path.parents:
+            os.close(fd)
+            path.unlink(missing_ok=True)
+            raise SystemExit(
+                f"FATAL: secrets file would land inside {forbidden}. It must live "
+                "outside the run tree and the repo; set TMPDIR elsewhere."
+            )
+    with os.fdopen(fd, "w") as handle:
+        for name, value in values.items():
+            handle.write(f"{name}={value}\n")
+    return path
 
 
 def codex_config_overrides(spec: dict) -> list[str]:
@@ -753,7 +798,8 @@ def resolve_runners(drivers: set[str], runner_arg: str | None) -> dict[str, list
 
 def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
             runners: dict[str, list[str]], driver_versions: dict, sha: str,
-            docs: dict, dry_run: bool, outside_cell_groups: bool = False) -> Meta:
+            docs: dict, dry_run: bool, outside_cell_groups: bool = False,
+            secrets_file: Path | None = None) -> Meta:
     agent = cell.get("driver", "claude")
     runner = runners[agent]
     prompt_id = entry["id"]
@@ -783,7 +829,7 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     if agent == "claude":
         config_path = write_mcp_config(dest, trace_dir, bill_text_only)
     else:
-        spec = codex_server_spec(trace_dir, bill_text_only)
+        spec = codex_server_spec(trace_dir, bill_text_only, secrets_file)
         config_path = write_codex_mcp_config(dest, spec)
         # The cell's knobs (effort verbatim, web search off) travel in the same -c
         # channel as the MCP surface, so the argv audit below covers them too.
@@ -1044,33 +1090,47 @@ def main() -> int:
     if off_cell_planned:
         print()
 
+    # Codex does not inherit the parent environment into MCP servers, so its cells get
+    # the keys through the spawn shim's 0600 file -- created once here, outside the run
+    # tree, deleted when the run ends whatever happens in between.
+    secrets_file = (write_secrets_file(run_dir)
+                    if "codex" in drivers and not args.dry_run else None)
+
     results: list[Meta] = []
     failures = 0
-    for entry, cell_name, cell, off_cell in planned:
-        try:
-            meta = run_one(entry, cell_name, cell, run_dir, runners, driver_versions,
-                           sha, docs, args.dry_run, outside_cell_groups=off_cell)
-        except ValueError as exc:
-            print(f"  {entry['id']:4s} {cell_name:11s} MANIFEST ERROR: {exc}")
-            failures += 1
-            continue
-        results.append(meta)
-        flag = "  [outside cell groups]" if meta.outside_cell_groups else ""
-        if meta.harness_failure:
-            flag += f"  HARNESS FAILURE: {meta.harness_failure[:60]}"
-            failures += 1
-        if meta.web_activity_suspected:
-            # An open web channel is an instrument breach, not a consumer behavior:
-            # the row's claims are no longer tool-attributable, so it counts as a
-            # harness failure even when the invocation itself exited cleanly (F30).
-            flag += (f"  WEB ACTIVITY SUSPECTED ({','.join(meta.web_activity_suspected)})"
-                     " -- claims not tool-attributable")
-            failures += 1
-        print(f"  {meta.prompt_id:4s} {cell_name:11s} {meta.duration_s:6.1f}s  "
-              f"{meta.trace_records:>3} trace records  "
-              f"{meta.answer_chars:>6} chars  "
-              f"{'+'.join(dict.fromkeys(meta.tool_calls)) or '-'}"
-              f"{flag}")
+    try:
+        for entry, cell_name, cell, off_cell in planned:
+            try:
+                meta = run_one(entry, cell_name, cell, run_dir, runners, driver_versions,
+                               sha, docs, args.dry_run, outside_cell_groups=off_cell,
+                               secrets_file=secrets_file)
+            except ValueError as exc:
+                print(f"  {entry['id']:4s} {cell_name:11s} MANIFEST ERROR: {exc}")
+                failures += 1
+                continue
+            results.append(meta)
+            flag = "  [outside cell groups]" if meta.outside_cell_groups else ""
+            if meta.harness_failure:
+                flag += f"  HARNESS FAILURE: {meta.harness_failure[:60]}"
+                failures += 1
+            if meta.web_activity_suspected:
+                # An open web channel is an instrument breach, not a consumer behavior:
+                # the row's claims are no longer tool-attributable, so it counts as a
+                # harness failure even when the invocation itself exited cleanly (F30).
+                flag += (f"  WEB ACTIVITY SUSPECTED ({','.join(meta.web_activity_suspected)})"
+                         " -- claims not tool-attributable")
+                failures += 1
+            print(f"  {meta.prompt_id:4s} {cell_name:11s} {meta.duration_s:6.1f}s  "
+                  f"{meta.trace_records:>3} trace records  "
+                  f"{meta.answer_chars:>6} chars  "
+                  f"{'+'.join(dict.fromkeys(meta.tool_calls)) or '-'}"
+                  f"{flag}")
+    finally:
+        # The credential file outlives nothing: deleted on success, failure, and ^C
+        # alike. The shim's stat-time check means a server started after this point
+        # fails loudly rather than reading a stale path.
+        if secrets_file is not None:
+            secrets_file.unlink(missing_ok=True)
 
     # F23: a cell with zero trace records across EVERY invocation is an instrument
     # that never ran, scored here as a harness failure -- never a clean run. It does

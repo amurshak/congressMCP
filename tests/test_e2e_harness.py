@@ -338,6 +338,130 @@ def test_codex_server_spec_pins_the_preflight_interpreter(tmp_path):
     assert spec["command"] == sys.executable
     assert spec["args"] == ["-m", "congress_api", "--transport", "stdio"]
     assert set(spec["env"]) == {"CONGRESSMCP_TRACE_DIR", "CONGRESSMCP_BILL_TEXT_ONLY"}
+    # With a secrets file, the server launches through the spawn shim -- same
+    # interpreter, and the ARGV carries only the file's path, never a value.
+    secrets = tmp_path / "s17-secrets.env"
+    shimmed = codex_server_spec(tmp_path / "trace", False, secrets_file=secrets)
+    assert shimmed["command"] == sys.executable
+    assert shimmed["args"][0].endswith("spawn_server.py")
+    assert shimmed["args"][1:] == ["--secrets-file", str(secrets)]
+
+
+# --------------------------------------------------------------------------- #
+# Key delivery (maintainer directive 2026-08-19): Codex does not forward the parent
+# env to MCP servers, and every channel it does offer is recorded verbatim in run
+# artifacts -- so keys travel through the spawn shim's 0600 file, path-only in
+# artifacts, values nowhere.
+# --------------------------------------------------------------------------- #
+SHIM = REPO / "tests" / "e2e" / "spawn_server.py"
+
+
+def test_secrets_reach_artifacts_as_a_path_never_a_value(tmp_path):
+    from run_suite import write_codex_mcp_config
+
+    fake = "ZEirgEryNcncMKowiNBW8Uqv6Z6xMh6Tvd6uQyoa"
+    secrets = tmp_path / "secrets.env"
+    secrets.write_text(f"CONGRESS_API_KEY={fake}\n")
+    spec = codex_server_spec(tmp_path / "trace", True, secrets_file=secrets)
+    config = write_codex_mcp_config(tmp_path, spec)
+    text = config.read_text()
+    assert str(secrets) in text          # the path is the record
+    assert fake not in text              # the value is not
+    assert_config_carries_no_secret(config, [fake])
+    assert_argv_carries_no_secret(codex_config_overrides(spec), [fake])
+
+
+def test_write_secrets_file_is_0600_outside_the_run_tree(tmp_path, monkeypatch):
+    from run_suite import write_secrets_file
+
+    monkeypatch.setenv("CONGRESS_API_KEY", "fake-key-for-this-test-only")
+    monkeypatch.delenv("GOVINFO_API_KEY", raising=False)
+    run_dir = tmp_path / "runs" / "now"
+    run_dir.mkdir(parents=True)
+    path = write_secrets_file(run_dir)
+    try:
+        assert path is not None
+        mode = path.stat().st_mode & 0o777
+        assert mode == 0o600, f"secrets file is {oct(mode)}, must be 0600"
+        assert run_dir.resolve() not in path.resolve().parents
+        assert REPO.resolve() not in path.resolve().parents
+        assert path.read_text() == "CONGRESS_API_KEY=fake-key-for-this-test-only\n"
+    finally:
+        if path:
+            path.unlink()
+
+
+def test_write_secrets_file_returns_none_with_no_keys(tmp_path, monkeypatch):
+    from run_suite import write_secrets_file
+
+    monkeypatch.delenv("CONGRESS_API_KEY", raising=False)
+    monkeypatch.delenv("GOVINFO_API_KEY", raising=False)
+    assert write_secrets_file(tmp_path) is None
+
+
+def test_write_secrets_file_refuses_to_land_inside_the_run_tree(tmp_path, monkeypatch):
+    # The run directory is exactly what an operator tars up and attaches to an issue.
+    import run_suite as rs
+
+    monkeypatch.setenv("CONGRESS_API_KEY", "fake-key-for-this-test-only")
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    inside = run_dir / "s17-secrets-oops.env"
+
+    def mkstemp_in_run_tree(**kwargs):
+        import os as _os
+        fd = _os.open(inside, _os.O_RDWR | _os.O_CREAT | _os.O_EXCL, 0o600)
+        return fd, str(inside)
+
+    monkeypatch.setattr(rs.tempfile, "mkstemp", mkstemp_in_run_tree)
+    with pytest.raises(SystemExit, match="outside the run tree"):
+        rs.write_secrets_file(run_dir)
+    assert not inside.exists(), "the misplaced file must be deleted, not left behind"
+
+
+def _run_shim(args, env=None):
+    import subprocess
+    return subprocess.run([sys.executable, str(SHIM), *args],
+                          capture_output=True, text=True, env=env, timeout=30)
+
+
+def test_shim_refuses_a_group_or_world_readable_secrets_file(tmp_path):
+    fake = "ZEirgEryNcncMKowiNBW8Uqv6Z6xMh6Tvd6uQyoa"
+    secrets = tmp_path / "secrets.env"
+    secrets.write_text(f"CONGRESS_API_KEY={fake}\n")
+    secrets.chmod(0o644)
+    proc = _run_shim(["--secrets-file", str(secrets)])
+    assert proc.returncode == 2
+    assert "chmod 600" in proc.stderr
+    assert fake not in proc.stderr and fake not in proc.stdout, (
+        "the shim must never print a credential value, even while refusing one"
+    )
+
+
+def test_shim_injects_the_keys_and_execs_the_server_module(tmp_path):
+    # The full channel, measured: value in the 0600 file -> child process env, with the
+    # value appearing on no command line. --exec-module swaps in a dump module so the
+    # test does not need a live MCP server.
+    import os
+    (tmp_path / "envdump.py").write_text(
+        "import os\nprint(os.getenv('CONGRESS_API_KEY', 'MISSING'))\n"
+    )
+    fake = "fake-key-for-this-test-only"
+    secrets = tmp_path / "secrets.env"
+    secrets.write_text(f"CONGRESS_API_KEY={fake}\n")
+    secrets.chmod(0o600)
+    env = dict(os.environ)
+    env.pop("CONGRESS_API_KEY", None)
+    env["PYTHONPATH"] = str(tmp_path)
+    proc = _run_shim(["--secrets-file", str(secrets), "--exec-module", "envdump"], env=env)
+    assert proc.returncode == 0, proc.stderr
+    assert proc.stdout.strip() == fake
+
+
+def test_shim_fails_loudly_on_a_missing_secrets_file(tmp_path):
+    proc = _run_shim(["--secrets-file", str(tmp_path / "gone.env")])
+    assert proc.returncode == 2
+    assert "cannot stat" in proc.stderr
 
 
 def test_claude_command_is_unchanged_by_the_codex_addition(tmp_path):
