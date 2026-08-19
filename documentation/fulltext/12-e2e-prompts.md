@@ -128,15 +128,15 @@ It also makes the cross-vendor cell cheap. Exposing a three-tool server to anoth
 
 ```json
 {
-  "cell_id": "codex/gpt-5.6-terra/medium/iso",
+  "cell_id": "codex/gpt-5.6-luna/<effort>/iso",
   "driver": {"name": "codex", "cli_version": "<recorded at run time, never assumed>"},
   "model": "<operator parameter>",
   "reasoning_effort": "<driver-native vocabulary, verbatim>",
   "surface": "bill_text_only",
   "context_condition": "fresh",
-  "prompt_variant": "standard",
+  "prompt_variant": "single_step",
   "groups": ["A"],
-  "role": "cross-vendor",
+  "role": "cross-vendor-floor",
   "merge_gating": false,
   "builtins_disabled": {"<driver-native keys>": "<effective values, asserted not assumed>"}
 }
@@ -146,7 +146,7 @@ The per-prompt `meta.json` row carries the same `driver` object beside the model
 
 Rules the shape encodes:
 
-1. **Knobs are recorded in the driver's native vocabulary, verbatim — never translated.** Codex `reasoning_effort: medium` is not "the floor"; Claude thinking budgets and Codex effort levels are different scales with no defensible mapping between them. Floor / ceiling / capability floor are Claude-matrix roles; every Codex cell carries `role: cross-vendor` whatever its tier, so a Codex result can never silently substitute for a Claude gate cell.
+1. **Knobs are recorded in the driver's native vocabulary, verbatim — never translated.** Codex `reasoning_effort: medium` is not "the floor"; Claude thinking budgets and Codex effort levels are different scales with no defensible mapping between them. Floor / ceiling / capability floor are Claude-matrix roles; every Codex cell carries a cross-vendor role — `cross-vendor`, or `cross-vendor-floor` for the single-step capability-floor cell — whatever its tier, so a Codex result can never silently substitute for a Claude gate cell.
 2. **Codex cells default to the isolation surface and Group A.** The Group A scope stands on its original reasoning, unchanged — B through E test mechanics that are not sensitive to vendor disposition. The isolation surface for two reasons: the three-tool surface was already this cell's cheap form (see above), and A4's fabrication check is attribution-dependent, which only trace-scope == tool-surface supports — the 2026-08-09 surface correction binds here unchanged.
 3. **`builtins_disabled` records the effective configuration in the driver's own keys, and the harness asserts it rather than assuming it.** On Codex this is more load-bearing than on Claude: that client's native capability is shell execution, and a live shell can fetch the U.S. Code or congress.gov directly — exactly the untraced channel the built-ins ruling closes, in the F7 shape (codified law standing in for bill location). Web search and shell off; per-prompt config written by the harness, never trusted from operator setup; `${...}` key references only; `assert_config_carries_no_secret`. All four config invariants carry over unchanged.
 4. **Multiple Codex tiers are permitted; the Terra paragraph above becomes interpretation guidance rather than a restriction.** "Not Sol, not Luna" was a call about which single cell to buy when a cell was expensive; cells are now cheap. What survives of it: a flagship pass adds nothing the Opus ceiling has not already said, a low-tier failure is too easily dismissed as tier, and the default tier is the population signal. Model ids remain operator parameters.
@@ -154,7 +154,9 @@ Rules the shape encodes:
 6. **F23 binds per cell, driver-agnostic.** The sibling liveness heuristic applies unchanged — a Group-A cell has four prompts, enough siblings — so an all-zero Codex cell is harness-invalid or a loud adoption flag, never a clean score, and one dead Codex cell must not cost any other cell's data.
 7. **`merge_gating: false`, even though the results will land in PR 1.** Landing is not gating. This cell answers whether the design leans on one vendor's habits — worth knowing before the server sees outside users, and now cheap enough to know before merge — but the stated Group A gate remains the Claude cells. A Codex Group-A failure is triaged like any Group A failure — make the signal explicit in the tool description or the response shape, per the rule just above — not by holding the merge.
 
-**Preregistration, before the Codex run reports.** *Expected:* Group A passes cross-vendor. Grounds: the 2026-08-15 re-run passed Group A 16/16 including the Haiku capability floor, and the fix round moved the load-bearing quoted-context signal toward active response content (F6's per-hit note; the E2/V21 finding that active disclosures propagate where passive fields depend on the reader) — so the property should not be leaning on Claude-specific disposition. *Falsifier:* a Codex cell presents inserted text as enacted while the per-hit note and `match_contexts` were present in its trace — which would mean the property still leans on reader disposition and the response shape needs another active turn. Record the outcome either way, including a falsification.
+**Maintainer selection (2026-08-18, requirements call) — the cell bought is the cross-vendor capability floor: Luna, Group A only. Terra and Sol are not run.** This inverts the Terra paragraph's pick, and deliberately: the question being purchased is not vendor disposition but this section's own first principle — the safety property has to hold for the weakest consumer that plausibly calls a public server — applied across vendors. The Terra paragraph's objection ("a Luna failure is too easily dismissed as tier") was real for the disposition question and is dissolved here the same way the Haiku cell dissolved it: **the Luna cell is the Haiku cell's cross-vendor twin** — Group A only, `prompt_variant: "single_step"` (the pre-resolved `section_id`/phrase variant, no chaining required), `role: "cross-vendor-floor"` — so a chaining limitation is never scored as a tool defect, and a failure with the per-hit note present in the response is a **prominence finding about the response shape**, never a tier artifact. Interpretation asymmetry, pinned before the run: a **pass** is the strongest cross-vendor result available — the active signal read and acted on by the weakest cross-vendor reader, which practically subsumes the disposition question, and a Terra run would add little after it. A **fail** does not condemn the design on its own; it triggers the Justify rung on the failed prompts, and it is what would make **Terra the follow-up cell** (does the property hold at the tier most users actually get?) — still non-gating either way.
+
+**Preregistration, before the Codex run reports.** *Expected:* Group A passes in the Luna cell. Grounds: the 2026-08-15 re-run passed Group A 16/16 including the Haiku capability floor **on the same single-step variant this cell runs**, and the fix round moved the load-bearing quoted-context signal toward active response content (F6's per-hit note; the E2/V21 finding that active disclosures propagate where passive fields depend on the reader) — so the property should not be leaning on Claude-specific disposition. *Falsifier:* the Luna cell presents inserted text as enacted while the per-hit note and `match_contexts` were present in its trace — which would mean the property still leans on reader disposition and the response shape needs another active turn. Record the outcome either way, including a falsification.
 
 **When the results land, §16 gains a row.** `15-completion-report.md` is finished against the current enumerations; a cross-vendor cell that reports in PR 1 is added there as its own row (cell id, outcome, non-gating), never folded into an existing Claude row.
 
