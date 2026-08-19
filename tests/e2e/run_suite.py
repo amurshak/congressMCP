@@ -37,7 +37,11 @@ tools. Claude enforces (2) by denying its built-ins; Codex has no per-tool deny,
 runs under --approve-for-me (auto-reviewed approvals; imposes the workspace-write
 sandbox) with shell network access and web search both explicitly configured off -- its
 shell can write only into the empty disposable cold cwd and cannot reach the network, so
-a grounded answer has nowhere to come from but the MCP server. Both configurations are
+a grounded answer has nowhere to come from but the MCP server. One channel sits above
+all of that configuration: under ChatGPT auth the backend attaches its own `web.run`
+tool, and NO client-side config removes it (measured 2026-08-20 -- see
+codex_auth_mode), so the harness refuses codex cells unless codex is logged in with an
+API key, where the toolset is client-built and carries no web tool. Both configurations are
 ASSERTED against the argv actually executed and recorded per cell as `builtins_disabled`,
 in each driver's own vocabulary (never translated -- Codex `reasoning_effort` is not a
 Claude thinking budget, and no mapping between the scales is recorded anywhere). Codex
@@ -300,6 +304,49 @@ def builtins_disabled_record(driver: str, cmd: list[str]) -> dict:
         "tools.web_search": "false (configured; effect NOT assumed -- see canary and "
                             "per-row web_activity_suspected, F30)",
     }
+
+
+def codex_auth_mode() -> str | None:
+    """The codex CLI's auth mode from $CODEX_HOME/auth.json; None if unreadable.
+
+    This decides whether web can actually be turned off. Measured 2026-08-20 on
+    codex-cli 0.147.0, ChatGPT auth, by listing the model-visible toolset under each
+    candidate config: `web.run` is attached BACKEND-side -- it survives
+    `tools.web_search=false` (valid key, accepted, ineffective) and
+    `tools.web_search.mode="disabled"` (accepted, ineffective), and `web_search_mode`
+    is not user config at all (`allowed_web_search_modes` is enterprise policy). The
+    namespaces say why: client-built tools are all `functions.*`; `web.run` and
+    `image_gen.imagegen` are backend namespaces the ChatGPT endpoint attaches on its
+    own. API-key auth talks to the Responses API directly, where the toolset is fully
+    client-built and web search exists only if --search requests it.
+    """
+    home = Path(os.getenv("CODEX_HOME", "") or (Path.home() / ".codex"))
+    try:
+        return json.loads((home / "auth.json").read_text()).get("auth_mode")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def assert_codex_auth_can_close_the_web(auth_mode: str | None) -> None:
+    """Refuse to run codex cells under an auth mode whose web channel cannot close.
+
+    A codex cell run with `web.run` attached is void by construction -- the model
+    answers from the web instead of adopting the traced tools (observed in the Luna
+    AND Sol runs of 2026-08-19/20), and no claim is tool-attributable. Since no
+    client-side configuration removes the backend tool under ChatGPT auth, the honest
+    instrument fails HERE, before any prompt or canary is spent, naming the fix.
+    """
+    if auth_mode == "chatgpt":
+        raise SystemExit(
+            "FATAL: codex is logged in with ChatGPT auth (auth_mode=chatgpt), which "
+            "attaches the backend web.run tool to every session. No client-side "
+            "config removes it (measured 2026-08-20: tools.web_search=false and "
+            "tools.web_search.mode=\"disabled\" are both accepted and both "
+            "ineffective), so every codex cell would be void: the model answers from "
+            "the web instead of the traced tools. Fix: `codex login --api-key <key>` "
+            "(platform API key) -- API-key auth builds the toolset client-side and "
+            "carries no web tool unless --search asks for one."
+        )
 
 
 def cli_version(executable: str) -> str:
@@ -1124,6 +1171,7 @@ def main() -> int:
     # none rather than a guess.
     driver_versions = ({d: None for d in drivers} if args.dry_run
                        else {d: cli_version(runners[d][0]) for d in sorted(drivers)})
+    codex_auth: str | None = None
 
     if not args.dry_run:
         # F23: assert at startup that the interpreter the MCP configs will name can
@@ -1147,6 +1195,13 @@ def main() -> int:
                   "arrives as that literal string and overrides the working value.")
             return 1
         print("preflight  : GovInfo reachable with the configured key.")
+        if "codex" in drivers:
+            # F30 residual: under ChatGPT auth the backend attaches web.run and no
+            # client-side config removes it, so a codex cell would be void by
+            # construction. Fail here, before any canary or prompt is spent.
+            codex_auth = codex_auth_mode()
+            assert_codex_auth_can_close_the_web(codex_auth)
+            print(f"preflight  : codex auth_mode={codex_auth!r} -- web channel closable.")
 
     if want_prompts:
         known = {p["id"] for p in manifest["prompts"]}
@@ -1314,6 +1369,10 @@ def main() -> int:
         "zero_trace_cell_failures": dead_cells,
         "voided_cells": voided,
         "canaries": [asdict(m) for m in canaries],
+        # Instrument identity for the codex driver: which auth mode ran. ChatGPT auth
+        # never reaches here (the preflight refuses it -- backend web.run), so a
+        # recorded value documents that the web channel was closable by construction.
+        "codex_auth_mode": codex_auth,
         "results": [asdict(m) for m in results],
     }, indent=2) + "\n")
 

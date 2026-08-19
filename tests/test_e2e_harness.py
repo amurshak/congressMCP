@@ -548,6 +548,34 @@ def test_a_canary_proven_cell_with_all_zero_prompts_is_adoption_not_death():
     assert zero_trace_cells(rows, dry_run=False) == ["cv"]
 
 
+def test_codex_auth_gate_refuses_chatgpt_auth_and_admits_apikey():
+    # F30 residual, measured 2026-08-20: under ChatGPT auth the backend attaches
+    # web.run and no client-side config removes it -- the Luna and Sol runs both
+    # answered from the web instead of adopting the traced tools. A codex cell there
+    # is void by construction, so the instrument must refuse before spending anything.
+    from run_suite import assert_codex_auth_can_close_the_web
+
+    with pytest.raises(SystemExit, match="web.run"):
+        assert_codex_auth_can_close_the_web("chatgpt")
+    # API-key auth builds the toolset client-side: admitted.
+    assert_codex_auth_can_close_the_web("apikey")
+    # Unknown/absent auth is not silently equated with the known-bad mode -- the CLI
+    # itself will fail loudly on missing auth, which is a different, honest error.
+    assert_codex_auth_can_close_the_web(None)
+
+
+def test_codex_auth_mode_reads_codex_home(tmp_path, monkeypatch):
+    from run_suite import codex_auth_mode
+
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    (tmp_path / "auth.json").write_text(json.dumps({"auth_mode": "chatgpt"}))
+    assert codex_auth_mode() == "chatgpt"
+    (tmp_path / "auth.json").write_text("not json")
+    assert codex_auth_mode() is None
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "missing"))
+    assert codex_auth_mode() is None
+
+
 def test_cell_void_marker_lands_in_the_cell_directory(tmp_path):
     from run_suite import write_cell_void
 
