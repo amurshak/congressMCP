@@ -602,6 +602,8 @@ Report `n examined` and fail if zero, per the hygiene section below.
 
 **Outcome: the §4 aggregation contract ACTIVATES, generalized to every assembling path (subdivided parents, chunk-only prefixes, assembled containers) — ruled in §4 as F33.** Own-unit values on an assembled response emit exactly the failure shape F32 exists to prevent, with a confident `false` attached. The A1 re-run traces are evidence for neither side here — `S:141` is a leaf.
 
+**V22 verify pass — CLOSED 2026-08-20.** The instrument gained a second stage (`668b357`) that calls the shipped `get_bill_section` on every id it examined and diffs the response fields against the F33 contract, exiting non-zero on any mismatch — the set-based acceptance made executable. Against the F33 build (`fe17fa5`): 3,216 calls, **0 mismatches, all eight populations** (341/341, 229/229 assembled-and-cited, 50/50, 198/198, 13/13, 231/231, 1,512/1,512, 871/871), reproduced by the spec session with exit 0. The 229 (not 261) denominator is the correct one and is recorded as a correction in §4. F33 closed; the aggregation contract is live and continuously verifiable by re-running this scan.
+
 ### Corpus-scan hygiene — applies to V19, V20, V21, V22
 
 **Assert a non-zero denominator.** A scan that errors and a scan that found nothing render identically today. An earlier resolution scan used bare `urllib`, swallowed exceptions, and reported 403s from a blocked User-Agent as *"no resolutions have 2+ versions."* The conclusion was not load-bearing, but the scan established nothing and was reported as though it had. **Every measurement below must report `n examined` alongside `n found`, and fail if `examined` is zero.**
