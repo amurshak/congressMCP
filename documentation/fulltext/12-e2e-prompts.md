@@ -219,6 +219,19 @@ Rules the shape encodes:
 
 **The description-density hypothesis (maintainer, via an external GPT critique, 2026-08-20) is dead for this cell.** It predicted non-adoption from an overlong tool description; the baseline it was to be tested against adopted 3/3 with the current description. Nothing on the adoption layer is left for a slim-description arm to explain here; the description's content obligations remain governed by §7/§4. Not pursued.
 
+**Fifth adjudication — the F32 re-run (2026-08-20, runs `2026-08-20T171204Z` / `171229Z` / `171300Z`, maintainer-run, build `d24e376` with the F32 fix an ancestor).** Instrument certified per run: canary `live` ×3, `web_activity_suspected` empty ×3, and — read from the server-side traces by this session, not taken from the implementation report — **every `get_bill_section` response carries `is_amendatory: true` and `amends: [10 U.S.C. 9062(j)]`**. The fix is live at the consumer boundary.
+
+**The preregistration's denominator turned out to be consumer-chosen, and the consumer chose small: only `171204Z` is pure section-direct; `171229Z`/`171300Z` searched first and received the disclosure on both surfaces.** The preregistration fixed the run count at 3 and assumed the runs would be on-path like the baseline's 2/3; path choice is itself stochastic per run, so the on-path denominator landed at 1. Lesson recorded for future consumer-behavior preregistrations: fix the path in the prompt variant, or condition the expected/falsified counts on the consumer's path choice — a run count is not a denominator when the consumer routes.
+
+**Scoring against the pinned criteria: 2/3 PASS.**
+- **`171204Z` PASS — the preregistered case, on the only on-path run.** Pure section-direct, and the answer leads "Section 141 **would amend 10 U.S.C. § 9062(j)** to require…" — the expected result, on the exact path that failed 2/2 without the fields. It also volunteers the inventory-floor-not-procurement distinction unprompted.
+- **`171229Z` PASS.** "Section 141 **amends 10 U.S.C. § 9062(j)** to require…"; phased minimums correctly framed as the amended statute's schedule, enforcement-threshold change attributed as a change.
+- **`171300Z` FAIL — the first frame-drop with the disclosure present at this cell.** "Section 141 of S. 1071 **requires the Air Force to maintain**…" — the pinned fail condition verbatim, no amendatory verb anywhere, 9062(j) never named — despite `amends` delivered on **both** the hit and the section response in the same trace.
+
+**Preregistration outcome: expected direction, not falsified — and underpowered on-path (1/1 PASS where the falsifier needed ≥2/3 FAIL).** Recorded per the discipline: the result confirms the expected mechanism on n=1 and cannot rule it. The escalation condition for an active note (≥2/3 flatten with fields present) did **not** fire — observed 1/3 overall, 0/1 on-path — so §4's minimal-width ruling stands and no note field is added. `171300Z` is recorded as the V21-family consumer residual it is: a passive schema field raises frame retention but does not guarantee it at this floor.
+
+**Cross-run tally, all six cold A1 clean-cell runs (counts, not rates — n is small):** amend frame retained **3/4** when the `amends` disclosure was delivered on any surface (`161031Z`, `171204Z`, `171229Z`; dropped in `171300Z`), **0/2** when it was not (`161142Z`, `161207Z`). Direction consistent with F6/V21 across both cells and both builds. **F32 is verified live; the §16 cross-vendor row is now writable from the four adjudicated clean-cell runs plus this one.** One residual rides with F32 in §4: the subdivided-parent semantics question, gated on V22.
+
 ### Do not suppress self-correction — measure the effort it took
 
 Instructing a model to answer quickly or without checking manufactures a consumer that does not exist. Let it correct itself, and **record what correction cost** from the out-of-band trace:
