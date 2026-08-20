@@ -350,6 +350,16 @@ async def get_bill_section(
     carries operative and quoted (amendatory) language in reading order; when the section is
     subdivided, child chunk descriptors are included. Text is capped at max_bytes, measured as
     UTF-8 encoded bytes of the returned text field, clamped to 1,000-100,000.
+
+    is_amendatory and amends carry the same values a search_bill_text hit reports for this
+    section_id. When is_amendatory is true, quoted language in text is matter the section
+    INSERTS INTO or STRIKES FROM existing law -- an instruction to change another statute, not
+    a freestanding requirement of this bill -- so present it as an amendment to the cited
+    target, not as the bill's own rule. Each amends entry is {kind: "usc"|"public_law", cite}.
+    amends is citations found, never a complete list: it resolves no named Acts, no chapter-
+    or title-level amendments, and no non-U.S. Code targets, so a non-empty list can still be
+    short. The two fields describe this unit's own text; in a subdivided section a child
+    chunk may amend even when the parent's intro does not.
     """
     capability_error = _capability_error()
     if capability_error:
@@ -431,6 +441,10 @@ async def get_bill_section(
             ancestor_path=unit.ancestor_path,
             header=unit.header,
             text=text,
+            # F32: the same stored per-unit values search_bill_text puts on a hit for
+            # this section_id -- read from the unit, never re-derived from `text`.
+            is_amendatory=unit.is_amendatory,
+            amends=unit.amends,
             # byte_length is the unit's OWN clean text size (spec §9), NOT the
             # rendered/concatenated payload: rendering adds ~2 bytes per quoted span
             # and concatenation inflates it, which made section disagree with search
@@ -565,6 +579,11 @@ def _container_response(
         ancestor_path=container.ancestor_path,
         header=container.header,
         text=text,
+        # F32: a container's heading is not an indexed unit, so it has no stored
+        # per-unit amendatory value; false / [] is the heading's own (non-)amendatory
+        # state, the same way byte_length below is 0. Descendants carry their own.
+        is_amendatory=False,
+        amends=[],
         # 0 for the same reason as in _container_children: a container's heading is
         # not an indexed unit, so counting it would break the containment identity
         # and disagree with the same node in get_bill_toc.

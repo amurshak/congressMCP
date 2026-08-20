@@ -159,6 +159,16 @@ class BillSectionResponse(BillTextEnvelope):
     ancestor_path: list[AncestorNode]
     header: str | None
     text: str
+    # F32 (§4, RULED 2026-08-20): the amendatory disclosure on the section-direct path.
+    # Identical semantics to the SearchHit fields -- the SAME per-unit value the search
+    # path reads for this section_id (carry, don't reconstruct), so the two tools can
+    # never disagree about one node; V13/A5 governance inherited. Describes THIS unit's
+    # own text: when the response assembles child chunks, a child may amend even when
+    # the addressed unit's own intro does not (search hits report per chunk). A
+    # container's heading is not an indexed unit and reports false / [] for the same
+    # reason its byte_length is 0.
+    is_amendatory: bool
+    amends: list[AmendsTarget]
     byte_length: int
     subtree_byte_length: int
     truncated: bool

@@ -120,6 +120,45 @@ def test_section_populates_text_and_counts_cohere():
         assert all(isinstance(c, dict) and c.get("section_id") for c in res["children"])
 
 
+def test_f32_section_carries_the_same_amendatory_disclosure_as_the_hit():
+    """F32 (§4): the section-direct path carries is_amendatory/amends, and they are
+    the SAME per-unit values the search path reports for that section_id -- carry,
+    don't reconstruct. Checked against a live hit rather than a literal so the two
+    tools can never be asserted green while disagreeing about one node."""
+    search = _call(tools.search_bill_text, congress=119, bill_type="s", number=1071,
+                   queries=["icebreaker"], max_hits=10)
+    hit = next(h for h in search["hits"] if h["amends"])
+    section = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
+                    section_id=hit["section_id"])
+    assert section["is_amendatory"] is True
+    assert section["amends"] == hit["amends"]
+    assert section["is_amendatory"] == hit["is_amendatory"]
+    # structured, discriminated objects -- not strings (§4 field decisions)
+    assert all(set(a) == {"kind", "cite"} for a in section["amends"])
+
+
+def test_f32_non_amendatory_leaf_reports_false_and_empty_list():
+    res = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
+                section_id=_SECTION_ID)
+    unit = next(u for u in LOADED.parsed.units if u.section_id == _SECTION_ID)
+    assert res["is_amendatory"] == unit.is_amendatory
+    assert res["amends"] == unit.amends
+    # `amends != [] => is_amendatory` holds on the section path too
+    assert not (res["amends"] and not res["is_amendatory"])
+
+
+def test_f32_container_response_carries_the_fields_as_false_and_empty():
+    # A structural container (division/title/subtitle) is not an indexed unit -- no
+    # stored per-unit value -- so it reports the heading's own state, like byte_length 0.
+    container_id = _SECTION_ID.rsplit("/", 1)[0]
+    res = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
+                section_id=container_id)
+    assert "error" not in res, res
+    assert res["section_id"] == container_id
+    assert res["is_amendatory"] is False
+    assert res["amends"] == []
+
+
 # --------------------------------------------------------------------------- #
 # get_bill_toc
 # --------------------------------------------------------------------------- #
