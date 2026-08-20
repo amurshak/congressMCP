@@ -131,6 +131,8 @@ Present on **hits, TOC nodes, and section-response children**. The highest-value
   "ancestor_path": [ /* ... */ ],
   "header": "Polar security cutter program",
   "text": "...",
+  "is_amendatory": true,               // RULED 2026-08-20 (F32) — same per-unit computation as search hits
+  "amends": [{"kind": "usc", "cite": "14 U.S.C. 5601"}],   // ditto; empty list when none
   "node_kind": "structural",
   "byte_length": 4211,
   "subtree_byte_length": 60700,
@@ -141,6 +143,10 @@ Present on **hits, TOC nodes, and section-response children**. The highest-value
   ]
 }
 ```
+
+> **`is_amendatory` and `amends` on `BillSectionResponse` — RULED 2026-08-20 (F32, §18; measured in §17's cold A1 ×3).** These fields existed only on search hits, and the section-direct path — the rational one for any consumer already holding a `section_id`, and the one §17's single-step prompts take by construction — returned no amendatory disclosure at all: the frame survived only as raw statutory text, which the cross-vendor floor flattened in 2 of 2 section-direct runs ("Section 141 requires the Air Force to maintain…") while the one search-path run, fed `amends` on the hit, led its answer with the amend frame. Semantics are **identical to the hit fields** — same per-unit computation, same `kind` discriminator, same V13 false-positive governance and A5 verb gate; this is exposure of an existing value on a second path, not new inference machinery, and per the carry-don't-reconstruct rule it must read the same stored value the search path reads. Minimal width deliberately: no `match_contexts` analogue (there is no query on this path) and no new note field yet.
+>
+> **Preregistration for the re-run (record the outcome either way):** *expected* — with the fields present, floor section-direct A1 names 9062(j)/the amend frame, grounded in the measured behavior that this consumer leads with `amends` when it is delivered (`2026-08-20T161031Z`); *falsified if* ≥2 of 3 section-direct re-runs still present the inserted text as the bill's own requirement with the fields verified present in the trace — which would show a passive schema field does not propagate on this path and the next rung is an **active** note (the `struck_text_note` form), not more width.
 
 ```jsonc
 // error envelope — every failure path
