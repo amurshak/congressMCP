@@ -42,6 +42,7 @@
 | D14 | MED | Guard hand-pasted at 81 sites, nothing enforced coverage | 7 routers | **coverage FIXED** `880cb53`; decorator open |
 | D15 | LOW | `from_date_time` / `fromDateTime` mixed permanently on the public surface | public MCP surface | OPEN |
 | D16 | LOW | Allowlist skip that never fires — documented exclusion is dead code | test quality | OPEN |
+| D17 | HIGH | **Noise presented as results** — `search_bills` matches any term as a substring; named-Act queries drown | check — where does matching happen? | OPEN (after PR 2) |
 
 ---
 
@@ -205,6 +206,20 @@ Full `api_key=…` appeared in the congress.gov request URL at INFO level. **Thi
 
 ---
 
+### D17 — `search_bills` matches any term as a substring, so named-Act queries return noise `[E2E, maintainer-observed 2026-08-20 — repro not yet pinned]`
+
+**Observed (maintainer, via a Claude Desktop session):** searching `Radiation Exposure Compensation Act` returned a hit about "impact" — `act` substring-matched inside the word — plus everything whose title contains "Act," which is most of Congress. The observed semantics are **any-term OR with substring matching, not whole words and not phrases**: on the single most common bill-search intent, a named Act, every term but the distinctive ones is pure noise and the distinctive ones are diluted by it. Note the irony against the new tools' measured lesson: `search_bill_text` failed consumers by being *stricter* than they assumed (literal phrases, §7) — this tool fails them by being infinitely looser. Both are the same root defect: matching semantics the caller is never told.
+
+**Failure mode: noise with a success envelope.** Not silent-wrong in the D1 sense — the real bill may be present in the list — but a consumer taking the top hits gets unrelated bills, and a consumer summarizing "what matched" confabulates relevance that is not there. Same harm family as D3's garbage-presented-as-data.
+
+**Claim to pin before fixing, per the register's provenance rule:** the maintainer reports the search does **not** go through a search-capable upstream API (the matching appears to happen against fetched titles, client-side or via a list endpoint). That is an implementation claim this register cannot verify from behavior alone. Pinning it takes one traced repro: the RECA query, the returned set, and the code path that produced it — record the before-set with the trace so the fix has a set-diff acceptance, not a vibe.
+
+**Maintainer direction, recorded 2026-08-20 (not a spec, a decision):** route bill search through a search-capable upstream — GovInfo's search API is the named candidate, and the bill-text feature already carries a GovInfo client and key handling. Whatever ships must also **state its matching semantics in the tool description** — that rule was measured into `fulltext/07-search.md` on the new tools and binds any successor here for the same reason.
+
+**Status: OPEN. Sequencing: after PR 2**, alongside the F27 error-shape convergence — both set by the maintainer 2026-08-20. Not for immediate implementation.
+
+---
+
 ## Closed and refuted — kept so they are not re-raised
 
 **Three of eight findings in the 2026-08-09 review were artifacts of the review's own tooling**, not of the software. The review branch overlays only the in-scope paths onto the branch point, so ~74 out-of-scope files sat at **pre-branch state**; a reviewer reading whole files reported them accurately — about the slice, not about the shipped code.
@@ -224,7 +239,9 @@ Full `api_key=…` appeared in the congress.gov request URL at INFO level. **Thi
 
 **Before PR 1 merges:** only the D2 shared-serializer check. If the bill-text tools emit through the same path, that fix blocks; if not, nothing here does.
 
-**PR A — envelope and converters (D2, D7).** First, despite the blast radius. D2 is about whether the structured container is emitted at all; B is about what goes in it. Fixing contents before container means testing contents twice. Run with the converter tests already in the repo, and pin D8's envelopes first.
+**PR A — envelope and converters (D2, D7).** First, despite the blast radius. D2 is about whether the structured container is emitted at all; B is about what goes in it. Fixing contents before container means testing contents twice. Run with the converter tests already in the repo, and pin D8's envelopes first. **Constraint added 2026-08-20 (F27 ruling, `fulltext/14-defect-priority.md`): the maintainer has ruled the server converges on the bill-text §9 error envelope (`error.code`/`message`/`detail`/`remediation`). PR A's envelope work and its characterization tests must target that shape — pinning the legacy `core/exceptions.py` shape would entrench what the ruling retires.**
+
+**After PR 2, by maintainer priority (2026-08-20): the F27 error-shape convergence and D17.** These outrank the lettered PRs below when PR 2 closes.
 
 **PR B — member legislation feed (D3, D4, D5).** One tool, three defects, one round of testing. Restores a use case that is currently unanswerable.
 
