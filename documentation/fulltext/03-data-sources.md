@@ -33,6 +33,18 @@ e.g. `BILLS-119s1071enr`, `BILLS-119hres463ih`. `bill_type` lowercase: `hr`, `s`
 
 `GET /related/{packageId}` requires a packageId, which **already contains the version**. It cannot be used to discover the version you don't yet have. An earlier draft of this spec claimed otherwise; that was wrong.
 
+### Version discovery — requirement recorded 2026-08-20 (maintainer, resolving #4)
+
+**The requirement:** a consumer must be able to ask what versions of a bill exist, and retrieval of any named version must work — **with the default unchanged: `version=None` always resolves to the most authoritative** (the maintainer reaffirmed A3's precedence-primary rule in the same ruling).
+
+**What is already satisfied:** pinned retrieval — all three tools take `version` (§4), and `version_not_available` errors list the available versions. **What is new is only the affirmative surface:** today the version inventory reaches a consumer exclusively through an error, so discovering versions requires provoking a failure.
+
+**The data is already in hand — no new upstream call is required.** The resolution algorithm below enumerates every text version (congress.gov `/text`, GovInfo fallback) on each `version=None` call; the server computes the full inventory and then discards all but the winner. Surfacing it is a **response-surface question, not a data-source question**. The maintainer named `/related` as a candidate mechanism; note the section above — `/related` is circular for *resolution* but is usable for *discovery given one packageId* (the resolved winner). It is recorded as a fallback candidate only: the resolver's own enumeration is strictly cheaper (zero extra calls) and already battle-tested through F20/F21/F25. If `/related` is ever reached for instead, its behavior must be measured first (does `/related/{packageId}` actually enumerate sibling BILLS versions? — one call on `119s1071enr` answers it).
+
+**Surface design deliberately left open for PR 2 planning**, with the candidates and the governing consideration recorded: (a) a new `list_bill_versions` tool; (b) an opt-in flag on `get_bill_toc` (the navigation tool); (c) an always-on envelope field — (c) is rejected now as width on every response for a sometimes-question. Between (a) and (b), the §17 adoption measurements are the governing consideration: tool count and description obligations tax the adoption layer, which is the measured failing layer on non-Claude consumers — so the smaller routing-surface change is favored unless discoverability evidence says otherwise. Whatever ships keeps the A3 default, the `version_resolution_note` contract, and states its semantics in the tool description (§7 rule).
+
+**Scope: not PR 1.** PR 1's parked #4 is closed by the delete ruling (register D12); this requirement queues with PR 2 planning.
+
 **Resolution algorithm for `version=None`:**
 
 1. `GET congress.gov /bill/{congress}/{type}/{number}/text` — enumerates text versions with type, date, and format URLs.
