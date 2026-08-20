@@ -47,7 +47,7 @@ get_bill_toc(congress, bill_type, number, *, version=None, depth=2)
 ```
 
 - **`search_bill_text`** — ranked hits, each with `match_contexts`, `is_amendatory`, `amends`, a `snippet` (drawn from a quoted segment when any match is quoted), `section_id`, `ancestor_path`, and `score`. `version=None` resolves to the latest authoritative version.
-- **`get_bill_section`** — one unit's full text. An oversized unit returns a heading plus child descriptors instead of raw text. Accepts synthetic ids for preamble, resolving-clause, and undivided bodies (`PRE:`/`RC:`/`U:`). Bare vs trailing-period ids both resolve (`804` and `804.`); a genuinely ambiguous id returns `ambiguous_section_id` with the qualified matches.
+- **`get_bill_section`** — one unit's full text, with the same `is_amendatory` and `amends` a hit on that `section_id` carries (F32 — they describe the addressed unit's own text; a structural container reports `false`/`[]`). An oversized unit returns a heading plus child descriptors instead of raw text. Accepts synthetic ids for preamble, resolving-clause, and undivided bodies (`PRE:`/`RC:`/`U:`). Bare vs trailing-period ids both resolve (`804` and `804.`); a genuinely ambiguous id returns `ambiguous_section_id` with the qualified matches.
 - **`get_bill_toc`** — a **navigation aid**, not the answer path. Reports size per branch (`subtree_byte_length`) so you can decide where to descend.
 
 ## Disclosures the tools surface — watch for these fields
