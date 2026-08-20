@@ -42,7 +42,8 @@
 | D14 | MED | Guard hand-pasted at 81 sites, nothing enforced coverage | 7 routers | **coverage FIXED** `880cb53`; decorator open |
 | D15 | LOW | `from_date_time` / `fromDateTime` mixed permanently on the public surface | public MCP surface | OPEN |
 | D16 | LOW | Allowlist skip that never fires — documented exclusion is dead code | test quality | OPEN |
-| D17 | HIGH | **Noise presented as results** — `search_bills` matches any term as a substring; named-Act queries drown | check — where does matching happen? | OPEN (after PR 2) |
+| D17 | HIGH | **Noise presented as results** — `search_bills` OR-splits + substring-matches; `Act` carries every named-Act query | no — client-side filter | OPEN (after PR 2) |
+| D18 | HIGH | **Silent wrong answer** — `search_bills` scans a 250-bill recency window; bills unreachable by exact title; `offset`/`limit` incoherent | no | OPEN (after PR 2; **must land with or before any D17 matcher fix**) |
 
 ---
 
@@ -206,17 +207,46 @@ Full `api_key=…` appeared in the congress.gov request URL at INFO level. **Thi
 
 ---
 
-### D17 — `search_bills` matches any term as a substring, so named-Act queries return noise `[E2E, maintainer-observed 2026-08-20 — repro not yet pinned]`
+### D17 — `search_bills` OR-splits on whitespace and substring-matches, so named-Act queries degrade to "newest bills" `[E2E, repro PINNED 2026-08-20 by differential probes]`
 
-**Observed (maintainer, via a Claude Desktop session):** searching `Radiation Exposure Compensation Act` returned a hit about "impact" — `act` substring-matched inside the word — plus everything whose title contains "Act," which is most of Congress. The observed semantics are **any-term OR with substring matching, not whole words and not phrases**: on the single most common bill-search intent, a named Act, every term but the distinctive ones is pure noise and the distinctive ones are diluted by it. Note the irony against the new tools' measured lesson: `search_bill_text` failed consumers by being *stricter* than they assumed (literal phrases, §7) — this tool fails them by being infinitely looser. Both are the same root defect: matching semantics the caller is never told.
+**Pinned by a probe sequence (maintainer via Claude Desktop, 2026-08-20) that falsified two prior hypotheses before landing — including the diagnosing session's own favored one (no-op filter / stringified keys; both killed by `latestAction` → 0 and `zzzqqx` → 0):**
 
-**Failure mode: noise with a success envelope.** Not silent-wrong in the D1 sense — the real bill may be present in the list — but a consumer taking the top hits gets unrelated bills, and a consumer summarizing "what matched" confabulates relevance that is not there. Same harm family as D3's garbage-presented-as-data.
+| query | result |
+|---|---|
+| `Radiation Exposure Compensation Act` | 50 |
+| `St. Louis RECA Readjustment Act` | same top 10, **byte-identical order** |
+| `Radiation Exposure Compensation` | **0** |
+| `zzzqqx` | 0 |
+| `latestAction` | 0 |
 
-**Claim to pin before fixing, per the register's provenance rule:** the maintainer reports the search does **not** go through a search-capable upstream API (the matching appears to happen against fetched titles, client-side or via a list endpoint). That is an implementation claim this register cannot verify from behavior alone. Pinning it takes one traced repro: the RECA query, the returned set, and the code path that produced it — record the before-set with the trace so the fix has a set-diff acceptance, not a vibe.
+**The differentials carry the diagnosis.** Dropping the single word `Act` goes 50 → 0; two queries sharing no token but `Act` return identical results in identical order — so `Act` carries the entire query and the other terms contribute nothing: **whitespace-split OR, not AND, not phrase.** And it is **substring, not token**: HCONRES 76 in the hit set matches no query token — `act` inside "imp**act**" does, which means `act` also hits *enacted*, *action*, *practice*, *transaction*, and nearly every bill record contains one.
 
-**Maintainer direction, recorded 2026-08-20 (not a spec, a decision):** route bill search through a search-capable upstream — GovInfo's search API is the named candidate, and the bill-text feature already carries a GovInfo client and key handling. Whatever ships must also **state its matching semantics in the tool description** — that rule was measured into `fulltext/07-search.md` on the new tools and binds any successor here for the same reason.
+**The pathology is precisely inverted from useful: because every federal statute is named "… Act," the filter degrades to "return the newest bills" on exactly the query class it exists to serve.** A user searching legislation by name hits the failure mode 100% of the time. Noise with a success envelope — same harm family as D3 — and the inverse of the new tools' §7 lesson: `search_bill_text` was stricter than consumers assumed (literal phrases), this is infinitely looser, and the shared root is matching semantics the caller is never told.
 
-**Status: OPEN. Sequencing: after PR 2**, alongside the F27 error-shape convergence — both set by the maintainer 2026-08-20. Not for immediate implementation.
+Mechanism attribution `[AUDIT — source read by the diagnosing session, consistent with every probe]`: `filter_by_keywords`, client-side, downstream of a fetch. Cosmetic tell recorded because it locates normalization: the hit header preserves query case, the empty message lowercases it — two formatting paths.
+
+### D18 — `search_bills` scans a 250-bill recency window, not the corpus; `offset` pages the *candidate* window `[AUDIT — source read; behavioral confirmation: HR 4631 unreachable by its own exact title]`
+
+**Independent of D17 and survives fixing it.** `search_limit = min(limit * 5, 250)` fetches one `updateDate desc` page, then filters it. HR 4631 (last activity July 2025) is nowhere near the 250 most-recently-updated bills of the 119th, so **even a perfect exact-phrase matcher returns zero for `St. Louis RECA Readjustment Act`** — it is a filter over a recency page wearing a search tool's name. Two structural consequences from the same design, recorded here rather than as separate entries:
+
+- **`limit` does double duty** — it sets fetch size *and* output cap (`limit=10` scans 50; `limit=50` scans 250), so results are **not monotonic in `limit`**: a bill can appear at 50 and vanish at 10 for reasons unrelated to ranking.
+- **`offset` pages the pre-filter candidate window, not the result set** — pagination over matches is not merely wrong but incoherent; matches cannot be enumerated.
+
+### D17 + D18 together — the actual headline, and a fix constraint
+
+**D17 is currently masking D18.** Tighten the matcher to AND/phrase and `Radiation Exposure Compensation Act` returns a clean zero — and a caller reasonably concludes the bill does not exist. That trades false positives for false negatives, **the worse trade for this tool: the noise at least looked wrong, a clean zero reads as an answer.** Therefore, binding on whoever picks this up: **do not ship a matcher fix without the window fix.** A matcher-only pass makes the tool quieter, not more correct.
+
+**Fix direction (maintainer 2026-08-20, reinforced by the diagnosis):** this problem is already solved once in this codebase — GovInfo's `/search` endpoint does real full-text over the BILLS collection, the GovInfo client and key handling exist, and `search_bill_text`'s `query_diagnostics` discipline (`phrasing` vs `absent_term`, so a zero is readable) applies at corpus level. **Minimum honesty fix if the full fix is deferred:** response metadata — `bills_scanned`, oldest `updateDate` in the window, `window_truncated` — so "no match in the 119th Congress" and "no match among the 50 bills examined" stop rendering as the same string (the fulltext scan-that-errors rule, applied to a scan that under-looks). Whatever ships states its matching semantics in the tool description, per the rule measured into `fulltext/07-search.md`.
+
+**Regression tests, recorded now because the failure is reproducible with a known-correct answer:**
+
+```python
+# fails today: returns 10 unrelated bills, none of them HR 4631
+assert "HR 4631" in search_bills(congress=119, keywords="St. Louis RECA Readjustment Act")
+assert search_bills(congress=119, keywords="Radiation Exposure Compensation") != ""
+```
+
+**Status: both OPEN. Sequencing: after PR 2**, alongside the F27 error-shape convergence — set by the maintainer 2026-08-20. Not for immediate implementation.
 
 ---
 
@@ -241,7 +271,7 @@ Full `api_key=…` appeared in the congress.gov request URL at INFO level. **Thi
 
 **PR A — envelope and converters (D2, D7).** First, despite the blast radius. D2 is about whether the structured container is emitted at all; B is about what goes in it. Fixing contents before container means testing contents twice. Run with the converter tests already in the repo, and pin D8's envelopes first. **Constraint added 2026-08-20 (F27 ruling, `fulltext/14-defect-priority.md`): the maintainer has ruled the server converges on the bill-text §9 error envelope (`error.code`/`message`/`detail`/`remediation`). PR A's envelope work and its characterization tests must target that shape — pinning the legacy `core/exceptions.py` shape would entrench what the ruling retires.**
 
-**After PR 2, by maintainer priority (2026-08-20): the F27 error-shape convergence and D17.** These outrank the lettered PRs below when PR 2 closes.
+**After PR 2, by maintainer priority (2026-08-20): the F27 error-shape convergence and D17/D18.** These outrank the lettered PRs below when PR 2 closes. D17 and D18 land together or window-first — the masking constraint in their joint entry.
 
 **PR B — member legislation feed (D3, D4, D5).** One tool, three defects, one round of testing. Restores a use case that is currently unanswerable.
 
