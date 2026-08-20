@@ -40,6 +40,18 @@ the script re-reads is_amendatory from the BillTextIndex sqlite row -- the colum
 search path reports from -- and fails if it disagrees with the Unit property. That is
 the carry-don't-reconstruct identity F32 depends on, checked rather than assumed.
 
+VERIFY (F33 acceptance, set-based). After measuring, the script calls the SHIPPED
+get_bill_section for every subdivided parent and every non-unit prefix it examined
+(load_bill_text patched to the cached, parsed package -- no network) and diffs the
+response's is_amendatory / amends against the F33 contract stated independently:
+assembled response -> OR / (kind, cite)-union in document order over exactly the
+units whose text was included; descriptor-only response -> the addressed unit's own
+values (false / [] for a container heading). It then reports the V22 populations by
+name -- found∧assembled must read true, found∧assembled∧cited must carry non-empty
+amends, both-false rows must stay false / [], overlap rows must stay true -- and
+FAILS on any mismatch. This is the acceptance the F33 ruling set: the sets, not the
+counts.
+
 HYGIENE (spec §10). Reports n found / n examined / n packages for every figure and
 FAILS (exit 1) if a denominator is zero, a manifest package is missing from the
 cache, a cached file's sha256 disagrees with the manifest, or the parser's tree is
@@ -60,12 +72,18 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent))
 
+import asyncio  # noqa: E402
+from unittest.mock import patch  # noqa: E402
+
+import congress_api.features.bill_text.tools as tools  # noqa: E402
+from congress_api.features.bill_text.client import ResolvedBillText  # noqa: E402
 from congress_api.features.bill_text.index import BillTextIndex  # noqa: E402
 from congress_api.features.bill_text.parser import (  # noqa: E402
     ParsedBill,
     Unit,
     parse_bill_xml,
 )
+from congress_api.features.bill_text.service import LoadedBillText  # noqa: E402
 
 MANIFEST = json.loads((HERE / "manifest.json").read_text())
 
@@ -107,6 +125,46 @@ def merged_amends(units: list[Unit]) -> list[dict[str, str]]:
         for a in u.amends:
             seen.setdefault((a["kind"], a["cite"]), a)
     return [seen[k] for k in sorted(seen)]
+
+
+def _loaded_for(parsed: ParsedBill, raw: bytes, index: BillTextIndex) -> LoadedBillText:
+    resolved = ResolvedBillText(
+        package_id=parsed.package_id, version=parsed.version, version_resolved_at="",
+        version_resolution_note=None, last_modified=None, xml_bytes=raw,
+    )
+    return LoadedBillText(resolved=resolved, parsed=parsed, index=index,
+                          timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0})
+
+
+class _Ctx:
+    pass
+
+
+def _shipped_section(loaded: LoadedBillText, section_id: str, max_bytes: int) -> dict:
+    """Call the SHIPPED get_bill_section with the fetch patched out."""
+    async def fake_load(ctx, congress, bill_type, number, version):
+        return loaded
+    with patch.object(tools, "load_bill_text", new=fake_load):
+        return asyncio.run(tools.get_bill_section(
+            _Ctx(), congress=0, bill_type="x", number=0, section_id=section_id, max_bytes=max_bytes,
+        ))
+
+
+def expected_disclosure(units: list[Unit]) -> tuple[bool, list[dict[str, str]]]:
+    """The F33 contract, independent of the implementation."""
+    return any(u.is_amendatory for u in units), merged_amends_docorder(units)
+
+
+def merged_amends_docorder(units: list[Unit]) -> list[dict[str, str]]:
+    seen: set[tuple[str, str]] = set()
+    out: list[dict[str, str]] = []
+    for u in units:
+        for a in u.amends:
+            k = (a["kind"], a["cite"])
+            if k not in seen:
+                seen.add(k)
+                out.append(a)
+    return out
 
 
 @dataclass
@@ -195,6 +253,8 @@ def main() -> int:
     per_package: list[tuple[str, int, int, int]] = []  # pkg, n_parents, n_found, n_overlap
     store_mismatch: list[str] = []
     tree_errors: list[str] = []
+    # for the verify pass: pkg -> (parsed, raw, index-or-None, parents, by_id)
+    handles: dict[str, tuple] = {}
 
     for e in entries:
         pkg = e["package_id"]
@@ -260,6 +320,7 @@ def main() -> int:
                 neither += 1
         per_package.append((pkg, len(parents), pkg_found, pkg_overlap))
         shapes.extend(non_unit_prefixes(parsed, by_id))
+        handles[pkg] = (parsed, raw, index, parents, by_id)
 
     # ---- hygiene gates ------------------------------------------------------ #
     if tree_errors:
@@ -346,6 +407,91 @@ def main() -> int:
                 print(f"     ... {len(active) - 30} more not listed (counted above)")
         print()
 
+    # ---- VERIFY: the shipped tool against the F33 contract, set by set --------- #
+    print("=" * 78)
+    print(f"VERIFY -- shipped get_bill_section (default max_bytes={DEFAULT_MAX_BYTES:,}) vs the F33")
+    print("contract, over every subdivided parent and non-unit prefix examined above")
+    print("=" * 78)
+    mismatches: list[str] = []
+    found_ids = {(f.package, f.section_id) for f in found}
+    overlap_ids = set(overlap)
+    # named populations -> (n checked, n correct)
+    pops: dict[str, list[int]] = {
+        "found, assembled under default  -> is_amendatory true": [0, 0],
+        "found, assembled, descendants cite -> amends non-empty": [0, 0],
+        "found, descriptor-only           -> own values (false, [])": [0, 0],
+        "both-false parents                -> false / []": [0, 0],
+        "overlap parents (parent true)     -> true": [0, 0],
+        "chunk-only prefixes, assembled    -> aggregate": [0, 0],
+        "structural containers, assembled  -> aggregate": [0, 0],
+        "non-unit prefixes, descriptor-only -> false / []": [0, 0],
+    }
+    n_calls = 0
+    for pkg, (parsed, raw, index, parents, by_id) in handles.items():
+        if index is None:
+            index = BillTextIndex(parsed)
+        loaded = _loaded_for(parsed, raw, index)
+        for parent in parents:
+            children = [by_id[c] for c in parent.child_ids]
+            size = parsed.subtree_bytes.get(parent.section_id, parent.byte_length)
+            assembled = size <= DEFAULT_MAX_BYTES
+            exp = expected_disclosure([parent, *children]) if assembled else (parent.is_amendatory, parent.amends)
+            res = _shipped_section(loaded, parent.section_id, DEFAULT_MAX_BYTES)
+            n_calls += 1
+            got = (res.get("is_amendatory"), res.get("amends"))
+            ok = "error" not in res and got == exp
+            key = (pkg, parent.section_id)
+            if key in found_ids:
+                if assembled:
+                    pops["found, assembled under default  -> is_amendatory true"][0] += 1
+                    pops["found, assembled under default  -> is_amendatory true"][1] += int(ok and got[0] is True)
+                    if any(c.amends for c in children):
+                        pops["found, assembled, descendants cite -> amends non-empty"][0] += 1
+                        pops["found, assembled, descendants cite -> amends non-empty"][1] += int(ok and bool(got[1]))
+                else:
+                    pops["found, descriptor-only           -> own values (false, [])"][0] += 1
+                    pops["found, descriptor-only           -> own values (false, [])"][1] += int(ok and got == (False, []))
+            elif key in overlap_ids:
+                pops["overlap parents (parent true)     -> true"][0] += 1
+                pops["overlap parents (parent true)     -> true"][1] += int(ok and got[0] is True)
+            elif not parent.is_amendatory and not any(c.is_amendatory for c in children):
+                pops["both-false parents                -> false / []"][0] += 1
+                pops["both-false parents                -> false / []"][1] += int(ok and got == (False, []))
+            if not ok:
+                mismatches.append(f"{pkg} {parent.section_id}: expected {exp}, got {got}"
+                                  + (f" ERROR {res['error']['code']}" if "error" in res else ""))
+        for shape in (x for x in shapes if x.package == pkg):
+            desc = [u for u in parsed.units if u.section_id.startswith(shape.prefix + "/")]
+            assembled = shape.subtree_bytes <= DEFAULT_MAX_BYTES
+            exp = expected_disclosure(desc) if assembled else (False, [])
+            res = _shipped_section(loaded, shape.prefix, DEFAULT_MAX_BYTES)
+            n_calls += 1
+            got = (res.get("is_amendatory"), res.get("amends"))
+            ok = "error" not in res and got == exp
+            if assembled:
+                label = ("chunk-only prefixes, assembled    -> aggregate" if shape.kind == "chunk_only_prefix"
+                         else "structural containers, assembled  -> aggregate")
+            else:
+                label = "non-unit prefixes, descriptor-only -> false / []"
+            pops[label][0] += 1
+            pops[label][1] += int(ok)
+            if not ok:
+                mismatches.append(f"{pkg} {shape.prefix} ({shape.kind}): expected {exp}, got {got}"
+                                  + (f" ERROR {res['error']['code']}" if "error" in res else ""))
+    print(f"  shipped-tool calls made: {n_calls}")
+    for label, (n, okc) in pops.items():
+        flag = "" if okc == n else "   <-- MISMATCH"
+        print(f"  {label:<60} {okc:>5} / {n:<5}{flag}")
+    if mismatches:
+        print(f"\n  FAIL: {len(mismatches)} response(s) disagree with the F33 contract:")
+        for m in mismatches[:15]:
+            print(f"     {m}")
+        verify_ok = False
+    else:
+        print("\n  VERIFY PASS: every response matches the F33 contract on every examined id.")
+        verify_ok = True
+    print()
+
     # ---- preregistered outcome, in the spec's own terms ---------------------- #
     print("=" * 78)
     if found:
@@ -360,7 +506,7 @@ def main() -> int:
               "semantics stand, the docstring note is the guard.")
     print("  (Recording the outcome is the spec session's job. This script does not write "
           "under documentation/.)")
-    return 0
+    return 0 if verify_ok else 1
 
 
 if __name__ == "__main__":
