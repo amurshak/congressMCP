@@ -582,6 +582,26 @@ Report `n examined` and fail if zero, per the hygiene section below.
 
 **Preregistration.** *Expected:* ≥1 found — NDAA-scale sections exceed the subdivision threshold (S. 4042 `T:II/S:204` spans ~60,700 bytes across 14 children) and multi-subsection amendments to Title 10 are ordinary drafting. *Falsified if* 0 found with non-zero denominators, in which case the §4 aggregation contract is recorded **dead-defensive — do not build**, own-text semantics stand, and the docstring note is the guard. Record the outcome either way.
 
+**V22 — MEASURED 2026-08-20. Preregistration CONFIRMED, and not marginally: the mislabel shape is the norm, not the edge.** Instrument: `tests/corpus/v22.py` (implementation commit `4cdc4f4`); identity from the parser's own tree (child-id closure, no dangling ids), stored values cross-checked against the index column the search path reads (391/391 agree); **reproduced by this session** (`python -m tests.corpus.v22`, ~12s offline, every figure identical to the implementation report). All hygiene gates passed, denominators non-zero.
+
+| Figure | n |
+|---|---|
+| Found — parent own `is_amendatory` false, ≥1 descendant true | **391** |
+| Subdivided parents examined | 602 |
+| Packages scanned | 21 |
+| Found ∧ subtree ≤ 25,000 B — assembled under default `max_bytes`, full amendatory text returned under `false` | **341** |
+| Found ∧ subtree ≤ 100,000 B (assemblable at the clamp ceiling) | 388 |
+| Found whose descendants carry ≥1 `amends` cite (aggregated `amends` would be non-empty) | 261 |
+| Parent true ∧ ≥1 descendant true (overlap — own-unit semantics correct for a subdivided amender) | 13 |
+| Parent true, no descendant true | 0 |
+| Parent false, no descendant true | 198 |
+
+**Reading: 65% of all subdivided parents are the mislabel shape**, because the drafting norm puts the amendatory verb in subsection (a) while the parent unit's own text is a header and often nothing else — the found rows are TCJA sections and omnibus "Amendments relating to…" sections with nearly every child amendatory. The 13 overlap rows are the entire population where own-unit semantics get a subdivided amender right.
+
+**Adjacent shapes, reported separately (not the preregistered figure; both resolve via the container path, which the F32 ruling gave `false`/`[]`):** chunk-only prefixes (oversized `S:n`/`SS:(a)` emitted only as `CHUNK:k` units, no unit under the id itself) — 297 examined, **219 with an amendatory chunk, 185 assembled by default under `false`/`[]`**; structural containers — 2,317 examined, 1,712 with an amendatory descendant, **975 assembled by default**.
+
+**Outcome: the §4 aggregation contract ACTIVATES, generalized to every assembling path (subdivided parents, chunk-only prefixes, assembled containers) — ruled in §4 as F33.** Own-unit values on an assembled response emit exactly the failure shape F32 exists to prevent, with a confident `false` attached. The A1 re-run traces are evidence for neither side here — `S:141` is a leaf.
+
 ### Corpus-scan hygiene — applies to V19, V20, V21, V22
 
 **Assert a non-zero denominator.** A scan that errors and a scan that found nothing render identically today. An earlier resolution scan used bare `urllib`, swallowed exceptions, and reported 403s from a blocked User-Agent as *"no resolutions have 2+ versions."* The conclusion was not load-bearing, but the scan established nothing and was reported as though it had. **Every measurement below must report `n examined` alongside `n found`, and fail if `examined` is zero.**
