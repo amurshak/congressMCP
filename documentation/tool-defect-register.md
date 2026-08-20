@@ -181,9 +181,9 @@ Three faces of one defect. The `validate_operation_kwargs` guard converted laten
 
 - **`committee_meetings.py:302`** — `get_committee_meeting_details` dropped its previously-required `committee_code` while the `committee_intelligence` docstring still advertises it.
 - **`treaties_and_summaries_tool.py:66`** — `offset` is advertised but none of the five routed operations accepts it, so **pagination via the documented parameter is impossible tool-wide**.
-- **`bills_tool.py:199`** — `version` ("Text version for content operations") is advertised but unroutable. **DECISION NEEDED, not a delete:** the description reads like an *unwired seam into the bill-text feature* (route a `bills` content request by version). If that wiring was planned this is unfinished integration; if not, the param is vestigial. **A maintainer call — an implementer must not decide it.**
+- **`bills_tool.py:199`** — `version` ("Text version for content operations") is advertised but unroutable. **DECISION NEEDED, not a delete:** the description reads like an *unwired seam into the bill-text feature* (route a `bills` content request by version). If that wiring was planned this is unfinished integration; if not, the param is vestigial. **A maintainer call — an implementer must not decide it.** **RULED BY MAINTAINER 2026-08-20: vestigial — delete.** There are no content operations in the legacy tools to wire it to; version-addressable retrieval is the bill-text tools' job and already ships there (`version` param on all three, §4). The capability the seam gestured at — surfacing *available* versions on request — is recorded as a requirement in `fulltext/03-data-sources.md` ("Version discovery — requirement recorded 2026-08-20"), not here.
 
-**Status: OPEN** (first two are mechanical; the third is blocked on the decision).
+**Status: OPEN, now wholly mechanical** — all three faces are schema cleanups; the third's decision is made (delete).
 
 ### D13 — API key in INFO logs, and it is one credential, not two `[E2E, confirmed live]`
 
