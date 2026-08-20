@@ -49,8 +49,8 @@ _QUERY = "polar security cutter"      # present in the fixture's quoted material
 _SECTION_ID = "D:B/T:I/S:102"          # a real leaf section in the fixture
 
 
-def _loaded() -> LoadedBillText:
-    raw = FIXTURE.read_bytes()
+def _loaded(raw: bytes | None = None) -> LoadedBillText:
+    raw = FIXTURE.read_bytes() if raw is None else raw
     parsed = parse_bill_xml(raw, PKG, VER, "2025-12-19T03:11:48Z")
     resolved = ResolvedBillText(
         package_id=PKG, version=VER, version_resolved_at="2025-12-19T03:11:48Z",
@@ -67,11 +67,11 @@ class _Ctx:  # never touched: load_bill_text is patched, so the fetch path never
     pass
 
 
-def _call(coro_fn, *args, **kwargs):
+def _call(coro_fn, *args, loaded: LoadedBillText = LOADED, **kwargs):
     async def fake_load(ctx, congress, bill_type, number, version):
         # mirror the real load path's provenance stamp so trace tests see it
-        trace.set_source(LOADED.resolved.package_id, LOADED.resolved.version, LOADED.resolved.xml_bytes)
-        return LOADED
+        trace.set_source(loaded.resolved.package_id, loaded.resolved.version, loaded.resolved.xml_bytes)
+        return loaded
     with patch.object(tools, "load_bill_text", new=fake_load):
         return asyncio.run(coro_fn(_Ctx(), *args, **kwargs))
 
@@ -147,16 +147,142 @@ def test_f32_non_amendatory_leaf_reports_false_and_empty_list():
     assert not (res["amends"] and not res["is_amendatory"])
 
 
-def test_f32_container_response_carries_the_fields_as_false_and_empty():
-    # A structural container (division/title/subtitle) is not an indexed unit -- no
-    # stored per-unit value -- so it reports the heading's own state, like byte_length 0.
+def _expected_disclosure(units):
+    """The F33 contract, stated independently of the implementation: OR over the
+    included units' STORED values, amends as the (kind, cite)-deduplicated union in
+    document order."""
+    seen, merged = set(), []
+    for u in units:
+        for a in u.amends:
+            if (a["kind"], a["cite"]) not in seen:
+                seen.add((a["kind"], a["cite"]))
+                merged.append(a)
+    return any(u.is_amendatory for u in units), merged
+
+
+def test_f33_assembled_container_aggregates_over_its_descendants():
+    # F33: a container whose subtree fits max_bytes returns the descendants' text, so
+    # the disclosure describes THAT text -- OR / union over the included units.
     container_id = _SECTION_ID.rsplit("/", 1)[0]
+    desc = [u for u in LOADED.parsed.units if u.section_id.startswith(container_id + "/")]
+    assert desc and LOADED.parsed.subtree_bytes[container_id] <= 25_000, "fixture premise"
     res = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
                 section_id=container_id)
     assert "error" not in res, res
-    assert res["section_id"] == container_id
+    assert res["truncated"] is False
+    exp_flag, exp_amends = _expected_disclosure(desc)
+    assert (res["is_amendatory"], res["amends"]) == (exp_flag, exp_amends)
+    assert exp_flag is True, "fixture premise: an amendatory descendant exists"
+
+
+# A subdivided section whose own intro is NOT amendatory but whose children are -- the
+# V22 majority shape (391/602 corpus parents). Built inline so the test owns the
+# premise: (a) amends 10 U.S.C. 9062, (b) is a plain requirement, (c) amends 14 U.S.C.
+# 5601 and 10 U.S.C. 9062 again (exercises dedup + document order). Each child is
+# padded past the subdivision threshold for the whole section.
+_FILL = ("word " * 700).strip()
+_SUBDIVIDED_XML = (
+    b"<bill><legis-body>"
+    b"<division><enum>A</enum><header>Div A</header>"
+    b"<title><enum>I</enum><header>Title I</header>"
+    b"<section><enum>5</enum><header>Plain intro, amendatory children</header>"
+    b"<subsection><enum>(a)</enum><header>First</header><text>Section 9062(j) of title 10, "
+    b"United States Code, is amended by striking <quote>466</quote>. " + _FILL.encode() + b"</text></subsection>"
+    b"<subsection><enum>(b)</enum><header>Second</header><text>The Secretary shall report. "
+    + _FILL.encode() + b"</text></subsection>"
+    b"<subsection><enum>(c)</enum><header>Third</header><text>Section 5601 of title 14, United "
+    b"States Code, is amended by inserting <quote>icebreaker</quote>; and section 9062 of title 10, "
+    b"United States Code, is further amended. " + _FILL.encode() + b"</text></subsection>"
+    b"</section>"
+    b"<section><enum>6</enum><header>Leaf, not amendatory</header><text>Plain text.</text></section>"
+    b"</title></division></legis-body></bill>"
+)
+SUBDIVIDED = _loaded(_SUBDIVIDED_XML)
+
+
+def test_f33_premise_the_inline_bill_is_the_v22_shape():
+    by_id = {u.section_id: u for u in SUBDIVIDED.parsed.units}
+    parent = by_id["D:A/T:I/S:5"]
+    assert parent.child_ids == ["D:A/T:I/S:5/SS:(a)", "D:A/T:I/S:5/SS:(b)", "D:A/T:I/S:5/SS:(c)"]
+    assert parent.is_amendatory is False and parent.amends == []
+    assert [by_id[c].is_amendatory for c in parent.child_ids] == [True, False, True]
+
+
+def test_f33_descriptor_only_container_reports_false_and_empty():
+    # The container false/[] ratification survives only on the descriptor-only shape:
+    # heading + child descriptors, no descendant text in the response. (The synthetic
+    # doc's title is ~11 KB, so the 1,000-byte clamp floor forces that shape.)
+    res = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
+                section_id="D:A/T:I", max_bytes=1_000, loaded=SUBDIVIDED)
+    assert res["truncated"] is True and res["children"]
     assert res["is_amendatory"] is False
     assert res["amends"] == []
+
+
+def test_f33_assembled_subdivided_parent_reports_or_and_ordered_union():
+    by_id = {u.section_id: u for u in SUBDIVIDED.parsed.units}
+    parent = by_id["D:A/T:I/S:5"]
+    res = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
+                section_id="D:A/T:I/S:5", loaded=SUBDIVIDED)
+    assert "error" not in res, res
+    assert res["children"] and res["truncated"] is False          # assembled shape
+    assert res["is_amendatory"] is True
+    # union, de-duplicated by (kind, cite), in DOCUMENT order: (a)'s target, then
+    # (c)'s targets in the order that unit itself reports them (the parser sorts a
+    # unit's amends by kind then cite), nothing repeated across units.
+    assert res["amends"] == [
+        {"kind": "usc", "cite": "10 U.S.C. 9062(j)"},
+        {"kind": "usc", "cite": "10 U.S.C. 9062"},
+        {"kind": "usc", "cite": "14 U.S.C. 5601"},
+    ]
+    # ...and that is exactly the contract stated independently over the included units
+    included = [parent, *(by_id[c] for c in parent.child_ids)]
+    assert (res["is_amendatory"], res["amends"]) == _expected_disclosure(included)
+
+
+def test_f33_descriptor_only_subdivided_parent_keeps_own_unit_values():
+    res = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
+                section_id="D:A/T:I/S:5", max_bytes=1_000, loaded=SUBDIVIDED)
+    assert res["children"] and res["truncated"] is True           # descriptor-only shape
+    assert res["is_amendatory"] is False and res["amends"] == []
+    # and each child's text arrives labeled on its own fetch
+    child = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
+                  section_id="D:A/T:I/S:5/SS:(a)", loaded=SUBDIVIDED)
+    assert child["is_amendatory"] is True and child["amends"] == [{"kind": "usc", "cite": "10 U.S.C. 9062(j)"}]
+
+
+def test_f33_leaf_and_search_hit_still_agree():
+    # Single-unit responses degenerate to the unit's own stored values -- the F32
+    # carry-don't-reconstruct identity with the search path is unchanged.
+    search = _call(tools.search_bill_text, congress=119, bill_type="s", number=1071,
+                   queries=["icebreaker"], max_hits=10, loaded=SUBDIVIDED)
+    hit = next(h for h in search["hits"] if h["amends"])
+    leaf = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
+                 section_id=hit["section_id"], loaded=SUBDIVIDED)
+    assert leaf["children"] is None
+    assert (leaf["is_amendatory"], leaf["amends"]) == (hit["is_amendatory"], hit["amends"])
+
+
+def test_f33_chunk_only_prefix_resolves_through_container_path_and_aggregates():
+    # An oversized subsection with no further structure is emitted only as CHUNK units;
+    # addressing `.../SS:(a)` itself hits the container path. V22: 185 such prefixes
+    # are amendatory and assembled under the default -- they must not read false.
+    big = ("Section 5601 of title 14, United States Code, is amended by striking <quote>x</quote>. "
+           + "filler " * 3000)
+    xml = (b"<bill><legis-body><section><enum>7</enum><header>Big</header>"
+           b"<subsection><enum>(a)</enum><text>" + big.encode() + b"</text></subsection>"
+           b"<subsection><enum>(b)</enum><text>short</text></subsection>"
+           b"</section></legis-body></bill>")
+    loaded = _loaded(xml)
+    ids = [u.section_id for u in loaded.parsed.units]
+    assert "S:7/SS:(a)" not in ids and any(i.startswith("S:7/SS:(a)/CHUNK:") for i in ids), ids
+    res = _call(tools.get_bill_section, congress=119, bill_type="s", number=1071,
+                section_id="S:7/SS:(a)", max_bytes=100_000, loaded=loaded)
+    assert "error" not in res, res
+    assert res["truncated"] is False
+    chunks = [u for u in loaded.parsed.units if u.section_id.startswith("S:7/SS:(a)/")]
+    assert (res["is_amendatory"], res["amends"]) == _expected_disclosure(chunks)
+    assert res["is_amendatory"] is True
 
 
 # --------------------------------------------------------------------------- #

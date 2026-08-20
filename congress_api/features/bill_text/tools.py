@@ -6,7 +6,7 @@ import functools
 import logging
 import re
 import time
-from typing import Any
+from typing import Any, Iterable
 
 from mcp.server.mcpserver import Context
 
@@ -322,6 +322,32 @@ async def search_bill_text(
         return _unexpected("search_bill_text", exc)
 
 
+def _aggregate_disclosure(units: Iterable[Unit]) -> tuple[bool, list[dict[str, str]]]:
+    """F33 (§4): is_amendatory / amends DESCRIBE THE RESPONSE'S TEXT. For an assembled
+    response -- a subdivided parent or a container whose subtree fit max_bytes, so the
+    returned `text` is several units concatenated -- the fields aggregate over exactly
+    the units whose text was included: OR for is_amendatory, amends as the union
+    de-duplicated by (kind, cite) identity in document order. Values are CARRIED from
+    the units (the same stored per-unit values a search hit reports), never recomputed
+    from the assembled text; a single-unit response degenerates to that unit's own
+    values. V22 measured why: 391 of 602 subdivided parents in the corpus carry
+    is_amendatory false on their own intro while a child amends, so own-unit values on
+    an assembled response emitted F32's failure shape with a confident false attached
+    (341 sections under the default max_bytes, plus chunk-only prefixes and assembled
+    containers on the container path)."""
+    any_amendatory = False
+    seen: set[tuple[str, str]] = set()
+    merged: list[dict[str, str]] = []
+    for unit in units:
+        any_amendatory = any_amendatory or unit.is_amendatory
+        for target in unit.amends:
+            key = (target["kind"], target["cite"])
+            if key not in seen:
+                seen.add(key)
+                merged.append(target)
+    return any_amendatory, merged
+
+
 @mcp.tool(
     "get_bill_section",
     title="Retrieve the full statutory text of a bill section (GovInfo)",
@@ -351,15 +377,18 @@ async def get_bill_section(
     subdivided, child chunk descriptors are included. Text is capped at max_bytes, measured as
     UTF-8 encoded bytes of the returned text field, clamped to 1,000-100,000.
 
-    is_amendatory and amends carry the same values a search_bill_text hit reports for this
-    section_id. When is_amendatory is true, quoted language in text is matter the section
-    INSERTS INTO or STRIKES FROM existing law -- an instruction to change another statute, not
-    a freestanding requirement of this bill -- so present it as an amendment to the cited
-    target, not as the bill's own rule. Each amends entry is {kind: "usc"|"public_law", cite}.
-    amends is citations found, never a complete list: it resolves no named Acts, no chapter-
-    or title-level amendments, and no non-U.S. Code targets, so a non-empty list can still be
-    short. The two fields describe this unit's own text; in a subdivided section a child
-    chunk may amend even when the parent's intro does not.
+    is_amendatory and amends describe the returned text. For a single unit they are the same
+    values a search_bill_text hit reports for that section_id; when the response assembles
+    several units (a subdivided section or a container that fit max_bytes), is_amendatory is
+    true if ANY included unit amends and amends is the union of their targets. When
+    is_amendatory is true, quoted language in text is matter the section INSERTS INTO or
+    STRIKES FROM existing law -- an instruction to change another statute, not a freestanding
+    requirement of this bill -- so present it as an amendment to the cited target, not as the
+    bill's own rule. Each amends entry is {kind: "usc"|"public_law", cite}. amends is citations
+    found, never a complete list: it resolves no named Acts, no chapter- or title-level
+    amendments, and no non-U.S. Code targets, so a non-empty list can still be short. A
+    heading-plus-children-descriptors response (subtree too large for max_bytes) reports the
+    addressed unit's own values; each child's text arrives labeled when fetched.
     """
     capability_error = _capability_error()
     if capability_error:
@@ -407,16 +436,23 @@ async def get_bill_section(
             )
             text = _limit_utf8(full, max_bytes)
             truncated = len(full.encode("utf-8")) > max_bytes
+            included_units = [unit, *children]
         elif children:
             # Subdivided and too large to inline: own header + intro plus child
             # descriptors so the caller can fetch a specific chunk. Never silently
             # return only the first chunk (spec §5).
             text = _limit_utf8(own_rendered, max_bytes)
             truncated = True
+            included_units = [unit]
         else:
             # Leaf: its own text, truncated only if that alone exceeds max_bytes.
             text = _limit_utf8(own_rendered, max_bytes)
             truncated = len(own_rendered.encode("utf-8")) > max_bytes
+            included_units = [unit]
+        # F33: the disclosure describes the text actually returned -- aggregated over
+        # the included units on an assembled response, the unit's own on a
+        # descriptor-only or leaf response. Carried, never recomputed.
+        is_amendatory, amends = _aggregate_disclosure(included_units)
         child_payload = (
             [
                 SectionChild(
@@ -441,10 +477,8 @@ async def get_bill_section(
             ancestor_path=unit.ancestor_path,
             header=unit.header,
             text=text,
-            # F32: the same stored per-unit values search_bill_text puts on a hit for
-            # this section_id -- read from the unit, never re-derived from `text`.
-            is_amendatory=unit.is_amendatory,
-            amends=unit.amends,
+            is_amendatory=is_amendatory,
+            amends=amends,
             # byte_length is the unit's OWN clean text size (spec §9), NOT the
             # rendered/concatenated payload: rendering adds ~2 bytes per quoted span
             # and concatenation inflates it, which made section disagree with search
@@ -566,9 +600,17 @@ def _container_response(
         )
         text = _limit_utf8(full, max_bytes)
         truncated = len(full.encode("utf-8")) > max_bytes
+        # F33: assembled -- the descendants' text IS the response, so the disclosure
+        # aggregates over them (this is also the only path a chunk-only prefix such as
+        # `.../S:n` or `.../S:n/SS:(a)` -- oversized, byte-split, no unit of its own --
+        # resolves through; V22 counted 185 of those amendatory under the default).
+        is_amendatory, amends = _aggregate_disclosure(container.descendants)
     else:
         text = _limit_utf8(container.header or "", max_bytes)
         truncated = True
+        # Descriptor-only: the heading is not an indexed unit and carries no stored
+        # value; false / [] is the heading's own state, like byte_length 0 below.
+        is_amendatory, amends = False, []
     return BillSectionResponse(
         **_envelope(loaded),
         version_resolution_note=loaded.resolved.version_resolution_note,
@@ -579,11 +621,8 @@ def _container_response(
         ancestor_path=container.ancestor_path,
         header=container.header,
         text=text,
-        # F32: a container's heading is not an indexed unit, so it has no stored
-        # per-unit amendatory value; false / [] is the heading's own (non-)amendatory
-        # state, the same way byte_length below is 0. Descendants carry their own.
-        is_amendatory=False,
-        amends=[],
+        is_amendatory=is_amendatory,
+        amends=amends,
         # 0 for the same reason as in _container_children: a container's heading is
         # not an indexed unit, so counting it would break the containment identity
         # and disagree with the same node in get_bill_toc.
