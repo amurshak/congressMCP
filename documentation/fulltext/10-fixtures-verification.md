@@ -572,7 +572,17 @@ Report `n examined` and fail if zero, per the hygiene section below.
 
 **Related, and cheaper:** B1's floor failure was **not calling the tool at all**. No response-side change reaches that consumer; F7 addressed it in the tool description (`07f3889`).
 
-### Corpus-scan hygiene — applies to V19, V20, V21
+---
+
+**V22 — subdivided amendatory parents.** *(no credentials needed; offline over the extended corpus)*. Decides whether F32's section-response fields need returned-text aggregation or own-unit values suffice. Gates the conditional contract in §4 (F32 container/subdivision ruling, 2026-08-20).
+
+**Why it exists.** §4's read contract serves a subdivided parent within `max_bytes` by concatenating children at read time, while F32's new fields carry the parent unit's **own** stored value — so if any amendatory section is large enough to subdivide, its full amendatory text returns under `is_amendatory: false`, an active mislabel of the F32 failure shape. Whether that section exists in reality is a corpus fact, not a judgment call — check-dead-defensive before contracting for it (the F20-ranking / F28 / F23-Haiku lesson).
+
+**Procedure.** Over every package in the extended corpus, enumerate units that have children (the subdivided parents — identity against the parser's own tree, never string matching). For each, read the stored per-unit `is_amendatory` of the parent and of every descendant. Count parents where the parent's own value is false and ≥1 descendant's is true; also record the parent-true/descendant-true overlap so the fix, if owed, can be sized. Report **`n found` / `n subdivided parents examined` / `n packages scanned`, and fail if either denominator is zero** — a corpus with no subdivided parents at all is a different result from one where none is amendatory, and both differ from a scan that errored.
+
+**Preregistration.** *Expected:* ≥1 found — NDAA-scale sections exceed the subdivision threshold (S. 4042 `T:II/S:204` spans ~60,700 bytes across 14 children) and multi-subsection amendments to Title 10 are ordinary drafting. *Falsified if* 0 found with non-zero denominators, in which case the §4 aggregation contract is recorded **dead-defensive — do not build**, own-text semantics stand, and the docstring note is the guard. Record the outcome either way.
+
+### Corpus-scan hygiene — applies to V19, V20, V21, V22
 
 **Assert a non-zero denominator.** A scan that errors and a scan that found nothing render identically today. An earlier resolution scan used bare `urllib`, swallowed exceptions, and reported 403s from a blocked User-Agent as *"no resolutions have 2+ versions."* The conclusion was not load-bearing, but the scan established nothing and was reported as though it had. **Every measurement below must report `n examined` alongside `n found`, and fail if `examined` is zero.**
 

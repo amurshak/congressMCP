@@ -33,7 +33,7 @@ Cross-references in the text use section numbers (§5, §6). The table above map
 
 **Amendments, not drift.** When implementation diverges from spec intentionally, record it inline as an amendment: what the spec said, what was measured, what changed, why the measurement beat the spec. Four exist — A1 (`amends` two-form), A2 (`timing` block), A3 (version resolution), A4 (structural discovery, since extended in scope), A5 (longhand USC verb gate), A6 (`timing` ships one field). **Number the next one A7.**
 
-**Verification steps are V1–V18**, defined in `10-fixtures-verification.md`. Refer to them by number. Several are credential-free and that is noted per step.
+**Verification steps are V1–V22**, defined in `10-fixtures-verification.md`. Refer to them by number. Several are credential-free and that is noted per step.
 
 **Non-vacuity proves test-fix coupling, not test-reality coupling.** Removing a fix and confirming the test fails shows the test is sensitive to *the fix*. It cannot show the test exercises the *real input shape*, because **a test and the fix it guards are usually authored from the same mental model** — perturbing one does not surface an assumption they share.
 
