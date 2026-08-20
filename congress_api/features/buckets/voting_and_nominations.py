@@ -12,22 +12,17 @@ from mcp.server.mcpserver.exceptions import ToolError
 from ...mcp_app import mcp
 from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import VotingNominationsResponse, VoteSummary, NominationSummary
-from ...utils.response_converters import _extract_result_count
+from ...utils.response_converters import _extract_result_count, _extract_json
 
 logger = logging.getLogger(__name__)
 
 def _convert_to_structured_response(raw_response: str, operation: str) -> VotingNominationsResponse:
     """Convert raw string response to structured VotingNominationsResponse."""
-    import json
-
     try:
         # Parse the raw response
         if isinstance(raw_response, str):
-            import re
-            json_match = re.search(r'\{.*\}', raw_response, re.DOTALL)
-            if json_match:
-                data = json.loads(json_match.group())
-            else:
+            data = _extract_json(raw_response)
+            if data is None:
                 # The underlying impls return pre-formatted markdown, not JSON, so this
                 # is the normal path for every operation, not a fallback for malformed
                 # data — it must preserve the full response, not truncate it.
