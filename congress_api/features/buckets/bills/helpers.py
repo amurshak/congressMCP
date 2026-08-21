@@ -12,7 +12,7 @@ from mcp.server.mcpserver import Context
 # Import existing validation and API infrastructure
 from ....core.validators import ParameterValidator
 from ....core.api_wrapper import safe_congressional_request
-from ....core.exceptions import CommonErrors, format_error_response
+from ....core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -80,6 +80,10 @@ async def fetch_bill_data(
         # Use defensive API wrapper for the request
         return await safe_congressional_request(endpoint, ctx, query_params, endpoint_type='bills')
 
+    except CongressionalAPIError as e:
+        # Typed 404/400/5xx from the wrapper: pass it through unchanged so the
+        # caller reports NOT_FOUND instead of a generic server error.
+        return {"error": format_error_response(e.error_response)}
     except Exception as e:
         logger.error(f"Error in fetch_bill_data: {str(e)}")
         error_response = CommonErrors.api_server_error(f"bills endpoint: {endpoint if 'endpoint' in locals() else 'unknown'}")

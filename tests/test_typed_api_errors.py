@@ -143,7 +143,7 @@ def test_every_generic_except_that_formats_errors_has_typed_clause_first():
         lines = src.split("\n")
         for i, line in enumerate(lines):
             if re.match(r"^\s*except Exception as e:\s*$", line):
-                window = "\n".join(lines[i + 1:i + 9])
+                window = "\n".join(lines[i + 1:i + 14])
                 if "format_error_response(" not in window:
                     continue
                 prev = "\n".join(lines[max(0, i - 2):i])
