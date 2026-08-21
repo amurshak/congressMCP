@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "congressmcp"
-version = "2.0.0"
+version = "2.1.0"
 description = "Access 91+ congressional data tools via Claude, Cursor, VS Code, and other MCP clients"
 readme = "README.md"
 license = {text = "Sustainable Use License"}
