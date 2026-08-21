@@ -1,18 +1,58 @@
 # CongressMCP
 
-**91+ congressional data tools for Claude, Cursor, VS Code, and any MCP client.**
+**Live U.S. Congressional data for any MCP client — Claude, ChatGPT, Cursor, VS Code, Codex, Gemini CLI, and more.**
 
-Access live U.S. Congressional data — bills, votes, members, committees, hearings, and more — through natural language via the [Model Context Protocol](https://modelcontextprotocol.io/).
+Bills, full bill text, votes, members, committees, hearings, nominations, and the Congressional Record — queried in natural language through the [Model Context Protocol](https://modelcontextprotocol.io/). Runs locally on your machine against the free Congress.gov and GovInfo APIs. No account, no hosted service, no telemetry.
 
 ## Quick Start
 
 ### 1. Get a free Congress.gov API key
 
-Sign up at **[api.congress.gov/sign-up](https://api.congress.gov/sign-up/)** (takes 30 seconds, completely free).
+Sign up at **[api.congress.gov/sign-up](https://api.congress.gov/sign-up/)** — takes 30 seconds. The same key also works for GovInfo (full bill text).
 
-### 2. Configure your MCP client
+### 2. Install `uv`
 
-**Claude Desktop** — add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+CongressMCP is published on PyPI and launched with `uvx`, which ships with [uv](https://docs.astral.sh/uv/getting-started/installation/):
+
+```bash
+# macOS / Linux
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Windows (PowerShell)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+(`brew install uv`, `winget install astral-sh.uv`, and `pipx install uv` also work.) Prefer pip? `pip install congressmcp` gives you a `congressmcp` command you can use in place of `uvx congressmcp` below.
+
+### 3. Connect your client
+
+Every client needs the same three facts: **command** `uvx`, **args** `["congressmcp"]`, **env** `CONGRESS_API_KEY`. Pick yours:
+
+| Client | Where it's configured | Notes |
+|--------|-----------------------|-------|
+| [Claude Desktop](#claude-desktop) | `claude_desktop_config.json` | |
+| [Claude Code](#claude-code) | `claude mcp add …` or `.mcp.json` | |
+| [Cursor](#cursor) | `~/.cursor/mcp.json` or `.cursor/mcp.json` | |
+| [VS Code / GitHub Copilot](#vs-code--github-copilot) | `.vscode/mcp.json` | uses `servers` + `inputs` |
+| [Windsurf](#windsurf) | `~/.codeium/windsurf/mcp_config.json` | |
+| [Cline / Roo Code](#cline--roo-code) | MCP settings panel → edit JSON | |
+| [Zed](#zed) | `settings.json` → `context_servers` | |
+| [OpenAI Codex CLI](#openai-codex-cli) | `codex mcp add …` or `~/.codex/config.toml` | TOML |
+| [Gemini CLI](#gemini-cli) | `gemini mcp add …` or `~/.gemini/settings.json` | |
+| [JetBrains AI Assistant / Junie](#jetbrains-ai-assistant--junie) | Settings → AI Assistant → MCP | paste the Claude Desktop JSON |
+| [Continue](#continue) | `~/.continue/config.yaml` | YAML, agent mode only |
+| [Goose](#goose) | `goose configure` or `~/.config/goose/config.yaml` | YAML |
+| [LM Studio](#lm-studio) | Program tab → `mcp.json` | Cursor-style JSON |
+| [ChatGPT, Claude.ai, Open WebUI](#remote-clients-chatgpt-claudeai-open-webui) | remote URL | need [HTTP mode](#remote--http-mode) |
+
+Anything not listed that speaks MCP over stdio will work with the same three values.
+
+<details>
+<summary><a name="claude-desktop"></a><b>Claude Desktop</b></summary>
+
+Claude menu → **Settings… → Developer → Edit Config**, or edit the file directly:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -20,38 +60,276 @@ Sign up at **[api.congress.gov/sign-up](https://api.congress.gov/sign-up/)** (ta
     "congressmcp": {
       "command": "uvx",
       "args": ["congressmcp"],
-      "env": {
-        "CONGRESS_API_KEY": "your-api-key-here"
-      }
+      "env": { "CONGRESS_API_KEY": "your-api-key-here" }
     }
   }
 }
 ```
 
-**VS Code** — add to `.vscode/mcp.json`:
+Restart Claude Desktop. If the server doesn't appear, use the absolute path to `uvx` (`which uvx` / `where uvx`) — GUI apps don't always inherit your shell `PATH`. Logs: `~/Library/Logs/Claude/mcp*.log` or `%APPDATA%\Claude\logs`.
+</details>
+
+<details>
+<summary><a name="claude-code"></a><b>Claude Code</b></summary>
+
+```bash
+# just for you
+claude mcp add congressmcp --env CONGRESS_API_KEY=your-api-key-here -- uvx congressmcp
+
+# shared with your team via .mcp.json in the repo root
+claude mcp add --scope project congressmcp --env CONGRESS_API_KEY='${CONGRESS_API_KEY}' -- uvx congressmcp
+```
+
+Put the server name *before* `--env` as shown — if `--env` comes first, the CLI tries to parse the name as another `KEY=value` pair. Equivalent `.mcp.json`:
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "congressmcp": {
+      "type": "stdio",
       "command": "uvx",
       "args": ["congressmcp"],
-      "env": {
-        "CONGRESS_API_KEY": "your-api-key-here"
-      }
+      "env": { "CONGRESS_API_KEY": "${CONGRESS_API_KEY}" }
     }
   }
 }
 ```
 
-**Cursor** — add to `~/.cursor/mcp.json` using the same format as VS Code.
+`${VAR}` / `${VAR:-default}` are expanded from your environment, so the key never has to be committed.
+</details>
 
-### 3. Start asking questions
+<details>
+<summary><a name="cursor"></a><b>Cursor</b></summary>
+
+Global: `~/.cursor/mcp.json`. Per-project: `.cursor/mcp.json`.
+
+```json
+{
+  "mcpServers": {
+    "congressmcp": {
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "${env:CONGRESS_API_KEY}" }
+    }
+  }
+}
+```
+
+`${env:NAME}` reads from your shell environment; a literal key string works too.
+</details>
+
+<details>
+<summary><a name="vs-code--github-copilot"></a><b>VS Code / GitHub Copilot</b></summary>
+
+Workspace: `.vscode/mcp.json` (or Command Palette → **MCP: Add Server** / **MCP: Open User Configuration** for user-level). VS Code uses `servers` rather than `mcpServers`, and `inputs` lets it prompt for the key and store it securely instead of writing it to disk:
+
+```json
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "congress-api-key",
+      "description": "Congress.gov API key",
+      "password": true
+    }
+  ],
+  "servers": {
+    "congressmcp": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "${input:congress-api-key}" }
+    }
+  }
+}
+```
+
+VS Code shows a trust prompt the first time the server starts.
+</details>
+
+<details>
+<summary><a name="windsurf"></a><b>Windsurf</b></summary>
+
+Cascade panel → MCPs icon → raw config, or edit `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "congressmcp": {
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "${env:CONGRESS_API_KEY}" }
+    }
+  }
+}
+```
+
+Windsurf caps total tools across all servers at 100; CongressMCP registers 24 (each bundling related operations), so it fits comfortably.
+</details>
+
+<details>
+<summary><a name="cline--roo-code"></a><b>Cline / Roo Code</b></summary>
+
+**Cline**: MCP Servers icon → **Configure → Configure MCP Servers** (opens `cline_mcp_settings.json`; the Cline CLI uses `~/.cline/mcp.json`).
+**Roo Code**: MCP Servers → **Edit Global MCP**, or per-project `.roo/mcp.json`.
+
+Both use the Claude Desktop shape plus a couple of client-specific fields:
+
+```json
+{
+  "mcpServers": {
+    "congressmcp": {
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "your-api-key-here" },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
+On Windows, Roo's docs recommend wrapping the command: `"command": "cmd", "args": ["/c", "uvx", "congressmcp"]`.
+</details>
+
+<details>
+<summary><a name="zed"></a><b>Zed</b></summary>
+
+Settings → **AI → MCP Servers → Add Local Server**, or edit `settings.json` (macOS `~/Library/Application Support/Zed/settings.json`, Linux `~/.config/zed/settings.json`, Windows `%APPDATA%\Zed\settings.json`; project-level `.zed/settings.json`):
+
+```json
+{
+  "context_servers": {
+    "congressmcp": {
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "your-api-key-here" }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><a name="openai-codex-cli"></a><b>OpenAI Codex CLI</b></summary>
+
+```bash
+codex mcp add congressmcp --env CONGRESS_API_KEY=your-api-key-here -- uvx congressmcp
+```
+
+Or in `~/.codex/config.toml` (also read by the Codex IDE extension and the ChatGPT desktop app; project-level `.codex/config.toml` works in trusted projects):
+
+```toml
+[mcp_servers.congressmcp]
+command = "uvx"
+args = ["congressmcp"]
+env_vars = ["CONGRESS_API_KEY"]   # forward from your shell — nothing secret in the file
+```
+
+To inline the key instead, replace the `env_vars` line with a `[mcp_servers.congressmcp.env]` table containing `CONGRESS_API_KEY = "…"`. Check with `codex mcp list` or `/mcp` inside a session.
+</details>
+
+<details>
+<summary><a name="gemini-cli"></a><b>Gemini CLI</b></summary>
+
+```bash
+gemini mcp add -s user -e CONGRESS_API_KEY=your-api-key-here congressmcp uvx congressmcp
+```
+
+(`-s user` makes it global; the default scope is the current project.) Or in `~/.gemini/settings.json` / `.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "congressmcp": {
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "$CONGRESS_API_KEY" }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><a name="jetbrains-ai-assistant--junie"></a><b>JetBrains AI Assistant / Junie</b></summary>
+
+**AI Assistant**: Settings → **Tools → AI Assistant → Model Context Protocol (MCP) → Add → As JSON** and paste the [Claude Desktop](#claude-desktop) block (there's also an *Import from Claude* button that reads `claude_desktop_config.json`).
+
+**Junie**: Settings → **Tools → Junie → MCP Settings**, which edits `~/.junie/mcp/mcp.json` (global) or `.junie/mcp/mcp.json` (project) — same `mcpServers` shape.
+</details>
+
+<details>
+<summary><a name="continue"></a><b>Continue</b></summary>
+
+`~/.continue/config.yaml`, or one file per server under `.continue/mcpServers/` in your workspace (Continue also accepts Claude/Cursor-style JSON files dropped in that folder). MCP tools are available in **agent mode**.
+
+```yaml
+mcpServers:
+  - name: congressmcp
+    type: stdio
+    command: uvx
+    args:
+      - congressmcp
+    env:
+      CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+```
+</details>
+
+<details>
+<summary><a name="goose"></a><b>Goose</b></summary>
+
+Interactive: `goose configure` → **Add Extension → Command-line Extension** (command `uvx congressmcp`, then add `CONGRESS_API_KEY` when prompted for env vars). One-off: `goose session --with-extension "CONGRESS_API_KEY=your-api-key-here uvx congressmcp"`. Or in `~/.config/goose/config.yaml`:
+
+```yaml
+extensions:
+  congressmcp:
+    name: congressmcp
+    type: stdio
+    cmd: uvx
+    args: [congressmcp]
+    envs: { "CONGRESS_API_KEY": "your-api-key-here" }
+    enabled: true
+    timeout: 300
+```
+</details>
+
+<details>
+<summary><a name="lm-studio"></a><b>LM Studio</b></summary>
+
+**Program** tab → **Install → Edit mcp.json**. LM Studio follows Cursor's `mcp.json` format, so the [Cursor](#cursor) block works as-is — use a literal key string rather than `${env:…}`. This gives any local model that supports tool calling access to congressional data.
+</details>
+
+<details>
+<summary><a name="remote-clients-chatgpt-claudeai-open-webui"></a><b>Remote clients: ChatGPT, Claude.ai, Open WebUI</b></summary>
+
+These clients can't launch a local process; they connect to an MCP server at a URL. Run CongressMCP in [HTTP mode](#remote--http-mode) and give them the URL:
+
+- **ChatGPT** (Plus/Pro/Business/Enterprise/Edu, web): Settings → **Security and login → Developer mode**, then add a connector with your server URL. Requires a public **HTTPS** endpoint (or a Secure MCP Tunnel).
+- **Claude.ai** (web; synced to mobile): **Customize → Connectors → Add custom connector** (Team/Enterprise: Organization settings → Connectors). Must be reachable over the public internet.
+- **Open WebUI**: Admin Settings → **Integrations → + Add Server → MCP (Streamable HTTP)**. Streamable HTTP only; it can be on your LAN.
+
+The endpoint in every case is `https://<your-host>/mcp`.
+</details>
+
+### 4. Start asking questions
 
 > "Find recent climate change bills in the 119th Congress"
+> "Where in the FY2026 NDAA is the Coast Guard's icebreaker funding?"
 > "How did senators from California vote on the latest defense bill?"
 > "Who are the members of the Senate Judiciary Committee?"
 > "What's the latest action on H.R. 1234?"
+
+## Remote / HTTP mode
+
+For clients that connect by URL (ChatGPT, Claude.ai connectors, Open WebUI, or several users sharing one install), run the server over Streamable HTTP:
+
+```bash
+CONGRESS_API_KEY=your-key congressmcp --transport streamable-http --host 0.0.0.0 --port 8000
+# MCP endpoint: http://<host>:8000/mcp
+```
+
+**CongressMCP has no built-in authentication.** The server is designed to run on your own machine. If you expose it beyond localhost, put it behind something that does authenticate — a reverse proxy with an access policy, an HTTPS tunnel with an allow-list, or a VPN — and remember that anyone who can reach it is spending your Congress.gov quota. ChatGPT and Claude.ai additionally require HTTPS on a publicly resolvable hostname.
 
 ## Tools
 
@@ -74,8 +352,6 @@ omit it to browse/list (committees can also be filtered by `chamber`/`committee_
 
 CongressMCP can fetch full Bill DTD XML from GovInfo, parse it locally, build a segment-level SQLite FTS5 index in memory, and return targeted bill sections instead of raw multi-megabyte XML or whole rendered bill pages.
 
-New tools:
-
 | Tool | What it does |
 |------|--------------|
 | `search_bill_text` | Searches full bill text and returns ranked addressable chunks with snippets, `match_contexts`, and amendatory flags |
@@ -84,7 +360,7 @@ New tools:
 
 No new API key is required. GovInfo and Congress.gov both use api.data.gov keys, so CongressMCP reuses `CONGRESS_API_KEY`; set `GOVINFO_API_KEY` only if you need an explicit GovInfo override.
 
-First-call latency can be seconds for NDAA-scale bills because PR 1 reparses and rebuilds the in-memory FTS5 index on every call. Persistent per-package indexes, LRU eviction, offline cache reuse, and measured live fixture timings are planned for PR 2. Network egress for this feature goes to `api.congress.gov` for text-version metadata and `api.govinfo.gov` for bill XML.
+First-call latency can be a few seconds for NDAA-scale bills because the current release re-parses and rebuilds the in-memory FTS5 index on every call. A persistent on-disk cache (per-package indexes, LRU eviction, offline reuse) is planned for a future release. Network egress for this feature goes to `api.congress.gov` for text-version metadata and `api.govinfo.gov` for bill XML.
 
 The search response distinguishes matches in `operative`, `quoted`, and `header` segments. If `quoted` appears in `match_contexts`, the hit may include language the bill is removing, even when `operative` also appears; retrieve the section before drawing conclusions about strike-and-insert language.
 
@@ -103,8 +379,10 @@ pip install -e .
 CONGRESS_API_KEY=your-key congressmcp
 
 # HTTP (for self-hosting / remote access)
-congressmcp --transport streamable-http --port 8000
+CONGRESS_API_KEY=your-key congressmcp --transport streamable-http --port 8000
 ```
+
+Point a client at a source checkout by using `"command": "congressmcp"` (with the venv activated or its `bin/` on `PATH`) or `"command": "/path/to/venv/bin/congressmcp"` in place of `uvx`.
 
 ## Configuration
 
@@ -114,13 +392,15 @@ congressmcp --transport streamable-http --port 8000
 | `GOVINFO_API_KEY` | No | — | Optional override for GovInfo; otherwise `CONGRESS_API_KEY` is reused |
 | `ENABLE_CACHING` | No | `false` | Cache API responses in memory |
 | `CACHE_TIMEOUT` | No | `300` | Cache TTL in seconds |
-| `CONGRESSMCP_CACHE_DIR` | No | Platform cache path | Planned PR 2 bill-text package cache root |
-| `CONGRESSMCP_CACHE_MAX_BYTES` | No | `524288000` | Planned PR 2 bill-text cache cap |
-| `CONGRESSMCP_CACHE_ENABLED` | No | `true` | Planned PR 2 persistent bill-text cache toggle; PR 1 always indexes in memory per call |
-| `CONGRESSMCP_VERSION_TTL` | No | `86400` | Planned PR 2 version-resolution cache TTL |
-| `CONGRESSMCP_REVALIDATE_DAYS` | No | `30` | Planned PR 2 explicit-version revalidation interval |
+| `CONGRESSMCP_BILL_TEXT_ONLY` | No | unset | If truthy, register only the three bill-text tools (standalone bill-text server) |
+| `CONGRESSMCP_TRACE_DIR` | No | unset | If set to a directory, write one key-redacted JSONL record per bill-text tool call (debugging) |
+| `CONGRESSMCP_CACHE_DIR` | No | Platform cache path | Bill-text package cache root (persistent cache is planned; currently in-memory) |
+| `CONGRESSMCP_CACHE_MAX_BYTES` | No | `524288000` | Planned bill-text cache cap |
+| `CONGRESSMCP_CACHE_ENABLED` | No | `true` | Planned persistent bill-text cache toggle |
+| `CONGRESSMCP_VERSION_TTL` | No | `86400` | Planned version-resolution cache TTL |
+| `CONGRESSMCP_REVALIDATE_DAYS` | No | `30` | Planned explicit-version revalidation interval |
 
-Default future bill-text cache locations:
+Default bill-text cache locations (once persistence ships):
 
 | Platform | Path |
 |----------|------|
@@ -128,14 +408,22 @@ Default future bill-text cache locations:
 | macOS | `~/Library/Caches/congressmcp` |
 | Windows | `%LOCALAPPDATA%\congressmcp\Cache` |
 
-Cache CLI skeleton:
+Cache CLI:
 
 ```bash
 congressmcp cache info
 congressmcp cache clear --yes
 ```
 
-In PR 1 these commands report the planned cache location and remove any package DBs if present; production bill-text indexes are still in-memory only.
+In the current release these commands report the planned cache location and remove any package DBs if present; bill-text indexes are still in-memory only.
+
+## Troubleshooting
+
+- **"command not found: uvx"** in a GUI client (Claude Desktop, Zed, LM Studio, JetBrains): use the absolute path from `which uvx` (macOS/Linux) or `where uvx` (Windows) as the `command`.
+- **Windows**: if a client can't spawn `uvx` directly, use `"command": "cmd", "args": ["/c", "uvx", "congressmcp"]`.
+- **First start is slow**: `uvx` downloads and caches the package on first run; subsequent starts are fast. Pin a version with `uvx congressmcp@2.1.0` if you want reproducibility.
+- **401 / 403 from the API**: the key is missing or wrong. Confirm it works with `curl "https://api.congress.gov/v3/bill?api_key=YOUR_KEY&limit=1"`.
+- **Tools missing in the client**: most clients need a restart or an explicit MCP reload after editing config.
 
 ## Contributing
 
