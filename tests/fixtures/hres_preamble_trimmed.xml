@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resolution>
+  <form>
+    <legis-num>H. RES. 463</legis-num>
+    <official-title>Expressing the sense of the House.</official-title>
+  </form>
+  <preamble>
+    <whereas><text>Whereas the first predicate about icebreaker readiness holds;</text></whereas>
+    <whereas><text>Whereas the second predicate about coastal infrastructure holds; and</text></whereas>
+    <whereas><text>Whereas the third predicate about appropriations holds: Now, therefore, be it</text></whereas>
+  </preamble>
+  <resolution-body>
+    <section>
+      <enum>1</enum>
+      <text>Resolved, That the House of Representatives expresses its sense on the matter.</text>
+      <paragraph>
+        <enum>(1)</enum>
+        <text>the first operative finding is affirmed; and</text>
+      </paragraph>
+      <paragraph>
+        <enum>(2)</enum>
+        <text>the second operative finding is affirmed.</text>
+      </paragraph>
+    </section>
+  </resolution-body>
+</resolution>
