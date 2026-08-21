@@ -150,3 +150,101 @@ def test_every_generic_except_that_formats_errors_has_typed_clause_first():
                 if "except CongressionalAPIError" not in prev:
                     offenders.append(f"{os.path.relpath(f)}:{i + 1}")
     assert offenders == []
+
+
+# ---------------------------------------------------------------------------
+# critique follow-ups: pagination path, routers, status-based classification
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_search_members_filtered_path_reports_not_found():
+    """chamber/party/name searches go through get_all_members_paginated; a
+    typed 404 there must not be re-wrapped as SERVER_ERROR."""
+    from congress_api.features import members as mod
+    from congress_api.core import api_wrapper
+    with patch.object(api_wrapper, "make_api_request", AsyncMock(return_value=_api_error(404))):
+        out = await mod.search_members(FakeContext(), state="WY", chamber="senate", congress=119)
+    assert "DATA_NOT_FOUND" in out and "SERVER_ERROR" not in out
+    assert "Pagination error" not in out
+
+
+@pytest.mark.asyncio
+async def test_name_search_skips_congress_that_404s():
+    from congress_api.features import members as mod
+    from congress_api.core.exceptions import CongressionalAPIError, CommonErrors
+    calls = []
+
+    async def fake_paginated(_ctx, endpoint, _params):
+        calls.append(endpoint)
+        if len(calls) == 1:
+            raise CongressionalAPIError(CommonErrors.data_not_found("members", identifier=endpoint))
+        return {"members": []}
+
+    with patch.object(mod, "get_all_members_paginated", fake_paginated), \
+            patch.object(mod, "current_congress", lambda: 121):
+        out = await mod.search_members(FakeContext(), name="Nobody")
+    assert len(calls) == 3           # first congress skipped, search continued
+    assert isinstance(out, str)
+
+
+@pytest.mark.asyncio
+async def test_router_surfaces_typed_error_from_bare_handler():
+    """nominations.* handlers call the wrapper with no try/except; the
+    voting_and_nominations router must turn the typed error into a ToolError
+    that carries the classification, not a generic failure."""
+    from mcp.server.mcpserver.exceptions import ToolError
+    from congress_api.features.buckets import voting_and_nominations as router
+    from congress_api.core import api_wrapper
+    with patch.object(api_wrapper, "make_api_request", AsyncMock(return_value=_api_error(404))):
+        with pytest.raises(ToolError) as ei:
+            await router.voting_and_nominations(
+                FakeContext(), operation="get_nomination_details", congress=119,
+                nomination_number=999999)
+    msg = str(ei.value)
+    assert msg.startswith("DATA_NOT_FOUND:") or "DATA_NOT_FOUND:" in msg
+    assert "experiencing issues" not in msg and "❌" not in msg
+
+
+def test_every_router_has_typed_clause():
+    root = os.path.join(os.path.dirname(os.path.dirname(__file__)), "congress_api", "features")
+    routers = [f for f in glob.glob(os.path.join(root, "**", "*.py"), recursive=True)
+               if "raise ToolError" in open(f).read() and "except Exception as e:" in open(f).read()]
+    assert routers, "no router modules found"
+    missing = [os.path.relpath(f) for f in routers
+               if "except CongressionalAPIError" not in open(f).read()]
+    assert missing == []
+
+
+@pytest.mark.asyncio
+async def test_classification_uses_http_status_not_endpoint_text():
+    """An endpoint whose path contains '404' with a 500 status is a server
+    error; a 404 status whose message lacks '404' is still not-found."""
+    from congress_api.core import api_wrapper as mod
+    from congress_api.core.exceptions import CongressionalAPIError
+
+    with patch.object(mod, "make_api_request",
+                      AsyncMock(return_value={"error": "boom", "status_code": 500})), \
+            patch.object(mod.asyncio, "sleep", AsyncMock()):
+        with pytest.raises(CongressionalAPIError) as ei:
+            await mod.safe_congressional_request("/bill/119/hr/4004", FakeContext(), {},
+                                                 endpoint_type="default")
+    assert ei.value.error_response.error_code == "SERVER_ERROR"
+
+    with patch.object(mod, "make_api_request",
+                      AsyncMock(return_value={"error": "gone", "status_code": 404})):
+        with pytest.raises(CongressionalAPIError) as ei:
+            await mod.safe_congressional_request("/member/X", FakeContext(), {})
+    assert ei.value.error_response.error_code == "DATA_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_429_is_rate_limit_not_server_error():
+    from congress_api.core import api_wrapper as mod
+    from congress_api.core.exceptions import CongressionalAPIError
+    with patch.object(mod, "make_api_request",
+                      AsyncMock(return_value={"error": "slow down", "status_code": 429})), \
+            patch.object(mod.asyncio, "sleep", AsyncMock()):
+        with pytest.raises(CongressionalAPIError) as ei:
+            await mod.safe_congressional_request("/bill/119", FakeContext(), {},
+                                                 endpoint_type="default")
+    assert ei.value.error_response.error_code == "RATE_LIMIT_EXCEEDED"
