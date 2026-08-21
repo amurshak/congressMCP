@@ -8,7 +8,7 @@ from ..core.client_handler import make_api_request
 # Import reliability framework components
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import HouseCommunicationsProcessor
 
 # Set up logger
@@ -196,6 +196,8 @@ async def latest_house_communications_resource() -> str:
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in latest house communications resource: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("/house-communication", message=str(e)))
@@ -267,6 +269,8 @@ async def get_house_communication_details(
         logger.info(f"Retrieved details for house communication {congress}/{communication_type}/{communication_number}")
         return format_house_communication_detail(comm_data)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error getting house communication details {congress}/{communication_type}/{communication_number}: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"/house-communication/{congress}/{communication_type}/{communication_number}", message=str(e)))
@@ -369,6 +373,8 @@ async def search_house_communications(
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error searching house communications: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(endpoint, message=str(e)))

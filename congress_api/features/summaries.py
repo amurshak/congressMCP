@@ -11,7 +11,7 @@ from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from datetime import datetime, timedelta, timezone
 from ..core.congress_dates import congress_start_date, iso_utc
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import SummariesProcessor, clean_summaries_response
 
 # Configure logging
@@ -121,6 +121,8 @@ async def get_latest_summaries() -> str:
         logger.info(f"Returning {len(summaries)} latest summaries")
         return format_summaries_list(summaries, "Latest Bill Summaries")
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error accessing latest summaries: {str(e)}")
         return format_error_response(
@@ -171,6 +173,8 @@ async def get_summaries_by_congress(ctx: Context, congress: str) -> str:
         return format_error_response(
             CommonErrors.invalid_parameter("congress", congress, "Congress must be a valid number", ["117", "118", "119"])
         )
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error accessing summaries for Congress {congress}: {str(e)}")
         return format_error_response(
@@ -229,6 +233,8 @@ async def get_summaries_by_type(ctx: Context, congress: str, bill_type: str) -> 
         return format_error_response(
             CommonErrors.invalid_parameter("congress", congress, "Congress must be a valid number", ["117", "118", "119"])
         )
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error accessing summaries for Congress {congress}, bill type {bill_type}: {str(e)}")
         return format_error_response(
@@ -600,6 +606,8 @@ async def search_summaries(
         logger.info(f"Found {len(filtered_summaries)} summaries ({'keyword' if keywords else 'browse'} mode)")
         return format_summaries_list(filtered_summaries, title)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error searching summaries with keywords '{keywords}': {str(e)}")
         return format_error_response(
@@ -701,6 +709,8 @@ async def get_bill_summaries(
         logger.info(f"Returning {len(summaries)} summaries for {bill_type.upper()} {bill_number}")
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error getting summaries for {bill_type.upper()} {bill_number} in Congress {congress}: {str(e)}")
         return format_error_response(

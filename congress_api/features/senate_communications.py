@@ -4,7 +4,7 @@ from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import SenateCommunicationsProcessor, clean_senate_communications_response
 
 # Set up logger
@@ -132,6 +132,8 @@ async def get_latest_senate_communications() -> str:
         logger.info(f"Found {len(processed_communications)} senate communications")
         return format_senate_communications_list(processed_communications, "Latest Senate Communications")
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_latest_senate_communications: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("/senate-communication", str(e)))
@@ -186,6 +188,8 @@ async def get_senate_communication_details(
             logger.warning(f"Unexpected response format. Keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dictionary'}")
             return f"Retrieved senate communication {congress_clean}/{type_clean}/{number_clean}, but in an unexpected format:\n\n{str(data)[:500]}..."
             
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_senate_communication_details: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"/senate-communication/{congress}/{communication_type}/{communication_number}", str(e)))
@@ -270,6 +274,8 @@ async def search_senate_communications(
         
         return format_senate_communications_list(processed_communications, title)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in search_senate_communications: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("/senate-communication", str(e)))

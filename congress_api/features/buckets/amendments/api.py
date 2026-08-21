@@ -11,7 +11,7 @@ from mcp.server.mcpserver import Context
 from .processors import AmendmentsDataProcessor
 from .formatters import AmendmentsFormatter
 from ....core.validators import ParameterValidator
-from ....core.exceptions import format_error_response, APIErrorResponse
+from ....core.exceptions import format_error_response, APIErrorResponse, CongressionalAPIError
 from ....core.response_utils import ResponseProcessor
 from ....core.api_wrapper import DefensiveAPIWrapper
 
@@ -90,6 +90,8 @@ async def get_amendments(
             title="Congressional Amendments"
         )
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_amendments: {str(e)}")
         return format_error_response(APIErrorResponse(
@@ -212,6 +214,8 @@ async def search_amendments(
             duplicates_removed=duplicates_removed
         )
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in search_amendments: {str(e)}")
         return format_error_response(APIErrorResponse(
@@ -294,6 +298,8 @@ async def get_amendment_details(
 
         return AmendmentsFormatter.format_amendment_details(amendment_data)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_amendment_details: {str(e)}")
         return format_error_response(APIErrorResponse(
@@ -382,6 +388,8 @@ async def get_amendment_actions(
             actions, amendment_type, amendment_number, congress, duplicates_removed
         )
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_amendment_actions: {str(e)}")
         return format_error_response(APIErrorResponse(
@@ -470,6 +478,8 @@ async def get_amendment_sponsors(
             cosponsors, amendment_type, amendment_number, congress, duplicates_removed
         )
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_amendment_sponsors: {str(e)}")
         return format_error_response(APIErrorResponse(
@@ -561,6 +571,8 @@ async def get_amendment_amendments(
             duplicates_removed=duplicates_removed
         )
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_amendment_amendments: {str(e)}")
         return format_error_response(APIErrorResponse(
@@ -669,6 +681,8 @@ async def get_amendment_text(
 
         return "\n".join(result)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_amendment_text: {str(e)}")
         return format_error_response(APIErrorResponse(

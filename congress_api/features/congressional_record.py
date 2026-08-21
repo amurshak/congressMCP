@@ -10,7 +10,7 @@ from ..core.client_handler import make_api_request
 # Reliability Framework Imports
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
 
 # Set up logger
@@ -163,6 +163,8 @@ async def get_latest_congressional_record() -> str:
             lines.append(format_record_issue(issue))
         
         return "\n".join(lines)
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.general_error(f"Error retrieving latest congressional record issues: {str(e)}")
         logger.error(f"Exception in get_latest_congressional_record: {str(e)}")
@@ -282,6 +284,8 @@ async def search_congressional_record(
             lines.append(format_record_issue(issue))
         
         return "\n".join(lines)
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.general_error(f"Error searching congressional record issues: {str(e)}")
         logger.error(f"Exception in search_congressional_record: {str(e)}")

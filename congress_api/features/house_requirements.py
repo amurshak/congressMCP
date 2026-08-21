@@ -7,7 +7,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
 
 # Set up logger
@@ -191,6 +191,8 @@ async def get_latest_house_requirements() -> str:
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error fetching latest house requirements: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("/house-requirement", message=str(e)))
@@ -258,6 +260,8 @@ async def search_house_requirements(
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error searching house requirements: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(endpoint, message=str(e)))
@@ -307,6 +311,8 @@ async def get_house_requirement_details(
         logger.info(f"Found house requirement {requirement_number}")
         return format_house_requirement_detail(requirement)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error fetching house requirement details: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(endpoint, message=str(e)))
@@ -347,6 +353,8 @@ async def get_house_requirement_matching_communications(
         logger.info(f"Found matching communications for house requirement {requirement_number}")
         return format_matching_communications(data)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error fetching matching communications: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(endpoint, message=str(e)))
