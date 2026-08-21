@@ -5,7 +5,7 @@ from ..mcp_app import mcp
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper, safe_congressional_request
 from ..core.congress_dates import current_congress
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
 import logging
 
@@ -165,6 +165,8 @@ async def get_member_details(ctx: Context, bioguide_id: str) -> str:
         
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_member_details: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
@@ -246,6 +248,8 @@ async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str, limit
         
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_member_sponsored_legislation: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
@@ -324,6 +328,8 @@ async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str, lim
         
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_member_cosponsored_legislation: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
@@ -388,6 +394,8 @@ async def get_members_by_congress(ctx: Context, congress: int, current_member: O
 
         return "\n".join(result)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_members_by_congress: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
@@ -449,6 +457,8 @@ async def get_members_by_state(ctx: Context, state_code: str, current_member: Op
         
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_members_by_state: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
@@ -509,6 +519,8 @@ async def get_members_by_district(ctx: Context, state_code: str, district: int, 
         
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_members_by_district: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
@@ -782,6 +794,8 @@ async def search_members(
         
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in search_members: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))
@@ -896,6 +910,8 @@ async def get_members_by_congress_state_district(
         
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_members_by_congress_state_district: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(f"Unexpected error: {str(e)}"))

@@ -8,7 +8,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
 
 # Configure logging
@@ -213,6 +213,8 @@ async def get_all_congresses() -> str:
         
         # Use default format type
         return format_congresses_list(deduplicated_congresses, "markdown")
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.general_error(f"Error retrieving congresses: {str(e)}")
         logger.error(f"Exception in get_all_congresses: {str(e)}")
@@ -300,6 +302,8 @@ async def get_congress_info(
             )
             
             return format_congresses_list(deduplicated_congresses, format_type)
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.general_error(f"Error retrieving Congress information: {str(e)}")
         return format_error_response(error)
@@ -438,6 +442,8 @@ async def search_congresses(
             formatted_list = format_congresses_list(limited_congresses)
             # Replace the default header with our search header
             return result_header + formatted_list[formatted_list.find("\n"):]
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.general_error(f"Error searching congresses: {str(e)}")
         return format_error_response(error)

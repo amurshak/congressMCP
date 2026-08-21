@@ -6,7 +6,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator, ValidationResult
-from ..core.exceptions import APIErrorResponse, ErrorType, format_error_response, CommonErrors
+from ..core.exceptions import APIErrorResponse, ErrorType, format_error_response, CommonErrors, CongressionalAPIError
 from ..core.response_utils import CommitteePrintsProcessor, clean_committee_prints_response
 
 # Set up logger
@@ -114,6 +114,8 @@ async def get_latest_committee_prints(ctx: Context) -> str:
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.api_server_error(
             f"Failed to retrieve latest committee prints: {str(e)}"
@@ -181,6 +183,8 @@ async def get_committee_prints_by_congress(ctx: Context, congress: int) -> str:
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.api_server_error(
             f"Failed to retrieve committee prints for Congress {congress}: {str(e)}"
@@ -257,6 +261,8 @@ async def get_committee_prints_by_congress_and_chamber(ctx: Context, congress: i
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.api_server_error(
             f"Failed to retrieve committee prints for Congress {congress}, {chamber}: {str(e)}"
@@ -352,6 +358,8 @@ async def get_committee_print_details(ctx: Context, congress: int, chamber: str,
         
         return format_committee_print_detail(print_item)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.api_server_error(
             f"Failed to retrieve committee print details: {str(e)}"
@@ -434,6 +442,8 @@ async def get_committee_print_text_versions(ctx: Context, congress: int, chamber
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.api_server_error(
             f"Failed to retrieve committee print text versions: {str(e)}"
@@ -540,6 +550,8 @@ async def search_committee_prints(
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         error = CommonErrors.api_server_error(
             f"Failed to search committee prints: {str(e)}"

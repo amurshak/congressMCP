@@ -7,7 +7,7 @@ from mcp.server.mcpserver import Context
 from ..core.client_handler import make_api_request
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
-from ..core.exceptions import format_error_response, CommonErrors
+from ..core.exceptions import format_error_response, CommonErrors, CongressionalAPIError
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -113,6 +113,8 @@ async def get_latest_committee_reports(ctx: Context) -> str:
         
         return result
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error fetching latest committee reports: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(
@@ -176,6 +178,8 @@ async def get_committee_reports_by_congress(ctx: Context, congress: int) -> str:
         
         return result
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error fetching committee reports for Congress {congress}: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(
@@ -254,6 +258,8 @@ async def get_committee_reports_by_congress_and_type(
         
         return result
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error fetching committee reports for Congress {congress}, type {report_type}: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(
@@ -329,6 +335,8 @@ async def get_committee_report_details(
         
         return format_committee_report_detail(report_item)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error fetching committee report details for {congress}/{report_type}/{report_number}: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(
@@ -408,6 +416,8 @@ async def get_committee_report_text_versions(
         
         return result
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error fetching text versions for committee report {congress}/{report_type}/{report_number}: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(
@@ -528,6 +538,8 @@ async def search_committee_reports(
         
         return result
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error searching committee reports: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(
@@ -758,6 +770,8 @@ async def get_committee_report_content(
             }
             return format_error_response(error_response)
             
+        except CongressionalAPIError as e:
+            return format_error_response(e.error_response)
         except Exception as e:
             logger.error(f"Unexpected error while fetching committee report content: {e}")
             error_response = CommonErrors.api_server_error("committee report content retrieval")
@@ -767,6 +781,8 @@ async def get_committee_report_content(
             }
             return format_error_response(error_response)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error fetching committee report content: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(

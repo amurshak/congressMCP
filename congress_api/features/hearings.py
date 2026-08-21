@@ -6,7 +6,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import DefensiveAPIWrapper
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
 
 # Set up logger
@@ -126,6 +126,8 @@ async def get_latest_hearings(ctx: Optional[Context] = None) -> str:
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error retrieving latest hearings: {e}")
         logger.error(f"Exception type: {type(e)}")
@@ -225,6 +227,8 @@ async def get_hearings_by_congress(ctx: Context, congress: int) -> str:
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error retrieving hearings for Congress {congress}: {e}")
         logger.error(f"Exception type: {type(e)}")
@@ -299,6 +303,8 @@ async def get_hearings_by_congress_and_chamber(ctx: Context, congress: int, cham
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error retrieving hearings for Congress {congress}, Chamber {chamber}: {e}")
         logger.error(f"Exception type: {type(e)}")
@@ -378,6 +384,8 @@ async def get_hearing_details(ctx: Context, congress: int, chamber: str, jacket_
         logger.info(f"Successfully retrieved hearing details for {congress}/{chamber}/{jacket_number}")
         return format_hearing_detail(HearingsProcessor.clean_hearing_response(hearing_data))
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error retrieving hearing details for {congress}/{chamber}/{jacket_number}: {e}")
         logger.error(f"Exception type: {type(e)}")
@@ -512,6 +520,8 @@ async def get_hearing_content(ctx: Context, congress: int, chamber: str, jacket_
             logger.error(f"Error fetching content from {content_url}: {fetch_error}")
             return f"Error fetching hearing content from {content_url}: {str(fetch_error)}"
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error retrieving hearing content for {congress}/{chamber}/{jacket_number}: {e}")
         logger.error(f"Exception type: {type(e)}")
@@ -605,6 +615,8 @@ async def search_hearings(
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error searching hearings: {e}")
         logger.error(f"Exception type: {type(e)}")

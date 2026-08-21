@@ -6,7 +6,7 @@ from ..mcp_app import mcp
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.response_utils import ResponseProcessor
-from ..core.exceptions import format_error_response, CommonErrors, APIErrorResponse
+from ..core.exceptions import format_error_response, CommonErrors, APIErrorResponse, CongressionalAPIError
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -148,6 +148,8 @@ async def get_latest_committee_meetings(ctx: Context) -> str:
         
         return "\n".join(lines)
     
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error in get_latest_committee_meetings: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meetings"))
@@ -196,6 +198,8 @@ async def get_committee_meetings_by_congress(ctx: Context, congress: int) -> str
         
         return "\n".join(lines)
     
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error in get_committee_meetings_by_congress: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meetings"))
@@ -249,6 +253,8 @@ async def get_committee_meetings_by_congress_and_chamber(ctx: Context, congress:
         
         return "\n".join(lines)
     
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error in get_committee_meetings_by_congress_and_chamber: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meetings"))
@@ -294,6 +300,8 @@ The list endpoints don't include committee information, which would require call
 
 Committee code requested: {committee_code}"""
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error in get_committee_meetings_by_committee: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meetings"))
@@ -338,6 +346,8 @@ async def get_committee_meeting_details(ctx: Context, congress: int, chamber: st
         logger.info(f"Successfully retrieved committee meeting details for {congress}/{chamber}/{event_id}")
         return format_committee_meeting_detail(meeting_data)
     
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error in get_committee_meeting_details: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meeting details"))
@@ -436,6 +446,8 @@ async def search_committee_meetings(
         
         return "\n".join(lines)
     
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Unexpected error in search_committee_meetings: {str(e)}")
         return format_error_response(CommonErrors.api_server_error("committee meetings"))

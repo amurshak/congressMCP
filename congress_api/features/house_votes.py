@@ -10,7 +10,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import safe_congressional_request
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
 
 logger = logging.getLogger(__name__)
@@ -378,6 +378,8 @@ async def get_latest_house_votes() -> str:
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Exception in get_latest_house_votes: {type(e).__name__}: {e}")
         logger.error(f"Exception repr: {repr(e)}")
@@ -431,6 +433,8 @@ async def get_house_votes_by_congress(ctx: Context, congress: int, limit: int = 
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Exception in get_house_votes_by_congress: {type(e).__name__}: {e}")
         logger.error(f"Exception repr: {repr(e)}")
@@ -490,6 +494,8 @@ async def get_house_votes_by_session(ctx: Context, congress: int, session: int, 
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Exception in get_house_votes_by_session: {type(e).__name__}: {e}")
         logger.error(f"Exception repr: {repr(e)}")
@@ -540,6 +546,8 @@ async def get_house_vote_details(ctx: Context, congress: int, session: int, vote
         vote = data['houseRollCallVote']
         return format_house_vote_detail(vote)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Exception in get_house_vote_details: {type(e).__name__}: {e}")
         logger.error(f"Exception repr: {repr(e)}")
@@ -605,6 +613,8 @@ async def get_house_vote_details_enhanced(ctx: Context, congress: int, session: 
         
         return f"# Enhanced House Vote Details\n\n{basic_result}{enhanced_section}"
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Enhanced function error: {type(e).__name__}: {e}")
         return format_error_response(CommonErrors.general_error(f"Error getting enhanced vote details: {str(e)}", ["Try again in a few moments", "Check your vote parameters"]))
@@ -667,6 +677,8 @@ async def get_house_vote_member_votes(ctx: Context, congress: int, session: int,
         
         return "\n".join(lines)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Exception in get_house_vote_member_votes: {type(e).__name__}: {e}")
         logger.error(f"Exception repr: {repr(e)}")
@@ -744,6 +756,8 @@ async def get_house_vote_member_votes_xml(ctx: Context, congress: int, session: 
                 f"Failed to fetch XML content: {str(fetch_error)}"
             ))
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Exception in get_house_vote_member_votes_xml: {type(e).__name__}: {e}")
         logger.error(f"Exception repr: {repr(e)}")
