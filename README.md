@@ -1,6 +1,6 @@
 # CongressMCP
 
-**Live U.S. Congressional data for any MCP client — Claude, ChatGPT, Cursor, VS Code, Codex, Gemini CLI, and more.**
+**Live U.S. Congressional data for any MCP client — Claude Code, ChatGPT, Copilot, Codex, Cursor, OpenCode, Gemini CLI, Grok Build, and more.**
 
 Bills, full bill text, votes, members, committees, hearings, nominations, and the Congressional Record — queried in natural language through the [Model Context Protocol](https://modelcontextprotocol.io/). Runs locally on your machine against the free Congress.gov and GovInfo APIs. No account, no hosted service, no telemetry.
 
@@ -26,48 +26,32 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 
 ### 3. Connect your client
 
-Every client needs the same three facts: **command** `uvx`, **args** `["congressmcp"]`, **env** `CONGRESS_API_KEY`. Pick yours:
+Every client needs the same three facts: **command** `uvx`, **args** `["congressmcp"]`, **env** `CONGRESS_API_KEY`. Clients are listed roughly by how many professional developers use them today (JetBrains Developer Ecosystem survey, mid-2026, then Pragmatic Engineer's 2026 tooling survey), so the one you want is probably near the top:
 
 | Client | Where it's configured | Notes |
 |--------|-----------------------|-------|
-| [Claude Desktop](#claude-desktop) | `claude_desktop_config.json` | |
 | [Claude Code](#claude-code) | `claude mcp add …` or `.mcp.json` | |
-| [Cursor](#cursor) | `~/.cursor/mcp.json` or `.cursor/mcp.json` | |
+| [ChatGPT](#remote-clients-chatgpt-claudeai-open-webui) | Developer mode → connector URL | remote only — needs [HTTP mode](#remote--http-mode) |
 | [VS Code / GitHub Copilot](#vs-code--github-copilot) | `.vscode/mcp.json` | uses `servers` + `inputs` |
-| [Windsurf](#windsurf) | `~/.codeium/windsurf/mcp_config.json` | |
-| [Cline / Roo Code](#cline--roo-code) | MCP settings panel → edit JSON | |
-| [Zed](#zed) | `settings.json` → `context_servers` | |
 | [OpenAI Codex CLI](#openai-codex-cli) | `codex mcp add …` or `~/.codex/config.toml` | TOML |
-| [Gemini CLI](#gemini-cli) | `gemini mcp add …` or `~/.gemini/settings.json` | |
+| [Cursor](#cursor) | `~/.cursor/mcp.json` or `.cursor/mcp.json` | |
 | [JetBrains AI Assistant / Junie](#jetbrains-ai-assistant--junie) | Settings → AI Assistant → MCP | paste the Claude Desktop JSON |
-| [Continue](#continue) | `~/.continue/config.yaml` | YAML, agent mode only |
+| [OpenCode](#opencode) | `opencode.json` → `mcp` | `command` is a single array |
+| [Gemini CLI](#gemini-cli) | `gemini mcp add …` or `~/.gemini/settings.json` | |
+| [Claude.ai](#remote-clients-chatgpt-claudeai-open-webui) | Connectors → custom connector URL | remote only — needs [HTTP mode](#remote--http-mode) |
+| [Claude Desktop](#claude-desktop) | `claude_desktop_config.json` | |
+| [Windsurf](#windsurf) | `~/.codeium/windsurf/mcp_config.json` | |
+| [Zed](#zed) | `settings.json` → `context_servers` | |
+| [Cline / Roo Code](#cline--roo-code) | MCP settings panel → edit JSON | |
 | [Goose](#goose) | `goose configure` or `~/.config/goose/config.yaml` | YAML |
+| [Grok Build](#grok-build) | `grok mcp add …` or `~/.grok/config.toml` | TOML; also auto-imports Claude Code / Cursor config |
+| [Hermes Agent](#hermes-agent) | `hermes mcp add …` or `~/.hermes/config.yaml` | YAML |
+| [OpenClaw](#openclaw) | `openclaw mcp add …` or `~/.openclaw/openclaw.json` | JSON5 |
+| [Continue](#continue) | `~/.continue/config.yaml` | YAML, agent mode only |
+| [Open WebUI](#remote-clients-chatgpt-claudeai-open-webui) | Admin → Integrations → MCP server URL | remote only — needs [HTTP mode](#remote--http-mode) |
 | [LM Studio](#lm-studio) | Program tab → `mcp.json` | Cursor-style JSON |
-| [ChatGPT, Claude.ai, Open WebUI](#remote-clients-chatgpt-claudeai-open-webui) | remote URL | need [HTTP mode](#remote--http-mode) |
 
 Anything not listed that speaks MCP over stdio will work with the same three values.
-
-<details>
-<summary><a name="claude-desktop"></a><b>Claude Desktop</b></summary>
-
-Claude menu → **Settings… → Developer → Edit Config**, or edit the file directly:
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-```json
-{
-  "mcpServers": {
-    "congressmcp": {
-      "command": "uvx",
-      "args": ["congressmcp"],
-      "env": { "CONGRESS_API_KEY": "your-api-key-here" }
-    }
-  }
-}
-```
-
-Restart Claude Desktop. If the server doesn't appear, use the absolute path to `uvx` (`which uvx` / `where uvx`) — GUI apps don't always inherit your shell `PATH`. Logs: `~/Library/Logs/Claude/mcp*.log` or `%APPDATA%\Claude\logs`.
-</details>
 
 <details>
 <summary><a name="claude-code"></a><b>Claude Code</b></summary>
@@ -96,26 +80,6 @@ Put the server name *before* `--env` as shown — if `--env` comes first, the CL
 ```
 
 `${VAR}` / `${VAR:-default}` are expanded from your environment, so the key never has to be committed.
-</details>
-
-<details>
-<summary><a name="cursor"></a><b>Cursor</b></summary>
-
-Global: `~/.cursor/mcp.json`. Per-project: `.cursor/mcp.json`.
-
-```json
-{
-  "mcpServers": {
-    "congressmcp": {
-      "command": "uvx",
-      "args": ["congressmcp"],
-      "env": { "CONGRESS_API_KEY": "${env:CONGRESS_API_KEY}" }
-    }
-  }
-}
-```
-
-`${env:NAME}` reads from your shell environment; a literal key string works too.
 </details>
 
 <details>
@@ -148,6 +112,119 @@ VS Code shows a trust prompt the first time the server starts.
 </details>
 
 <details>
+<summary><a name="openai-codex-cli"></a><b>OpenAI Codex CLI</b></summary>
+
+```bash
+codex mcp add congressmcp --env CONGRESS_API_KEY=your-api-key-here -- uvx congressmcp
+```
+
+Or in `~/.codex/config.toml` (also read by the Codex IDE extension and the ChatGPT desktop app; project-level `.codex/config.toml` works in trusted projects):
+
+```toml
+[mcp_servers.congressmcp]
+command = "uvx"
+args = ["congressmcp"]
+env_vars = ["CONGRESS_API_KEY"]   # forward from your shell — nothing secret in the file
+```
+
+To inline the key instead, replace the `env_vars` line with a `[mcp_servers.congressmcp.env]` table containing `CONGRESS_API_KEY = "…"`. Check with `codex mcp list` or `/mcp` inside a session.
+</details>
+
+<details>
+<summary><a name="cursor"></a><b>Cursor</b></summary>
+
+Global: `~/.cursor/mcp.json`. Per-project: `.cursor/mcp.json`.
+
+```json
+{
+  "mcpServers": {
+    "congressmcp": {
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "${env:CONGRESS_API_KEY}" }
+    }
+  }
+}
+```
+
+`${env:NAME}` reads from your shell environment; a literal key string works too.
+</details>
+
+<details>
+<summary><a name="jetbrains-ai-assistant--junie"></a><b>JetBrains AI Assistant / Junie</b></summary>
+
+**AI Assistant**: Settings → **Tools → AI Assistant → Model Context Protocol (MCP) → Add → As JSON** and paste the [Claude Desktop](#claude-desktop) block (there's also an *Import from Claude* button that reads `claude_desktop_config.json`).
+
+**Junie**: Settings → **Tools → Junie → MCP Settings**, which edits `~/.junie/mcp/mcp.json` (global) or `.junie/mcp/mcp.json` (project) — same `mcpServers` shape.
+</details>
+
+<details>
+<summary><a name="opencode"></a><b>OpenCode</b></summary>
+
+Global `~/.config/opencode/opencode.json` or project-root `opencode.json` / `opencode.jsonc` (project overrides global). OpenCode puts the command and its args in one array and calls the env map `environment`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "congressmcp": {
+      "type": "local",
+      "command": ["uvx", "congressmcp"],
+      "environment": { "CONGRESS_API_KEY": "your-api-key-here" },
+      "enabled": true
+    }
+  }
+}
+```
+
+There's no `opencode mcp add`; edit the file, then check with `opencode mcp list` / `opencode mcp debug congressmcp`. Remote servers use `"type": "remote", "url": "https://<host>/mcp"`.
+</details>
+
+<details>
+<summary><a name="gemini-cli"></a><b>Gemini CLI</b></summary>
+
+```bash
+gemini mcp add -s user -e CONGRESS_API_KEY=your-api-key-here congressmcp uvx congressmcp
+```
+
+(`-s user` makes it global; the default scope is the current project.) Or in `~/.gemini/settings.json` / `.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "congressmcp": {
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "$CONGRESS_API_KEY" }
+    }
+  }
+}
+```
+</details>
+
+<details>
+<summary><a name="claude-desktop"></a><b>Claude Desktop</b></summary>
+
+Claude menu → **Settings… → Developer → Edit Config**, or edit the file directly:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "congressmcp": {
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "your-api-key-here" }
+    }
+  }
+}
+```
+
+Restart Claude Desktop. If the server doesn't appear, use the absolute path to `uvx` (`which uvx` / `where uvx`) — GUI apps don't always inherit your shell `PATH`. Logs: `~/Library/Logs/Claude/mcp*.log` or `%APPDATA%\Claude\logs`.
+</details>
+
+<details>
 <summary><a name="windsurf"></a><b>Windsurf</b></summary>
 
 Cascade panel → MCPs icon → raw config, or edit `~/.codeium/windsurf/mcp_config.json`:
@@ -165,6 +242,24 @@ Cascade panel → MCPs icon → raw config, or edit `~/.codeium/windsurf/mcp_con
 ```
 
 Windsurf caps total tools across all servers at 100; CongressMCP registers 24 (each bundling related operations), so it fits comfortably.
+</details>
+
+<details>
+<summary><a name="zed"></a><b>Zed</b></summary>
+
+Settings → **AI → MCP Servers → Add Local Server**, or edit `settings.json` (macOS `~/Library/Application Support/Zed/settings.json`, Linux `~/.config/zed/settings.json`, Windows `%APPDATA%\Zed\settings.json`; project-level `.zed/settings.json`):
+
+```json
+{
+  "context_servers": {
+    "congressmcp": {
+      "command": "uvx",
+      "args": ["congressmcp"],
+      "env": { "CONGRESS_API_KEY": "your-api-key-here" }
+    }
+  }
+}
+```
 </details>
 
 <details>
@@ -193,70 +288,86 @@ On Windows, Roo's docs recommend wrapping the command: `"command": "cmd", "args"
 </details>
 
 <details>
-<summary><a name="zed"></a><b>Zed</b></summary>
+<summary><a name="goose"></a><b>Goose</b></summary>
 
-Settings → **AI → MCP Servers → Add Local Server**, or edit `settings.json` (macOS `~/Library/Application Support/Zed/settings.json`, Linux `~/.config/zed/settings.json`, Windows `%APPDATA%\Zed\settings.json`; project-level `.zed/settings.json`):
+Interactive: `goose configure` → **Add Extension → Command-line Extension** (command `uvx congressmcp`, then add `CONGRESS_API_KEY` when prompted for env vars). One-off: `goose session --with-extension "CONGRESS_API_KEY=your-api-key-here uvx congressmcp"`. Or in `~/.config/goose/config.yaml`:
 
-```json
-{
-  "context_servers": {
-    "congressmcp": {
-      "command": "uvx",
-      "args": ["congressmcp"],
-      "env": { "CONGRESS_API_KEY": "your-api-key-here" }
-    }
-  }
-}
+```yaml
+extensions:
+  congressmcp:
+    name: congressmcp
+    type: stdio
+    cmd: uvx
+    args: [congressmcp]
+    envs: { "CONGRESS_API_KEY": "your-api-key-here" }
+    enabled: true
+    timeout: 300
 ```
 </details>
 
 <details>
-<summary><a name="openai-codex-cli"></a><b>OpenAI Codex CLI</b></summary>
+<summary><a name="grok-build"></a><b>Grok Build</b></summary>
+
+xAI's terminal coding agent. If you already configured CongressMCP for Claude Code (`~/.claude.json` / `.mcp.json`) or Cursor (`.cursor/mcp.json`), Grok Build picks it up automatically — nothing more to do. Otherwise:
 
 ```bash
-codex mcp add congressmcp --env CONGRESS_API_KEY=your-api-key-here -- uvx congressmcp
+grok mcp add congressmcp -- uvx congressmcp      # add --scope project for .grok/config.toml
 ```
 
-Or in `~/.codex/config.toml` (also read by the Codex IDE extension and the ChatGPT desktop app; project-level `.codex/config.toml` works in trusted projects):
+then set the key in `~/.grok/config.toml` (or project `.grok/config.toml`):
 
 ```toml
 [mcp_servers.congressmcp]
 command = "uvx"
 args = ["congressmcp"]
-env_vars = ["CONGRESS_API_KEY"]   # forward from your shell — nothing secret in the file
+env = { CONGRESS_API_KEY = "${CONGRESS_API_KEY}" }
 ```
 
-To inline the key instead, replace the `env_vars` line with a `[mcp_servers.congressmcp.env]` table containing `CONGRESS_API_KEY = "…"`. Check with `codex mcp list` or `/mcp` inside a session.
+`grok mcp list` / `grok mcp doctor congressmcp` to verify; `/mcps` in a session toggles servers. Tools appear as `congressmcp__<tool>`.
 </details>
 
 <details>
-<summary><a name="gemini-cli"></a><b>Gemini CLI</b></summary>
+<summary><a name="hermes-agent"></a><b>Hermes Agent</b></summary>
+
+Nous Research's Hermes Agent. `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  congressmcp:
+    command: "uvx"
+    args: ["congressmcp"]
+    env:
+      CONGRESS_API_KEY: "${CONGRESS_API_KEY}"   # or a literal key
+    enabled: true
+```
+
+Or `hermes mcp add congressmcp --command uvx --args congressmcp` and then add the `env:` block by hand. `hermes mcp test congressmcp` checks the connection; `/reload-mcp` in a session reloads without restarting. Tools appear as `mcp__congressmcp__<tool>`.
+</details>
+
+<details>
+<summary><a name="openclaw"></a><b>OpenClaw</b></summary>
 
 ```bash
-gemini mcp add -s user -e CONGRESS_API_KEY=your-api-key-here congressmcp uvx congressmcp
+openclaw mcp add congressmcp --command uvx --arg congressmcp --env CONGRESS_API_KEY=your-api-key-here
 ```
 
-(`-s user` makes it global; the default scope is the current project.) Or in `~/.gemini/settings.json` / `.gemini/settings.json`:
+Or under `mcp.servers` in `~/.openclaw/openclaw.json` (JSON5, so comments and trailing commas are fine):
 
-```json
+```json5
 {
-  "mcpServers": {
-    "congressmcp": {
-      "command": "uvx",
-      "args": ["congressmcp"],
-      "env": { "CONGRESS_API_KEY": "$CONGRESS_API_KEY" }
-    }
-  }
+  mcp: {
+    servers: {
+      congressmcp: {
+        command: "uvx",
+        args: ["congressmcp"],
+        env: { CONGRESS_API_KEY: "your-api-key-here" },
+      },
+    },
+  },
 }
 ```
-</details>
 
-<details>
-<summary><a name="jetbrains-ai-assistant--junie"></a><b>JetBrains AI Assistant / Junie</b></summary>
-
-**AI Assistant**: Settings → **Tools → AI Assistant → Model Context Protocol (MCP) → Add → As JSON** and paste the [Claude Desktop](#claude-desktop) block (there's also an *Import from Claude* button that reads `claude_desktop_config.json`).
-
-**Junie**: Settings → **Tools → Junie → MCP Settings**, which edits `~/.junie/mcp/mcp.json` (global) or `.junie/mcp/mcp.json` (project) — same `mcpServers` shape.
+`openclaw mcp status` / `openclaw mcp probe congressmcp` to verify. OpenClaw does not read `mcporter`'s registry — use `mcp.servers`. For a remote server, use `url` with an explicit `transport: "streamable-http"`.
 </details>
 
 <details>
@@ -277,24 +388,6 @@ mcpServers:
 </details>
 
 <details>
-<summary><a name="goose"></a><b>Goose</b></summary>
-
-Interactive: `goose configure` → **Add Extension → Command-line Extension** (command `uvx congressmcp`, then add `CONGRESS_API_KEY` when prompted for env vars). One-off: `goose session --with-extension "CONGRESS_API_KEY=your-api-key-here uvx congressmcp"`. Or in `~/.config/goose/config.yaml`:
-
-```yaml
-extensions:
-  congressmcp:
-    name: congressmcp
-    type: stdio
-    cmd: uvx
-    args: [congressmcp]
-    envs: { "CONGRESS_API_KEY": "your-api-key-here" }
-    enabled: true
-    timeout: 300
-```
-</details>
-
-<details>
 <summary><a name="lm-studio"></a><b>LM Studio</b></summary>
 
 **Program** tab → **Install → Edit mcp.json**. LM Studio follows Cursor's `mcp.json` format, so the [Cursor](#cursor) block works as-is — use a literal key string rather than `${env:…}`. This gives any local model that supports tool calling access to congressional data.
@@ -309,7 +402,7 @@ These clients can't launch a local process; they connect to an MCP server at a U
 - **Claude.ai** (web; synced to mobile): **Customize → Connectors → Add custom connector** (Team/Enterprise: Organization settings → Connectors). Must be reachable over the public internet.
 - **Open WebUI**: Admin Settings → **Integrations → + Add Server → MCP (Streamable HTTP)**. Streamable HTTP only; it can be on your LAN.
 
-The endpoint in every case is `https://<your-host>/mcp`.
+The endpoint in every case is `https://<your-host>/mcp`. Most of the local clients above (OpenCode, Grok Build, Hermes, OpenClaw, Codex, Claude Code, Cursor, VS Code) can also connect to that URL instead of launching `uvx` — useful for sharing one install across a team.
 </details>
 
 ### 4. Start asking questions
