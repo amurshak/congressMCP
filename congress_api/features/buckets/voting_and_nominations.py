@@ -9,6 +9,7 @@ import logging
 from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
+from ...core.exceptions import CongressionalAPIError
 from ...mcp_app import mcp
 from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import VotingNominationsResponse, VoteSummary, NominationSummary
@@ -231,6 +232,10 @@ async def voting_and_nominations(
         # returning empty/zero results regardless of what the API actually returned.
         return await route_voting_and_nominations_operation(ctx, operation, **operation_kwargs)
 
+    except CongressionalAPIError as e:
+        # Typed Congress.gov error from a handler with no try/except of its own:
+        # surface the classification instead of a generic failure.
+        raise ToolError(f"{e.error_response.error_code}: {e.error_response.message}")
     except ToolError:
         raise
     except Exception as e:

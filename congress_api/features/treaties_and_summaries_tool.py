@@ -9,6 +9,7 @@ import logging
 from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
+from ..core.exceptions import CongressionalAPIError
 from ..mcp_app import mcp
 from ..core.operation_routing import validate_operation_kwargs
 
@@ -127,6 +128,10 @@ async def treaties_and_summaries(
         raw_response = await route_treaties_summaries_operation(ctx, operation, **operation_kwargs)
         return raw_response
 
+    except CongressionalAPIError as e:
+        # Typed Congress.gov error from a handler with no try/except of its own:
+        # surface the classification instead of a generic failure.
+        raise ToolError(f"{e.error_response.error_code}: {e.error_response.message}")
     except ToolError:
         # Re-raise ToolError as-is (preserves access control messages)
         raise
