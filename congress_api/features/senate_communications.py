@@ -134,7 +134,7 @@ async def get_latest_senate_communications() -> str:
         
     except Exception as e:
         logger.error(f"Error in get_latest_senate_communications: {str(e)}")
-        return CommonErrors.api_server_error("/senate-communication", str(e))
+        return format_error_response(CommonErrors.api_server_error("/senate-communication", str(e)))
 
 # --- MCP Tools ---
 
@@ -188,7 +188,7 @@ async def get_senate_communication_details(
             
     except Exception as e:
         logger.error(f"Error in get_senate_communication_details: {str(e)}")
-        return CommonErrors.api_server_error(f"/senate-communication/{congress}/{communication_type}/{communication_number}", str(e))
+        return format_error_response(CommonErrors.api_server_error(f"/senate-communication/{congress}/{communication_type}/{communication_number}", str(e)))
 
 # @require_paid_access
 async def search_senate_communications(
@@ -272,4 +272,4 @@ async def search_senate_communications(
         
     except Exception as e:
         logger.error(f"Error in search_senate_communications: {str(e)}")
-        return CommonErrors.api_server_error("/senate-communication", str(e))
+        return format_error_response(CommonErrors.api_server_error("/senate-communication", str(e)))

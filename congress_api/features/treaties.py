@@ -193,6 +193,22 @@ def format_treaties_list(data: Dict[str, Any]) -> str:
 
 # --- MCP Resources ---
 
+
+def _treaty_record(response):
+    """Return the treaty dict from a /treaty/{congress}/{number}[/{suffix}] response.
+
+    Congress.gov wraps the record in a one-element list (`"treaty": [ {...} ]`)
+    and answers a nonexistent treaty with HTTP 200 and an empty list rather
+    than a 404. Older responses used a bare dict; accept both. Returns None
+    when there is no record.
+    """
+    if not isinstance(response, dict):
+        return None
+    treaty = response.get('treaty')
+    if isinstance(treaty, list):
+        treaty = treaty[0] if treaty else None
+    return treaty if isinstance(treaty, dict) else None
+
 @mcp.resource("congress://treaties/latest")
 # @require_paid_access
 async def get_latest_treaties() -> str:
@@ -308,20 +324,14 @@ async def get_treaty_detail(ctx: Context, congress: int, treaty_number: int) -> 
         params = {'format': 'json'}
         response = await safe_congressional_request(endpoint, ctx, params, endpoint_type='treaties')
         
-        if not response or 'treaty' not in response:
-            error_response = CommonErrors.not_found(
+        treaty_data = _treaty_record(response)
+        if treaty_data is None:
+            error_response = CommonErrors.data_not_found(
                 resource_type="treaty",
-                identifier=f"{congress}/{treaty_number}",
-                suggestions=[
-                    "Verify the congress number and treaty number are correct",
-                    f"Try searching for treaties in Congress {congress} first",
-                    "Check if the treaty exists using the search_treaties tool"
-                ]
-            )
+                identifier=f"{congress}/{treaty_number}")
             return format_error_response(error_response)
         
         # Extract treaty data and format
-        treaty_data = response['treaty']
         return format_treaty_detail(treaty_data)
         
     except Exception as e:
@@ -347,20 +357,14 @@ async def get_treaty_detail_with_suffix(ctx: Context, congress: int, treaty_numb
         params = {'format': 'json'}
         response = await safe_congressional_request(endpoint, ctx, params, endpoint_type='treaties')
         
-        if not response or 'treaty' not in response:
-            error_response = CommonErrors.not_found(
+        treaty_data = _treaty_record(response)
+        if treaty_data is None:
+            error_response = CommonErrors.data_not_found(
                 resource_type="treaty",
-                identifier=f"{congress}/{treaty_number}/{treaty_suffix}",
-                suggestions=[
-                    "Verify the congress number, treaty number, and suffix are correct",
-                    f"Try checking if Treaty {congress}-{treaty_number} exists without suffix first",
-                    "Verify the suffix format (single uppercase letter like 'A', 'B')"
-                ]
-            )
+                identifier=f"{congress}/{treaty_number}/{treaty_suffix}")
             return format_error_response(error_response)
         
         # Extract treaty data and format
-        treaty_data = response['treaty']
         return format_treaty_detail(treaty_data)
         
     except Exception as e:
@@ -564,18 +568,14 @@ async def get_treaty_text(
         # Make API request
         response = await safe_congressional_request(endpoint, ctx, params, endpoint_type='treaties')
         
-        if not response or 'treaty' not in response:
-            return CommonErrors.not_found(
-                resource_type="treaty text",
-                identifier=f"{congress}/{treaty_number}" + (f"/{treaty_suffix}" if treaty_suffix else ""),
-                suggestions=[
-                    "Verify the congress number and treaty number are correct",
-                    "Check if the treaty has been processed and has available text",
-                    "Some treaties may not have text available if still under review"
-                ]
-            )
+        treaty_data = _treaty_record(response)
+        if treaty_data is None:
+            ident = f"{congress}/{treaty_number}"
+            if treaty_suffix:
+                ident += f"/{treaty_suffix}"
+            return format_error_response(CommonErrors.data_not_found(
+                resource_type="treaty text", identifier=ident))
         
-        treaty_data = response['treaty']
         
         # Format treaty text response
         result = []
@@ -680,10 +680,10 @@ async def get_treaty_text(
         
     except Exception as e:
         logger.error(f"Error getting treaty text for {congress}/{treaty_number}: {str(e)}")
-        return CommonErrors.api_server_error(
+        return format_error_response(CommonErrors.api_server_error(
             endpoint=f"/treaty/{congress}/{treaty_number}",
             message=f"Failed to retrieve treaty text: {str(e)}"
-        )
+        ))
 
 # @require_paid_access
 async def search_treaties(
