@@ -2,7 +2,7 @@
 
 # 16. Completion report — PR 1
 
-> **Status 2026-08-16: complete.** Four items remain open and are named under *Gates* at the end — one owed confirmation (F16), three maintainer requirements calls, and Group F's sourcing gap. **None blocks merge under §17's stated rule** (a Group A failure blocks; Group A passed 16/16 in all four cells). It is laid out against the spec's own enumerations — every V-step by number, every amendment by number, every §16 question by name, every defect by F-number — so a gap renders as a blank `[ ]`, never as prose that reads complete. Every descriptive claim about runtime behaviour is stamped with the commit or measurement it rests on (`00-INDEX`); the spec author cannot read the source, so numbers come from V-steps and reported artifacts, never from familiarity. Figures attributed to the implementation session are marked *(reported)* where they were not independently re-derived here.
+> **Status 2026-08-20: FINAL.** Four items remain open and are named under *Gates* at the end — two owed confirmations (F16; F31's live keyless check), one maintainer requirements call (#17), and Group F's sourcing gap. **None blocks merge under §17's stated rule** (a Group A failure blocks; Group A passed 16/16 in all four cells). It is laid out against the spec's own enumerations — every V-step by number, every amendment by number, every §16 question by name, every defect by F-number — so a gap renders as a blank `[ ]`, never as prose that reads complete. Every descriptive claim about runtime behaviour is stamped with the commit or measurement it rests on (`00-INDEX`); the spec author cannot read the source, so numbers come from V-steps and reported artifacts, never from familiarity. Figures attributed to the implementation session are marked *(reported)* where they were not independently re-derived here.
 
 ---
 
@@ -20,7 +20,7 @@
 
 The part that matters most is not search — it is **not being confidently wrong**. Bills are mostly *amendments to other law*: the text is full of quoted blocks the bill is inserting into, or striking from, the U.S. Code. A plain full-text search over a bill happily returns a hit sitting inside one of those blocks, and reporting it as "what the bill requires" is a wrong answer with **no tell** — it reads exactly like a right one. This is not a rare corner: measured at hit level, **29.2% of matches are quoted-only** (V21) — nearly a third of what a naive search returns is text the bill does not enact.
 
-So every match carries `match_contexts` (`operative` / `quoted` / `header`) and every unit carries `is_amendatory` and `amends`, which is how a consumer tells
+So every match carries `match_contexts` (`operative` / `quoted` / `header`), and every response carries `is_amendatory` and `amends` **describing the text actually returned** — including a section assembled from amendatory subsections, verified against the whole corpus with zero mismatches over 3,216 conformance calls. That is how a consumer tells
 
 > *"the bill requires an inventory of not less than 478 aircraft"* (wrong)
 
@@ -38,7 +38,9 @@ That distinction is the feature. The same machinery also excludes **committee-st
 | Tests + E2E harness | 27 | 7,057 | 42% |
 | Spec + decision record | 21 | 5,268 | 31% |
 | Shared-layer adoption in existing tools | 44 | 1,170 (−321) | 7% |
-| **Total** (111 commits) | **100** | **16,962** (−1,862) | |
+| **Total as of 2026-08-20** (157 commits) | **65** | **18,467** (−1,592) | |
+
+*(Per-category split measured 2026-08-16; the totals row is re-measured at final — the growth since is the F29–F33 round: cross-vendor harness support, the disclosure-aggregation fix, and the V22 corpus instrument.)*
 
 The 42% is the point, not overhead: bill XML is adversarial (nested quoted blocks, 330 KB single paragraphs, resolutions with no sections, typos enacted *into* the Code), so the feature is pinned by fixtures, a 20-package corpus, and a four-cell end-to-end suite that tests the **consumer** — whether a model reading these responses draws the right conclusion — not just the code.
 
@@ -52,7 +54,13 @@ The 42% is the point, not overhead: bill XML is adversarial (nested quoted block
 
 `models.py`/`service.py`/`__init__.py` are small. Tests and the spec files can be skimmed unless a specific claim is in question.
 
-**What's verified.** 21 acceptance steps (V1–V21) run live against real APIs, not fixtures; bill-text suite **166 passed / 1 skipped** *(reported)*. The end-to-end suite ran across four cells — attention floor (Sonnet, crowded context), reasoning ceiling (Opus, fresh), capability floor (Haiku), and an isolated cell where only these three tools are registered so every claim is attributable — **70 prompt runs**. The gating group (the amendatory-trap prompts) passed **16/16 across all four cells**, including at the capability floor.
+**What's verified.** 22 acceptance steps (V1–V22) run live against real APIs, not fixtures; bill-text suite **167 passed** *(reported)*. The end-to-end suite ran across four Claude cells — attention floor (Sonnet, crowded context), reasoning ceiling (Opus, fresh), capability floor (Haiku), and an isolated cell where only these three tools are registered so every claim is attributable — **70 prompt runs**. The gating group (the amendatory-trap prompts) passed **16/16 across all four cells**, including at the capability floor.
+
+A fifth, **cross-vendor cell** (GPT-5.6 via the Codex CLI, non-gating by design) then measured how the tools survive a consumer nobody tuned for. Result worth stating: **every disclosure that reached that consumer was read correctly** — struck text, quoted-name traps, incompleteness — at that vendor's floor tier; and the exercise surfaced two real defects the Claude cells structurally could not have found (Claude reconstructs the amendatory frame from raw statutory text, masking a missing schema field): a disclosure absent from one response path, and assembled responses mislabeling amendatory content. Both are fixed and verified corpus-wide — **3,216 conformance calls, zero mismatches** — and the whole chain (six adjudicated runs, a measured "danger ladder" of consumption modes, two preregistered experiments) is in `documentation/fulltext/12-e2e-prompts.md`.
+
+**Reproducing the verification, and what it costs.** The unit and corpus layers need only Python and the two upstream API keys (GovInfo / congress.gov — free). The end-to-end suite has **pre-existing software requirements: the Claude Code CLI** (drives the four Claude cells) **and the Codex CLI** (drives the cross-vendor cells). Practical notes from running it: the full Claude-cell suite is 70 prompts, and the maintainer's experience is that a **Claude Max 5x plan** is needed to complete it — 70 prompts appears to exceed a Pro plan's 5-hour usage window (believed from use, not precisely measured). Reproducing the `gpt-5.6-luna` cross-vendor runs **without web grounding** requires an **OpenAI API key**, billed at native API rates — the harness configures a custom no-web model provider so the results are attributable to the tools rather than to web search.
+
+**Further verification is welcome — especially Group F.** This feature has had unusually heavy verification (the tables below), but its one honestly open gap is **real questions from people who have never read this spec or code**: every prompt in the suite was written by someone who knew where the bodies were buried, which measures the known traps and not the unknown ones. If you use these tools, verbatim questions — asked exactly as you'd naturally ask them, ideally with the answer you expected — are the single most valuable contribution, and there is a ready slot for them (§17 Group F). The harness itself (`tests/e2e/`) is deliberately not bill-text-specific — manifest-driven prompts with pre-pinned pass/fail criteria, per-cell out-of-band tracing, canary liveness checks, cold per-prompt working directories — and **could be extended to verify the other ~93 tools the same way**.
 
 **Where that evidence lives, and how to re-derive it.** The raw run artifacts (`runs/`) and the fetched corpus bytes (`tests/corpus/cache/`) are **deliberately gitignored — they are large, disposable, and reproducible**, so they are not in this diff and there is nothing to review there. What *is* in the diff is the durable record: the analysis of each run in `documentation/fulltext/` (§16 here, §17 in `12-e2e-prompts.md`, defects in `14-defect-priority.md`). That is a large part of why the spec is 31% of the change — **it is the only surviving account of verification whose inputs were thrown away by design.** To re-derive any of it yourself: `tests/corpus/manifest.json` is tracked, so the corpus re-fetches from it; the three trimmed XML fixtures under `tests/fixtures/` are in-tree; and the E2E harness under `tests/e2e/` re-runs the prompt suite (set `CONGRESSMCP_TRACE_DIR` for traces).
 
@@ -68,7 +76,7 @@ The 42% is the point, not overhead: bill XML is adversarial (nested quoted block
 
 ---
 
-## A. V-step results (V1–V21)
+## A. V-step results (V1–V22)
 
 Sourced from `01-status.md`, where each step's full finding and its live-run evidence are recorded.
 
@@ -95,6 +103,7 @@ Sourced from `01-status.md`, where each step's full finding and its live-run evi
 | V19 `amends` lead-in | ✅ ruled | Pop A 8.1% (stable denom); Pop B 6.9% — documentation, no schema change |
 | V20 RRF k=60 | ✅ | **hold k=60**; the concern was refuted, not confirmed; k-sweep flat |
 | V21 `match_contexts` mix | ✅ ruled | hit-level quoted-only 29.2%; per-hit note on `operative` ∉ `match_contexts` |
+| V22 subdivided amendatory parents | ✅ ruled | 391/602 parents (65%) are the mislabel shape → F33 returned-text contract; verify pass **3,216 calls, 0 mismatches** (reproduced by spec session) |
 
 ## B. Amendments (A1–A6)
 
@@ -155,6 +164,16 @@ Sourced from `01-status.md`, where each step's full finding and its live-run evi
 
 **Two entries are worth reading as results in their own right.** F20's ranking machinery and F28's pagination guard were both fully specified and then **not built**, because the measurement said the case cannot occur. Recording *"we checked, it does not exist, do not build it"* is the cheapest thing in this document to lose and the most expensive to rediscover.
 
+**F29–F33 — the cross-vendor round (2026-08-19/20).** Three instrument defects and two product defects, all surfaced by pointing a consumer nobody tuned for at the tools. Full adjudications in `12-e2e-prompts.md`; triage in §18.
+
+| F | Disposition | Commit / evidence |
+|---|---|---|
+| F29 Codex cell died at the approval layer; harness scored the dead cell clean | FIXED + CLOSED | per-driver pre-cell canary; verified working on first live use (`2026-08-19T025509Z`) |
+| F30 cell record asserted effects the instrument never verified (web "off" while measurably live) | settled at **effect level** | `openai-noweb` provider — the web tool is never registered, proven in-band; residual: a cell-level `web:` marker in the manifest |
+| F31 keyless server wore `govinfo_key_rejected` ("existing key rejected" with no key configured) | FIXED `99ae552` *(reported)* | `api_key_missing`-shaped code; **live keyless verification owed** — one scrubbed-env stdio call, the instrument that found it |
+| F32 `BillSectionResponse` carried no amendatory disclosure; the section-direct path is the one that needs it | FIXED `4911603`, **verified live** | cold A1 ×3 split exactly on path (0/2 without the fields, then 2/3 PASS with them, incl. the only section-direct run); spec-caused (§9 never required the fields there) |
+| F33 assembled responses returned amendatory text under `is_amendatory: false` | FIXED `fe17fa5`, **verified `668b357`** | V22: the fields now describe the returned text on every assembling path; set-based verify, 3,216 calls, 0 mismatches |
+
 ## E. §17 — consumer-layer results
 
 ### COMPLETE RE-RUN — `2026-08-15T033553Z`, build `9224726`. The authoritative post-fix measurement.
@@ -178,6 +197,23 @@ Sourced from `01-status.md`, where each step's full finding and its live-run evi
 >
 > **Isolation re-run of F3 (maintainer, 2026-08-15) — F3 is clean; the ceiling claim stays an unadjudicable outlier.** Run in the `bill_text_only=true` cell (trace scope == tool surface, so zero calls now *means* zero calls): **zero tool calls, and a sane answer** — *"Which bill are you referring to? … I'll need the specific bill … to pull the exact text."* This is the **correct** response: the bill-text tools require a bill identifier (congress/type/number) and F3 names none, so recognizing that and asking — rather than inventing a bill to search — is right, not a gap. Floor did the same. So F3 is invariant-clean in the attributable cell and is **not a defect**. The ceiling's "I searched for an FY2026 NDAA" is now an outlier against three clean references (floor, isolation, and the expected behavior), but the isolation run cannot reach back to adjudicate a *different* model on the *full* surface — it remains unverifiable, neither confirmed-fabrication nor confirmed-honest, and is left there. *(This was the fifth confident negative finding of mine this cycle to fail scrutiny — F20, F28, the F23 Haiku amendment, the Haiku id-echo, and this; my integrity/grounding **verifications** held, my **defect-flags** did not. Weight accordingly.)*
 
+### Cross-vendor row — `codex/gpt-5.6-luna/medium/iso`, driver codex-cli 0.147.0 — NON-GATING
+
+Its own row per the driver-axis ruling, never folded into a Claude row. Six adjudications (full record: `12-e2e-prompts.md`, cross-vendor subsection):
+
+| Run | Adjudication |
+|---|---|
+| `2026-08-19T013718Z` | **VOID** — the approval layer cancelled every MCP call and the harness scored the dead cell clean → F29 |
+| `2026-08-19T025509Z` | **Realistic-agent-with-web**: 54 in-band web events, 0 MCP calls; web-fed A1 **FAIL** (inserted text presented as enacted) — first evidence the safety property does not survive web-only consumption |
+| Sol probe `2026-08-19T031035Z` | Tools **discoverable** on this surface (1/4 cold adoption kills the invisibility branch); adoption stochastic even at flagship; A1 criteria gap ruled (fail binds only when the amendatory frame is absent/subordinated) |
+| `2026-08-19T051758Z` clean cell | Web-off at **effect** level; **3/4 PASS tool-fed** — struck-text, quoted-name, and incompleteness disclosures all read correctly at the cross-vendor floor; A1 FAIL by non-adoption → priors fabrication |
+| Cold A1 ×3 (2026-08-20) | Adoption **3/3** (the earlier zero was a stochastic draw; Hint rung not owed); content 1/3 — the split is the tool path → **F32** |
+| F32 re-run ×3 (2026-08-20) | Fields live in every trace; **2/3 PASS including the only pure section-direct run** — the preregistered case, on the path that was 0/2 without the fields |
+
+**Standing findings from this row:** the **response shape is vindicated at the cross-vendor floor** — everywhere a disclosure was delivered, it was read and acted on correctly, including both traps; **adoption is the failing layer**, stochastic per prompt×run at every tier measured; and the **danger ladder** of consumption modes is measured, safest first: *tool-fed-with-disclosure > tool-fed-frame-dropped > web-fed > priors-fed*. The row is non-gating, but it produced two P0-class fixes (F32/F33) that the Claude cells could not have surfaced — Claude at every tier reconstructs the amendatory frame from raw statutory text, which masked the missing schema fields. That is §17's "do not let a design lean on one vendor's carefulness" rule, cashed out.
+
+### Prior runs (historical)
+
 - **Original runs (pre-fix).** Group A passed in both cells; 13 findings ranked in §18; B1 at the floor made zero calls (F7). **Caveat established 2026-08-09:** these ran on Claude Desktop with web access, and some claims were grounded in web artifacts rather than in these tools — so the prior findings are **not fully attributable** to the tools, and some passes may have been web-propped. Treat them as a cross-reference, not a clean baseline.
 - **Re-run — first run executed `2026-08-09T062714Z`, build `9e119f9`; PARTIAL.** Floor (`claude-sonnet-5`) + ceiling (`claude-opus-5`), Groups A–F, 48 results, 0 harness failures, all `cold_cwd` temp, built-ins off. **Valid cold run, but NOT fully attributable:** both cells ran the full ~96-op congress surface with only the three bill-text tools instrumented, so a claim can come from an untraced sibling tool. Per-claim salvage confirmed for A1/A2/A3 (pinned claims present in the bill-text trace); A4 (fabrication check) cannot be audited until the trace is complete. **Owed: the isolation cell (`bill_text_only=true`)** — the only fully-attributable configuration (§17 surface correction) — before recording "the tool carried the property" or any fabrication verdict. Group F is DERIVED, not verbatim (manifest `group_f_caveat`), so it is weak evidence. Preregistration asymmetry stands: a prior pass the re-run fails is a trace-inspection trigger, not an automatic regression.
 - **Isolation cell executed `2026-08-09T154646Z`, build `2ec66c5`; Group A, fully attributable.** `bill_text_only=1`, `claude-sonnet-5`, fresh; A1–A4. **Instrument certified:** every trace call is one of the three tools (get_bill_section 37 / get_bill_toc 5 / search_bill_text 4), all `cold_cwd` temp, 0 harness failures — trace scope == tool surface. **A1/A2/A3 tool-attributable** (load-bearing claims in the trace). **A4:** the model bypassed the `amends` field (which the tools populated richly — 95 distinct targets in-trace) and did a 31-section read-through, then claimed the list is *"complete for Division G"* — which touches the pinned FAIL condition ("presents the list as complete") on a path the criterion did not anticipate (its own read-through, not `amends`).
@@ -196,6 +232,7 @@ Sourced from `01-status.md`, where each step's full finding and its live-run evi
 
 - `amends` resolves U.S. Code and Public Law only, **never named Acts** (incl. IRC by bare section); convenience, not completeness; populated = citations *found*, not *present*.
 - `is_amendatory` is verb-only; ~1% amendatory residual uses no recognised verb, retrievable via `match_contexts=['quoted']`.
+- `is_amendatory`/`amends` on `get_bill_section` **describe the returned text** (F32/F33): an assembled response aggregates over the units whose text is included; a descriptor-only response reports the addressed unit's own values (`false`/`[]` for containers). Verified set-based over the corpus, 0 mismatches.
 - Committee-struck text excluded and disclosed via `struck_text_note`; recoverable as the prior version.
 - Header→body operative run-on (`Quorum.A majority`) — 2-instance residual on `join_segments`, outside the flatten-site separator ruling.
 - Caching, offline, disk cap — **PR 2**; `cache` fields currently inert.
@@ -217,7 +254,9 @@ Sourced from `01-status.md`, where each step's full finding and its live-run evi
 - [ ] **F16** dispositioned — **one measurement, not a defect**: confirm F4's struck-text carve-out drops the `#2` collision suffix to zero on `119s4726rs`, then decide the residual question (*should a silently-applied disambiguation be silent?* — a mechanism that quietly resolves an anomaly prevents anyone from learning the anomaly occurred). Does not block merge on the stated §17 rule; it is an owed confirmation of a fix already shipped.
 - [x] **Cosmetic residuals dispositioned.** `quotes_seen` — **resolved by measurement**: it is dead state (initialized, never mutated, never read), so *removal* is correct rather than population; routed as nit #30. `cache` `false`→`null` — **open, PR 2**, and worth doing before then: this spec's own author twice read the inert `false` as a measurement. `S 3548`'s orphaned `" .` — **explained**: not a source delimiter (V16 measured those at 0.0%), a spacing artifact, superseded by the F12/F18 delimiter work.
 - [x] **Every `[ ]` above is filled or deliberately marked out-of-scope**, and the two items that remain open are named rather than folded into prose.
-- [ ] **Three maintainer requirements calls** — not implementer decisions, not merge blockers, but they should be answered rather than drift: **F27 RESOLVED 2026-08-20** (converge on §9's envelope server-wide, after PR 2 — ruling at the F27 entry, §18); **#4 RESOLVED 2026-08-20** (vestigial — delete; the version-discovery capability it gestured at is a recorded PR-2 requirement, §3 "Version discovery — requirement recorded 2026-08-20"; delete tracked as D12); **#17 OPEN** (does the pinned-version pre-validation round-trip earn its better error message?).
+- [x] **Cross-vendor row recorded (non-gating)** — six adjudications, F29/F32/F33 closed, F30 settled at effect level; response shape vindicated at the cross-vendor floor, adoption findings and the danger ladder recorded. See §E.
+- [ ] **F31 live keyless verification** — fix shipped `99ae552` *(reported, unit-tested)*; one scrubbed-environment stdio call closes it — the same instrument that measured the defect.
+- [ ] **Requirements calls: two of three answered** — **F27 RESOLVED 2026-08-20** (converge on §9's envelope server-wide, after PR 2 — ruling at the F27 entry, §18); **#4 RESOLVED 2026-08-20** (vestigial — delete; the version-discovery capability it gestured at is a recorded PR-2 requirement, §3 "Version discovery — requirement recorded 2026-08-20"; delete tracked as D12); **#17 OPEN** (does the pinned-version pre-validation round-trip earn its better error message?). Not merge blockers.
 - [ ] **Group F's verbatim-sourcing gap.** The six questions used were derived by someone who had read this spec, and were not run in the isolated cell — the manifest self-flags them as indicative only. Replace with verbatim questions from naive sources **and** run them in isolation before any Group F finding is recorded as a measurement. This is the one §17 gap the re-run did not close.
 
 ---
