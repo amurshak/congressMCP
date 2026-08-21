@@ -9,6 +9,8 @@ from ..core.client_handler import make_api_request
 # Reliability Framework Imports
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
+from datetime import datetime, timedelta, timezone
+from ..core.congress_dates import congress_start_date, iso_utc
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import SummariesProcessor, clean_summaries_response
 
@@ -537,11 +539,19 @@ async def search_summaries(
             "sort": sort
         }
         
-        # Add optional date filters if provided
-        if fromDateTime:
-            params["fromDateTime"] = fromDateTime
-        if toDateTime:
-            params["toDateTime"] = toDateTime
+        # Congress.gov returns an empty list from /summaries[/congress] unless a
+        # date range is supplied, so default one: the whole Congress when a
+        # congress is given, otherwise the last 90 days.
+        now = datetime.now(timezone.utc)
+        if not fromDateTime:
+            if congress is not None:
+                fromDateTime = iso_utc(congress_start_date(congress))
+            else:
+                fromDateTime = iso_utc((now - timedelta(days=90)).date())
+        if not toDateTime:
+            toDateTime = iso_utc((now + timedelta(days=1)).date())
+        params["fromDateTime"] = fromDateTime
+        params["toDateTime"] = toDateTime
         
         # Build endpoint
         endpoint = "/summaries"
@@ -563,7 +573,12 @@ async def search_summaries(
         summaries = clean_summaries_response(data, limit=100)  # Get more for filtering
         
         if not summaries:
-            return f"No summaries found for the specified criteria."
+            upstream = (data.get("pagination") or {}).get("count")
+            scope = f"{fromDateTime[:10]} to {toDateTime[:10]}"
+            if upstream == 0:
+                return (f"No summaries found: Congress.gov reports 0 summaries "
+                        f"for {endpoint} between {scope}.")
+            return f"No summaries found for the specified criteria ({scope})."
 
         # Client-side keyword filtering only when a keyword was supplied; otherwise
         # browse the recent summaries list as-is.

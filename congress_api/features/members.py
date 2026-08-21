@@ -4,6 +4,7 @@ from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper, safe_congressional_request
+from ..core.congress_dates import current_congress
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
 import logging
@@ -599,24 +600,32 @@ async def search_members(
         if current_member:
             params["currentMember"] = "true"
         
-        # Determine the best API endpoint based on provided parameters
+        # Determine the best API endpoint based on provided parameters.
+        # Prefer the congress-scoped endpoints when a congress is given; the
+        # bare /member/{state} endpoint ignores congress entirely.
         endpoint = "/member"
-        
-        # If we have specific state and district, use the district endpoint
-        if state and district:
+        if congress and state and district:
+            endpoint = f"/member/congress/{congress}/{state}/{district}"
+        elif congress and state:
+            endpoint = f"/member/congress/{congress}/{state}"
+        elif state and district:
             endpoint = f"/member/{state}/{district}"
-        # If we have state but no district, use the state endpoint
-        elif state and not district:
+        elif state:
             endpoint = f"/member/{state}"
-        # If we have congress, use the congress endpoint
         elif congress:
             endpoint = f"/member/congress/{congress}"
-        
+
+        # chamber / party / name are filtered client-side, so a single page of
+        # `limit` rows is not enough -- the matches may sit on a later page
+        # (e.g. a state's senators after its representatives).
+        needs_all_pages = any([name, chamber, party])
+
         # For name-only searches, we need comprehensive data across congresses
         # Use pagination to get all members
         if name and not any([state, congress, district, chamber, party]):
             # Progressive search strategy: current congress first, then previous
-            congress_search_order = [118, 117, 116]  # Current and recent congresses
+            newest = current_congress()
+            congress_search_order = [newest, newest - 1, newest - 2]
             
             all_members = []
             for search_congress in congress_search_order:
@@ -653,6 +662,8 @@ async def search_members(
             
             # Use the aggregated data
             data = {"members": all_members}
+        elif needs_all_pages:
+            data = await get_all_members_paginated(ctx, endpoint, params)
         else:
             # Use single endpoint request for other cases
             data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='members')
@@ -740,16 +751,11 @@ async def search_members(
             # Filter by chamber if provided
             if chamber:
                 member_chamber = ""
-                if "terms" in member:
-                    terms = member["terms"]
-                    if isinstance(terms, dict) and "item" in terms:
-                        terms = terms["item"]
-                    if terms and isinstance(terms, list) and terms:
-                        # Get the most recent term
-                        latest_term = terms[-1]
-                        member_chamber = latest_term.get("chamber", "").lower()
-                
-                if chamber != member_chamber:
+                latest_term = latest_term_of(member.get("terms"))
+                if latest_term:
+                    member_chamber = latest_term.get("chamber", "").lower()
+                # API values are "House of Representatives" / "Senate"
+                if not member_chamber.startswith(chamber):
                     continue
             
             filtered_members.append(member)
@@ -956,6 +962,29 @@ async def get_all_members_paginated(ctx: Context, endpoint: str, base_params: Di
         logger.error(f"Error in get_all_members_paginated: {str(e)}")
         return {"error": f"Pagination error: {str(e)}"}
 
+def latest_term_of(terms):
+    """Return the member's most recent term.
+
+    The API lists terms oldest-first, but don't rely on order: pick the term
+    with the greatest startYear (an open endYear wins ties).
+    """
+    if isinstance(terms, dict) and "item" in terms:
+        terms = terms["item"]
+    if not isinstance(terms, list) or not terms:
+        return None
+    dict_terms = [t for t in terms if isinstance(t, dict)]
+    if not dict_terms:
+        return None
+
+    def _key(t):
+        start = t.get("startYear")
+        start = int(start) if str(start).isdigit() else -1
+        open_ended = 1 if t.get("endYear") in (None, "", "Present") else 0
+        return (start, open_ended)
+
+    return max(dict_terms, key=_key)
+
+
 # Formatting helpers
 def format_member_summary(member: Dict[str, Any]) -> str:
     """Format a member into a readable summary."""
@@ -1009,14 +1038,14 @@ def format_member_summary(member: Dict[str, Any]) -> str:
             terms = terms["item"]
         
         if terms and isinstance(terms, list) and len(terms) > 0:
-            latest_term = terms[0]
+            latest_term = latest_term_of(terms)
             if isinstance(latest_term, dict):
                 chamber = latest_term.get('chamber', 'Unknown')
                 result.append(f"Chamber: {chamber}")
                 
                 # Add term years if available
-                start_year = latest_term.get('startYear', 'Unknown')
-                end_year = latest_term.get('endYear', 'Present')
+                start_year = latest_term.get('startYear') or 'Unknown'
+                end_year = latest_term.get('endYear') or 'Present'
                 if start_year != 'Unknown':
                     result.append(f"Term: {start_year} - {end_year}")
     
