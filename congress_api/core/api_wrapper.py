@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass, replace
 from mcp.server.mcpserver import Context
 from .client_handler import make_api_request
-from .exceptions import APIErrorResponse
+from .exceptions import APIErrorResponse, CongressionalAPIError
 
 @dataclass
 class APIEndpointConfig:
@@ -78,13 +78,28 @@ class DefensiveAPIWrapper:
                 if any(x in str(e).lower() for x in ["404", "not found", "400", "bad request"]): break
         
         error_response = DefensiveAPIWrapper._format_api_error(endpoint, last_error, config.retry_count)
-        raise Exception(error_response.message)
+        # Raise the *typed* error so handlers can report not-found / bad-request
+        # faithfully instead of collapsing everything into SERVER_ERROR.
+        raise CongressionalAPIError(error_response)
     
     @staticmethod
     def _format_api_error(endpoint: str, error: Exception, retry_count: int) -> APIErrorResponse:
+        resp = DefensiveAPIWrapper._classify_api_error(endpoint, error, retry_count)
+        resp.details = {**(resp.details or {}), "endpoint": endpoint}
+        return resp
+
+    @staticmethod
+    def _classify_api_error(endpoint: str, error: Exception, retry_count: int) -> APIErrorResponse:
         error_str = str(error).lower()
         if "timeout" in error_str: return APIErrorResponse("timeout", f"API request timed out after {retry_count + 1} attempts", ["Try again"], "API_TIMEOUT")
-        elif "404" in error_str or "not found" in error_str: return APIErrorResponse("not_found", "Data not found. Check parameters.", ["Verify parameters"], "DATA_NOT_FOUND")
+        elif "404" in error_str or "not found" in error_str:
+            return APIErrorResponse(
+                "not_found",
+                f"Not found: {endpoint}. The resource does not exist at Congress.gov.",
+                ["Check the identifiers (congress, type, number / bioguide id) for typos",
+                 "Confirm the item exists with a list/search operation first",
+                 "This is not a server outage; retrying will not help"],
+                "DATA_NOT_FOUND")
         elif "400" in error_str or "bad request" in error_str: return APIErrorResponse("validation", "Invalid parameters.", ["Check format"], "INVALID_PARAMETERS")
         elif "500" in error_str: return APIErrorResponse("server_error", "API issues.", ["Try later"], "SERVER_ERROR")
         else: return APIErrorResponse("api_failure", f"Failed after {retry_count + 1} attempts: {error}", ["Try later"], "GENERAL_API_FAILURE")

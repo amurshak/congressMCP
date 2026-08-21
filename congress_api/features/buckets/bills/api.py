@@ -16,7 +16,7 @@ from .formatters import BillsFormatter
 
 # Import existing reliability framework
 from ....core.validators import ParameterValidator
-from ....core.exceptions import CommonErrors, format_error_response
+from ....core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -103,6 +103,8 @@ async def get_bills(
         # Standard response formatting
         return BillsFormatter.format_bills_list(response, "Bills")
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bills: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bills")
@@ -190,6 +192,8 @@ async def search_bills(
         # Format and return
         return BillsFormatter.format_bills_list(response, f"Bills matching '{keywords}'")
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in search_bills: {str(e)}")
         error_response = CommonErrors.api_server_error("search_bills")
@@ -233,6 +237,8 @@ async def get_recent_bills(
             bill_type=bill_type
         )
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_recent_bills: {str(e)}")
         error_response = CommonErrors.api_server_error("get_recent_bills")
@@ -296,6 +302,8 @@ async def get_bill_details(
         # Format and return
         return BillsFormatter.format_bill_detail(bill)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_details: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_details")
@@ -363,6 +371,8 @@ async def get_bill_actions(
         # Format and return
         return BillsFormatter.format_bill_actions(actions, congress, bill_type, bill_number)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_actions: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_actions")
@@ -395,6 +405,8 @@ async def get_bill_text_versions(
         text_versions = response.get('textVersions', [])
         return BillsFormatter.format_bill_text_versions(text_versions)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_text_versions: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_text_versions")
@@ -423,6 +435,8 @@ async def get_bill_summaries(
         summaries = response.get('summaries', [])
         return BillsFormatter.format_bill_summaries(summaries)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_summaries: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_summaries")
@@ -453,6 +467,8 @@ async def get_bill_text(
         text_versions = response.get('textVersions', [])
         return BillsFormatter.format_bill_text_versions(text_versions)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_text: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_text")
@@ -488,6 +504,8 @@ async def get_bill_amendments(
         amendments = response.get('amendments', [])
         return BillsFormatter.format_bill_amendments(amendments)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_amendments: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_amendments")
@@ -523,6 +541,8 @@ async def get_bill_committees(
         committees = response.get('committees', [])
         return BillsFormatter.format_bill_committees(committees)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_committees: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_committees")
@@ -558,6 +578,8 @@ async def get_bill_cosponsors(
         cosponsors = response.get('cosponsors', [])
         return BillsFormatter.format_bill_cosponsors(cosponsors)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_cosponsors: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_cosponsors")
@@ -593,6 +615,8 @@ async def get_bill_related_bills(
         related_bills = response.get('relatedBills', [])
         return BillsFormatter.format_bill_related_bills(related_bills)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_related_bills: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_related_bills")
@@ -630,6 +654,8 @@ async def get_bill_subjects(
         subjects = response.get('subjects', {})
         return BillsFormatter.format_bill_subjects(subjects)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_subjects: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_subjects")
@@ -665,6 +691,8 @@ async def get_bill_titles(
         titles = response.get('titles', [])
         return BillsFormatter.format_bill_titles(titles)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_titles: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_titles")
@@ -690,6 +718,8 @@ async def get_bill_content(
         # implement real chunked content fetching and wire all three through.
         return await get_bill_text_versions(ctx, congress, bill_type, bill_number)
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bill_content: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_content")
@@ -719,6 +749,8 @@ async def get_bills_by_date_range(
             bill_type=bill_type
         )
 
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_bills_by_date_range: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bills_by_date_range")

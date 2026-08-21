@@ -12,7 +12,7 @@ from mcp.server.mcpserver import Context
 from ..core.client_handler import make_api_request
 from ..core.validators import BoundCongressionalRecordValidator, ParameterValidator
 from ..core.api_wrapper import safe_congressional_request
-from ..core.exceptions import handle_validation_error, format_error_response, CommonErrors
+from ..core.exceptions import handle_validation_error, format_error_response, CommonErrors, CongressionalAPIError
 from ..core.response_utils import clean_bound_congressional_record_response
 from ..mcp_app import mcp
 
@@ -338,6 +338,8 @@ async def search_bound_congressional_record(
         
         return result
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in search_bound_congressional_record: {str(e)}")
         # If it's already a formatted error, return it directly

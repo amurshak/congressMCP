@@ -6,7 +6,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import TreatiesProcessor, clean_treaties_response
 
 # Set up logger
@@ -245,6 +245,8 @@ async def get_latest_treaties() -> str:
             logger.warning(f"Unexpected response format for latest treaties: {type(data)}")
             return "No treaties data available in the expected format."
             
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error getting latest treaties: {str(e)}")
         error_response = CommonErrors.api_server_error(
@@ -302,6 +304,8 @@ async def get_treaties_by_congress(ctx: Context, congress: int) -> str:
             logger.warning(f"Unexpected response format for Congress {congress} treaties: {type(data)}")
             return f"No treaties data available for Congress {congress} in the expected format."
             
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error getting treaties for Congress {congress}: {str(e)}")
         error_response = CommonErrors.api_server_error(
@@ -334,6 +338,8 @@ async def get_treaty_detail(ctx: Context, congress: int, treaty_number: int) -> 
         # Extract treaty data and format
         return format_treaty_detail(treaty_data)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error getting treaty detail for {congress}/{treaty_number}: {str(e)}")
         error_response = CommonErrors.api_server_error(
@@ -367,6 +373,8 @@ async def get_treaty_detail_with_suffix(ctx: Context, congress: int, treaty_numb
         # Extract treaty data and format
         return format_treaty_detail(treaty_data)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error getting treaty detail for {congress}/{treaty_number}/{treaty_suffix}: {str(e)}")
         error_response = CommonErrors.api_server_error(
@@ -457,6 +465,8 @@ async def get_treaty_actions(
             logger.warning(f"Unexpected response format for treaty actions: {type(data)}")
             return f"No treaty actions data available for Congress {congress}, Treaty {treaty_number}."
             
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error getting treaty actions for Congress {congress}, Treaty {treaty_number}: {str(e)}")
         error_response = CommonErrors.api_server_error(
@@ -523,6 +533,8 @@ async def get_treaty_committees(
         # Format the response
         return format_treaty_committees(data)
     
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error getting treaty committees for Congress {congress}, Treaty {treaty_number}: {str(e)}")
         error_response = CommonErrors.api_server_error(
@@ -678,6 +690,8 @@ async def get_treaty_text(
         
         return '\n'.join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error getting treaty text for {congress}/{treaty_number}: {str(e)}")
         return format_error_response(CommonErrors.api_server_error(
@@ -796,6 +810,8 @@ async def search_treaties(
         # Format the response
         return format_treaties_list(data)
     
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error searching for treaties: {str(e)}")
         error_response = CommonErrors.api_server_error(

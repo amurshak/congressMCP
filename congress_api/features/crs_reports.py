@@ -6,7 +6,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
 
 # Set up logger
@@ -186,6 +186,8 @@ async def get_latest_crs_reports() -> str:
         # Format the response
         return format_crs_reports_list(data)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Exception in get_latest_crs_reports: {str(e)}")
         return format_error_response(CommonErrors.general_error(f"Error retrieving latest CRS reports: {str(e)}"))
@@ -307,6 +309,8 @@ async def search_crs_reports(
         else:
             return format_error_response(CommonErrors.data_not_found("No CRS reports available"))
             
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Exception in search_crs_reports: {str(e)}")
         return format_error_response(CommonErrors.general_error(f"Error searching CRS reports: {str(e)}"))

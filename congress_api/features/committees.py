@@ -6,7 +6,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import DefensiveAPIWrapper
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
 
 # Set up logging
@@ -322,6 +322,8 @@ async def get_committee_bills(
         logger.info(f"Successfully retrieved {len(bills)} bills for committee {committee_code}")
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_committee_bills: {str(e)}")
         error_response = CommonErrors.api_server_error("committee bills")
@@ -420,6 +422,8 @@ async def get_committee_reports(
         logger.info(f"Successfully retrieved {len(reports)} reports for committee {committee_code}")
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_committee_reports: {str(e)}")
         error_response = CommonErrors.api_server_error("committee reports")
@@ -510,6 +514,8 @@ async def get_committee_nominations(
         logger.info(f"Successfully retrieved {len(nominations)} nominations for committee {committee_code}")
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_committee_nominations: {str(e)}")
         error_response = CommonErrors.api_server_error("committee nominations")
@@ -622,6 +628,8 @@ async def get_committee_communications(
         logger.info(f"Successfully retrieved {len(communications)} communications for committee {committee_code}")
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_committee_communications: {str(e)}")
         error_response = CommonErrors.api_server_error("committee communications")
@@ -713,6 +721,8 @@ async def search_committees(
         logger.info(f"Successfully found {len(committees)} committees (search='{keywords}', type='{committee_type}')")
         return "\n".join(result)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in search_committees: {str(e)}")
         error_response = CommonErrors.api_server_error("committee search")
@@ -809,6 +819,8 @@ async def get_committee_communication_details(
         logger.info(f"Successfully retrieved communication details for {chamber} {communication_type} {communication_number}")
         return result
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in get_committee_communication_details: {str(e)}")
         error_response = CommonErrors.api_server_error("communication details")

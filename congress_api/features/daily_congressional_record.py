@@ -6,7 +6,7 @@ from ..mcp_app import mcp
 from ..core.client_handler import make_api_request
 from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
-from ..core.exceptions import CommonErrors, format_error_response
+from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
 
 # Set up logger
@@ -184,6 +184,8 @@ async def get_latest_daily_congressional_record() -> str:
             )
             return format_error_response(error_response)
             
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error retrieving latest daily congressional record issues: {e}")
         logger.error(f"Exception type: {type(e)}")
@@ -371,6 +373,8 @@ async def search_daily_congressional_record(
                 )
                 return format_error_response(error_response)
         
+    except CongressionalAPIError as e:
+        return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error searching daily congressional record: {e}")
         logger.error(f"Exception type: {type(e)}")
