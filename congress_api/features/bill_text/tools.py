@@ -118,14 +118,14 @@ def _envelope(loaded: LoadedBillText) -> dict[str, Any]:
     return {
         "package_id": loaded.resolved.package_id,
         "version": loaded.resolved.version,
-        "version_resolution": "fresh",
+        "version_resolution": loaded.version_resolution,
         "version_resolved_at": loaded.resolved.version_resolved_at,
         # version_resolution_note is intentionally omitted here: each tool passes
         # it explicitly so it can merge in the input-clamp note.
         "source_format": "bill_dtd",
         "last_modified": loaded.resolved.last_modified,
         "govinfo_url": govinfo_details_url(loaded.resolved.package_id),
-        "cache": CacheStatus(index_hit=False, version_hit=False).model_dump(),
+        "cache": CacheStatus(index_hit=loaded.index_hit, version_hit=loaded.version_hit).model_dump(),
         "sections_indexed": loaded.parsed.sections_indexed,
         "chunks_indexed": len(loaded.parsed.units),
         "struck_text_note": _struck_text_note(loaded),

@@ -57,7 +57,7 @@ def _loaded(raw: bytes | None = None) -> LoadedBillText:
         version_resolution_note=None, last_modified="2025-12-19T03:11:48Z", xml_bytes=raw,
     )
     return LoadedBillText(resolved=resolved, parsed=parsed, index=BillTextIndex(parsed),
-                          timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0})
+                          timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0})
 
 
 LOADED = _loaded()
@@ -482,7 +482,7 @@ def test_f4_struck_text_note_is_active_and_reaches_every_tool(monkeypatch):
     loaded = LoadedBillText(
         resolved=ResolvedBillText(PKG, "rs", "2026-08-08T00:00:00Z", None, None, xml),
         parsed=parsed, index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):

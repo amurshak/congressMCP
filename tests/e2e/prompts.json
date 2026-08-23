@@ -1,7 +1,7 @@
 {
   "_about": "§17 end-to-end prompt manifest. The harness executes these verbatim and records results BESIDE the pinned criteria; it never scores. Pinning `pass`/`fail` here, before the run, is §17's preregistration-of-scoring rule -- so do not edit a criterion after seeing a result.",
   "_substitution_rule": "§17 requires concrete phrases substituted from harness output, and requires every prompt asserting a document property to cite its evidence. A3 and B3 were both invalidated by phrases written from plausibility rather than from the record. Each `grounding` below is a measured property of the cached document named in `document`, reproducible with tests/e2e/verify_grounding.py.",
-  "_cells_note": "Per the §17 driver-axis ruling (2026-08-18): a cell is identified by (driver, model, effort, surface, context condition, prompt variant). `role` is the short matrix role -- floor/ceiling/capability-floor/isolation are Claude-matrix roles, and every codex cell carries a cross-vendor role, so a codex result can never silently substitute for a Claude gate cell. Knobs are recorded in the driver's native vocabulary, verbatim, never translated: Claude cells carry `thinking`, codex cells carry `reasoning_effort`, and no mapping between the two scales exists or is defensible. Model ids and knobs are operator parameters defaulting to this table.",
+  "_cells_note": "Per the §17 driver-axis ruling (2026-08-18): a cell is identified by (driver, model, effort, surface, context condition, prompt variant). `role` is the short matrix role -- floor/ceiling/capability-floor/isolation are Claude-matrix roles, and every codex cell carries a cross-vendor role, so a codex result can never silently substitute for a Claude gate cell. Knobs are recorded in the driver's native vocabulary, verbatim, never translated: Claude cells carry `thinking`, codex cells carry `reasoning_effort`, and no mapping between the two scales exists or is defensible. Model ids and knobs are operator parameters defaulting to this table. Cache axis (§17-PR2, 2026-08-22): every cell carries `cache: {mode, packages?}` -- absent means `cold` (a fresh, empty CONGRESSMCP_CACHE_DIR per invocation, created by the harness; the default, and required for every timing-sensitive cell); `warm` names packages from `documents` that the harness pre-warms by direct server-side calls before the prompt, never by a model turn. The dir and what the warm did are recorded per row in meta.json; a warm cell's cell_id carries `/cache-warm`.",
   "cells": {
     "floor": {
       "driver": "claude",
@@ -71,6 +71,36 @@
       "merge_gating": false,
       "groups": ["A"],
       "prompts": ["A4"]
+    },
+    "isolation-warm-a4": {
+      "driver": "claude",
+      "role": "isolation",
+      "notes": "§17-PR2 Run A (2026-08-22) -- the A4 cost re-measure on a WARM cache. Same instrument as `isolation` (bill_text_only, Sonnet, fresh, cold cwd), directly comparable to 2026-08-09T154646Z (31-call read-through, completeness over-claim, 408 s at the ceiling variant), with the cache pre-warmed on 119s1071enr by direct server-side calls before the prompt -- never a model turn. Same A4 prompt, same pinned criteria; the artifacts additionally carry what the adjudication needs: wall clock (meta duration_s), tool-call count (meta trace_records / tool_calls), and the trace (Σ total_ms and response bytes are derived from trace.jsonl). Preregistration (§17-PR2): EXPECTED -- tool-side latency collapses out of the run (Σ total_ms from ~seconds-per-call to ~ms-per-call; wall clock becomes model-token-bound), the read-through strategy persists and the incompleteness handling stays honest => the A4 over-work concern is CLOSED as intended behavior and the A4 criterion stays unchanged. FALSIFIED IF (i) Σ total_ms stays call-dominated on a warm cell -- an INSTRUMENT defect (cache not engaged E2E; fix the harness before any disposition), or (ii) the consumer still over-claims completeness after a full read-through -- a consumer-behavior finding (D4 family), recorded against the criterion, not the tools. Not merge-gating: a re-measure with its own disposition rule, not the Group A gate (the `isolation` cell is). Off the default grid: run with --cells isolation-warm-a4.",
+      "model": "claude-sonnet-5",
+      "thinking": "none",
+      "context": "fresh",
+      "bill_text_only": true,
+      "merge_gating": false,
+      "groups": ["A"],
+      "prompts": ["A4"],
+      "cache": {
+        "mode": "warm",
+        "packages": ["BILLS-119s1071enr"]
+      }
+    },
+    "isolation-vd": {
+      "driver": "claude",
+      "role": "isolation",
+      "notes": "§17-PR2 Run B -- the version-difference experiment (preregistered 2026-08-06; cell configs pinned 2026-08-22): isolation instrument, COLD cache, one prompt per arm, fresh process per arm. Arm (a) VD-a 119hr1 (maximal priors); arm (b) VD-b 114hr5147 (obscure; ih vs enr). Cold cache is load-bearing for arm (b) -- it keeps the two arms symmetric and the timing readable. Prompt text and criteria are pinned verbatim on the VD-a / VD-b entries and must not be edited. Scoring is the spec session's, against the preregistration. Off the default grid: run with --cells isolation-vd.",
+      "model": "claude-sonnet-5",
+      "thinking": "none",
+      "context": "fresh",
+      "bill_text_only": true,
+      "merge_gating": false,
+      "groups": ["VD"],
+      "cache": {
+        "mode": "cold"
+      }
     }
   },
   "documents": {
@@ -381,6 +411,31 @@
       "pass": null,
       "fail": null,
       "watch": null
+    },
+    {
+      "id": "VD-a",
+      "group": "VD",
+      "title": "version-difference experiment, arm (a): 119hr1 (maximal priors)",
+      "document": null,
+      "prompt": "Compare the earliest and the final versions of H.R. 1 (119th Congress). What changed substantively between them — not structurally, but in what the bill actually does and who it covers?",
+      "substitution": null,
+      "grounding": "Live version list, govinfo search 2026-08-22: 119hr1 carries rh (2025-05-20), eh, pcs, eas, enr (2025-07-09) -- no ih, so 'earliest' resolves to rh and 'final' to enr; both are real packages. `document` is null because the prompt is about a PAIR of versions the consumer must discover and pin itself; the trace records which packages it actually retrieved. Prompt text, scoring, and the both-arms rule are §17-PR2's pinned text (2026-08-22), copied verbatim.",
+      "pass": null,
+      "fail": null,
+      "scoring": "scored for attribution, not just correctness: for each substantive claim, record whether it is grounded in the trace or arrives from priors. The preregistered prediction reads on the *pair*: if (b) collapses to structure-only-or-honesty while (a) reads richly substantive with weak trace grounding, the substance was never the tool's to give — recorded as the measured boundary of the retrieval-not-analysis design (§16 limitation), not as a defect.",
+      "watch": "`version=None` must not be relied on — the prompt requires two versions, so the consumer must pin versions explicitly; how it discovers what versions exist is itself data (the §3 version-discovery requirement's motivating case, observed rather than assumed)."
+    },
+    {
+      "id": "VD-b",
+      "group": "VD",
+      "title": "version-difference experiment, arm (b): 114hr5147 (obscure; ih vs enr)",
+      "document": null,
+      "prompt": "Compare the earliest and the final versions of H.R. 5147 (114th Congress). What changed substantively between them — not structurally, but in what the bill actually does and who it covers?",
+      "substitution": null,
+      "grounding": "Live version list, govinfo search 2026-08-22: 114hr5147 carries ih (2016-04-29), rh, eh, rds, enr (2016-09-30); 'earliest' is ih and 'final' is enr. The documented real deltas named in `pass` are §17-PR2's (the spec session's record), not re-measured here. `document` is null for the same reason as VD-a (a pair of versions, discovered and pinned by the consumer). Prompt text, pass/fail, and the both-arms rule are §17-PR2's pinned text (2026-08-22), copied verbatim.",
+      "pass": "every claimed content change is grounded in retrieved text of both versions (the documented real deltas: scope narrowed, exceptions 2→4, a new jurisdictional definition, applicability halved), **or** the answer honestly reports that it can establish structural divergence but cannot fully characterise content changes from the text alone.",
+      "fail": "any content change asserted that the retrieved text of the named versions does not support, or a diff presented as complete without both versions read (trace-checkable on the isolation instrument).",
+      "watch": "`version=None` must not be relied on — the prompt requires two versions, so the consumer must pin versions explicitly; how it discovers what versions exist is itself data (the §3 version-discovery requirement's motivating case, observed rather than assumed)."
     }
   ],
   "_group_f_caveat": "READ BEFORE SCORING GROUP F. §17 requires these be VERBATIM questions from prior research sessions, 'not written by anyone who knows the internals', with 8-12 of them. These six were DERIVED by the implementation session from the spec's recorded sourcing hints (RECA; PVSA/Section 883/maritime; HR 1) because the original sessions were not recoverable here. That violates the sourcing rule in the specific way the rule exists to prevent: an author who has read this spec inherits exactly the adversarial bias Groups A-E already carry, and the count is below the stated minimum of 8. Treat Group F results from this manifest as INDICATIVE ONLY, and replace these entries with verbatim originals before any Group F finding is recorded as a measurement. The four invariants still apply to every answer in every group."

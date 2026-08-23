@@ -443,7 +443,7 @@ omit it to browse/list (committees can also be filtered by `chamber`/`committee_
 
 ### Full Bill Text Search
 
-CongressMCP can fetch full Bill DTD XML from GovInfo, parse it locally, build a segment-level SQLite FTS5 index in memory, and return targeted bill sections instead of raw multi-megabyte XML or whole rendered bill pages.
+**What changed:** instead of proxying API responses, CongressMCP fetches the full Bill DTD XML from GovInfo, parses it locally, builds a segment-level SQLite FTS5 index per bill version, and returns targeted, addressable bill sections instead of raw multi-megabyte XML or whole rendered bill pages. Indexes are **persisted on disk** and reused across calls and restarts.
 
 | Tool | What it does |
 |------|--------------|
@@ -451,9 +451,32 @@ CongressMCP can fetch full Bill DTD XML from GovInfo, parse it locally, build a 
 | `get_bill_section` | Retrieves a qualified section or chunk id, with `max_bytes` measured against UTF-8 bytes of the returned `text` field |
 | `get_bill_toc` | Returns a shallow navigation tree for finding section ids |
 
-No new API key is required. GovInfo and Congress.gov both use api.data.gov keys, so CongressMCP reuses `CONGRESS_API_KEY`; set `GOVINFO_API_KEY` only if you need an explicit GovInfo override.
+**No new API key is needed.** GovInfo and Congress.gov both sit behind api.data.gov, so CongressMCP reuses your existing `CONGRESS_API_KEY` for both; set `GOVINFO_API_KEY` only if you want a separate GovInfo key. (People assume a second key is required. It is not.)
 
-First-call latency can be a few seconds for NDAA-scale bills because the current release re-parses and rebuilds the in-memory FTS5 index on every call. A persistent on-disk cache (per-package indexes, LRU eviction, offline reuse) is planned for a future release. Network egress for this feature goes to `api.congress.gov` for text-version metadata and `api.govinfo.gov` for bill XML.
+**Where data lives.** One SQLite file per bill version (`<package_id>.v<N>.db`, e.g. `BILLS-119s1071enr.v1.db`) under `packages/` in the cache root, plus a small `manifest.db` index. The cache root is `CONGRESSMCP_CACHE_DIR` if set, otherwise the platform default:
+
+| Platform | Path |
+|----------|------|
+| Linux | `$XDG_CACHE_HOME/congressmcp`, else `~/.cache/congressmcp` |
+| macOS | `~/Library/Caches/congressmcp` |
+| Windows | `%LOCALAPPDATA%\congressmcp\Cache` |
+
+**How much disk.** Capped at **500 MB** by default (`CONGRESSMCP_CACHE_MAX_BYTES`, bytes), enforced by least-recently-used eviction after every index write. An NDAA-scale enrolled bill (S.1071/119, 1,448 indexed units) builds an **11 MB** index; most bills are far smaller. Inspect or empty the cache from the command line — it is deliberately not an MCP tool:
+
+```bash
+congressmcp cache info          # path, cap, total bytes, one line per package
+congressmcp cache clear --yes   # remove every package file and the manifest
+```
+
+Deleting the cache directory by hand is also safe at any time; the files are a cache, not a store.
+
+**First-call latency — measured, not estimated.** Cold (nothing cached) on S.1071/119: **4.1–6.8 s** end to end across runs, of which congress.gov version resolution + the GovInfo package summary took 3.0–3.4 s, the XML download 1.1–2.3 s, parse 0.75 s, and the FTS5 build 0.31 s — the network legs are the slow and variable part, and they are the part the cache removes. Warm (index and version resolution cached): **30–60 ms**, no network. Every response carries a `timing` block (`resolve_ms`, `download_ms`, `parse_ms`, `index_ms`, `search_ms`, `total_ms`; a leg is `null` when it did not run) and a `cache` block (`index_hit`, `version_hit`), so you can see which case you got. **Client-timeout implication:** set your MCP client's per-call timeout to at least 30 s; a cold NDAA-scale call under a slow network can exceed a 10 s default and the partial work is not lost — the next call is warm.
+
+**Offline behavior.** A version you have fetched explicitly (`version="enr"`) is fully queryable offline for as long as it stays in the cache; explicitly cached versions are re-checked against GovInfo's `lastModified` only every `CONGRESSMCP_REVALIDATE_DAYS` (30) and rebuilt if the package was reissued. With `version` omitted, the "latest version" answer is cached for `CONGRESSMCP_VERSION_TTL` (86400 s = 1 day; `version_resolution: "cached"`); past the TTL it is re-resolved, and if the network is unavailable the last answer is served **best-effort and labelled** `version_resolution: "cached_offline"` with the resolution timestamp and a note that a newer version may exist. If nothing is cached and the network is down you get `version_resolution_unavailable`, listing the versions of that bill that are cached so you can pin one.
+
+**Network egress.** Exactly two hosts: `api.congress.gov` (bill and text-version metadata) and `api.govinfo.gov` (bill content). Both independently rate-limited per api.data.gov (20,000/h and 36,000/h), so indexing cannot starve the other tools.
+
+Setting `CONGRESSMCP_CACHE_ENABLED=false` turns all of this off: every call re-downloads, re-parses and re-indexes the full document in memory — NDAA-scale latency, every time. It exists for diagnosis, not for normal use.
 
 The search response distinguishes matches in `operative`, `quoted`, and `header` segments. If `quoted` appears in `match_contexts`, the hit may include language the bill is removing, even when `operative` also appears; retrieve the section before drawing conclusions about strike-and-insert language.
 
@@ -487,28 +510,18 @@ Point a client at a source checkout by using `"command": "congressmcp"` (with th
 | `CACHE_TIMEOUT` | No | `300` | Cache TTL in seconds |
 | `CONGRESSMCP_BILL_TEXT_ONLY` | No | unset | If truthy, register only the three bill-text tools (standalone bill-text server) |
 | `CONGRESSMCP_TRACE_DIR` | No | unset | If set to a directory, write one key-redacted JSONL record per bill-text tool call (debugging) |
-| `CONGRESSMCP_CACHE_DIR` | No | Platform cache path | Bill-text package cache root (persistent cache is planned; currently in-memory) |
-| `CONGRESSMCP_CACHE_MAX_BYTES` | No | `524288000` | Planned bill-text cache cap |
-| `CONGRESSMCP_CACHE_ENABLED` | No | `true` | Planned persistent bill-text cache toggle |
-| `CONGRESSMCP_VERSION_TTL` | No | `86400` | Planned version-resolution cache TTL |
-| `CONGRESSMCP_REVALIDATE_DAYS` | No | `30` | Planned explicit-version revalidation interval |
+| `CONGRESSMCP_CACHE_DIR` | No | Platform cache path (see [Full Bill Text Search](#full-bill-text-search)) | Bill-text package cache root |
+| `CONGRESSMCP_CACHE_MAX_BYTES` | No | `524288000` | Bill-text cache cap (500 MB); LRU eviction after each index write |
+| `CONGRESSMCP_CACHE_ENABLED` | No | `true` | `false` disables the persistent cache: every call re-fetches and re-parses the full document |
+| `CONGRESSMCP_VERSION_TTL` | No | `86400` | Seconds a `version`-omitted "latest version" answer is reused without asking congress.gov |
+| `CONGRESSMCP_REVALIDATE_DAYS` | No | `30` | Days before an explicitly cached version is re-checked against GovInfo's `lastModified` |
 
-Default bill-text cache locations (once persistence ships):
-
-| Platform | Path |
-|----------|------|
-| Linux | `$XDG_CACHE_HOME/congressmcp`, else `~/.cache/congressmcp` |
-| macOS | `~/Library/Caches/congressmcp` |
-| Windows | `%LOCALAPPDATA%\congressmcp\Cache` |
-
-Cache CLI:
+Cache CLI (the cache is administered from the command line, never via an MCP tool):
 
 ```bash
-congressmcp cache info
-congressmcp cache clear --yes
+congressmcp cache info          # exit 0
+congressmcp cache clear --yes   # exit 0; without --yes in a non-interactive shell it refuses with exit 1
 ```
-
-In the current release these commands report the planned cache location and remove any package DBs if present; bill-text indexes are still in-memory only.
 
 ## Troubleshooting
 

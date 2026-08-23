@@ -6,10 +6,7 @@ Usage:
     uvx congressmcp                                     # stdio via uvx
 """
 import argparse
-import os
-import platform
 import sys
-from pathlib import Path
 
 
 def main():
@@ -46,58 +43,79 @@ def main():
 
 
 def _cache_cli(args):
-    cache_dir = _cache_dir()
-    packages_dir = cache_dir / "packages"
-    files = sorted(packages_dir.glob("*.db")) if packages_dir.exists() else []
-    total = sum(path.stat().st_size for path in files if path.exists())
-    cap = int(os.getenv("CONGRESSMCP_CACHE_MAX_BYTES", "524288000"))
+    # The persistent-cache module owns the layout -- cache root and platform
+    # defaults, packages/ glob, cap env var, schema version (spec §10). This
+    # CLI reads them from it and re-declares nothing, so `cache info`/`clear`
+    # can never point at a different path than the server writes to.
+    # Imported lazily and WITHOUT the server stack: administering a broken
+    # cache must work when the server cannot start.
+    from congress_api.features.bill_text import cache
+
+    settings = cache.CacheSettings.from_env()
+    layout = settings.layout
 
     if args.cache_command == "info":
-        print(f"path: {cache_dir}")
-        print(f"schema_version: in-memory-pr1")
-        print(f"total_bytes: {total}")
-        print(f"cap_bytes: {cap}")
-        if not files:
+        info = cache.describe(settings)
+        print(f"path: {info.path}")
+        print(f"manifest: {info.manifest_path}")
+        print(f"schema_version: {info.schema_version}")
+        print(f"enabled: {'true' if info.enabled else 'false'}")
+        print(f"total_bytes: {info.total_bytes}")
+        print(f"cap_bytes: {info.cap_bytes}")
+        if info.temp_files:
+            print(f"in_progress_builds: {info.temp_files}")
+        if not info.packages:
             print("packages: []")
         else:
             print("packages:")
-            for path in files:
-                print(f"  - {path.name}\t{path.stat().st_size}")
+            for entry in info.packages:
+                print(f"  - {entry.name}\t{entry.bytes}\t{entry.status}")
         return 0
 
     if args.cache_command == "clear":
-        if not args.yes:
-            print("Bill-text persistent caching is planned for PR 2. Nothing was removed.")
-            print("Re-run with --yes once persistent cache files exist.")
+        if not args.yes and not _confirm_clear(layout):
+            # Refusal exits 1 on BOTH entry points (spec §10 exit-code
+            # contract); a completed clear exits 0.
+            print("Refusing to clear the bill-text cache without confirmation.", file=sys.stderr)
+            print(f"Re-run with --yes to remove everything under {layout.root}.", file=sys.stderr)
             return 1
-        removed = 0
-        for path in files:
-            path.unlink()
-            removed += 1
-        print(f"removed_packages: {removed}")
+        result = cache.clear(layout)
+        print(f"removed_packages: {result.removed_packages}")
+        print(f"removed_in_progress_builds: {result.removed_temps}")
+        print(f"removed_manifest: {'true' if result.removed_manifest else 'false'}")
+        for failure in result.failed:
+            print(f"could_not_remove: {failure}", file=sys.stderr)
         return 0
 
     print("Specify `congressmcp cache info` or `congressmcp cache clear --yes`.", file=sys.stderr)
     return 2
 
 
-def _cache_dir() -> Path:
-    override = os.getenv("CONGRESSMCP_CACHE_DIR")
-    if override:
-        return Path(override).expanduser()
-    system = platform.system()
-    if system == "Darwin":
-        return Path.home() / "Library" / "Caches" / "congressmcp"
-    if system == "Windows":
-        base = os.getenv("LOCALAPPDATA") or str(Path.home() / "AppData" / "Local")
-        return Path(base) / "congressmcp" / "Cache"
-    return Path(os.getenv("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "congressmcp"
+def _confirm_clear(layout) -> bool:
+    """Interactive confirmation for `cache clear` without --yes. Only a TTY on
+    both stdin and stdout is asked; a non-interactive caller is refused."""
+    try:
+        interactive = sys.stdin.isatty() and sys.stdout.isatty()
+    except (AttributeError, ValueError):
+        interactive = False
+    if not interactive:
+        return False
+    count = len(layout.package_files())
+    total = layout.total_bytes()
+    try:
+        answer = input(
+            f"Remove {count} cached package file(s), {total} bytes, and the manifest "
+            f"under {layout.root}? [y/N] "
+        )
+    except EOFError:
+        return False
+    return answer.strip().lower() in {"y", "yes"}
 
 
 if __name__ == "__main__":
-    # sys.exit(main()), not bare main(): the console script generated from
-    # [project.scripts] wraps the entry point and propagates its return value, so
-    # `congressmcp cache clear` without --yes exits 2 while `python -m congress_api
-    # cache clear` exited 0 for the same refusal. Two invocation paths disagreeing
-    # about the exit code makes the CLI unscriptable through the module form.
+    # SystemExit(main()), not bare main(): the console script generated from
+    # [project.scripts] wraps the entry point and propagates its return value,
+    # while a bare main() here would discard it and exit 0. Spec §10 pins the
+    # exit-code contract on BOTH entry points: `cache clear` refused for want of
+    # --yes exits 1; a completed `cache clear` and any `cache info` exit 0.
     raise SystemExit(main())

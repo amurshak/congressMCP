@@ -1,0 +1,414 @@
+{
+  "D1": {
+    "state=NJ": {
+      "success": true,
+      "results_count": 20,
+      "len_members_array": 0,
+      "found_n": 20,
+      "head": "# Member Search Results\nFound 20 members:\n\n## Mejia, Analilia\nBioguide ID: M001246\nParty: Democratic\nState: New Jersey\nDistrict: 11\nChamber: House of Representatives\nTerm: 2026 - Present\nURL: https://api.congress.gov/v3/member/M001246?format=json\n\n## Pou, Nellie\nBioguide ID: P000621\nParty: Democrati",
+      "names": [
+        "Mejia, Analilia",
+        "Pou, Nellie",
+        "Conaway, Herbert C.",
+        "McIver, LaMonica",
+        "Menendez, Robert",
+        "Kean, Thomas H.",
+        "Van Drew, Jefferson",
+        "Gottheimer, Josh",
+        "Watson Coleman, Bonnie",
+        "Norcross, Donald",
+        "Pallone, Frank",
+        "Smith, Christopher H."
+      ]
+    },
+    "state=NJ,congress=119": {
+      "success": true,
+      "results_count": 15,
+      "len_members_array": 0,
+      "found_n": 15,
+      "head": "# Member Search Results\nFound 15 members:\n\n## Mejia, Analilia\nBioguide ID: M001246\nParty: Democratic\nState: New Jersey\nDistrict: 11\nChamber: House of Representatives\nTerm: 2026 - Present\nURL: https://api.congress.gov/v3/member/M001246?format=json\n\n## Pou, Nellie\nBioguide ID: P000621\nParty: Democrati",
+      "names": [
+        "Mejia, Analilia",
+        "Pou, Nellie",
+        "Conaway, Herbert C.",
+        "McIver, LaMonica",
+        "Menendez, Robert",
+        "Kean, Thomas H.",
+        "Van Drew, Jefferson",
+        "Gottheimer, Josh",
+        "Watson Coleman, Bonnie",
+        "Norcross, Donald",
+        "Pallone, Frank",
+        "Smith, Christopher H."
+      ]
+    },
+    "state=CA,chamber=senate": {
+      "success": true,
+      "results_count": 11,
+      "len_members_array": 0,
+      "found_n": 11,
+      "head": "# Member Search Results\nFound 11 members:\n\n## Schiff, Adam B.\nBioguide ID: S001150\nParty: Democratic\nState: California\nChamber: Senate\nTerm: 2024 - Present\nURL: https://api.congress.gov/v3/member/S001150?format=json\n\n## Seymour, John\nBioguide ID: S000269\nParty: Republican\nState: California\nChamber: ",
+      "names": [
+        "Schiff, Adam B.",
+        "Seymour, John",
+        "Padilla, Alex",
+        "Butler, Laphonza R.",
+        "Feinstein, Dianne",
+        "Harris, Kamala D.",
+        "Wilson, Pete",
+        "Tunney, John V.",
+        "Boxer, Barbara",
+        "Hayakawa, Samuel Ichiye",
+        "Cranston, Alan"
+      ]
+    },
+    "state=NJ,chamber=senate": {
+      "success": true,
+      "results_count": 12,
+      "len_members_array": 0,
+      "found_n": 12,
+      "head": "# Member Search Results\nFound 12 members:\n\n## Booker, Cory A.\nBioguide ID: B001288\nParty: Democratic\nState: New Jersey\nChamber: Senate\nTerm: 2013 - Present\nURL: https://api.congress.gov/v3/member/B001288?format=json\n\n## Kim, Andy\nBioguide ID: K000394\nParty: Democratic\nState: New Jersey\nChamber: Sena",
+      "names": [
+        "Booker, Cory A.",
+        "Kim, Andy",
+        "Menendez, Robert",
+        "Helmy, George S.",
+        "Chiesa, Jeff",
+        "Williams, Harrison A., Jr.",
+        "Torricelli, Robert G.",
+        "Lautenberg, Frank R.",
+        "Case, Clifford P.",
+        "Brady, Nicholas",
+        "Bradley, Bill",
+        "Corzine, Jon S."
+      ]
+    },
+    "state=New Jersey": {
+      "success": true,
+      "results_count": 0,
+      "len_members_array": 0,
+      "found_n": null,
+      "head": "\u274c **Error**: Invalid state: New Jersey. State code must be exactly 2 characters: 'New Jersey'\n\n**Error Type**: Validation\n**Error Code**: INVALID_PARAMETER\n\n**Suggestions**:\n1. Check the state value and try again\n2. Refer to the API documentation for valid parameter values\n\n**Additional Details**:\n-",
+      "names": []
+    }
+  },
+  "D3_D4_D5": {
+    "bioguide": "S000033",
+    "walks": {
+      "50": {
+        "pages": [
+          {
+            "offset": 0,
+            "results_count": 50,
+            "len_members_array": 0,
+            "found_n": 50,
+            "n_headers": 50,
+            "n_unknown": 36,
+            "n_no_title": 36,
+            "congresses": [
+              "114",
+              "119"
+            ]
+          },
+          {
+            "offset": 50,
+            "results_count": 50,
+            "len_members_array": 0,
+            "found_n": 50,
+            "n_headers": 50,
+            "n_unknown": 40,
+            "n_no_title": 40,
+            "congresses": [
+              "114",
+              "118",
+              "119"
+            ]
+          },
+          {
+            "offset": 100,
+            "results_count": 50,
+            "len_members_array": 0,
+            "found_n": 50,
+            "n_headers": 50,
+            "n_unknown": 11,
+            "n_no_title": 11,
+            "congresses": [
+              "114",
+              "117",
+              "118",
+              "119"
+            ]
+          },
+          {
+            "offset": 150,
+            "results_count": 50,
+            "len_members_array": 0,
+            "found_n": 50,
+            "n_headers": 50,
+            "n_unknown": 14,
+            "n_no_title": 14,
+            "congresses": [
+              "117",
+              "118"
+            ]
+          },
+          {
+            "offset": 200,
+            "results_count": 50,
+            "len_members_array": 0,
+            "found_n": 50,
+            "n_headers": 50,
+            "n_unknown": 21,
+            "n_no_title": 21,
+            "congresses": [
+              "114",
+              "116",
+              "117",
+              "118"
+            ]
+          },
+          {
+            "offset": 250,
+            "results_count": 50,
+            "len_members_array": 0,
+            "found_n": 50,
+            "n_headers": 50,
+            "n_unknown": 21,
+            "n_no_title": 21,
+            "congresses": [
+              "114",
+              "116",
+              "117"
+            ]
+          },
+          {
+            "offset": 300,
+            "results_count": 50,
+            "len_members_array": 0,
+            "found_n": 50,
+            "n_headers": 50,
+            "n_unknown": 11,
+            "n_no_title": 11,
+            "congresses": [
+              "111",
+              "112",
+              "115",
+              "116"
+            ]
+          }
+        ],
+        "total": 350,
+        "distinct": 201,
+        "dups": [
+          [
+            "UNKNOWN",
+            "Unknown",
+            "114"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "116"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "117"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "118"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "119"
+          ]
+        ]
+      },
+      "100": {
+        "pages": [
+          {
+            "offset": 0,
+            "results_count": 100,
+            "len_members_array": 0,
+            "found_n": 100,
+            "n_headers": 100,
+            "n_unknown": 76,
+            "n_no_title": 76,
+            "congresses": [
+              "114",
+              "118",
+              "119"
+            ]
+          },
+          {
+            "offset": 100,
+            "results_count": 100,
+            "len_members_array": 0,
+            "found_n": 100,
+            "n_headers": 100,
+            "n_unknown": 25,
+            "n_no_title": 25,
+            "congresses": [
+              "114",
+              "117",
+              "118",
+              "119"
+            ]
+          },
+          {
+            "offset": 200,
+            "results_count": 100,
+            "len_members_array": 0,
+            "found_n": 100,
+            "n_headers": 100,
+            "n_unknown": 42,
+            "n_no_title": 42,
+            "congresses": [
+              "114",
+              "116",
+              "117",
+              "118"
+            ]
+          },
+          {
+            "offset": 300,
+            "results_count": 100,
+            "len_members_array": 0,
+            "found_n": 100,
+            "n_headers": 100,
+            "n_unknown": 59,
+            "n_no_title": 59,
+            "congresses": [
+              "111",
+              "112",
+              "113",
+              "115",
+              "116"
+            ]
+          }
+        ],
+        "total": 400,
+        "distinct": 205,
+        "dups": [
+          [
+            "UNKNOWN",
+            "Unknown",
+            "112"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "113"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "114"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "116"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "117"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "118"
+          ],
+          [
+            "UNKNOWN",
+            "Unknown",
+            "119"
+          ]
+        ]
+      }
+    }
+  },
+  "D6": {
+    "sample": "# Sponsored Legislation for Member S000033\nFound 3 bills:\n\n## S 5185 (Congress 119)\nAudit the Pentagon Act\n[View Details](https://api.congress.gov/v3/bill/119/s/5185?format=json)\n\n## S 5284 (Congress 119)\nGreen New Deal for Public Housing Act\n[View Details](https://api.congress.gov/v3/bill/119/s/5284?format=json)\n\n## S 5280 (Congress 119)\nGuaranteed Paid Vacation Act\n[View Details](https://api.congress.gov/v3/bill/119/s/5280?format=json)"
+  },
+  "D7": {
+    "S751": {
+      "has_html_tags": true,
+      "html_samples": [
+        "<p>",
+        "<strong>",
+        "</strong>",
+        "</p>",
+        "<p>",
+        "</p>",
+        "<p>",
+        "</p>"
+      ],
+      "head": "## Bill Summaries\n\n**Introduced in Senate** (2025-02-26)\n<p><strong>Creating a Respectful and Open World for Natural Hair Act of 2025 or the CROWN Act of 2025</strong></p><p>This bill prohibits discrimination based on a person's hair texture or hairstyle if that style or texture is commonly associat"
+    },
+    "S4977": {
+      "head": "No summaries found.",
+      "bare_no_summaries": true
+    },
+    "S999999_nonexistent": {
+      "head": "\u274c **Error**: Not found: /bill/119/s/999999/summaries. The resource does not exist at Congress.gov.\n\n**Error Type**: Not_Found\n**Error Code**: DATA_NOT_FOUND\n\n**Suggestions**:\n1. Check the identifiers (congress, type, number / bioguide id) for typos\n2. Confirm the item exists with a list/search operation first\n3. This is not a server outage; retrying will not help\n\n**Additional Details**:\n- **Endpo"
+    }
+  },
+  "D17_D18": {
+    "Radiation Exposure Compensation Act": {
+      "found_n": null,
+      "n_listed": 0,
+      "listed": [],
+      "has_HR4631": false,
+      "head": "## Bills matching 'Radiation Exposure Compensation Act'\n\n**HR 5744** (Congress 119)\n**Title:** Targeting Online Sales of Fentanyl Act\n**Latest Action:** Referred to the Committee on Energy and Commerc"
+    },
+    "St. Louis RECA Readjustment Act": {
+      "found_n": null,
+      "n_listed": 0,
+      "listed": [],
+      "has_HR4631": false,
+      "head": "## Bills matching 'St. Louis RECA Readjustment Act'\n\n**HR 5744** (Congress 119)\n**Title:** Targeting Online Sales of Fentanyl Act\n**Latest Action:** Referred to the Committee on Energy and Commerce, a"
+    },
+    "Radiation Exposure Compensation": {
+      "found_n": null,
+      "n_listed": 0,
+      "listed": [],
+      "has_HR4631": false,
+      "head": "No bills matching 'radiation exposure compensation' found."
+    },
+    "zzzqqx": {
+      "found_n": null,
+      "n_listed": 0,
+      "listed": [],
+      "has_HR4631": false,
+      "head": "No bills matching 'zzzqqx' found."
+    },
+    "latestAction": {
+      "found_n": null,
+      "n_listed": 0,
+      "listed": [],
+      "has_HR4631": false,
+      "head": "No bills matching 'latestaction' found."
+    },
+    "RECA limit=10": {
+      "found_n": null,
+      "listed": []
+    },
+    "RECA limit=50": {
+      "found_n": null,
+      "listed": []
+    }
+  },
+  "errors_53_D8_D11": {
+    "bills.get_bill_details nonexistent": "\u274c **Error**: Not found: /bill/119/hr/9999999. The resource does not exist at Congress.gov.\n\n**Error Type**: Not_Found\n**Error Code**: DATA_NOT_FOUND\n\n**Suggestions**:\n1. Check the identifiers (congress, type, number / bioguide id) for typos\n2. Confirm the item exists with a list/search operation first\n3. This is not a server outage; retrying will not help\n\n**Additional Details**:\n- **Endpoint**: /bill/119/hr/9999999\n\n\ud83d\udca1 If you continue to experience issues, try simplifying your query or checking the parameter formats.",
+    "get_member_details nonexistent": "\u274c **Error**: Not found: /member/Z999999. The resource does not exist at Congress.gov.\n\n**Error Type**: Not_Found\n**Error Code**: DATA_NOT_FOUND\n\n**Suggestions**:\n1. Check the identifiers (congress, type, number / bioguide id) for typos\n2. Confirm the item exists with a list/search operation first\n3. This is not a server outage; retrying will not help\n\n**Additional Details**:\n- **Endpoint**: /member/Z999999\n\n\ud83d\udca1 If you continue to experience issues, try simplifying your query or checking the parameter formats.",
+    "laws.get_law_details nonexistent": "DATA_NOT_FOUND: Not found: /law/119/pub/999999. The resource does not exist at Congress.gov.",
+    "D8 validation envelope (congress=999)": "\u274c **Error**: Invalid congress number: 999\n\n**Error Type**: Validation\n**Error Code**: INVALID_CONGRESS_NUMBER\n\n**Suggestions**:\n1. Congress numbers should be integers between 1 and 119\n2. The current Congress is 119 (2025-2026)\n3. The first Congress was 1 (1789-1791)\n\n**Additional Details**:\n- **Provided_Value**: 999\n\n\ud83d\udca1 If you continue to experience issues, try simplifying your query or checking the parameter formats.",
+    "D11 laws get_laws+law_number": "Operation 'get_laws' does not accept parameter(s): law_number"
+  },
+  "_calls": 32
+}

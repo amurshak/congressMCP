@@ -30,13 +30,15 @@ def initialize_mcp_features():
     """Initialize all MCP tool features - called after server setup to avoid circular imports"""
     # Importing a feature module triggers its @mcp.tool() decorator registration.
     # ruff: noqa: F401
+    # bill_text's package __init__ is lazy (its cache module must import without
+    # the server stack), so registration needs the tools module itself.
     if _bill_text_only():
-        from .features import bill_text  # noqa: F401 -- the three bill-text tools only
+        from .features.bill_text import tools as bill_text_tools  # noqa: F401 -- the three bill-text tools only
         return
 
+    from .features.bill_text import tools as bill_text_tools  # noqa: F401
     from .features import (  # noqa: F401
         bills_tool,
-        bill_text,
         amendments_tool,
         treaties_and_summaries_tool,
         members_committees_tools,

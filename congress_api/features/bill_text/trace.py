@@ -77,16 +77,20 @@ def clear_source() -> None:
     _source.set(None)
 
 
-def set_source(package_id: str, version: str, xml_bytes: bytes) -> None:
+def set_source(package_id: str, version: str, xml_bytes: bytes | None) -> None:
     """Record which exact bytes produced this response. sha256 is only computed when
-    tracing is on, so the hash cost never touches the normal path."""
+    tracing is on, so the hash cost never touches the normal path. When the
+    response was served from a persisted index (no XML in hand) the sha256 is
+    None and ``served_from_cache`` says so, so a replay knows the bytes were not
+    re-downloaded on this call."""
     if not enabled():
         return
     _source.set(
         {
             "package_id": package_id,
             "version": version,
-            "sha256": hashlib.sha256(xml_bytes).hexdigest(),
+            "sha256": hashlib.sha256(xml_bytes).hexdigest() if xml_bytes is not None else None,
+            "served_from_cache": xml_bytes is None,
         }
     )
 

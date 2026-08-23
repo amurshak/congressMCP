@@ -1,0 +1,173 @@
+{
+  "D5_aligned_first300": {
+    "len50": 300,
+    "len100": 300,
+    "distinct50": 300,
+    "distinct100": 300,
+    "dups_in_walk50": [],
+    "dups_in_walk100": [],
+    "only_in_50": [],
+    "only_in_100": [],
+    "sets_equal": true
+  },
+  "D17_D18": {
+    "Radiation Exposure Compensation Act": {
+      "n": 10,
+      "bills": [
+        "HR 5744",
+        "S 2943",
+        "HR 2973",
+        "HR 5622",
+        "S 3210",
+        "HR 8026",
+        "HR 6567",
+        "HR 6221",
+        "HR 5495",
+        "HR 5793"
+      ],
+      "titles": [
+        "Targeting Online Sales of Fentanyl Act",
+        "ACE Veterans Act",
+        "Coast Guard Combat-Injured Tax Fairness Act",
+        "National Gun Violence Research Act of 2025",
+        "EXPERTS Act of 2025",
+        "CLEAR Act",
+        "Federal Food Administration Act of 2025",
+        "Fostering the Future for American Children and Families Act",
+        "SEVER Act",
+        "Eastern Flank Strategic Partnership Act of 2025"
+      ],
+      "has_HR4631": false,
+      "titles_containing_act_substring_only": 10,
+      "head": "## Bills matching 'Radiation Exposure Compensation Act'\n\n**HR 5744** (Congress 119)\n**Title:** Targeting Online Sales of"
+    },
+    "St. Louis RECA Readjustment Act": {
+      "n": 10,
+      "bills": [
+        "HR 5744",
+        "S 2943",
+        "HR 2973",
+        "HR 5622",
+        "S 3210",
+        "HR 8026",
+        "HR 6567",
+        "HR 6221",
+        "HR 5495",
+        "HR 5793"
+      ],
+      "titles": [
+        "Targeting Online Sales of Fentanyl Act",
+        "ACE Veterans Act",
+        "Coast Guard Combat-Injured Tax Fairness Act",
+        "National Gun Violence Research Act of 2025",
+        "EXPERTS Act of 2025",
+        "CLEAR Act",
+        "Federal Food Administration Act of 2025",
+        "Fostering the Future for American Children and Families Act",
+        "SEVER Act",
+        "Eastern Flank Strategic Partnership Act of 2025"
+      ],
+      "has_HR4631": false,
+      "titles_containing_act_substring_only": 10,
+      "head": "## Bills matching 'St. Louis RECA Readjustment Act'\n\n**HR 5744** (Congress 119)\n**Title:** Targeting Online Sales of Fen"
+    },
+    "Radiation Exposure Compensation": {
+      "n": 0,
+      "bills": [],
+      "titles": [],
+      "has_HR4631": false,
+      "titles_containing_act_substring_only": 0,
+      "head": "No bills matching 'radiation exposure compensation' found."
+    },
+    "zzzqqx": {
+      "n": 0,
+      "bills": [],
+      "titles": [],
+      "has_HR4631": false,
+      "titles_containing_act_substring_only": 0,
+      "head": "No bills matching 'zzzqqx' found."
+    },
+    "latestAction": {
+      "n": 0,
+      "bills": [],
+      "titles": [],
+      "has_HR4631": false,
+      "titles_containing_act_substring_only": 0,
+      "head": "No bills matching 'latestaction' found."
+    },
+    "top10_identical_RECA_vs_StLouis": true,
+    "RECA limit=10": {
+      "n": 10,
+      "bills": [
+        "HR 5744",
+        "S 2943",
+        "HR 2973",
+        "HR 5622",
+        "S 3210",
+        "HR 8026",
+        "HR 6567",
+        "HR 6221",
+        "HR 5495",
+        "HR 5793"
+      ]
+    },
+    "RECA limit=50": {
+      "n": 50,
+      "bills": [
+        "HR 5744",
+        "S 2943",
+        "HR 2973",
+        "HR 5622",
+        "S 3210",
+        "HR 8026",
+        "HR 6567",
+        "HR 6221",
+        "HR 5495",
+        "HR 5793",
+        "HCONRES 76",
+        "HR 9577",
+        "HR 9531",
+        "HR 9554",
+        "HR 9545",
+        "HR 9565",
+        "HR 9539",
+        "HR 9547",
+        "HR 8058",
+        "HR 9551",
+        "HR 9567",
+        "HR 9561",
+        "HR 9576",
+        "HR 9558",
+        "HR 9542",
+        "HR 9487",
+        "HR 9537",
+        "HR 9075",
+        "HR 8059",
+        "HR 8742",
+        "HR 7557",
+        "S 4006",
+        "HR 8754",
+        "S 4005",
+        "S 4002",
+        "S 4008",
+        "S 4022",
+        "S 4003",
+        "S 4010",
+        "S 4000",
+        "S 4015",
+        "S 4001",
+        "S 4024",
+        "HR 8749",
+        "HR 5105",
+        "HR 7254",
+        "HR 6708",
+        "HR 6709",
+        "HR 8983",
+        "S 3473"
+      ]
+    },
+    "limit10_subset_of_limit50": true,
+    "in_limit10_not_limit50": [],
+    "HR4631_details_head": "# HR 4631 - Congress 119\n\n**Title:** St. Louis RECA Readjustment Act\n**Sponsor:** Rep. Bell, Wesley [D-MO-1]\n**Latest Action:** Referred to the House Committee on the Judiciary. (2025-07-23)\n**Committees:** 1\n**Policy Area:** Labor and Employment\n**Subjects:** 1\n**Text Versions Available:** Use get_"
+  }
+}

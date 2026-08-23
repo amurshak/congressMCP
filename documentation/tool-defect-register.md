@@ -26,13 +26,13 @@
 
 | ID | Sev | Failure mode | Shared layer? | PR |
 |---|---|---|---|---|
-| D1 | HIGH | **Silent wrong answer** — valid empty result | no | C |
+| D1 | HIGH | **Silent wrong answer** — valid empty result | no | **FIXED upstream `abb7550`** (audited live; residual: full-name spelling errors *visibly*) |
 | D2 | HIGH | **Silent** — contract unmet, counter disagrees with serializer | **likely — check** | A |
 | D3 | HIGH | Garbage presented as data | feed converter | B |
 | D4 | HIGH | **Silent truncation** | feed | B |
-| D5 | HIGH | **Silent data loss** | feed | B |
+| D5 | HIGH | **Silent data loss** | feed | **PARTIAL** — drop class fixed upstream `ed9aa4b`; dup not reproduced; walk-twice test worth pinning |
 | D6 | MED | Enables confabulation | no | D |
-| D7 | MED | Visible garbage + ambiguous absence | converter family | A |
+| D7 | MED | Visible garbage + ambiguous absence | converter family | **PARTIAL** — absence half fixed by `b04d327` typed errors; HTML half open (A) |
 | D8 | — | Working, protect with regression tests | — | — |
 | D9 | hygiene | Known-failing test baseline, clamped not fixed | repo-wide | out of scope |
 | D10 | HIGH | **Silent data loss** — `_extract_json` discards real content behind a success envelope | converter family (4 buckets) | OPEN |
@@ -44,6 +44,7 @@
 | D16 | LOW | Allowlist skip that never fires — documented exclusion is dead code | test quality | OPEN |
 | D17 | HIGH | **Noise presented as results** — `search_bills` OR-splits + substring-matches; `Act` carries every named-Act query | no — client-side filter | OPEN (after PR 2) |
 | D18 | HIGH | **Silent wrong answer** — `search_bills` scans a 250-bill recency window; bills unreachable by exact title; `offset`/`limit` incoherent | no | OPEN (after PR 2; **must land with or before any D17 matcher fix**) |
+| D19 | LOW | `client_handler.py` calls async (deprecated) `ctx.error` un-awaited ×4 — client notification never happens | no | OPEN (reopened from `bug_008`'s failed refutation) |
 
 ---
 
@@ -56,6 +57,8 @@ Validation accepts only a 2-char code; the post-fetch filter compares against th
 **Fix:** code→name normalization before comparison, or filter API-side. Prefer API-side if the endpoint supports it — it removes the dual representation rather than translating between them.
 
 **Regression test:** assert non-empty for a known state in both chambers, and assert the two spellings agree rather than merely that one works.
+
+**FIXED upstream `abb7550` (#50/#51) — audited live 2026-08-21.** `state="NJ"` → 20 members; the entry's own `state="CA", chamber="senate"` repro → 11; mechanism is API-side routing (`/member/congress/{c}/{state}`) plus full-pagination before client-side filters — the entry's preferred fix. **Residual, downgraded:** `state="New Jersey"` still errors, but *visibly* (`INVALID_PARAMETER`, names the 2-char requirement) — the silent-wrong-answer severity this entry was ranked on is dead; the two-spellings regression test remains unmet as a nicety, not a defect.
 
 ---
 
@@ -130,6 +133,8 @@ S 751 came back with `<p>`, `<strong>`, `&nbsp;` unconverted. Same converter fam
 ---
 
 ### D9 — known-failing test baseline, repo-scope. Clamped, not fixed.
+
+> **Clamp ergonomics FIXED `46f648f` (2026-08-23, prompted by F37's undiagnosable CI log):** on a regression the clamp now re-runs exactly the regressed node ids with `--tb=long -rA` and prints the output verbatim under a REGRESSION DETAIL banner; shrink-only and matching paths unchanged. The baseline itself (2 failures + 4 collection errors) remains clamped-not-fixed, as recorded below.
 
 > **Update 2026-08-15 — this entry's own prediction fired, and half of it is now actioned.** D9 warned that the file held **two populations with different lifecycles** and that the dead ones needed *deleting*, not waiting on the migration. That is exactly what happened. Six baselined **collection errors** were bill-text-adjacent (they imported the standalone `fastmcp` package) and were **verified dead and deleted** in `880cb53` — they tested the removed SaaS-tier architecture (`core.auth.auth`, `check_operation_access`, `FREE`/`PAID_OPERATIONS`, and 5 of 6 target modules renamed), so no import fix could have made them collect. Collection errors **10 → 4**. The baseline is also **single-sourced** now: the Python copy of the set is gone, `KNOWN_FAILURES.md`'s fenced blocks are the one machine-read record, the checker **refuses an empty parse** instead of reporting everything as a regression, and a new test rejects baselined entries whose files no longer exist.
 >
@@ -246,9 +251,32 @@ assert "HR 4631" in search_bills(congress=119, keywords="St. Louis RECA Readjust
 assert search_bills(congress=119, keywords="Radiation Exposure Compensation") != ""
 ```
 
-**Status: both OPEN. Sequencing: after PR 2**, alongside the F27 error-shape convergence — set by the maintainer 2026-08-20. Not for immediate implementation.
+**Status: both OPEN. Sequencing: after PR 2**, alongside the F27 error-shape convergence — set by the maintainer 2026-08-20. Not for immediate implementation. **Audited 2026-08-21: both UNCHANGED on master** — the differential table reproduced byte-for-byte (spec-session-verified from the raw evidence JSON), `HR 4631` confirmed to exist upstream and confirmed unreachable by its own exact title, `processors.py` matcher and `api.py` window both untouched by the upstream fix round. The joint constraint stands. **Real-use corroboration 2026-08-22:** a genuine research session hunting a just-introduced bill (`119hr10115ih`) could not reach it through `search_bills` or `search_summaries` and got there only via web search + `get_member_sponsored_legislation` — the discovery gap costing an actual session, not a probe. Priority argument strengthened.
+
+### D19 — `client_handler.py` calls the async, deprecated `ctx.error` un-awaited at four sites `[AUDIT, 2026-08-21 — reopened from bug_008's failed refutation]`
+
+**How it got here:** ultrareview's `bug_008` (2026-08-09) flagged un-awaited `ctx.error()` calls; the 2026-08-10 refutation closed it on the premise that `Context.error` is sync in the installed mcp 2.0.0. The 2026-08-21 audit measured the premise false: it is `async def` (and `@deprecated` since 2026-07-28, SEP-2577), so the four call sites (`client_handler.py:193/223/245/264`) create coroutines that are never awaited — the client-notification never happens, Python warns `coroutine … was never awaited`, and the repo's own harness *stubs the method sync* to keep its tests green (`test_invoke_all_operations_with_defaults.py:73-76`).
+
+**Severity LOW, stated precisely:** nothing crashes, and the error still reaches both the returned envelope and the server log — what is lost is only the in-band client notification the calls appear to provide, plus warning noise. The reviewer's finding was right in substance; the refutation's instrument was wrong.
+
+**Fix direction (spec ruling, 2026-08-21): remove the four calls rather than await them.** The API is deprecated upstream; awaiting would invest in a surface scheduled for removal, and the envelope already carries the error. A removal also deletes the harness's sync-stub lie. Any replacement client-notification mechanism is a separate, unrequested feature.
+
+**Status: OPEN (LOW).** No sequencing pressure; bundle with any future `client_handler.py` work (note the same file carries the F-series credential-leak history — §11's exception-path lesson — so whoever opens it should read that first).
 
 ---
+
+## Upstream reconciliation — audit commissioned 2026-08-21
+
+**Master moved under this register.** Upstream landed defect fixes that overlap these entries: `abb7550` ("Fix P1 defects from the 2026-08-21 functional review", #49–#52), `b04d327` ("Report Congress.gov 404/400 as NOT_FOUND / INVALID_PARAMETERS instead of SERVER_ERROR", #53), and earlier commits touching register territory (#32 null-field crashes, #35 offset paging, #36 truncation, #42/#43 schema-drift guard/CI). The maintainer's read is that at least **D1** (dead `search_members` state filter) is fixed. Register rows are therefore **suspect-stale** until audited; do not plan work from them.
+
+**Audit protocol (implementation session), per this register's own rules:**
+- For each of D1–D18 *and* the refuted section: status on current master — FIXED (name the upstream commit), PARTIAL, or UNCHANGED.
+- **Behavioral evidence per row, not diff-reading alone**: where the entry records a repro, run it (D1's state filter; D2's count-vs-collection coherence; D17/D18's RECA probe set — the differential table is in their entry). A fix claim without its entry's failure mode demonstrated dead is a claim.
+- **Do not re-raise refuted items**; if an upstream commit "fixes" something this register refuted, that is a finding about the commit, not the register.
+- **Report which error shape #53 used.** It invested in the legacy code family (`NOT_FOUND`/`INVALID_PARAMETERS`) — this bears directly on the **F27 convergence ruling** (server-wide §9 envelope, ruled 2026-08-20) and the PR-A constraint that characterization tests must not entrench the legacy shape. If #53 deepened the legacy shape, the convergence ruling stands and its cost just went up; the audit reports, the spec session rules.
+- Deliver as a table, one row per D-entry, evidence cited per row. Register updates happen here after it reports.
+
+**AUDIT DELIVERED AND ADJUDICATED 2026-08-21** — `upstream-reconciliation-audit-2026-08-21.md` (this directory, maintainer-copied), evidence in `audit_repro_results.json` / `audit_repro2_results.json`. 55 live calls through the registered tool functions; every row carries behavioral evidence; the refuted section was re-checked without re-raising. Spec-session spot-check: the D17/D18 differential (identical top-10 byte-for-byte across the two RECA queries, `has_HR4631: false`, drop-`Act` → 0) verified directly from the raw JSON; the first evidence file's D17 block has a failed extractor (`n_listed: 0`) superseded by the second file's corrected re-run — cite the second. Repro *scripts* referenced by the audit were not copied alongside the JSONs; the JSONs are the observations of record. **Outcomes applied to the rows below: D1 FIXED (`abb7550`), D5 PARTIAL, D7 PARTIAL, D11/D13 confirmed holding, D2/D3/D4/D6/D9/D10/D12/D14–D18 confirmed UNCHANGED, `bug_008`'s refutation withdrawn → D19.** Audit caveats recorded as stated: D4+D5's walk-twice ran on one member; D18 non-monotonicity neither shown nor falsified on one pair; D10 still synthetic-only. The #53 error-shape finding is recorded at the F27 entry (`fulltext/14-defect-priority.md`).
 
 ## Closed and refuted — kept so they are not re-raised
 
@@ -256,7 +284,7 @@ assert search_bills(congress=119, keywords="Radiation Exposure Compensation") !=
 
 - **`bug_002` — REFUTED 2026-08-10.** Claimed the default server path is unstartable because 33 files import `mcp.server.fastmcp`. Measured on the real branch: **0** such imports (the MCP-2 migration `0ab182c` converted them); the reviewer's 33 matches the **stale slice** exactly. The full server starts.
 - **`bug_004` — REFUTED, same cause.** "`pyproject.toml` still allows `mcp>=1.26`" was true only of the frozen slice; the real branch has pinned `mcp>=2.0.0,<3` since `0ab182c`.
-- **`bug_008` — REFUTED on its own premise.** Assumed `ctx.error()` is a coroutine in mcp 2.x; `Context.error` is **sync** in the installed 2.0.0, so calling it without `await` is correct.
+- **`bug_008` — REFUTED on its own premise.** Assumed `ctx.error()` is a coroutine in mcp 2.x; `Context.error` is **sync** in the installed 2.0.0, so calling it without `await` is correct. **CORRECTION 2026-08-21 (upstream audit): the refutation's premise is false — refutation withdrawn, item reopened as D19.** `inspect.iscoroutinefunction(Context.error)` → coroutine in the installed 2.0.0 (`async def error`), and the repo's own harness stubs it *sync* to make the un-awaited calls work — the refutation's instrument was a test environment authored from the same wrong model, the trimmed-fixture rule biting inside a refutation. The original review finding was right in substance and its severity was over-stated relative to what D19 records; kept here, corrected in place, per the negative-results rule.
 - **`bug_005` — FIXED `950125d`.** `python -m congress_api` discarded `main()`'s return, so a `cache clear` refusal exited 0 under `-m` while the console script exited 1. Both return 1 now; `cache info` still 0. *(This is a contract the bill-text spec pins — see `fulltext/08-cache-storage.md` §10.)*
 - **`bug_006` — FIXED `950125d`.** `sqlite_supports_fts5()` opened and closed a database on every tool call to probe a compile-time property; now `@functools.cache`d.
 - **`bug_007` — FIXED `950125d`.** `README.md` documented `MCP_TRANSPORT`, absent from the code; row removed.
