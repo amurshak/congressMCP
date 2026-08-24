@@ -189,7 +189,10 @@ async def make_api_request(endpoint: str, ctx: Optional[Context] = None, params:
 
         request_kwargs = {"params": request_params}
         if timeout is not None:
-            request_kwargs["timeout"] = timeout
+            # A bare float would override connect/write/pool too, loosening
+            # the 5s connect timeout the client was built with (line ~90).
+            # Only the read timeout is meant to vary per endpoint.
+            request_kwargs["timeout"] = httpx.Timeout(timeout, connect=5.0)
         response = await client.get(endpoint, **request_kwargs)
         response.raise_for_status()
         
@@ -257,8 +260,13 @@ async def make_api_request(endpoint: str, ctx: Optional[Context] = None, params:
         if ctx is not None:
             ctx.error(ctx_error_message)
 
+        # No endpoint/digits in the returned message (endpoint is only in the
+        # log line above): DefensiveAPIWrapper's no-status-code fallback does
+        # a substring scan for "400"/"404" on str(error), and an endpoint
+        # like /bill/118/hr/404 would false-positive that scan and skip
+        # retries on a plain timeout.
         return {
-            "error": f"API request timeout for endpoint {endpoint} after {request_time:.2f}s",
+            "error": f"API request timeout after {request_time:.2f}s",
             "request_time": request_time,
         }
     except httpx.RequestError as e:
