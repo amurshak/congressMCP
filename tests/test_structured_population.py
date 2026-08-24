@@ -169,5 +169,8 @@ def test_converters_never_raise_on_junk_items():
     resp = _convert_to_structured_response(
         StructuredText("text", "house_vote", [{"rollCallNumber": "not-an-int"}]),
         "get_house_votes_by_congress")
-    # junk falls into the except branch -> success=False, never an exception
-    assert resp.success is False or resp.results_count in (0, 1)
+    # junk falls into the except branch -> success=False with the error noted,
+    # never an exception propagating out of the converter
+    assert resp.success is False
+    assert resp.results_count == 0
+    assert "Error processing response" in resp.summary

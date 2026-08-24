@@ -13,7 +13,7 @@ from ...core.exceptions import CongressionalAPIError
 from ...mcp_app import mcp
 from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import RecordsHearingsResponse, HearingSummary, RecordSummary
-from ...utils.response_converters import _extract_result_count, structured_items_of
+from ...utils.response_converters import _extract_result_count, _int_or_none, structured_items_of
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +39,10 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Record
             elif kind in ("record", "daily_record", "bound_record"):
                 for r in items:
                     records.append(RecordSummary(
-                        volume=_int(r.get("Volume") or r.get("volumeNumber") or r.get("volume")),
-                        issue=_int(r.get("Issue") or r.get("issueNumber")),
-                        session=_int(r.get("Session") or r.get("sessionNumber")),
-                        congress=_int(r.get("Congress") or r.get("congress")),
+                        volume=_int_or_none(r.get("Volume") or r.get("volumeNumber") or r.get("volume")),
+                        issue=_int_or_none(r.get("Issue") or r.get("issueNumber")),
+                        session=_int_or_none(r.get("Session") or r.get("sessionNumber")),
+                        congress=_int_or_none(r.get("Congress") or r.get("congress")),
                         date=r.get("PublishDate") or r.get("issueDate") or r.get("date"),
                         id=str(r.get("Id")) if r.get("Id") is not None else None,
                         url=r.get("url"),
@@ -64,12 +64,6 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Record
             success=False, operation=operation, results_count=0,
             hearings=[], records=[], summary=f"Error processing response: {str(e)}")
 
-
-def _int(value):
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
 
 async def route_records_and_hearings_operation(ctx: Context, operation: str, **kwargs) -> RecordsHearingsResponse:
     """Route operation to appropriate internal function."""
