@@ -11,7 +11,6 @@ import random
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 from typing import Any, Callable
 
 import httpx
@@ -19,6 +18,7 @@ from mcp.server.mcpserver import Context
 
 from ...core.api_config import API_KEY
 from ...core.client_handler import make_api_request
+from ...core.retry_timing import parse_retry_after as _retry_after
 
 
 logger = logging.getLogger(__name__)
@@ -552,16 +552,11 @@ async def _follow_with_key(
     )
 
 
-def _retry_after(value: str | None) -> float | None:
-    if not value:
-        return None
-    try:
-        return float(value)
-    except ValueError:
-        try:
-            return max(0.0, (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds())
-        except (TypeError, ValueError):
-            return None
+# _retry_after -- Retry-After header parsing -- now lives in
+# core/retry_timing.py (issue #58 code review: this copy had no clamp on
+# the numeric branch, so a negative/NaN Retry-After fed straight into
+# min(sleep_for, 8.0) below, and min() with NaN doesn't clamp). Imported
+# above as `_retry_after` so the call site here is unchanged.
 
 
 def _xml_url_from_summary(data: dict[str, Any]) -> str | None:
