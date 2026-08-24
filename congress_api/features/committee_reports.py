@@ -8,6 +8,7 @@ from ..core.client_handler import make_api_request
 from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import format_error_response, CommonErrors, CongressionalAPIError
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -111,7 +112,7 @@ async def get_latest_committee_reports(ctx: Context) -> str:
         result = f"# Latest Committee Reports ({len(limited_reports)} found)\n\n"
         result += "\n\n---\n\n".join(formatted_reports)
         
-        return result
+        return structured(result, "committee_report", limited_reports)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -176,7 +177,7 @@ async def get_committee_reports_by_congress(ctx: Context, congress: int) -> str:
         result = f"# Committee Reports for Congress {congress} ({len(limited_reports)} found)\n\n"
         result += "\n\n---\n\n".join(formatted_reports)
         
-        return result
+        return structured(result, "committee_report", limited_reports)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -256,7 +257,7 @@ async def get_committee_reports_by_congress_and_type(
         result = f"# Committee Reports for Congress {congress}, Type {report_type} ({len(limited_reports)} found)\n\n"
         result += "\n\n---\n\n".join(formatted_reports)
         
-        return result
+        return structured(result, "committee_report", limited_reports)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -333,7 +334,7 @@ async def get_committee_report_details(
         
         logger.info(f"Successfully retrieved committee report details for {congress}/{report_type}/{report_number}")
         
-        return format_committee_report_detail(report_item)
+        return structured(format_committee_report_detail(report_item), "committee_report", [report_item])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -536,7 +537,7 @@ async def search_committee_reports(
         result = f"# Committee Reports Search Results ({len(limited_reports)} found)\n\n"
         result += "\n\n---\n\n".join(formatted_reports)
         
-        return result
+        return structured(result, "committee_report", limited_reports)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

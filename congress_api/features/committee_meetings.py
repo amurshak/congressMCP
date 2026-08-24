@@ -7,6 +7,7 @@ from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.response_utils import ResponseProcessor
 from ..core.exceptions import format_error_response, CommonErrors, APIErrorResponse, CongressionalAPIError
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -146,7 +147,7 @@ async def get_latest_committee_meetings(ctx: Context) -> str:
             lines.append("")
             lines.append(format_committee_meeting_item(meeting_item))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "committee_meeting", meetings)
     
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -196,7 +197,7 @@ async def get_committee_meetings_by_congress(ctx: Context, congress: int) -> str
             lines.append("")
             lines.append(format_committee_meeting_item(meeting_item))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "committee_meeting", meetings)
     
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -251,7 +252,7 @@ async def get_committee_meetings_by_congress_and_chamber(ctx: Context, congress:
             lines.append("")
             lines.append(format_committee_meeting_item(meeting_item))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "committee_meeting", meetings)
     
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -344,7 +345,7 @@ async def get_committee_meeting_details(ctx: Context, congress: int, chamber: st
             return f"No committee meeting found for {congress}/{chamber}/{event_id}."
         
         logger.info(f"Successfully retrieved committee meeting details for {congress}/{chamber}/{event_id}")
-        return format_committee_meeting_detail(meeting_data)
+        return structured(format_committee_meeting_detail(meeting_data), "committee_meeting", [meeting_data])
     
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -444,7 +445,7 @@ async def search_committee_meetings(
             lines.append("")
             lines.append(format_committee_meeting_item(meeting_item))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "committee_meeting", meetings)
     
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

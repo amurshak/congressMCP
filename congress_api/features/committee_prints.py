@@ -8,6 +8,7 @@ from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator, ValidationResult
 from ..core.exceptions import APIErrorResponse, ErrorType, format_error_response, CommonErrors, CongressionalAPIError
 from ..core.response_utils import CommitteePrintsProcessor, clean_committee_prints_response
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -112,7 +113,7 @@ async def get_latest_committee_prints(ctx: Context) -> str:
             lines.append("")
             lines.append(format_committee_print_item(print_item))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "committee_print", processed_prints)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -181,7 +182,7 @@ async def get_committee_prints_by_congress(ctx: Context, congress: int) -> str:
             lines.append("")
             lines.append(format_committee_print_item(print_item))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "committee_print", processed_prints)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -259,7 +260,7 @@ async def get_committee_prints_by_congress_and_chamber(ctx: Context, congress: i
             lines.append("")
             lines.append(format_committee_print_item(print_item))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "committee_print", processed_prints)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -356,7 +357,7 @@ async def get_committee_print_details(ctx: Context, congress: int, chamber: str,
                 logger.info(f"Empty committee print list: Congress {congress}, chamber {chamber}, jacket {jacket_number}")
                 return format_error_response(error)
         
-        return format_committee_print_detail(print_item)
+        return structured(format_committee_print_detail(print_item), "committee_print", [print_item])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -548,7 +549,7 @@ async def search_committee_prints(
             lines.append("")
             lines.append(format_committee_print_item(print_item))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "committee_print", processed_prints)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

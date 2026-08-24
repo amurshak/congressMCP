@@ -10,6 +10,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -271,7 +272,7 @@ async def get_congress_info(
                 error = CommonErrors.data_not_found("current Congress", "current")
                 return format_error_response(error)
             
-            return format_congress(congress_data, detailed)
+            return structured(format_congress(congress_data, detailed), "congress", [congress_data])
         elif congress is not None:
             # Get specific Congress
             data = await safe_congress_request(f"/congress/{congress}", ctx)
@@ -283,7 +284,7 @@ async def get_congress_info(
                 error = CommonErrors.data_not_found("Congress", str(congress))
                 return format_error_response(error)
             
-            return format_congress(congress_data, detailed)
+            return structured(format_congress(congress_data, detailed), "congress", [congress_data])
         else:
             # Get list of congresses
             data = await safe_congress_request("/congress", ctx, {"limit": limit})
@@ -301,7 +302,8 @@ async def get_congress_info(
                 key_fields=["number", "name"]
             )
             
-            return format_congresses_list(deduplicated_congresses, format_type)
+            text = format_congresses_list(deduplicated_congresses, format_type)
+            return structured(text, "congress", deduplicated_congresses)
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
     except Exception as e:
@@ -436,12 +438,13 @@ async def search_congresses(
                 
                 result.append(f"| {name} | {start_year} - {end_year} | {sessions_str} |")
             
-            return "\n".join(result)
+            return structured("\n".join(result), "congress", limited_congresses)
         else:
             # Use the existing format_congresses_list function
             formatted_list = format_congresses_list(limited_congresses)
             # Replace the default header with our search header
-            return result_header + formatted_list[formatted_list.find("\n"):]
+            text = result_header + formatted_list[formatted_list.find("\n"):]
+            return structured(text, "congress", limited_congresses)
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
     except Exception as e:

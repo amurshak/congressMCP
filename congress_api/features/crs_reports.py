@@ -8,6 +8,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -251,7 +252,8 @@ async def search_crs_reports(
                 return format_error_response(CommonErrors.data_not_found(f"CRS report '{report_number}' not found"))
             
             # Format the response
-            return format_crs_report_detail(data)
+            report = data.get("CRSReport") if isinstance(data, dict) else None
+            return structured(format_crs_report_detail(data), "crs_report", [report] if report else [])
         
         # If no keywords provided, guide user
         if not keywords:
@@ -303,7 +305,8 @@ async def search_crs_reports(
                 for report in deduplicated_reports:
                     formatted_reports.append(format_crs_report_item(report))
                 
-                return f"Search Results - CRS Reports matching '{keywords}':\n\n" + "\n\n".join(formatted_reports)
+                text = f"Search Results - CRS Reports matching '{keywords}':\n\n" + "\n\n".join(formatted_reports)
+                return structured(text, "crs_report", deduplicated_reports)
             else:
                 return format_error_response(CommonErrors.data_not_found(f"No CRS reports found matching keywords: '{keywords}'"))
         else:
