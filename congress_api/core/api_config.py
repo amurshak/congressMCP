@@ -4,7 +4,7 @@ import sys
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -25,6 +25,12 @@ def load_environment_config():
     project_root = Path(__file__).parent.parent.parent
 
     env = (os.getenv('CONGRESS_API_ENV') or '').lower().strip()
+
+    if env and env not in ('development', 'staging', 'production'):
+        logger.warning(
+            f"Unknown CONGRESS_API_ENV '{env}' (expected development, staging"
+            f" or production); treating as 'local'.")
+        env = ''
 
     if env:
         env_file = project_root / f".env.{env}"

@@ -105,7 +105,7 @@ def _restore_logging():
         logging.getLogger(n).setLevel(level)
 
 
-def _setup_with(env_name, log_level_var, _restore):
+def _setup_with(env_name, log_level_var):
     with patch.object(main_mod, "ENV", env_name), \
             patch.dict(os.environ, {"LOG_LEVEL": log_level_var} if log_level_var else {},
                        clear=False):
@@ -116,13 +116,19 @@ def _setup_with(env_name, log_level_var, _restore):
 
 
 def test_local_defaults_to_warning(_restore_logging):
-    assert _setup_with("local", None, _restore_logging) == logging.WARNING
+    assert _setup_with("local", None) == logging.WARNING
 
 
 def test_production_defaults_to_info(_restore_logging):
-    assert _setup_with("production", None, _restore_logging) == logging.INFO
+    assert _setup_with("production", None) == logging.INFO
 
 
 def test_log_level_env_var_still_overrides(_restore_logging):
-    assert _setup_with("local", "DEBUG", _restore_logging) == logging.DEBUG
-    assert _setup_with("production", "ERROR", _restore_logging) == logging.ERROR
+    assert _setup_with("local", "DEBUG") == logging.DEBUG
+    assert _setup_with("production", "ERROR") == logging.ERROR
+
+
+def test_unknown_congress_api_env_falls_back_to_local():
+    env, calls = _run_load({"CONGRESS_API_ENV": "prod"}, {".env.prod", ".env"})
+    assert env == "local"          # typo warned about, not silently honored
+    assert (".env.prod", False) not in calls
