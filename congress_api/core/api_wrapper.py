@@ -3,13 +3,12 @@
 import asyncio
 import logging
 import random
-from datetime import datetime, timezone
-from email.utils import parsedate_to_datetime
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, replace
 from mcp.server.mcpserver import Context
 from .client_handler import make_api_request
 from .exceptions import APIErrorResponse, CongressionalAPIError
+from .retry_timing import parse_retry_after
 
 @dataclass
 class APIEndpointConfig:
@@ -31,35 +30,28 @@ class _HTTPStatusFailure(Exception):
 _RETRY_AFTER_STATUSES = frozenset({429, 503})
 
 
-def _parse_retry_after(value: Optional[str]) -> Optional[float]:
-    """Seconds to wait from a Retry-After header value, or None if unusable.
+def _retry_after_seconds(error: Exception, status: Optional[int]) -> Optional[float]:
+    """The usable Retry-After delay for this failure, or None.
 
-    Retry-After is either a delay in seconds or an HTTP-date (RFC 7231 §7.1.3);
-    mirrors bill_text/client.py's `_retry_after`.
+    None means either the status doesn't carry Retry-After semantics, or the
+    header was absent/unusable -- parse_retry_after already rejects negative,
+    zero, and non-finite values, so a caller never has to re-check those.
     """
-    if not value:
+    if status not in _RETRY_AFTER_STATUSES:
         return None
-    try:
-        return float(value)
-    except ValueError:
-        try:
-            return max(0.0, (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds())
-        except (TypeError, ValueError):
-            return None
+    return parse_retry_after(getattr(error, "retry_after", None))
 
 
-def _next_delay(error: Exception, status: Optional[int], fallback_delay: float, cap: float) -> float:
+def _next_delay(retry_after: Optional[float], fallback_delay: float, cap: float) -> float:
     """Seconds to sleep before the next retry.
 
-    Honors Retry-After on 429/503 when the server sent one; otherwise falls
-    back to exponential backoff with jitter. Either way the result is capped
-    at the endpoint's max_retry_delay so a large/malformed Retry-After can't
-    stall a tool call.
+    Uses `retry_after` (already resolved by `_retry_after_seconds`, already
+    known to be <= cap -- see the give-up branch in safe_api_request) when
+    given; otherwise falls back to exponential backoff with jitter, capped at
+    the endpoint's max_retry_delay.
     """
-    if status in _RETRY_AFTER_STATUSES:
-        retry_after = _parse_retry_after(getattr(error, "retry_after", None))
-        if retry_after is not None:
-            return min(retry_after, cap)
+    if retry_after is not None:
+        return retry_after
     return min(fallback_delay + random.uniform(0, 0.25), cap)
 
 
@@ -129,7 +121,14 @@ class DefensiveAPIWrapper:
                 # 429/503: honor Retry-After instead of retrying immediately
                 # (issue #58) -- that's what was multiplying requests against
                 # Congress.gov exactly when the key was already being throttled.
-                await asyncio.sleep(_next_delay(e, status, retry_delay, config.max_retry_delay))
+                retry_after = _retry_after_seconds(e, status)
+                if retry_after is not None and retry_after > config.max_retry_delay:
+                    # The server wants longer than we're willing to block a
+                    # tool call for. Sleeping the capped value anyway would
+                    # just spend the remaining attempts hitting the same
+                    # still-throttled key again, so give up now instead.
+                    break
+                await asyncio.sleep(_next_delay(retry_after, retry_delay, config.max_retry_delay))
                 retry_delay = min(retry_delay * config.backoff_multiplier, config.max_retry_delay)
         
         error_response = DefensiveAPIWrapper._format_api_error(endpoint, last_error, config.retry_count)
@@ -168,10 +167,11 @@ class DefensiveAPIWrapper:
             remaining = getattr(error, "rate_limit_remaining", None)
             if remaining is not None:
                 try:
-                    if int(remaining) <= 0:
-                        message += f" X-RateLimit-Remaining: {remaining}."
+                    remaining_int = int(remaining)
                 except (TypeError, ValueError):
-                    pass
+                    remaining_int = None
+                if remaining_int is not None and remaining_int <= 0:
+                    message += f" X-RateLimit-Remaining: {remaining_int}."
             return APIErrorResponse("rate_limit", message,
                                     ["Wait a minute and retry", "Reduce request volume"], "RATE_LIMIT_EXCEEDED")
         if isinstance(status, int) and status >= 500:
