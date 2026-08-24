@@ -27,14 +27,21 @@ class CacheStatus(BaseModel):
 
 
 class Timing(BaseModel):
-    """Server-measured wall-clock per phase, in milliseconds. fetch_ms covers
-    congress.gov version resolution plus the GovInfo document download; while
-    version_resolution is "fresh" and index_hit is false these run on every call
-    (persistence is PR 2). search_ms is present only for search_bill_text."""
+    """Server-measured wall-clock per phase, in milliseconds; each leg is null
+    when it did not run (§4/§9). resolve_ms: congress.gov version resolution
+    plus the GovInfo package summary (lastModified); download_ms: the GovInfo
+    document download; parse_ms: Bill DTD parse + chunk; index_ms: FTS5 build.
+    On a persisted-index hit parse_ms and index_ms are null; within the
+    version-resolution TTL resolve_ms is null too, and download_ms is null
+    whenever the document was not fetched. The cost of opening a cached
+    package is inside total_ms only. search_ms is present only for
+    search_bill_text. total_ms is server compute -- a lower bound on
+    client-observed latency."""
 
-    fetch_ms: float
-    parse_ms: float
-    index_ms: float
+    resolve_ms: float | None
+    download_ms: float | None
+    parse_ms: float | None
+    index_ms: float | None
     search_ms: float | None = None
     total_ms: float
 
@@ -53,7 +60,9 @@ class ErrorEnvelope(BaseModel):
 class BillTextEnvelope(BaseModel):
     package_id: str
     version: str
-    version_resolution: Literal["fresh", "cached", "cached_offline"] = "fresh"
+    # pinned: the caller named the version, so no resolution -- fresh or cached
+    # -- occurred (§10 ruling 2026-08-22). cache.version_hit stays false there.
+    version_resolution: Literal["fresh", "cached", "cached_offline", "pinned"] = "fresh"
     version_resolved_at: str
     # VERSION ISSUES ONLY. Non-null means the served text is not simply the version the
     # caller asked for: the latest listed version was unavailable and the server fell

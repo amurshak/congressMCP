@@ -271,6 +271,8 @@ One flag was answering two questions and hiding a third. The fix (`a52d54a`) kee
 
 **Accepted, and recorded rather than left silent.** Every PR 1 call is cold — resolve and download both always run — so the split conveys nothing today. It becomes informative only when PR 2 lets a warm index coexist with a network call, at which point `download_ms: null` against a populated `resolve_ms` is a real signal.
 
+**A6 CLOSED 2026-08-22 — the trigger fired and the split shipped** (`070560c`, PR 2 step 5): `fetch_ms` is gone; `resolve_ms`/`download_ms`/`parse_ms`/`index_ms` each null when the leg did not run. Certified live by the spec session: a fresh-resolve-over-warm-index call shows exactly the predicted signal (`resolve_ms: 1084.5`, `download_ms: null`, `index_hit: true`), and a within-TTL hit nulls every leg at `total_ms: 1.7`.
+
 **This is a reasoning-driven amendment, not a measurement-driven one**, which distinguishes it from A1–A5. It is recorded under the same convention because an undocumented divergence is the failure mode the convention exists to prevent — not because it carries the same evidential weight.
 
 **Trigger to revisit, stated so it is not forgotten:** the first PR 2 change that makes `index_hit: true` possible. At that point split the field, or delete `timing` from §9 if the split still is not wanted.

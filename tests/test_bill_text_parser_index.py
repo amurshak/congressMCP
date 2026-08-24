@@ -1160,7 +1160,7 @@ async def test_tool_wrappers_build_responses_without_network(monkeypatch):
         ),
         parsed=parsed,
         index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):
@@ -1217,7 +1217,7 @@ async def test_f5_toc_container_ids_resolve_through_get_bill_section(monkeypatch
         ),
         parsed=parsed,
         index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):
@@ -1281,7 +1281,7 @@ async def test_f5_oversized_container_returns_descriptors_not_the_first_child(mo
         resolved=ResolvedBillText("BILLS-119s1071enr", "enr", "2026-08-03T00:00:00Z", None, None, b""),
         parsed=parsed,
         index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):
@@ -1335,7 +1335,7 @@ async def test_f5_byte_split_section_resolves_and_reassembles_from_its_chunks(mo
         resolved=ResolvedBillText("BILLS-119s1071enr", "enr", "2026-08-03T00:00:00Z", None, None, b""),
         parsed=parsed,
         index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):
@@ -1415,7 +1415,7 @@ async def test_get_bill_section_concatenates_subdivided_section_when_it_fits(mon
         resolved=ResolvedBillText("BILLS-119s1071enr", "enr", "2026-08-04T00:00:00Z", None, None, b""),
         parsed=parsed,
         index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):
@@ -2157,7 +2157,7 @@ def test_get_bill_section_retrieves_synthetic_unit_end_to_end():
     loaded = LoadedBillText(
         resolved=ResolvedBillText("BILLS-119hres463ih", "ih", "t", None, None, b""),
         parsed=parsed, index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, *a, **k):
@@ -2197,7 +2197,7 @@ def test_undivided_body_unit_resolves_on_input_like_the_other_synthetic_shapes()
     loaded = LoadedBillText(
         resolved=ResolvedBillText("BILLS-119hres463ih", "ih", "t", None, None, b""),
         parsed=parsed, index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, *a, **k):
@@ -2241,7 +2241,7 @@ async def test_clamp_note_does_not_clobber_the_version_resolution_note(monkeypat
             version_resolution_note=version_note, last_modified=None, xml_bytes=b"",
         ),
         parsed=parsed, index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):
@@ -2297,7 +2297,7 @@ async def test_version_resolution_note_is_null_when_only_the_request_was_clamped
             last_modified=None, xml_bytes=b"",
         ),
         parsed=parsed, index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):
@@ -2388,7 +2388,7 @@ async def test_search_response_diagnoses_only_the_queries_that_died(monkeypatch)
             last_modified=None, xml_bytes=b"",
         ),
         parsed=parsed, index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):
@@ -2454,7 +2454,7 @@ async def test_matched_query_outranked_by_max_hits_is_not_diagnosed(monkeypatch)
             last_modified=None, xml_bytes=b"",
         ),
         parsed=parsed, index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):
@@ -2532,7 +2532,7 @@ async def test_toc_response_separates_depth_reduction_from_more_below(monkeypatc
         ),
         parsed=parsed,
         index=BillTextIndex(parsed),
-        timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
+        timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0},
     )
 
     async def fake_load(ctx, congress, bill_type, number, version):

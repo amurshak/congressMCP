@@ -12,6 +12,13 @@ rots into a bigger version of the problem it was meant to solve.
     python tests/check_known_failures.py
 
 Exits 0 when the live set matches, 1 otherwise, printing the symmetric difference.
+
+On a REGRESSION the script re-runs exactly the regressed targets with full
+tracebacks and captured output and prints that verbatim. The first CI failure
+this check caught (F37, 2026-08-23) was undiagnosable from its own log -- the
+comparison runs with --tb=no, so the build failed on a one-line test name and the
+maintainer had to reproduce locally to learn WHY. A regression gate that names the
+test but withholds the failure is half a gate.
 """
 from __future__ import annotations
 
@@ -72,13 +79,37 @@ def run_suite() -> tuple[set[str], set[str]]:
     return failures, collection_errors
 
 
-def report(label: str, live: set[str], known: set[str]) -> bool:
+def report(label: str, live: set[str], known: set[str]) -> list[str]:
+    """Print the symmetric difference; return the REGRESSED targets (new failures)."""
     new, fixed = sorted(live - known), sorted(known - live)
     for item in new:
         print(f"  REGRESSION  {label}: {item}")
     for item in fixed:
         print(f"  NOW PASSING {label}: {item}  (remove it from KNOWN_FAILURES.md)")
-    return not (new or fixed)
+    return new
+
+
+def explain_regressions(targets: list[str]) -> str:
+    """Re-run only the regressed targets with full tracebacks and captured output.
+
+    The comparison pass runs --tb=no (it needs the set, not the stories); this pass
+    is the story. Tracebacks, captured stdout/stderr/log of the failing tests (-rA
+    plus --showlocals-free long tracebacks), and nothing about the known baseline,
+    so the log a CI run leaves behind is sufficient to diagnose the failure that
+    broke it. A collection error names a file; re-running the file reproduces the
+    import error with its traceback.
+    """
+    result = subprocess.run(
+        [
+            sys.executable, "-m", "pytest", *targets,
+            "--tb=long", "-rA", "-p", "no:cacheprovider",
+            "--continue-on-collection-errors",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+    )
+    return (result.stdout or "") + (("\n[stderr]\n" + result.stderr) if result.stderr else "")
 
 
 def main() -> int:
@@ -93,14 +124,22 @@ def main() -> int:
               "blocks were lost in an edit.")
         return 1
     failures, collection_errors = run_suite()
-    ok = report("failure", failures, known_failures)
-    ok &= report("collection error", collection_errors, known_collection_errors)
-    if ok:
+    regressed = report("failure", failures, known_failures)
+    regressed += report("collection error", collection_errors, known_collection_errors)
+    changed = (failures != known_failures
+               or collection_errors != known_collection_errors)
+    if not changed:
         print(
             f"Baseline matches: {len(known_failures)} known failures, "
             f"{len(known_collection_errors)} known collection errors, nothing new."
         )
         return 0
+    if regressed:
+        print("\n" + "=" * 78)
+        print(f"REGRESSION DETAIL -- re-running {len(regressed)} regressed target(s) "
+              "with full tracebacks and captured output:")
+        print("=" * 78)
+        print(explain_regressions(regressed))
     print("\nThe known-failing set changed. Investigate, then update KNOWN_FAILURES.md.")
     return 1
 

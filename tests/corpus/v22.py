@@ -133,7 +133,7 @@ def _loaded_for(parsed: ParsedBill, raw: bytes, index: BillTextIndex) -> LoadedB
         version_resolution_note=None, last_modified=None, xml_bytes=raw,
     )
     return LoadedBillText(resolved=resolved, parsed=parsed, index=index,
-                          timing={"fetch_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0})
+                          timing={"resolve_ms": 0.0, "download_ms": 0.0, "parse_ms": 0.0, "index_ms": 0.0})
 
 
 class _Ctx:

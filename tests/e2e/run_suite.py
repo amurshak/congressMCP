@@ -57,6 +57,22 @@ default run directory -- hands the model CLAUDE.md, the source, the spec, and th
 history. One run answered "I had to identify H.R. 3838 from your git history" before this
 was fixed.
 
+THE CACHE AXIS (§17-PR2, 2026-08-22). PR 2 gave the server a persistent bill-text
+cache, and a persistent cache is shared state between invocations: a timing observed
+on a cell that inherited the platform-default cache dir -- or another prompt's -- is
+uninterpretable, and cross-prompt reuse is undisclosed shared state of the same family
+as the cold-cwd rule. So every invocation gets a FRESH, EMPTY cache directory created
+by the harness outside the repo, passed to the spawned server as CONGRESSMCP_CACHE_DIR
+(beside CONGRESSMCP_TRACE_DIR / CONGRESSMCP_BILL_TEXT_ONLY), and recorded in meta.json
+as `cache: {dir, mode, ...}`. Mode `cold` (the default, required for every
+timing-sensitive cell) is that empty directory. Mode `warm` names packages in the
+cell config; the harness warms them by DIRECT server-side calls through the tool
+function (tests/e2e/warm_cache.py, a separate process with the trace switch off, so
+the warming never burns a model turn and never appears in the cell's trace), asserts
+each named package file exists on disk and that the cell's trace is still empty, and
+only then runs the prompt in a fresh process against that directory. The warmed
+package ids and each warm call's envelope fields are recorded in meta.json.
+
 THE CENTRAL HAZARD, restated from §17: automation is the easiest place to silently
 violate the method. A script that runs all prompts in one session, appends a diagnostic
 instruction, or reads the model's own account of its tool calls produces numbers that
@@ -114,6 +130,146 @@ DEFAULT_RUNNERS = {
     "codex": "codex exec -m {model}",
 }
 
+# The standard grid. Cells outside it (terra-a4-probe; the §17-PR2 isolation-warm-a4
+# and isolation-vd cells) run only on an explicit --cells, each being a one-off
+# measurement with its own preregistration rather than part of the recurring matrix.
+DEFAULT_CELLS = "floor,ceiling,capability,isolation,cross-vendor-floor"
+
+
+# The cache axis (§17-PR2). CACHE_ENV is the server's own switch (cache.ENV_CACHE_DIR);
+# it is spelled here as a literal on purpose, beside the other two per-prompt env
+# names, so the MCP config a run writes is readable without importing the server.
+CACHE_ENV = "CONGRESSMCP_CACHE_DIR"
+CACHE_MODES = ("cold", "warm")
+# Tunables that, if set in the harness's own environment, reach a Claude-driver server
+# by inheritance (and a codex-driver server not at all). Recorded per row when set, so
+# a non-default TTL or cap is disclosed beside the timing it shaped.
+CACHE_TUNABLE_ENVS = (
+    "CONGRESSMCP_CACHE_ENABLED", "CONGRESSMCP_CACHE_MAX_BYTES",
+    "CONGRESSMCP_VERSION_TTL", "CONGRESSMCP_REVALIDATE_DAYS",
+)
+
+
+def cache_config(cell: dict, docs: dict) -> dict:
+    """The cell's cache axis, validated: {"mode": cold|warm, "packages": [ids]}.
+
+    Absent config means cold -- the default, and the only mode a timing-sensitive
+    cell may run in. `warm` must name at least one package, each present in the
+    manifest's `documents` table (that table carries the congress/type/number/version
+    the warm call needs, and the sha the document is pinned at). `cold` must name
+    none: a cold cell that lists packages is a config that means two things.
+    """
+    raw = cell.get("cache") or {}
+    if not isinstance(raw, dict):
+        raise ValueError("cell `cache` must be an object {mode, packages?}")
+    mode = raw.get("mode", "cold")
+    if mode not in CACHE_MODES:
+        raise ValueError(f"cell cache mode {mode!r} is not one of {CACHE_MODES}")
+    packages = list(raw.get("packages") or [])
+    if mode == "warm":
+        if not packages:
+            raise ValueError("a warm cell must name the packages to pre-warm")
+        unknown = [p for p in packages if p not in docs]
+        if unknown:
+            raise ValueError(
+                f"warm packages {unknown} are not in the manifest's documents table; "
+                "the warm call needs the congress/type/number/version recorded there"
+            )
+    elif packages:
+        raise ValueError("a cold cell must not name packages (cold means empty)")
+    return {"mode": mode, "packages": packages}
+
+
+def make_cache_dir(prompt_id: str) -> Path:
+    """A fresh, EMPTY cache directory per invocation, outside the repo.
+
+    Never the platform default and never another invocation's: a cell that
+    inherits a populated cache records a timing that some earlier run shaped, and a
+    cell that shares one with its siblings carries undisclosed state between prompts.
+    mkdtemp guarantees fresh; the rest is asserted rather than assumed. The directory
+    is left in place after the run (like the cold cwd) so a warm cell's package files
+    can be inspected; its path is in meta.json.
+    """
+    path = Path(tempfile.mkdtemp(prefix=f"s17-cache-{prompt_id}-"))
+    resolved = path.resolve()
+    if resolved == REPO.resolve() or REPO.resolve() in resolved.parents:
+        raise SystemExit(
+            f"FATAL: cache directory {resolved} is inside {REPO}. Package files are "
+            "megabytes each and the run tree is what gets attached to an issue; set "
+            "TMPDIR outside the repo."
+        )
+    sys.path.insert(0, str(REPO))
+    from congress_api.features.bill_text import cache as cache_mod  # noqa: PLC0415
+
+    inherited = cache_mod.resolve_cache_dir(os.environ).resolve()
+    if resolved == inherited:
+        raise SystemExit(
+            f"FATAL: the fresh cache directory {resolved} IS the directory the server "
+            "would use anyway (CONGRESSMCP_CACHE_DIR or the platform default). A cell "
+            "must never inherit a persistent cache."
+        )
+    if any(resolved.iterdir()):
+        raise SystemExit(f"FATAL: fresh cache directory {resolved} is not empty.")
+    return path
+
+
+def cache_tunables_in_env() -> dict[str, str]:
+    """Cache tunables set in the harness's own environment, for disclosure."""
+    return {name: os.environ[name] for name in CACHE_TUNABLE_ENVS
+            if os.getenv(name, "").strip()}
+
+
+def warm_cache(cache_dir: Path, package_ids: list[str], docs: dict,
+               trace_dir: Path) -> list[dict]:
+    """Warm `package_ids` into `cache_dir` by direct server-side calls; verify on disk.
+
+    Spawns tests/e2e/warm_cache.py with the cell's CONGRESSMCP_CACHE_DIR and the
+    trace switch OFF (it refuses otherwise), feeds it the package coordinates from
+    the manifest's documents table, and then asserts two things the §17-PR2 contract
+    makes load-bearing: every named package file exists in the cell's cache dir, and
+    the cell's trace dir is still empty -- the warm never appears in the measurement.
+    Halts the run on either failure; a warm cell that is not warm would record a
+    cold timing under a warm label.
+    """
+    specs = [{"package_id": pid, **{k: docs[pid][k] for k in
+              ("congress", "bill_type", "number", "version")}}
+             for pid in package_ids]
+    env = dict(os.environ)
+    env[CACHE_ENV] = str(cache_dir)
+    env.pop("CONGRESSMCP_TRACE_DIR", None)
+    env.pop("CONGRESSMCP_BILL_TEXT_ONLY", None)
+    proc = subprocess.run([sys.executable, str(HERE / "warm_cache.py")],
+                          cwd=REPO, env=env, input=json.dumps(specs),
+                          capture_output=True, text=True, timeout=900)
+    if proc.returncode != 0:
+        raise SystemExit(
+            f"FATAL: warm_cache.py exited {proc.returncode} for {package_ids}: "
+            f"{proc.stderr[-800:]}"
+        )
+    try:
+        records = json.loads(proc.stdout)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"FATAL: warm_cache.py printed no JSON: {exc}") from None
+    sys.path.insert(0, str(REPO))
+    from congress_api.features.bill_text import cache as cache_mod  # noqa: PLC0415
+
+    layout = cache_mod.CacheLayout(cache_dir)
+    for pid in package_ids:
+        path = layout.package_path(pid)
+        if not path.exists():
+            record = next((r for r in records if r.get("package_id") == pid), None)
+            raise SystemExit(
+                f"FATAL: warm cell named {pid} but {path} does not exist after "
+                f"warming. The cell is NOT warm; refusing to record a cold timing "
+                f"under a warm label. warm record: {json.dumps(record)[:600]}"
+            )
+    if any(trace_dir.iterdir()):
+        raise SystemExit(
+            f"FATAL: the cell's trace dir {trace_dir} is not empty after warming. "
+            "The warming calls must never appear in the measurement."
+        )
+    return records
+
 
 def toml_quote(value: str) -> str:
     """Quote a string as a TOML basic string, for Codex `-c key=value` overrides.
@@ -128,11 +284,12 @@ def toml_quote(value: str) -> str:
 
 
 def codex_server_spec(trace_dir: Path, bill_text_only: bool,
-                      secrets_file: Path | None = None) -> dict:
+                      secrets_file: Path | None = None, *,
+                      cache_dir: Path) -> dict:
     """The single congress MCP server Codex is given -- the exact analog of the Claude JSON.
 
-    Same server, same interpreter rule (sys.executable, per F23), same two per-prompt env
-    vars and NO credential (see write_mcp_config for why naming one would be a bug, not a
+    Same server, same interpreter rule (sys.executable, per F23), same three per-prompt
+    env vars (trace dir, surface, cache dir) and NO credential (see write_mcp_config for why naming one would be a bug, not a
     convenience). The whole surface is one server, and --ignore-user-config guarantees it is
     the ONLY one.
 
@@ -165,6 +322,7 @@ def codex_server_spec(trace_dir: Path, bill_text_only: bool,
         "env": {
             "CONGRESSMCP_TRACE_DIR": str(trace_dir),
             "CONGRESSMCP_BILL_TEXT_ONLY": "1" if bill_text_only else "",
+            CACHE_ENV: str(cache_dir),
         },
     }
 
@@ -440,7 +598,7 @@ def cli_version(executable: str) -> str:
 
 
 def cell_id_of(cell: dict) -> str:
-    """(driver, model, effort, surface) as one id -- §17's cell identity, one formula.
+    """(driver, model, effort, surface[, cache]) as one id -- §17's cell identity.
 
     Shared by the per-prompt meta row and the per-cell manifest record so the two can
     never disagree about which instrument produced a result.
@@ -448,7 +606,13 @@ def cell_id_of(cell: dict) -> str:
     driver = cell.get("driver", "claude")
     effort = cell.get("reasoning_effort", cell.get("thinking", "unspecified"))
     iso = bool(cell.get("bill_text_only"))
-    return f"{driver}/{cell['model']}/{effort}/{'iso' if iso else 'full'}"
+    base = f"{driver}/{cell['model']}/{effort}/{'iso' if iso else 'full'}"
+    # The cache axis (§17-PR2) is part of the instrument: a warm cell and its cold
+    # twin measure different things. Cold is the default and the state every prior
+    # run was in, so its id is unchanged; warm is marked.
+    if (cell.get("cache") or {}).get("mode", "cold") == "warm":
+        base += "/cache-warm"
+    return base
 
 
 def cell_record(name: str, cell: dict, driver_versions: dict,
@@ -475,6 +639,10 @@ def cell_record(name: str, cell: dict, driver_versions: dict,
         "role": cell["role"],
         "merge_gating": bool(cell.get("merge_gating", False)),
         "builtins_disabled": builtins if builtins is not None else {},
+        # The cache axis as configured (mode + packages to warm); each row's
+        # meta.json carries the directory and what the warm actually did.
+        "cache": {"mode": (cell.get("cache") or {}).get("mode", "cold"),
+                  "packages": list((cell.get("cache") or {}).get("packages") or [])},
     }
     if cell.get("prompts"):
         record["prompts"] = cell["prompts"]
@@ -560,7 +728,8 @@ def build_command(agent: str, runner: list[str], model: str, config_path: Path |
     ]
 
 
-def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool) -> Path:
+def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool,
+                     cache_dir: Path) -> Path:
     """Write the per-prompt MCP config the CLI is pointed at.
 
     The harness owns the tool surface rather than inheriting whatever the operator has
@@ -586,8 +755,9 @@ def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool) -> Path:
     was sent to GovInfo verbatim -- 401 govinfo_key_rejected on every single call, in a
     shape that reads like a tool defect rather than a harness bug.
 
-    So the env block carries only the two per-prompt variables the harness must control.
-    Everything else, credentials included, comes from inheritance.
+    So the env block carries only the three per-prompt variables the harness must
+    control (trace dir, surface, cache dir). Everything else, credentials included,
+    comes from inheritance.
     """
     config = {
         "mcpServers": {
@@ -604,6 +774,7 @@ def write_mcp_config(dest: Path, trace_dir: Path, bill_text_only: bool) -> Path:
                 "env": {
                     "CONGRESSMCP_TRACE_DIR": str(trace_dir),
                     "CONGRESSMCP_BILL_TEXT_ONLY": "1" if bill_text_only else "",
+                    CACHE_ENV: str(cache_dir),
                 },
             }
         }
@@ -737,6 +908,12 @@ class Meta:
     # (F30). Non-empty means the "web off" configuration was NOT effective for this
     # invocation and its claims cannot be read as tool-attributable.
     web_activity_suspected: list[str] = field(default_factory=list)
+    # The cache axis (§17-PR2): {dir, mode, warm_packages, warmed, packages_after,
+    # tunables_in_harness_env}. `dir` is fresh and empty per invocation; `warmed` is
+    # what warm_cache.py recorded for each named package (envelope fields of the
+    # direct server-side calls, the file, its size); `packages_after` lists the
+    # package files in the dir once the prompt finished.
+    cache: dict = field(default_factory=dict)
 
 
 def build_sha() -> str:
@@ -1042,6 +1219,11 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     # complete developer framing available, handed over silently. §17: "no memory of
     # this project, no developer framing." An empty directory is the only way to mean it.
     cold_cwd = make_cold_cwd(prompt_id)
+    # A fresh, empty cache directory per invocation (§17-PR2 cache axis) -- never the
+    # platform default, never another prompt's. Warmed below, after the configs are
+    # written and before the CLI is spawned, when the cell asks for it.
+    cache_cfg = cache_config(cell, docs)
+    cache_dir = make_cache_dir(prompt_id)
 
     text = resolve_prompt(entry, cell)
     assert_prompt_is_cold(text, prompt_id)
@@ -1057,9 +1239,10 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     codex_overrides: list[str] = []
     answer_file: Path | None = None
     if agent == "claude":
-        config_path = write_mcp_config(dest, trace_dir, bill_text_only)
+        config_path = write_mcp_config(dest, trace_dir, bill_text_only, cache_dir)
     else:
-        spec = codex_server_spec(trace_dir, bill_text_only, secrets_file)
+        spec = codex_server_spec(trace_dir, bill_text_only, secrets_file,
+                                 cache_dir=cache_dir)
         config_path = write_codex_mcp_config(dest, spec)
         # The cell's knobs (effort verbatim, web search off) travel in the same -c
         # channel as the MCP surface, so the argv audit below covers them too.
@@ -1070,6 +1253,7 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     env = dict(os.environ)
     env["CONGRESSMCP_TRACE_DIR"] = str(trace_dir)
     env["CONGRESSMCP_BILL_TEXT_ONLY"] = "1" if bill_text_only else ""
+    env[CACHE_ENV] = str(cache_dir)
     if agent == "codex" and codex_api_key:
         # The no-web provider authenticates via env_key=OPENAI_API_KEY. Process env
         # only: it appears in no config file, no argv, and no meta row.
@@ -1089,6 +1273,12 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
     # Asserted from the argv about to be executed, never assumed (§17 driver-axis rule
     # 3): halts here if the command does not actually close the untraced channels.
     builtins = builtins_disabled_record(agent, cmd)
+
+    # Warm BEFORE the CLI process exists, never through it. Skipped on a dry run
+    # (no network, no model), and recorded as skipped rather than as warm.
+    warmed: list[dict] | None = None
+    if cache_cfg["mode"] == "warm" and not dry_run:
+        warmed = warm_cache(cache_dir, cache_cfg["packages"], docs, trace_dir)
 
     if dry_run:
         exit_status, answer = 0, "[dry-run: no model was called]"
@@ -1171,12 +1361,25 @@ def run_one(entry: dict, cell_name: str, cell: dict, out_root: Path,
         cold_cwd=str(cold_cwd),
         # Criteria travel WITH the result so a scorer never has to reconstruct them,
         # and so editing one after seeing a result is visible in the diff.
-        criteria={k: entry.get(k) for k in ("title", "pass", "fail", "watch",
-                                            "grounding", "sourcing", "substitution")},
+        criteria={k: entry.get(k) for k in ("title", "pass", "fail", "scoring",
+                                            "watch", "grounding", "sourcing",
+                                            "substitution")},
         builtins_disabled=builtins,
         web_activity_suspected=(scan_web_activity(stdout_text, stderr_text)
                                 if agent == "codex"
                                 else scan_web_activity(stderr_text)),
+        cache={
+            "dir": str(cache_dir),
+            "mode": cache_cfg["mode"],
+            "warm_packages": cache_cfg["packages"],
+            "warmed": (warmed if warmed is not None else
+                       ("[dry-run: not warmed]" if cache_cfg["mode"] == "warm"
+                        else None)),
+            "packages_after": sorted(
+                p.name for p in (cache_dir / "packages").glob("*.db")
+            ) if (cache_dir / "packages").is_dir() else [],
+            "tunables_in_harness_env": cache_tunables_in_env(),
+        },
     )
     (dest / "meta.json").write_text(json.dumps(asdict(meta), indent=2) + "\n")
     return meta
@@ -1189,8 +1392,10 @@ def main() -> int:
     # terra-a4-probe is deliberately NOT in the default grid: it is the optional
     # single-prompt characterization probe, run on explicit maintainer call or as the
     # upgrade path after a cross-vendor-floor failure (§17, maintainer 2026-08-18).
-    ap.add_argument("--cells", default="floor,ceiling,capability,isolation,cross-vendor-floor",
-                    help="comma-separated cell names")
+    ap.add_argument("--cells", default=DEFAULT_CELLS,
+                    help="comma-separated cell names (default: the standard grid; the "
+                         "§17-PR2 cells isolation-warm-a4 and isolation-vd, and the "
+                         "terra-a4-probe, run on explicit maintainer call)")
     ap.add_argument("--groups", default=None, help="restrict to these groups, e.g. A,B")
     ap.add_argument("--prompts", default=None,
                     help="restrict to these prompt ids. An id named here runs in every "
@@ -1238,6 +1443,15 @@ def main() -> int:
         if not cells:
             print(f"FATAL: --agent {args.agent} leaves zero cells. Each cell declares "
                   "its driver in the manifest; select cells of that driver instead.")
+            return 1
+
+    # The cache axis is validated for every selected cell BEFORE anything is spent,
+    # so a misconfigured warm cell fails here and not after its siblings ran.
+    for c in cells:
+        try:
+            cache_config(manifest["cells"][c], manifest["documents"])
+        except ValueError as exc:
+            print(f"FATAL: cell {c!r} cache axis: {exc}")
             return 1
 
     want_groups = {g.strip() for g in args.groups.split(",")} if args.groups else None
@@ -1290,6 +1504,18 @@ def main() -> int:
                   "arrives as that literal string and overrides the working value.")
             return 1
         print("preflight  : GovInfo reachable with the configured key.")
+        # The cache axis needs the cache ON: a cold cell with the cache disabled is
+        # still "cold" but a warm one is a lie, and the disabled switch would reach
+        # only the Claude-driver servers (by inheritance) -- an undisclosed
+        # asymmetry. Refuse rather than record it.
+        from congress_api.features.bill_text import cache as cache_mod  # noqa: PLC0415
+        if not cache_mod.CacheSettings.from_env().enabled:
+            print("FATAL: CONGRESSMCP_CACHE_ENABLED is off in this environment. The "
+                  "cache axis (§17-PR2) requires the cache enabled; unset it.")
+            return 1
+        print("preflight  : cache enabled; fresh CONGRESSMCP_CACHE_DIR per invocation"
+              + (f"; tunables in env: {cache_tunables_in_env()}"
+                 if cache_tunables_in_env() else ""))
         if "codex" in drivers:
             # F30 residual: the codex cells run through the no-web provider, which
             # needs an OpenAI API key. Resolve it now -- before any canary or prompt
