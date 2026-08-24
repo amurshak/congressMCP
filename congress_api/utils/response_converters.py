@@ -1,12 +1,18 @@
 """
-Response converters - Extract structured Pydantic models from raw API responses.
+Response converters - build structured Pydantic responses from impl output.
 
-Centralizes the conversion logic previously duplicated across deprecated bucket files.
+Impls return pre-formatted markdown. When they attach the real item dicts
+via congress_api.utils.structured.structured(), the converter here maps
+them into the typed lists and derives results_count with len(). Plain
+strings fall back to the legacy count-phrase regex with empty lists
+(accurate for error/empty messages; a lie-free zero otherwise only when
+the impl genuinely returned nothing).
 """
 
 import json
 import logging
 import re
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..models.responses import (
     CommitteeSummary,
@@ -16,11 +22,9 @@ from ..models.responses import (
 
 logger = logging.getLogger(__name__)
 
-# Impls across the codebase report their count in prose rather than a
-# structured field, since these converters receive pre-formatted markdown
-# rather than raw JSON (see _extract_json). Two phrasings are common:
-# "Found 191 bills:" (members.py, committees.py, ...) and
-# "(10 found)" (committee_reports.py, hearings.py, ...).
+# Legacy fallback only (plain-str responses): impls report their count in
+# prose. "Found 191 bills:" (members.py, committees.py, ...) and
+# "(10 found)" (committee_reports.py, ...).
 _COUNT_PATTERNS = (
     re.compile(r"Found\s+(\d+)", re.IGNORECASE),
     re.compile(r"\((\d+)\s+found\)", re.IGNORECASE),
@@ -28,11 +32,7 @@ _COUNT_PATTERNS = (
 
 
 def _extract_result_count(text: str) -> int:
-    """Best-effort recovery of a result count from a summary's count phrase.
-
-    Returns 0 if no recognized count phrase is found — a limitation, not a
-    regression: results_count was unconditionally 0 before this helper existed.
-    """
+    """Best-effort count recovery from a plain string's count phrase."""
     for pattern in _COUNT_PATTERNS:
         match = pattern.search(text)
         if match:
@@ -79,74 +79,132 @@ def _extract_json(raw_response: str) -> dict | None:
     return None
 
 
-def convert_members_committees_response(raw_response: str, operation: str) -> MembersCommitteesResponse:
-    """Convert raw string response to structured MembersCommitteesResponse."""
+def structured_items_of(raw_response: str) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
+    """Return (item_kind, items) if the impl attached real data, else (None, None)."""
+    items = getattr(raw_response, "structured_items", None)
+    kind = getattr(raw_response, "item_kind", None)
+    if isinstance(items, list):
+        return kind, items
+    return None, None
+
+
+def _int_or_none(value: Any) -> Optional[int]:
     try:
-        if isinstance(raw_response, str):
-            data = _extract_json(raw_response)
-            if data is None:
-                # All members/committees impls return pre-formatted human-readable
-                # markdown, not JSON, so this "no JSON found" branch is the NORMAL
-                # path for every one of these tools, not a fallback for malformed
-                # data. It must therefore preserve the full response: a prior bug
-                # here truncated it to raw_response[:500], which for any member or
-                # committee with more than a handful of results cut the summary off
-                # mid-word (and always reported results_count=0 regardless of how
-                # much data was actually returned).
-                return MembersCommitteesResponse(
-                    success=True,
-                    operation=operation,
-                    results_count=_extract_result_count(raw_response),
-                    members=[],
-                    committees=[],
-                    summary=raw_response,
-                    context=f"Performed {operation} operation",
-                )
-        else:
-            data = raw_response
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
-        members = []
-        committees = []
 
-        if isinstance(data, dict):
-            if "members" in data:
-                for member_data in data.get("members", []):
-                    if isinstance(member_data, dict):
-                        members.append(
-                            MemberSummary(
-                                bioguide_id=member_data.get("bioguideId", ""),
-                                name=member_data.get("name", ""),
-                                party=member_data.get("partyName"),
-                                state=member_data.get("state"),
-                                district=member_data.get("district"),
-                                chamber=member_data.get("chamber", ""),
-                                current_member=member_data.get("currentMember", False),
-                                url=member_data.get("url"),
-                            )
-                        )
+def _latest_term(member: Dict[str, Any]) -> Dict[str, Any]:
+    """Most recent term dict from a member record (greatest startYear)."""
+    terms = member.get("terms")
+    if isinstance(terms, dict):
+        terms = terms.get("item")
+    if not isinstance(terms, list):
+        return {}
+    dict_terms = [t for t in terms if isinstance(t, dict)]
+    if not dict_terms:
+        return {}
 
-            if "committees" in data:
-                for committee_data in data.get("committees", []):
-                    if isinstance(committee_data, dict):
-                        committees.append(
-                            CommitteeSummary(
-                                committee_code=committee_data.get("systemCode", ""),
-                                name=committee_data.get("name", ""),
-                                chamber=committee_data.get("chamber", ""),
-                                committee_type=committee_data.get("committeeTypeCode", ""),
-                                url=committee_data.get("url"),
-                            )
-                        )
+    def _key(t):
+        start = _int_or_none(t.get("startYear"))
+        open_ended = 1 if t.get("endYear") in (None, "", "Present") else 0
+        return (start if start is not None else -1, open_ended)
 
-        results_count = len(members) + len(committees)
+    return max(dict_terms, key=_key)
 
+
+def _member_name(member: Dict[str, Any]) -> str:
+    name = member.get("name")
+    if isinstance(name, str) and name:
+        return name
+    if isinstance(name, dict):
+        first, last = name.get("firstName", ""), name.get("lastName", "")
+        if first or last:
+            return f"{last}, {first}".strip(", ")
+    return member.get("invertedOrderName") or member.get("directOrderName") \
+        or member.get("bioguideId", "")
+
+
+def map_member(member: Dict[str, Any]) -> MemberSummary:
+    """Map a Congress.gov member list dict to MemberSummary."""
+    party = member.get("partyName") or member.get("party")
+    if not party:
+        history = member.get("partyHistory")
+        if isinstance(history, list) and history and isinstance(history[0], dict):
+            party = history[0].get("partyName") or history[0].get("partyAbbreviation")
+    term = _latest_term(member)
+    current = None
+    if term:
+        current = term.get("endYear") in (None, "", "Present")
+    district = member.get("district")
+    return MemberSummary(
+        bioguide_id=member.get("bioguideId", ""),
+        name=_member_name(member),
+        party=party,
+        state=member.get("state"),
+        district=str(district) if district is not None else None,
+        chamber=term.get("chamber") or member.get("chamber"),
+        current_member=current,
+        url=member.get("url"),
+    )
+
+
+def map_committee(committee: Dict[str, Any]) -> CommitteeSummary:
+    """Map a Congress.gov committee list dict to CommitteeSummary."""
+    return CommitteeSummary(
+        committee_code=committee.get("systemCode", ""),
+        name=committee.get("name", ""),
+        chamber=committee.get("chamber"),
+        committee_type=committee.get("committeeTypeCode") or committee.get("type"),
+        url=committee.get("url"),
+    )
+
+
+def convert_members_committees_response(raw_response: str, operation: str) -> MembersCommitteesResponse:
+    """Convert impl output to a structured MembersCommitteesResponse.
+
+    The summary is ALWAYS the impl's full markdown (a prior bug truncated
+    it to 500 chars). When the impl attached real items, the typed lists
+    are populated from them and results_count == len(items); member/
+    committee dicts map to their models, anything else (bills, reports,
+    communications, nominations) passes through in `items` labeled by
+    `item_kind`.
+    """
+    try:
+        kind, items = structured_items_of(raw_response)
+        if items is not None:
+            members: List[MemberSummary] = []
+            committees: List[CommitteeSummary] = []
+            generic: List[Dict[str, Any]] = []
+            if kind == "member":
+                members = [map_member(i) for i in items]
+            elif kind == "committee":
+                committees = [map_committee(i) for i in items]
+            else:
+                generic = items
+            return MembersCommitteesResponse(
+                success=True,
+                operation=operation,
+                results_count=len(items),
+                members=members,
+                committees=committees,
+                items=generic,
+                item_kind=kind,
+                summary=str(raw_response),
+                context=f"Performed {operation} operation",
+            )
+
+        # Legacy path: plain markdown with no attached data (error and
+        # empty-result messages, and impls not yet converted). Preserve the
+        # full text; recover a count from the count phrase if present.
         return MembersCommitteesResponse(
             success=True,
             operation=operation,
-            results_count=results_count,
-            members=members,
-            committees=committees,
-            summary=f"Found {len(members)} members and {len(committees)} committees",
+            results_count=_extract_result_count(raw_response),
+            members=[],
+            committees=[],
+            summary=str(raw_response),
             context=f"Performed {operation} operation",
         )
 

@@ -13,81 +13,43 @@ from ...core.exceptions import CongressionalAPIError
 from ...mcp_app import mcp
 from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import ResearchProfessionalResponse, ResearchSummary
-from ...utils.response_converters import _extract_result_count, _extract_json
+from ...utils.response_converters import _extract_result_count, structured_items_of
 
 logger = logging.getLogger(__name__)
 
 def _convert_to_structured_response(raw_response: str, operation: str) -> ResearchProfessionalResponse:
-    """Convert raw string response to structured ResearchProfessionalResponse."""
+    """Build the structured response; typed lists come from the impl's real items."""
     try:
-        if isinstance(raw_response, str):
-            data = _extract_json(raw_response)
-            if data is None:
-                # The underlying impls return pre-formatted markdown, not JSON, so this
-                # is the normal path for every operation, not a fallback for malformed
-                # data — it must preserve the full response, not truncate it.
-                return ResearchProfessionalResponse(
-                    success=True,
-                    operation=operation,
-                    results_count=_extract_result_count(raw_response),
-                    research_materials=[],
-                    summary=raw_response,
-                    recommended_reading=[]
-                )
-        else:
-            data = raw_response
-
-        research_materials = []
-        results_count = 0
-
-        if isinstance(data, dict):
-            # Handle research materials (CRS reports, committee reports, etc.)
-            if 'reports' in data:
-                for report_data in data.get('reports', []):
-                    if isinstance(report_data, dict):
-                        research_materials.append(ResearchSummary(
-                            title=report_data.get('title', ''),
-                            type=report_data.get('reportType', 'Research Document'),
-                            date=report_data.get('date'),
-                            summary=report_data.get('summary'),
-                            topics=report_data.get('policyArea', []),
-                            url=report_data.get('url')
-                        ))
-
-            # Handle other research document types
-            if 'crsReports' in data:
-                for crs_data in data.get('crsReports', []):
-                    if isinstance(crs_data, dict):
-                        research_materials.append(ResearchSummary(
-                            title=crs_data.get('title', ''),
-                            type='CRS Report',
-                            date=crs_data.get('date'),
-                            summary=crs_data.get('summary'),
-                            topics=crs_data.get('topics', []),
-                            url=crs_data.get('url')
-                        ))
-
-            results_count = len(research_materials)
+        kind, items = structured_items_of(raw_response)
+        if items is not None:
+            materials = []
+            for m in items:
+                if kind == "congress":
+                    start = m.get("startYear")
+                    end = m.get("endYear")
+                    materials.append(ResearchSummary(
+                        title=m.get("name", ""), type="Congress",
+                        date=f"{start}-{end}" if start else None,
+                        url=m.get("url")))
+                else:
+                    materials.append(ResearchSummary(
+                        title=m.get("title", ""), type="CRS Report",
+                        date=m.get("publishDate") or m.get("updateDate"),
+                        status=m.get("status"),
+                        url=m.get("url")))
+            return ResearchProfessionalResponse(
+                success=True, operation=operation, results_count=len(items),
+                research_materials=materials, summary=str(raw_response))
 
         return ResearchProfessionalResponse(
-            success=True,
-            operation=operation,
-            results_count=results_count,
-            research_materials=research_materials,
-            summary=f"Found {len(research_materials)} research materials",
-            recommended_reading=[]
-        )
-
+            success=True, operation=operation,
+            results_count=_extract_result_count(raw_response),
+            research_materials=[], summary=str(raw_response))
     except Exception as e:
         logger.error(f"Error converting response to structured format: {e}")
         return ResearchProfessionalResponse(
-            success=False,
-            operation=operation,
-            results_count=0,
-            research_materials=[],
-            summary=f"Error processing response: {str(e)}",
-            recommended_reading=[]
-        )
+            success=False, operation=operation, results_count=0,
+            research_materials=[], summary=f"Error processing response: {str(e)}")
 
 async def route_research_and_professional_operation(ctx: Context, operation: str, **kwargs) -> ResearchProfessionalResponse:
     """Route operation to appropriate internal function."""

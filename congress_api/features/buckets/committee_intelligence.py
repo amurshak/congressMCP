@@ -13,81 +13,46 @@ from ...core.exceptions import CongressionalAPIError
 from ...mcp_app import mcp
 from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import CommitteeIntelligenceResponse, CommitteeActivitySummary
-from ...utils.response_converters import _extract_result_count, _extract_json
+from ...utils.response_converters import _extract_result_count, structured_items_of
 
 logger = logging.getLogger(__name__)
 
 def _convert_to_structured_response(raw_response: str, operation: str) -> CommitteeIntelligenceResponse:
-    """Convert raw string response to structured CommitteeIntelligenceResponse."""
+    """Build the structured response; typed lists come from the impl's real items."""
     try:
-        if isinstance(raw_response, str):
-            data = _extract_json(raw_response)
-            if data is None:
-                # The underlying impls return pre-formatted markdown, not JSON, so this
-                # is the normal path for every operation, not a fallback for malformed
-                # data — it must preserve the full response, not truncate it.
-                return CommitteeIntelligenceResponse(
-                    success=True,
-                    operation=operation,
-                    results_count=_extract_result_count(raw_response),
-                    activities=[],
-                    summary=raw_response,
-                    insights=[]
-                )
-        else:
-            data = raw_response
-
-        activities = []
-        results_count = 0
-
-        if isinstance(data, dict):
-            # Handle committee activities
-            if 'activities' in data:
-                for activity_data in data.get('activities', []):
-                    if isinstance(activity_data, dict):
-                        activities.append(CommitteeActivitySummary(
-                            committee_name=activity_data.get('committee', ''),
-                            activity_type=activity_data.get('activityType', ''),
-                            title=activity_data.get('title', ''),
-                            date=activity_data.get('date'),
-                            status=activity_data.get('status', ''),
-                            url=activity_data.get('url')
-                        ))
-
-            # Handle meetings as activities
-            if 'meetings' in data:
-                for meeting_data in data.get('meetings', []):
-                    if isinstance(meeting_data, dict):
-                        activities.append(CommitteeActivitySummary(
-                            committee_name=meeting_data.get('committee', ''),
-                            activity_type='meeting',
-                            title=meeting_data.get('title', ''),
-                            date=meeting_data.get('date'),
-                            status=meeting_data.get('status', ''),
-                            url=meeting_data.get('url')
-                        ))
-
-            results_count = len(activities)
+        kind, items = structured_items_of(raw_response)
+        if items is not None:
+            activities = []
+            kind_map = {"committee_report": "report", "committee_print": "print",
+                        "committee_meeting": "meeting"}
+            activity_type = kind_map.get(kind or "", kind or "activity")
+            for a in items:
+                identifier = a.get("number") or a.get("jacketNumber") or a.get("eventId")
+                activities.append(CommitteeActivitySummary(
+                    activity_type=activity_type,
+                    citation=a.get("citation"),
+                    identifier=str(identifier) if identifier is not None else None,
+                    congress=a.get("congress"),
+                    chamber=a.get("chamber"),
+                    committee_name=(a.get("committees") or [{}])[0].get("name")
+                    if isinstance(a.get("committees"), list) else None,
+                    title=a.get("title"),
+                    date=a.get("updateDate") or a.get("date"),
+                    url=a.get("url"),
+                ))
+            return CommitteeIntelligenceResponse(
+                success=True, operation=operation, results_count=len(items),
+                activities=activities, summary=str(raw_response))
 
         return CommitteeIntelligenceResponse(
-            success=True,
-            operation=operation,
-            results_count=results_count,
-            activities=activities,
-            summary=f"Found {len(activities)} committee activities",
-            insights=[]
-        )
-
+            success=True, operation=operation,
+            results_count=_extract_result_count(raw_response),
+            activities=[], summary=str(raw_response))
     except Exception as e:
         logger.error(f"Error converting response to structured format: {e}")
         return CommitteeIntelligenceResponse(
-            success=False,
-            operation=operation,
-            results_count=0,
-            activities=[],
-            summary=f"Error processing response: {str(e)}",
-            insights=[]
-        )
+            success=False, operation=operation, results_count=0,
+            activities=[], summary=f"Error processing response: {str(e)}")
 
 async def route_committee_intelligence_operation(ctx: Context, operation: str, **kwargs) -> CommitteeIntelligenceResponse:
     """Route operation to appropriate internal function."""
