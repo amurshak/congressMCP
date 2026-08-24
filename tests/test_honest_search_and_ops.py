@@ -121,7 +121,7 @@ async def test_member_votes_rejects_entity_xml():
             return FakeResp()
 
     with patch.object(mod, "safe_congressional_request",
-                      AsyncMock(return_value={"houseRollCallVote": {"sourceDataURL": "http://x"}})), \
+                      AsyncMock(return_value={"houseRollCallVote": {"sourceDataURL": "https://clerk.house.gov/evs/2025/roll100.xml"}})), \
             patch("httpx.AsyncClient", FakeClient):
         out = await mod.get_house_vote_member_votes(FakeContext(), congress=119,
                                                     session=1, vote_number=100)
@@ -198,3 +198,32 @@ async def test_crs_miss_message_not_doubled():
     assert "No No" not in out
     assert "most recently updated reports" in out
     assert "report_number" in out
+
+
+@pytest.mark.asyncio
+async def test_search_summaries_keyword_window_is_not_truncated():
+    """The 250-row fetch must not be cut back down by the response cleaner."""
+    from congress_api.features import summaries as mod
+    fetch = AsyncMock(return_value={"summaries": [], "pagination": {"count": 0}})
+    cleaned = []
+
+    def fake_clean(data, limit):
+        cleaned.append(limit)
+        return []
+
+    with patch.object(mod, "safe_congressional_request", fetch), \
+            patch.object(mod, "clean_summaries_response", fake_clean):
+        await mod.search_summaries(FakeContext(), keywords="veterans", congress=119)
+    assert fetch.call_args.args[2]["limit"] == 250
+    assert cleaned == [250]
+
+
+@pytest.mark.asyncio
+async def test_member_votes_refuses_non_clerk_host():
+    from congress_api.features import house_votes as mod
+    with patch.object(mod, "safe_congressional_request",
+                      AsyncMock(return_value={"houseRollCallVote":
+                                              {"sourceDataURL": "https://evil.example.com/x.xml"}})):
+        out = await mod.get_house_vote_member_votes(FakeContext(), congress=119,
+                                                    session=1, vote_number=100)
+    assert "unexpected host" in out

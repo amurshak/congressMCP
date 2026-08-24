@@ -642,6 +642,11 @@ async def _fetch_member_votes_xml(ctx, congress, session, vote_number):
     if not source_data_url:
         return None, None, (f"No XML member vote data URL available for House "
                             f"vote {congress}-{session}-{vote_number}.")
+    from urllib.parse import urlparse
+    host = urlparse(source_data_url).hostname or ''
+    if host != 'clerk.house.gov' and not host.endswith('.house.gov'):
+        return None, source_data_url, format_error_response(CommonErrors.api_server_error(
+            f"Refusing to fetch member-vote XML from unexpected host: {host}"))
     import httpx
     async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
         response = await client.get(source_data_url)
@@ -776,52 +781,14 @@ async def get_house_vote_member_votes_xml(ctx: Context, congress: int, session: 
         return format_error_response(CommonErrors.invalid_parameter("vote_number", vote_number, "Must be a positive integer"))
     
     try:
-        # First get the vote details to find the XML URL
-        endpoint = f"house-vote/{congress}/{session}/{vote_number}"
-        params = {"format": "json"}
-        
-        logger.debug(f"Fetching house vote details to get XML URL for {congress}-{session}-{vote_number}")
-        
-        # Make the API request
-        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
-        
-        if "error" in data:
-            logger.error(f"Error fetching house vote details: {data['error']}")
-            return format_error_response(CommonErrors.api_server_error(endpoint, message=data['error']))
-        
-        # Check for the correct response key
-        if 'houseRollCallVote' not in data:
-            return f"House vote {congress}-{session}-{vote_number} not found."
-        
-        vote = data['houseRollCallVote']
-        source_data_url = vote.get('sourceDataURL')
-        
-        if not source_data_url:
-            return f"No XML member vote data URL available for House vote {congress}-{session}-{vote_number}."
-        
-        # Fetch the actual XML content from the House Clerk's website
-        logger.debug(f"Fetching XML member vote data from URL: {source_data_url}")
-        
-        try:
-            import httpx
-            async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-                response = await client.get(source_data_url)
-                if response.status_code == 200:
-                    xml_content = response.text
-                    
-                    # Parse and format the XML content
-                    return format_house_vote_xml_content(xml_content, source_data_url)
-                else:
-                    logger.error(f"Failed to fetch XML content: HTTP {response.status_code}")
-                    return format_error_response(CommonErrors.api_server_error(
-                        f"Failed to fetch XML content from House Clerk website: HTTP {response.status_code}"
-                    ))
-        except Exception as fetch_error:
-            logger.error(f"Error fetching XML content: {str(fetch_error)}")
-            return format_error_response(CommonErrors.api_server_error(
-                f"Failed to fetch XML content: {str(fetch_error)}"
-            ))
-        
+        xml_content, source_url, error = await _fetch_member_votes_xml(
+            ctx, congress, session, vote_number)
+        if error is not None:
+            return error
+
+        # Parse and format the XML content
+        return format_house_vote_xml_content(xml_content, source_url)
+
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
     except Exception as e:

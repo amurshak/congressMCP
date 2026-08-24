@@ -576,7 +576,7 @@ async def search_summaries(
             )
         
         # Process response with deduplication and cleaning
-        summaries = clean_summaries_response(data, limit=100)  # Get more for filtering
+        summaries = clean_summaries_response(data, limit=250)  # keep the whole fetched page for filtering
         
         if not summaries:
             upstream = (data.get("pagination") or {}).get("count")

@@ -308,9 +308,10 @@ async def search_crs_reports(
                 text = f"Search Results - CRS Reports matching '{keywords}':\n\n" + "\n\n".join(formatted_reports)
                 return structured(text, "crs_report", deduplicated_reports)
             else:
+                fetched = len(data['CRSReports'])
                 return (
                     f"No CRS report with '{keywords}' in the title among "
-                    f"the {search_limit} most recently updated reports.\n\n"
+                    f"the {fetched} most recently updated reports.\n\n"
                     "Note: this operation only filters recent report "
                     "TITLES -- it is not a full-text search. Try broader or "
                     "different title words, or a specific report_number "

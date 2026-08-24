@@ -12,8 +12,6 @@ It would have caught both known bugs described in the schema-drift audit:
   default) -- masked in production by the tool's blanket except-and-return-
   an-error-object handling, which is exactly why this test checks `.success`
   on structured responses instead of only "did it raise".
-  This operation is intentionally excluded here (ALLOWLIST in the audit
-  script) since content-chunking isn't implemented yet; see the comment on
 
 The network is mocked at the httpx.AsyncClient.get level -- the one place
 every request path funnels through regardless of which of the many

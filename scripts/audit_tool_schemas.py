@@ -48,12 +48,10 @@ Usage
                                                      # EXTRA/DROPPED finding
                                                      # is not in the allowlist
 
-Known, deliberately-unfixed exception
+Known, deliberately-unfixed exceptions
 --------------------------------------
-(UNUSED) are excluded from the failing set via ALLOWLIST below. Content
-get_bill_text_versions and ignores all three params. Accepting `version` and
-silently ignoring it would be worse than the current hard rejection, so it's
-left alone pending the real chunking implementation. See the comment on
+A small number of (tool, operation, param) triples are excluded from the
+failing set via the ALLOWLIST below; each entry carries its own comment.
 """
 from __future__ import annotations
 
@@ -81,10 +79,6 @@ IGNORED_PARAMS = {"ctx", "self"}
 # exceptions -- not bugs to fix, just not yet implemented. Keep this list
 # small and each entry commented with why.
 ALLOWLIST: Set[Tuple[str, str, str]] = {
-    # delegates to get_bill_text_versions and has no use for a specific
-    # version. Accepting the param and ignoring it would be worse than
-    # rejecting it outright. See congress_api/features/buckets/bills/api.py.
-
     # most_recent: get_committee_nominations keeps the same signature as its
     # sibling committee tools (get_committee_bills/reports/communications),
     # but the Senate nominations endpoint is already newest-first, so there's
