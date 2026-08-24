@@ -663,3 +663,33 @@ def test_clear_reports_files_it_could_not_remove(tmp_path, monkeypatch):
     assert result.removed_packages == 3
     assert any(f.startswith(f"A.v{cache.SCHEMA_VERSION}.db") for f in result.failed)
     assert (layout.packages_dir / f"A.v{cache.SCHEMA_VERSION}.db").exists()
+
+
+class TestMalformedVersionInput:
+    """PR #63 review follow-up: a malformed `version` must come back as
+    version_not_found on every tool, never internal_error ('server-side
+    bug') -- the cache layer's filename guard raises ValueError on such
+    input before any network fallback can classify it."""
+
+    @pytest.mark.anyio
+    async def test_all_three_tools_reject_malformed_version_cleanly(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CONGRESSMCP_CACHE_DIR", str(tmp_path))
+        from congress_api.features.bill_text import tools
+
+        class Ctx:
+            async def info(self, *_):
+                ...
+
+            async def error(self, *_):
+                ...
+
+        for fn, kwargs in (
+            (tools.search_bill_text, {"queries": ["x"]}),
+            (tools.get_bill_section, {"section_id": "S:1"}),
+            (tools.get_bill_toc, {}),
+        ):
+            out = await fn(Ctx(), congress=119, bill_type="s", number=1071,
+                           version="e nr!", **kwargs)
+            err = (out or {}).get("error") or {}
+            assert err.get("code") == "version_not_found", (fn.__name__, out)
+            assert "internal_error" not in str(out)

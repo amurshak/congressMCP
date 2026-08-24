@@ -20,7 +20,7 @@ import congress_api.features.bill_text.service as service_mod
 import congress_api.features.bill_text.tools as tools_mod
 from congress_api.features.bill_text import cache
 from congress_api.features.bill_text.client import ResolvedBillText, TextVersion
-from congress_api.features.bill_text.index import FTS_TABLE, PACKAGE_TABLES, BillTextIndex, load_parsed
+from congress_api.features.bill_text.index import PACKAGE_TABLES, BillTextIndex
 from congress_api.features.bill_text.parser import Segment, Unit, parse_bill_xml
 from congress_api.features.bill_text.service import LoadedBillText
 from congress_api.features.bill_text.store import PackageBuildError, PackageStore
