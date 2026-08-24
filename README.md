@@ -430,7 +430,7 @@ CONGRESS_API_KEY=your-key congressmcp --transport streamable-http --host 0.0.0.0
 
 | Toolset | Operations | What it does |
 |---------|-----------|--------------|
-| **Bills** | 16 | Search, details, text, actions, amendments, cosponsors, subjects |
+| **Bills** | 15 | Search, details, text, actions, amendments, cosponsors, subjects |
 | **Laws** | 2 | Enacted public/private laws by congress (`get_laws`, `get_law_details`) |
 | **Amendments** | 7 | Search, details, actions, sponsors, text |
 | **Treaties & Summaries** | 5 | Treaty search, actions, committees, text; bill summaries |

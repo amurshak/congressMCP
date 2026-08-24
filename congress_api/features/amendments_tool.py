@@ -82,7 +82,8 @@ async def amendments(
     
     SEARCH OPERATIONS:
     - get_amendments: Core amendments API access with filtering
-    - search_amendments: Search amendments by keywords and parameters
+    - search_amendments: filters the 250 most recently updated amendments
+      by purpose/description text (client-side; not full-text search)
     
     DETAILS OPERATIONS:
     - get_amendment_details: Complete amendment information and status

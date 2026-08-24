@@ -81,13 +81,6 @@ async def route_research_and_professional_operation(ctx: Context, operation: str
         raw_response = await search_crs_reports(ctx, **kwargs)
         return _convert_to_structured_response(raw_response, operation)
 
-    # Future professional analytics operations
-    elif operation == "get_congress_statistics":
-        # Placeholder for future implementation
-        raise ToolError("Congress statistics analysis feature coming soon - contact support for early access")
-    elif operation == "get_legislative_analysis":
-        # Placeholder for future implementation
-        raise ToolError("Advanced legislative analysis feature coming soon - contact support for early access")
 
     else:
         raise ToolError(f"Unknown operation: {operation}")
@@ -120,10 +113,9 @@ async def research_and_professional(
     • get_congress_info_enhanced - Advanced analytics with detailed insights
     • search_congresses - Historical Congress search with trend analysis
 
-    PROFESSIONAL RESEARCH (3 operations):
-    • search_crs_reports - Congressional Research Service report search
-    • get_congress_statistics - Statistical analysis across Congresses
-    • get_legislative_analysis - Advanced legislative trend analysis
+    PROFESSIONAL RESEARCH (1 operation):
+    • search_crs_reports - CRS reports: exact report_number lookup, or a
+      title filter over the 250 most recently updated reports (not full-text)
 
     Key params: operation, congress, keywords, report_number, start_year, end_year
     Returns professional-grade research data with enhanced analytics and historical insights.

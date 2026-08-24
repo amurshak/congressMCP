@@ -131,6 +131,11 @@ class VotingNominationsResponse(BaseResponse):
     results_count: int = Field(description="Number of items returned (equals the populated list's length)")
     votes: List[VoteSummary] = Field(default=[], description="Vote results")
     nominations: List[NominationSummary] = Field(default=[], description="Nomination results")
+    items: List[Dict[str, Any]] = Field(
+        default=[],
+        description="Results of other kinds (per-member votes), as parsed from the source data")
+    item_kind: Optional[str] = Field(
+        default=None, description="What `items` contains (member_vote, ...)")
     summary: str = Field(description="Human-readable summary of the results")
 
 # Records & Hearings Response

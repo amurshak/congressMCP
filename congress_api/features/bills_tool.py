@@ -44,10 +44,6 @@ async def route_bills_operation(ctx: Context, operation: str, **kwargs) -> str:
         from .buckets.bills import get_bill_titles
         validate_operation_kwargs(get_bill_titles, kwargs, operation)
         return await get_bill_titles(ctx, **kwargs)
-    elif operation == "get_bill_content":
-        from .buckets.bills import get_bill_content
-        validate_operation_kwargs(get_bill_content, kwargs, operation)
-        return await get_bill_content(ctx, **kwargs)
     elif operation == "get_bill_summaries":
         from .buckets.bills import get_bill_summaries
         validate_operation_kwargs(get_bill_summaries, kwargs, operation)
@@ -110,10 +106,6 @@ async def bills(
     fromDateTime: Optional[str] = None,
     toDateTime: Optional[str] = None,
     days_back: Optional[int] = None,
-    # Text and content
-    version: Optional[str] = None,
-    chunk_number: Optional[int] = None,
-    chunk_size: Optional[int] = None,
 ) -> str:
     """
     Comprehensive Bills Tool - All bill operations in one focused interface.
@@ -125,7 +117,9 @@ async def bills(
     CORE OPERATIONS:
     • Search & Discovery: search_bills, get_bills, get_recent_bills
     • Details & Metadata: get_bill_details, get_bill_titles, get_bill_subjects
-    • Text & Content: get_bill_text, get_bill_text_versions, get_bill_content
+    • Text & Content: get_bill_text, get_bill_text_versions
+      (for FULL bill text search/retrieval use the dedicated search_bill_text,
+      get_bill_section and get_bill_toc tools)
     • Summaries: get_bill_summaries
     • Relationships: get_bill_related_bills, get_bill_amendments
     • Legislative Process: get_bill_actions, get_bill_committees, get_bill_cosponsors
@@ -142,7 +136,6 @@ async def bills(
         limit: Results limit (max 250 for API compliance)
         sort: updateDate+desc (newest first) or updateDate+asc
         fromDateTime/toDateTime: Date range (YYYY-MM-DDTHH:MM:SSZ)
-        version: Text version for content operations
         
     Returns:
         Formatted results specific to requested operation
@@ -196,10 +189,7 @@ async def bills(
             'offset': offset,
             'fromDateTime': fromDateTime,
             'toDateTime': toDateTime,
-            'days_back': days_back,
-            'version': version,
-            'chunk_number': chunk_number,
-            'chunk_size': chunk_size
+            'days_back': days_back
         }.items():
             if param_value is not None:
                 operation_kwargs[param_name] = param_value
