@@ -10,6 +10,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import HouseCommunicationsProcessor
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -267,7 +268,7 @@ async def get_house_communication_details(
             return f"House communication {congress}/{communication_type}/{communication_number} not found."
         
         logger.info(f"Retrieved details for house communication {congress}/{communication_type}/{communication_number}")
-        return format_house_communication_detail(comm_data)
+        return structured(format_house_communication_detail(comm_data), "communication", [comm_data])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -371,7 +372,7 @@ async def search_house_communications(
             lines.append(format_house_communication_item(comm))
             lines.append("")
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "communication", processed_communications[:limit])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

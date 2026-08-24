@@ -15,6 +15,7 @@ from ..core.api_wrapper import safe_congressional_request
 from ..core.exceptions import handle_validation_error, format_error_response, CommonErrors, CongressionalAPIError
 from ..core.response_utils import clean_bound_congressional_record_response
 from ..mcp_app import mcp
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -336,7 +337,7 @@ async def search_bound_congressional_record(
         result += ".\n\n"
         result += "\n".join(formatted_results)
         
-        return result
+        return structured(result, "bound_record", deduplicated_issues)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

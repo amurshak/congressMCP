@@ -6,6 +6,7 @@ from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import SenateCommunicationsProcessor, clean_senate_communications_response
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -182,7 +183,8 @@ async def get_senate_communication_details(
         # Check for different possible response formats
         if 'senateCommunication' in data:
             logger.info(f"Retrieved senate communication using 'senateCommunication' key")
-            return format_senate_communication_detail(data)
+            comm_record = data['senateCommunication']
+            return structured(format_senate_communication_detail(data), "communication", [comm_record])
         else:
             # If the expected key is not found, log the keys and return a formatted version of whatever we got
             logger.warning(f"Unexpected response format. Keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dictionary'}")
@@ -272,7 +274,8 @@ async def search_senate_communications(
         elif communication_type:
             title = f"Senate Communications - Type: {communication_type.upper()}"
         
-        return format_senate_communications_list(processed_communications, title)
+        formatted = format_senate_communications_list(processed_communications, title)
+        return structured(formatted, "communication", processed_communications)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

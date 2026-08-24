@@ -12,6 +12,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -283,7 +284,7 @@ async def search_congressional_record(
             lines.append("")
             lines.append(format_record_issue(issue))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "record", deduplicated_issues)
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
     except Exception as e:

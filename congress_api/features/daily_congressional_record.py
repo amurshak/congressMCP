@@ -8,6 +8,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -175,7 +176,7 @@ async def get_latest_daily_congressional_record() -> str:
             for item in deduplicated_records:
                 formatted_items.append(format_daily_record_item(item))
             
-            return "\n\n".join(formatted_items)
+            return structured("\n\n".join(formatted_items), "daily_record", deduplicated_records)
         else:
             logger.warning("No daily congressional record issues found in API response")
             error_response = CommonErrors.data_not_found(
@@ -355,7 +356,8 @@ async def search_daily_congressional_record(
                     
                     search_desc = f"volume {volume_number}" if volume_number else "your search criteria"
                     result_header = f"Daily Congressional Record Issues matching {search_desc}:\n\n"
-                    return result_header + "\n\n".join(formatted_items)
+                    text = result_header + "\n\n".join(formatted_items)
+                    return structured(text, "daily_record", deduplicated_records)
                 else:
                     search_desc = f"volume {volume_number}" if volume_number else "your search criteria"
                     logger.warning(f"No daily congressional record issues found matching {search_desc}")
