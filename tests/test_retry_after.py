@@ -57,25 +57,25 @@ async def test_429_sleeps_for_retry_after_seconds():
 
 
 @pytest.mark.asyncio
-async def test_429_retry_after_is_capped_at_max_retry_delay():
-    """A large/malformed Retry-After can't stall a tool call past the
-    endpoint's configured cap."""
+async def test_429_retry_after_beyond_cap_gives_up_instead_of_retrying():
+    """A Retry-After longer than the endpoint's max_retry_delay means the key
+    is throttled well past what we're willing to block a tool call for.
+    Sleeping the capped value anyway would just spend the remaining retries
+    hitting the same still-throttled key again, so give up on the first
+    failure instead of retrying at all."""
     from congress_api.core import api_wrapper as mod
     from congress_api.core.exceptions import CongressionalAPIError
 
-    sleep_calls = []
-
-    async def fake_sleep(seconds):
-        sleep_calls.append(seconds)
-
-    with patch.object(mod, "make_api_request",
-                      AsyncMock(return_value=_rate_limited(retry_after="120"))), \
-            patch.object(mod.asyncio, "sleep", fake_sleep):
-        with pytest.raises(CongressionalAPIError):
+    mock = AsyncMock(return_value=_rate_limited(retry_after="120"))
+    with patch.object(mod, "make_api_request", mock), \
+            patch.object(mod.asyncio, "sleep", AsyncMock()) as sleep_mock:
+        with pytest.raises(CongressionalAPIError) as ei:
             await mod.safe_congressional_request("/bill/119", FakeContext(), {},
                                                  endpoint_type="default")  # max_retry_delay=5.0
 
-    assert sleep_calls and all(s <= 5.0 for s in sleep_calls)
+    assert mock.await_count == 1
+    sleep_mock.assert_not_awaited()
+    assert ei.value.error_response.error_code == "RATE_LIMIT_EXCEEDED"
 
 
 @pytest.mark.asyncio
@@ -120,6 +120,57 @@ async def test_rate_limit_remaining_surfaced_when_exhausted():
     err = ei.value.error_response
     assert err.error_code == "RATE_LIMIT_EXCEEDED"
     assert "X-RateLimit-Remaining: 0" in err.message
+
+
+@pytest.mark.asyncio
+async def test_503_also_honors_retry_after():
+    """503 shares the Retry-After treatment with 429 (both are in
+    _RETRY_AFTER_STATUSES, mirroring the GovInfo client's {429, 503})."""
+    from congress_api.core import api_wrapper as mod
+    from congress_api.core.exceptions import CongressionalAPIError
+
+    def _unavailable(retry_after):
+        return {"error": "API request failed: 503", "status_code": 503,
+                "request_time": 0.01, "retry_after": retry_after,
+                "rate_limit_remaining": None}
+
+    sleep_calls = []
+
+    async def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+
+    with patch.object(mod, "make_api_request",
+                      AsyncMock(return_value=_unavailable("2"))), \
+            patch.object(mod.asyncio, "sleep", fake_sleep):
+        with pytest.raises(CongressionalAPIError) as ei:
+            await mod.safe_congressional_request("/bill/119", FakeContext(), {},
+                                                 endpoint_type="bills")  # retry_count=3
+
+    assert sleep_calls == [2, 2, 2]
+    assert ei.value.error_response.error_code == "SERVER_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_unusable_retry_after_falls_back_to_backoff_not_immediate_retry():
+    """A negative/NaN Retry-After (issue #58 code review) must not fire the
+    next attempt with ~0 delay against a key that's still being throttled --
+    it should be treated the same as no header at all."""
+    from congress_api.core import api_wrapper as mod
+    from congress_api.core.exceptions import CongressionalAPIError
+
+    sleep_calls = []
+
+    async def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+
+    with patch.object(mod, "make_api_request",
+                      AsyncMock(return_value=_rate_limited(retry_after="-30"))), \
+            patch.object(mod.asyncio, "sleep", fake_sleep):
+        with pytest.raises(CongressionalAPIError):
+            await mod.safe_congressional_request("/bill/119", FakeContext(), {},
+                                                 endpoint_type="bills")
+
+    assert all(s >= 1.0 for s in sleep_calls)
 
 
 @pytest.mark.asyncio
@@ -188,7 +239,12 @@ async def test_make_api_request_forwards_timeout_kwarg_to_httpx():
         await mod.make_api_request("/bill/119", _FakeCtx(_FakeAppContext(fake_client)),
                                     {"limit": 5}, timeout=8.0)
 
-    assert fake_client.get.await_args.kwargs["timeout"] == 8.0
+    # A bare float would also loosen the 5s connect timeout the client was
+    # built with; only the read/write/pool legs should track the override.
+    import httpx
+    sent_timeout = fake_client.get.await_args.kwargs["timeout"]
+    assert sent_timeout == httpx.Timeout(8.0, connect=5.0)
+    assert sent_timeout.connect == 5.0
 
 
 @pytest.mark.asyncio
@@ -246,6 +302,49 @@ async def test_make_api_request_reports_timeout_distinctly():
 
     assert "timeout" in result["error"].lower()
     assert "status_code" not in result
+
+
+@pytest.mark.asyncio
+async def test_timeout_message_does_not_leak_endpoint_digits():
+    """The returned error message must not embed the endpoint: an endpoint
+    like /bill/118/hr/404 would false-positive api_wrapper's no-status-code
+    '400'/'404' substring scan and wrongly short-circuit retries on a plain
+    timeout (issue #58 code review)."""
+    import httpx
+    from congress_api.core import client_handler as mod
+
+    fake_client = MagicMock()
+    fake_client.get = AsyncMock(side_effect=httpx.ReadTimeout("timed out"))
+
+    with patch.object(mod, "ENABLE_CACHING", False):
+        result = await mod.make_api_request(
+            "/bill/118/hr/404", _FakeCtx(_FakeAppContext(fake_client)), {})
+
+    assert "404" not in result["error"]
+    assert "400" not in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_timeout_on_endpoint_with_404_in_path_still_retries():
+    """End-to-end: a real timeout against an endpoint whose path contains
+    '404' must still use the endpoint's full retry budget, not short-circuit
+    the way an actual 404 status does."""
+    import httpx
+    from congress_api.core import api_wrapper as mod
+    from congress_api.core.exceptions import CongressionalAPIError
+
+    fake_client = MagicMock()
+    fake_client.get = AsyncMock(side_effect=httpx.ReadTimeout("timed out"))
+    ctx = _FakeCtx(_FakeAppContext(fake_client))
+
+    with patch("congress_api.core.client_handler.ENABLE_CACHING", False), \
+            patch.object(mod.asyncio, "sleep", AsyncMock()):
+        with pytest.raises(CongressionalAPIError) as ei:
+            await mod.safe_congressional_request("/bill/118/hr/404", ctx, {},
+                                                 endpoint_type="bills")  # retry_count=3
+
+    assert fake_client.get.await_count == 4  # 1 initial + 3 retries, none skipped
+    assert ei.value.error_response.error_code == "API_TIMEOUT"
 
 
 @pytest.mark.asyncio
