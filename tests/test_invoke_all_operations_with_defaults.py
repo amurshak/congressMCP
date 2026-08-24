@@ -18,6 +18,14 @@ every request path funnels through regardless of which of the many
 `safe_*_request`/`make_api_request` local import aliases a given handler
 uses -- so every operation gets a uniformly empty-but-valid JSON response
 without needing per-operation response fixtures.
+
+Issue #69 follow-up: for bucket tools, one schema is shared across every
+operation, so every parameter is marked optional even when a specific
+operation genuinely requires it. When schema defaults trip a parameter-
+shaped validation error (invalid_parameter and the handful of dedicated
+invalid_*_type/congress_too_old_for_text codes), this test also asserts
+that the required parameter is actually named in the tool's own docstring
+-- the only channel available to tell a caller before it tries.
 """
 import inspect
 import os
@@ -147,6 +155,17 @@ def _list_operations():
 
 _OPERATIONS = _list_operations()
 
+# Issue #69: a handful of error codes name the offending parameter in the
+# code itself rather than via the generic invalid_parameter -> detail.parameter
+# channel (see congress_api/core/exceptions.py's dedicated CommonErrors.*
+# helpers). Map each straight to the parameter a bucket docstring must name.
+_CODE_TO_PARAM = {
+    "invalid_bill_type": "bill_type",
+    "invalid_amendment_type": "amendment_type",
+    "invalid_communication_type": "communication_type",
+    "congress_too_old_for_text": "congress",
+}
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -169,6 +188,8 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
     with patch.object(httpx.AsyncClient, "get", return_value=_FakeResponse()):
         result = await tool_fn(ctx, **kwargs)
 
+    code = None
+    detail = None
     if hasattr(result, "success"):
         if result.success is False:
             err = getattr(result, "error", None)
@@ -184,6 +205,8 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
                                     "general_error", "general_api_failure"), (
                 f"{tool_name}::{operation} crashed: {err.message}"
             )
+            code = err.code
+            detail = err.detail
     elif isinstance(result, str) and result.lstrip().startswith("{"):
         try:
             payload = _json.loads(result).get("error") or {}
@@ -192,6 +215,25 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
         assert payload.get("code") not in ("internal_error", "server_error",
                                            "general_error", "general_api_failure"), (
             f"{tool_name}::{operation} crashed: {payload.get('message')}"
+        )
+        code = payload.get("code")
+        detail = payload.get("detail")
+
+    # Issue #69: a bucket's shared schema marks every parameter optional,
+    # so when schema defaults trip a parameter-shaped validation error, the
+    # only place a caller could have learned that parameter was required is
+    # the tool's own docstring. Assert it's actually named there.
+    missing_param = _CODE_TO_PARAM.get(code)
+    if missing_param is None and code == "invalid_parameter" and detail:
+        missing_param = detail.get("parameter")
+    if missing_param is not None:
+        doc = tool_fn.__doc__ or ""
+        assert missing_param in doc, (
+            f"{tool_name}::{operation} rejected schema defaults with an "
+            f"invalid '{missing_param}', but the {tool_name} tool's "
+            f"docstring never names '{missing_param}' as required -- a "
+            f"caller reading the schema has no way to learn that "
+            f"beforehand (issue #69)."
         )
 
 
