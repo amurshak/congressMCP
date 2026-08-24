@@ -155,18 +155,43 @@ _OPERATIONS = _list_operations()
     ids=[f"{t}::{o}" for t, o, _, _ in _OPERATIONS],
 )
 async def test_operation_invocable_with_schema_defaults(tool_name, operation, tool_fn, kwargs):
-    """Every operation must run its full call chain without raising, and
-    without reporting success=False on a structured response -- with an
-    always-empty-but-valid mocked network layer, a False/raised result can
-    only come from a code bug, not real "no data" business logic."""
+    """Every operation must run its full call chain without raising, and never
+    produce an internal_error -- with an always-empty-but-valid mocked network
+    layer, internal_error (or an untyped failure) can only come from a code
+    bug (a signature mismatch, a crash in the handler body), not business
+    logic. Honest domain errors ARE allowed now that the section-9 envelope
+    surfaces them: empty mocked data legitimately yields data_not_found, and
+    schema defaults legitimately violate some operations' parameter rules
+    (invalid_parameter). Before the envelope work those cases hid behind
+    success=True markdown, which is what the old assertion checked."""
+    import json as _json
     ctx = _make_fake_ctx()
     with patch.object(httpx.AsyncClient, "get", return_value=_FakeResponse()):
         result = await tool_fn(ctx, **kwargs)
 
     if hasattr(result, "success"):
-        assert result.success is True, (
-            f"{tool_name}::{operation} returned success=False: "
-            f"{getattr(result, 'summary', result)}"
+        if result.success is False:
+            err = getattr(result, "error", None)
+            assert err is not None, (
+                f"{tool_name}::{operation} failed without a typed error: "
+                f"{getattr(result, 'summary', result)}"
+            )
+            # With an always-healthy mocked network, none of these codes are
+            # legitimate: internal_error is a crash by definition, and
+            # server_error/general_* only arise from handler-local generic
+            # excepts swallowing a crash (the network cannot have failed).
+            assert err.code not in ("internal_error", "server_error",
+                                    "general_error", "general_api_failure"), (
+                f"{tool_name}::{operation} crashed: {err.message}"
+            )
+    elif isinstance(result, str) and result.lstrip().startswith("{"):
+        try:
+            payload = _json.loads(result).get("error") or {}
+        except ValueError:
+            payload = {}
+        assert payload.get("code") not in ("internal_error", "server_error",
+                                           "general_error", "general_api_failure"), (
+            f"{tool_name}::{operation} crashed: {payload.get('message')}"
         )
 
 

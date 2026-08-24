@@ -14,8 +14,10 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..core.exceptions import error_envelope
 from ..models.responses import (
     CommitteeSummary,
+    ErrorInfo,
     MemberSummary,
     MembersCommitteesResponse,
 )
@@ -172,6 +174,18 @@ def convert_members_committees_response(raw_response: str, operation: str) -> Me
     `item_kind`.
     """
     try:
+        typed_error = getattr(raw_response, "error_response", None)
+        if typed_error is not None:
+            payload = error_envelope(typed_error)["error"]
+            return MembersCommitteesResponse(
+                success=False,
+                operation=operation,
+                error=ErrorInfo(**payload),
+                results_count=0,
+                summary=f"{payload['code']}: {payload['message']}",
+                context=f"Failed {operation} operation",
+            )
+
         kind, items = structured_items_of(raw_response)
         if items is not None:
             members: List[MemberSummary] = []

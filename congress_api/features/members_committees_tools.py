@@ -9,7 +9,7 @@ import logging
 from typing import Optional
 from mcp.server.mcpserver import Context
 from ..mcp_app import mcp
-from ..models.responses import MembersCommitteesResponse
+from ..models.responses import MembersCommitteesResponse, ErrorInfo
 from ..utils.response_converters import convert_members_committees_response
 
 logger = logging.getLogger(__name__)
@@ -67,11 +67,14 @@ async def search_members(
         return MembersCommitteesResponse(
             success=False,
             operation="search_members",
+            error=ErrorInfo(code="internal_error",
+                            message=f"search_members failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error searching members: {str(e)}",
-            context="Search members operation failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed search_members operation",
         )
 
 @mcp.tool(
@@ -101,11 +104,14 @@ async def get_member_details(
         return MembersCommitteesResponse(
             success=False,
             operation="get_member_details",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_member_details failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving member details: {str(e)}",
-            context=f"Get details for member {bioguide_id} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_member_details operation",
         )
 
 @mcp.tool(
@@ -144,11 +150,14 @@ async def get_member_sponsored_legislation(
         return MembersCommitteesResponse(
             success=False,
             operation="get_member_sponsored_legislation",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_member_sponsored_legislation failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving sponsored legislation: {str(e)}",
-            context=f"Get sponsored legislation for member {bioguide_id} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_member_sponsored_legislation operation",
         )
 
 @mcp.tool(
@@ -187,11 +196,14 @@ async def get_member_cosponsored_legislation(
         return MembersCommitteesResponse(
             success=False,
             operation="get_member_cosponsored_legislation",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_member_cosponsored_legislation failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving cosponsored legislation: {str(e)}",
-            context=f"Get cosponsored legislation for member {bioguide_id} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_member_cosponsored_legislation operation",
         )
 
 @mcp.tool(
@@ -230,11 +242,14 @@ async def get_members_by_congress(
         return MembersCommitteesResponse(
             success=False,
             operation="get_members_by_congress",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_members_by_congress failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving members by congress: {str(e)}",
-            context=f"Get members for Congress {congress} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_members_by_congress operation",
         )
 
 @mcp.tool(
@@ -273,11 +288,14 @@ async def get_members_by_state(
         return MembersCommitteesResponse(
             success=False,
             operation="get_members_by_state",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_members_by_state failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving members by state: {str(e)}",
-            context=f"Get members for state {state_code} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_members_by_state operation",
         )
 
 @mcp.tool(
@@ -316,11 +334,14 @@ async def get_members_by_district(
         return MembersCommitteesResponse(
             success=False,
             operation="get_members_by_district",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_members_by_district failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving member by district: {str(e)}",
-            context=f"Get member for {state_code}-{district} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_members_by_district operation",
         )
 
 @mcp.tool(
@@ -362,11 +383,14 @@ async def get_members_by_congress_state_district(
         return MembersCommitteesResponse(
             success=False,
             operation="get_members_by_congress_state_district",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_members_by_congress_state_district failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving member by congress/state/district: {str(e)}",
-            context=f"Get member for Congress {congress}, {state_code}-{district} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_members_by_congress_state_district operation",
         )
 
 # Committee Tools
@@ -414,11 +438,14 @@ async def search_committees(
         return MembersCommitteesResponse(
             success=False,
             operation="search_committees",
+            error=ErrorInfo(code="internal_error",
+                            message=f"search_committees failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error searching committees: {str(e)}",
-            context="Search committees operation failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed search_committees operation",
         )
 
 @mcp.tool(
@@ -465,11 +492,14 @@ async def get_committee_bills(
         return MembersCommitteesResponse(
             success=False,
             operation="get_committee_bills",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_committee_bills failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving committee bills: {str(e)}",
-            context=f"Get bills for committee {committee_code} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_committee_bills operation",
         )
 
 @mcp.tool(
@@ -515,11 +545,14 @@ async def get_committee_reports(
         return MembersCommitteesResponse(
             success=False,
             operation="get_committee_reports",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_committee_reports failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving committee reports: {str(e)}",
-            context=f"Get reports for committee {committee_code} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_committee_reports operation",
         )
 
 @mcp.tool(
@@ -565,11 +598,14 @@ async def get_committee_communications(
         return MembersCommitteesResponse(
             success=False,
             operation="get_committee_communications",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_committee_communications failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving committee communications: {str(e)}",
-            context=f"Get communications for committee {committee_code} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_committee_communications operation",
         )
 
 @mcp.tool(
@@ -611,9 +647,12 @@ async def get_committee_nominations(
         return MembersCommitteesResponse(
             success=False,
             operation="get_committee_nominations",
+            error=ErrorInfo(code="internal_error",
+                            message=f"get_committee_nominations failed unexpectedly: {str(e)}",
+                            remediation="Server-side bug; see the MCP server log."),
             results_count=0,
             members=[],
             committees=[],
-            summary=f"Error retrieving committee nominations: {str(e)}",
-            context=f"Get nominations for committee {committee_code} failed"
+            summary=f"internal_error: {str(e)}",
+            context="Failed get_committee_nominations operation",
         )
