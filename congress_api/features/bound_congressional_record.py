@@ -343,8 +343,8 @@ async def search_bound_congressional_record(
         return format_error_response(e.error_response)
     except Exception as e:
         logger.error(f"Error in search_bound_congressional_record: {str(e)}")
-        # If it's already a formatted error, return it directly
-        if "❌ **Error**:" in str(e):
+        # If it's already a formatted section-9 envelope, return it directly
+        if '"error"' in str(e) and '"code"' in str(e):
             return str(e)
         
         # Otherwise, create a general error response

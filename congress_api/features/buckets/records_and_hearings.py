@@ -9,10 +9,10 @@ import logging
 from typing import Optional
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
-from ...core.exceptions import CongressionalAPIError
+from ...core.exceptions import CongressionalAPIError, error_envelope, format_error_response
 from ...mcp_app import mcp
 from ...core.operation_routing import validate_operation_kwargs
-from ...models.responses import RecordsHearingsResponse, HearingSummary, RecordSummary
+from ...models.responses import RecordsHearingsResponse, HearingSummary, RecordSummary, ErrorInfo
 from ...utils.response_converters import _extract_result_count, _int_or_none, structured_items_of
 
 logger = logging.getLogger(__name__)
@@ -20,6 +20,15 @@ logger = logging.getLogger(__name__)
 def _convert_to_structured_response(raw_response: str, operation: str) -> RecordsHearingsResponse:
     """Build the structured response; typed lists come from the impl's real items."""
     try:
+        typed_error = getattr(raw_response, "error_response", None)
+        if typed_error is not None:
+            payload = error_envelope(typed_error)["error"]
+            return RecordsHearingsResponse(
+                success=False, operation=operation,
+                error=ErrorInfo(**payload), results_count=0,
+                hearings=[], records=[],
+                summary=f"{payload['code']}: {payload['message']}")
+
         kind, items = structured_items_of(raw_response)
         if items is not None:
             hearings, records, generic = [], [], []
@@ -239,9 +248,9 @@ async def records_and_hearings(
         return await route_records_and_hearings_operation(ctx, operation, **operation_kwargs)
 
     except CongressionalAPIError as e:
-        # Typed Congress.gov error from a handler with no try/except of its own:
-        # surface the classification instead of a generic failure.
-        raise ToolError(f"{e.error_response.error_code}: {e.error_response.message}")
+        # Typed Congress.gov error from a handler with no try/except of its
+        # own: return the model carrying the section-9 envelope.
+        return _convert_to_structured_response(format_error_response(e.error_response), operation)
     except ToolError:
         raise
     except Exception as e:

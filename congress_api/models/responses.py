@@ -14,10 +14,23 @@ from typing import List, Optional, Dict, Any, Union
 from pydantic import BaseModel, Field
 
 # Base Response Models
+class ErrorInfo(BaseModel):
+    """Section-9 error payload: stable code, human message, secret-safe
+    detail, actionable remediation. Mirrors the bill-text tools' envelope
+    (documentation/fulltext/04-tools-responses.md section 9)."""
+    code: str = Field(description="Stable machine-readable error code (lowercase)")
+    message: str = Field(description="What went wrong")
+    detail: Optional[Dict[str, Any]] = Field(default=None, description="Structured context; never carries secrets")
+    remediation: Optional[str] = Field(default=None, description="What the caller should do about it")
+
+
 class BaseResponse(BaseModel):
     """Base response model with common fields."""
     success: bool = Field(description="Whether the operation was successful")
     operation: str = Field(description="The operation that was performed")
+    error: Optional[ErrorInfo] = Field(
+        default=None,
+        description="Present when success is false: the section-9 error envelope")
 
 class ErrorResponse(BaseResponse):
     """Error response model."""

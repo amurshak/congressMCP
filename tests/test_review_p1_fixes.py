@@ -194,7 +194,7 @@ async def test_get_treaty_text_not_found_returns_str():
                       AsyncMock(return_value={})):
         out = await mod.get_treaty_text(FakeContext(), congress=118, treaty_number=2)
     assert isinstance(out, str)
-    assert "DATA_NOT_FOUND" in out and "SERVER_ERROR" not in out
+    assert "data_not_found" in out and "server_error" not in out
 
 
 @pytest.mark.asyncio
@@ -283,8 +283,8 @@ async def test_treaty_empty_list_is_not_found_not_server_error():
                       AsyncMock(return_value={"treaty": []})):
         out = await mod.get_treaty_text(FakeContext(), congress=118, treaty_number=99999)
     assert isinstance(out, str)
-    assert "DATA_NOT_FOUND" in out
-    assert "SERVER_ERROR" not in out and "has no attribute" not in out
+    assert "data_not_found" in out
+    assert "server_error" not in out and "has no attribute" not in out
 
 
 def test_treaty_record_accepts_dict_and_list():

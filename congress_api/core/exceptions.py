@@ -7,6 +7,8 @@ and debugging utilities across all APIs.
 
 import logging
 from typing import List, Optional, Dict, Any
+import json
+from urllib.parse import urlsplit, urlunsplit
 from dataclasses import dataclass
 from enum import Enum
 
@@ -36,41 +38,68 @@ class APIErrorResponse:
         if isinstance(self.error_type, ErrorType):
             self.error_type = self.error_type.value
 
-def format_error_response(error: APIErrorResponse) -> str:
+class ErrorText(str):
+    """The formatted error string, still carrying its typed APIErrorResponse.
+
+    Converters for structured (Pydantic) tools read `.error_response` to
+    populate the typed `error` field; str-returning tools emit the string
+    as-is. A plain-str consumer sees only the JSON envelope text.
     """
-    Format an APIErrorResponse into a user-friendly markdown string.
-    
-    Args:
-        error: The error response to format
-        
-    Returns:
-        Formatted error message string
+
+    error_response: "APIErrorResponse"
+
+    def __new__(cls, text: str, error_response: "APIErrorResponse"):
+        obj = super().__new__(cls, text)
+        obj.error_response = error_response
+        return obj
+
+
+def _strip_url_secrets(value):
+    """Spec section 9 (F22 rule): any URL reaching an error `detail` is
+    stripped to scheme+host+path -- query strings can carry the api_key or
+    signed redirect tokens."""
+    if isinstance(value, str) and "://" in value:
+        try:
+            parts = urlsplit(value)
+            if parts.scheme and parts.netloc:
+                return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+        except ValueError:
+            return value
+    return value
+
+
+def error_envelope(error: APIErrorResponse) -> dict:
+    """Section-9 error envelope dict for a typed error.
+
+    {"error": {"code", "message", "detail", "remediation"}} with a stable
+    lowercase code, secret-stripped detail, and the suggestions folded into
+    one actionable remediation string.
     """
-    # Start with the main error message
-    formatted = f"❌ **Error**: {error.message}\n\n"
-    
-    # Add error type and code for debugging
-    formatted += f"**Error Type**: {error.error_type.title()}\n"
-    formatted += f"**Error Code**: {error.error_code}\n\n"
-    
-    # Add suggestions if available
-    if error.suggestions:
-        formatted += "**Suggestions**:\n"
-        for i, suggestion in enumerate(error.suggestions, 1):
-            formatted += f"{i}. {suggestion}\n"
-        formatted += "\n"
-    
-    # Add additional details if available
+    detail = None
     if error.details:
-        formatted += "**Additional Details**:\n"
-        for key, value in error.details.items():
-            formatted += f"- **{key.title()}**: {value}\n"
-        formatted += "\n"
-    
-    # Add general help message
-    formatted += "💡 If you continue to experience issues, try simplifying your query or checking the parameter formats."
-    
-    return formatted
+        detail = {k: _strip_url_secrets(v) for k, v in error.details.items()
+                  if v is not None}
+        detail = detail or None
+    remediation = "; ".join(error.suggestions) if error.suggestions else None
+    return {
+        "error": {
+            "code": (error.error_code or "general_error").lower(),
+            "message": error.message,
+            "detail": detail,
+            "remediation": remediation,
+        }
+    }
+
+
+def format_error_response(error: APIErrorResponse) -> str:
+    """Render a typed error as the section-9 JSON envelope (one envelope
+    format for the whole server -- models parse structure, not prose).
+
+    Returns an ErrorText: a str whose `.error_response` lets the structured
+    converters rebuild the typed `error` field without re-parsing JSON.
+    """
+    return ErrorText(json.dumps(error_envelope(error), indent=2), error)
+
 
 class CongressionalAPIError(Exception):
     """Base exception for Congressional MCP API errors."""

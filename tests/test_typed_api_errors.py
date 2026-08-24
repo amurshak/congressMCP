@@ -92,8 +92,8 @@ async def test_get_member_details_reports_not_found():
     with patch.object(api_wrapper, "make_api_request", AsyncMock(return_value=_api_error(404))):
         out = await mod.get_member_details(FakeContext(), bioguide_id="ZZZ999")
     assert isinstance(out, str)
-    assert "DATA_NOT_FOUND" in out
-    assert "experiencing issues" not in out and "SERVER_ERROR" not in out
+    assert "data_not_found" in out
+    assert "experiencing issues" not in out and "server_error" not in out
 
 
 @pytest.mark.asyncio
@@ -104,7 +104,7 @@ async def test_get_bill_details_reports_not_found():
         out = await mod.get_bill_details(FakeContext(), congress=119, bill_type="hr",
                                          bill_number=9999999)
     assert isinstance(out, str)
-    assert "DATA_NOT_FOUND" in out
+    assert "data_not_found" in out
     assert "experiencing issues" not in out
 
 
@@ -115,7 +115,7 @@ async def test_get_treaty_detail_reports_not_found():
     with patch.object(api_wrapper, "make_api_request", AsyncMock(return_value=_api_error(404))):
         out = await mod.get_treaty_detail(FakeContext(), congress=118, treaty_number=99999)
     assert isinstance(out, str)
-    assert "DATA_NOT_FOUND" in out and "SERVER_ERROR" not in out
+    assert "data_not_found" in out and "server_error" not in out
 
 
 # ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ async def test_search_members_filtered_path_reports_not_found():
     from congress_api.core import api_wrapper
     with patch.object(api_wrapper, "make_api_request", AsyncMock(return_value=_api_error(404))):
         out = await mod.search_members(FakeContext(), state="WY", chamber="senate", congress=119)
-    assert "DATA_NOT_FOUND" in out and "SERVER_ERROR" not in out
+    assert "data_not_found" in out and "server_error" not in out
     assert "Pagination error" not in out
 
 
@@ -192,17 +192,15 @@ async def test_router_surfaces_typed_error_from_bare_handler():
     """nominations.* handlers call the wrapper with no try/except; the
     voting_and_nominations router must turn the typed error into a ToolError
     that carries the classification, not a generic failure."""
-    from mcp.server.mcpserver.exceptions import ToolError
     from congress_api.features.buckets import voting_and_nominations as router
     from congress_api.core import api_wrapper
     with patch.object(api_wrapper, "make_api_request", AsyncMock(return_value=_api_error(404))):
-        with pytest.raises(ToolError) as ei:
-            await router.voting_and_nominations(
-                FakeContext(), operation="get_nomination_details", congress=119,
-                nomination_number=999999)
-    msg = str(ei.value)
-    assert msg.startswith("DATA_NOT_FOUND:") or "DATA_NOT_FOUND:" in msg
-    assert "experiencing issues" not in msg and "❌" not in msg
+        resp = await router.voting_and_nominations(
+            FakeContext(), operation="get_nomination_details", congress=119,
+            nomination_number=999999)
+    assert resp.success is False
+    assert resp.error is not None and resp.error.code == "data_not_found"
+    assert "experiencing issues" not in resp.summary
 
 
 def test_every_router_has_typed_clause():
