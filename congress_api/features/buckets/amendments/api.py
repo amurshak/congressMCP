@@ -177,9 +177,11 @@ async def search_amendments(
         if toDateTime is not None:
             api_params['toDateTime'] = toDateTime
 
-        # If keywords provided, add as query parameter for Congress.gov API
+        # Keyword filtering is CLIENT-SIDE: the /amendment endpoint has no
+        # query parameter (a 'query' param would be silently ignored), so
+        # fetch the largest page the API allows and filter locally.
         if keywords:
-            api_params['query'] = keywords
+            api_params['limit'] = 250
 
         # Build endpoint - API-faithful approach
         endpoint = "/amendment"
@@ -203,11 +205,26 @@ async def search_amendments(
         amendments = AmendmentsDataProcessor.deduplicate_amendments(amendments)
         duplicates_removed = original_count - len(amendments)
 
+        fetched = len(amendments)
+        if keywords:
+            amendments = AmendmentsDataProcessor.filter_by_keywords(amendments, keywords, limit)
+            if not amendments:
+                scope = f" in Congress {congress}" if congress else ""
+                return (
+                    f"No match for '{keywords}' in the purposes or "
+                    f"descriptions of the {fetched} most recently updated "
+                    f"amendments{scope}.\n\n"
+                    "Note: this operation only filters recently updated "
+                    "amendments by purpose text -- it is not a full-text or "
+                    "historical search."
+                )
+
         # Apply pagination
         amendments = ResponseProcessor.paginate_results(amendments, limit)
 
         # Format results
-        title = f"Amendments Matching '{keywords}'" if keywords else "Congressional Amendments"
+        title = (f"Amendments Matching '{keywords}' (purpose filter over "
+                 f"the {fetched} most recently updated)") if keywords else "Congressional Amendments"
         return AmendmentsFormatter.format_amendments_list(
             amendments,
             title=title,

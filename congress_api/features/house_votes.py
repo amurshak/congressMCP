@@ -623,6 +623,76 @@ async def get_house_vote_details_enhanced(ctx: Context, congress: int, session: 
         return format_error_response(CommonErrors.general_error(f"Error getting enhanced vote details: {str(e)}", ["Try again in a few moments", "Check your vote parameters"]))
 
 # @require_paid_access
+
+async def _fetch_member_votes_xml(ctx, congress, session, vote_number):
+    """Resolve the Clerk XML URL via Congress.gov and fetch it.
+
+    Returns (xml_content, source_url, error_markdown); exactly one of
+    xml_content/error_markdown is set.
+    """
+    endpoint = f"house-vote/{congress}/{session}/{vote_number}"
+    data = await safe_congressional_request(endpoint, ctx, {"format": "json"},
+                                            endpoint_type='house-votes')
+    if "error" in data:
+        return None, None, format_error_response(
+            CommonErrors.api_server_error(endpoint, message=data['error']))
+    if 'houseRollCallVote' not in data:
+        return None, None, f"House vote {congress}-{session}-{vote_number} not found."
+    source_data_url = data['houseRollCallVote'].get('sourceDataURL')
+    if not source_data_url:
+        return None, None, (f"No XML member vote data URL available for House "
+                            f"vote {congress}-{session}-{vote_number}.")
+    import httpx
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        response = await client.get(source_data_url)
+    if response.status_code != 200:
+        return None, source_data_url, format_error_response(CommonErrors.api_server_error(
+            f"Failed to fetch XML content from House Clerk website: HTTP {response.status_code}"))
+    if "<!ENTITY" in response.text:
+        return None, source_data_url, format_error_response(CommonErrors.api_server_error(
+            "Rejected Clerk XML containing entity declarations"))
+    return response.text, source_data_url, None
+
+
+def parse_member_votes(xml_content):
+    """Parse a Clerk roll-call XML into (header_lines, member_items, tallies).
+
+    member_items: [{"name", "party", "state", "vote"}, ...] for every
+    recorded vote in the document.
+    """
+    import xml.etree.ElementTree as ET
+    root = ET.fromstring(xml_content)
+    meta = root.find('vote-metadata')
+
+    def _t(tag):
+        el = meta.find(tag) if meta is not None else None
+        return el.text if el is not None and el.text else 'N/A'
+
+    header = [
+        f"**Legislation**: {_t('legis-num')}",
+        f"**Question**: {_t('vote-question')}",
+        f"**Result**: {_t('vote-result')}",
+        f"**Date**: {_t('action-date')}",
+    ]
+    members = []
+    vote_data = root.find('vote-data')
+    if vote_data is not None:
+        for rv in vote_data.findall('recorded-vote'):
+            leg, vote = rv.find('legislator'), rv.find('vote')
+            if leg is None or vote is None:
+                continue
+            members.append({
+                "name": leg.text or leg.get('unaccented-name') or 'Unknown',
+                "party": leg.get('party', 'Unknown'),
+                "state": leg.get('state', 'Unknown'),
+                "vote": vote.text or 'Unknown',
+            })
+    tallies = {}
+    for m in members:
+        tallies[m["vote"]] = tallies.get(m["vote"], 0) + 1
+    return header, members, tallies
+
+
 async def get_house_vote_member_votes(ctx: Context, congress: int, session: int, vote_number: int) -> str:
     """Get information about how individual members voted on a specific House roll call vote.
     
@@ -646,39 +716,32 @@ async def get_house_vote_member_votes(ctx: Context, congress: int, session: int,
         return format_error_response(CommonErrors.invalid_parameter("vote_number", vote_number, "Must be a positive integer"))
     
     try:
-        # First get the vote details to find the XML URL
-        endpoint = f"house-vote/{congress}/{session}/{vote_number}"
-        params = {"format": "json"}
-        
-        logger.debug(f"Fetching house vote details to get XML URL for {congress}-{session}-{vote_number}")
-        
-        # Make the API request
-        data = await safe_congressional_request(endpoint, ctx, params, endpoint_type='house-votes')
-        
-        if "error" in data:
-            logger.error(f"Error fetching house vote details: {data['error']}")
-            return format_error_response(CommonErrors.api_server_error(endpoint, message=data['error']))
-        
-        # Check for the correct response key
-        if 'houseRollCallVote' not in data:
-            return f"House vote {congress}-{session}-{vote_number} not found."
-        
-        vote = data['houseRollCallVote']
-        source_data_url = vote.get('sourceDataURL')
-        
-        if not source_data_url:
-            return f"No XML member vote data URL available for House vote {congress}-{session}-{vote_number}."
-        
+        xml_content, source_url, error = await _fetch_member_votes_xml(
+            ctx, congress, session, vote_number)
+        if error is not None:
+            return error
+
+        header, members, tallies = parse_member_votes(xml_content)
+        if not members:
+            return (f"The Clerk XML for House vote {congress}-{session}-"
+                    f"{vote_number} contains no recorded member votes: {source_url}")
+
         lines = [
             f"# Member Votes - House Vote {congress}-{session}-{vote_number}",
             "",
-            f"**Source Data URL**: {source_data_url}",
+            *header,
+            f"**Source**: {source_url}",
             "",
-            "**Note**: Member vote data is available in XML format from the House Clerk's website.",
-            "This data contains detailed voting information for each member including their vote choice (Yes/No/Present/Not Voting)."
+            "## Tallies",
         ]
-        
-        return "\n".join(lines)
+        for choice, count in sorted(tallies.items(), key=lambda kv: -kv[1]):
+            lines.append(f"- **{choice}**: {count}")
+        lines += [
+            "",
+            f"All {len(members)} individual member votes (name, party, state, "
+            "vote) are included in this response's structured `items` field.",
+        ]
+        return structured("\n".join(lines), "member_vote", members)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

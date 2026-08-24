@@ -541,7 +541,7 @@ async def search_summaries(
         # Build API request parameters
         params = {
             # Increase the limit to get more results for filtering
-            "limit": min(100, limit * 5),  # Get more results but cap at 100
+            "limit": 250,  # largest page the API allows; keyword filter runs client-side
             "sort": sort
         }
         
@@ -591,7 +591,11 @@ async def search_summaries(
         if keywords:
             filtered_summaries = SummariesProcessor.filter_by_keywords(summaries, keywords)
             title = f"Bill Summaries Matching '{keywords}'"
-            empty_msg = f"No summaries found matching '{keywords}'."
+            empty_msg = (
+                f"No match for '{keywords}' in the {len(summaries)} most "
+                "recently updated summaries in the date window. Note: this "
+                "filters recent summaries client-side -- it is not a "
+                "full-text search.")
         else:
             filtered_summaries = summaries
             title = "Recent Bill Summaries"

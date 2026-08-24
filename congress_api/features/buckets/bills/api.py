@@ -160,8 +160,9 @@ async def search_bills(
                 bill_type=bill_type
             )
 
-        # For keyword search, get more results to filter from
-        search_limit = min(limit * 5, 250)  # Get extra for keyword filtering
+        # Client-side filter: fetch the largest page the API allows so the
+        # keyword match sees as many recently-updated bills as possible.
+        search_limit = 250
 
         # Core API call
         response = await fetch_bill_data(
@@ -186,11 +187,25 @@ async def search_bills(
         # Apply keyword filtering
         filtered_bills = await BillsDataProcessor.filter_by_keywords(bills, keywords, limit)
 
+        if not filtered_bills:
+            scope = f" in Congress {congress}" if congress else ""
+            return (
+                f"No match for '{keywords}' in the titles or policy areas of "
+                f"the {len(bills)} most recently updated bills{scope}.\n\n"
+                "Note: this operation only filters recently updated bills by "
+                "title/policy area -- it is not a full-text or historical "
+                "search. For text inside a bill use the search_bill_text "
+                "tool; for subject browsing use get_bill_subjects."
+            )
+
         # Update response with filtered bills
         response["bills"] = filtered_bills
 
         # Format and return
-        return BillsFormatter.format_bills_list(response, f"Bills matching '{keywords}'")
+        return BillsFormatter.format_bills_list(
+            response,
+            f"Bills matching '{keywords}' (title/policy-area filter over "
+            f"the {len(bills)} most recently updated)")
 
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -696,33 +711,6 @@ async def get_bill_titles(
     except Exception as e:
         logger.error(f"Error in get_bill_titles: {str(e)}")
         error_response = CommonErrors.api_server_error("get_bill_titles")
-        return format_error_response(error_response)
-
-
-async def get_bill_content(
-    ctx: Context,
-    congress: int,
-    bill_type: str,
-    bill_number: int,
-    chunk_number: Optional[int] = None,
-    chunk_size: int = 5000
-) -> str:
-    """Get content for a specific bill with chunking support."""
-    try:
-        # Real content-chunking (fetching a specific `version`'s full text and
-        # paging it via chunk_number/chunk_size) isn't implemented yet, so this
-        # delegates to get_bill_text_versions and ignores chunk_number/chunk_size
-        # entirely. `version` isn't even accepted here (schema/impl audit
-        # allowlist: scripts/audit_tool_schemas.py) -- accepting it and then
-        # ignoring it would be worse than the current hard rejection. Follow-up:
-        # implement real chunked content fetching and wire all three through.
-        return await get_bill_text_versions(ctx, congress, bill_type, bill_number)
-
-    except CongressionalAPIError as e:
-        return format_error_response(e.error_response)
-    except Exception as e:
-        logger.error(f"Error in get_bill_content: {str(e)}")
-        error_response = CommonErrors.api_server_error("get_bill_content")
         return format_error_response(error_response)
 
 

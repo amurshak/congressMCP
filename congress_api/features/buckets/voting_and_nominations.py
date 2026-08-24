@@ -22,7 +22,7 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Voting
     try:
         kind, items = structured_items_of(raw_response)
         if items is not None:
-            votes, nominations = [], []
+            votes, nominations, generic = [], [], []
             if kind == "house_vote":
                 for v in items:
                     leg_type = v.get("legislationType") or ""
@@ -60,9 +60,12 @@ def _convert_to_structured_response(raw_response: str, operation: str) -> Voting
                         update_date=n.get("updateDate"),
                         url=n.get("url"),
                     ))
+            if kind not in ("house_vote", "nomination"):
+                generic = items
             return VotingNominationsResponse(
                 success=True, operation=operation, results_count=len(items),
-                votes=votes, nominations=nominations, summary=str(raw_response))
+                votes=votes, nominations=nominations, items=generic,
+                item_kind=kind, summary=str(raw_response))
 
         return VotingNominationsResponse(
             success=True, operation=operation,

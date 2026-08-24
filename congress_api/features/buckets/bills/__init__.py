@@ -35,7 +35,6 @@ from .api import (
     get_bill_cosponsors,
     get_bill_related_bills,
     get_bill_subjects,
-    get_bill_content,
 )
 
 # Define what gets imported with "from bills import *"
@@ -60,7 +59,6 @@ __all__ = [
     'get_bill_cosponsors',
     'get_bill_related_bills',
     'get_bill_subjects',
-    'get_bill_content',
 ]
 
 # Module metadata

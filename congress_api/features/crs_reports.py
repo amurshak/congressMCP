@@ -260,7 +260,7 @@ async def search_crs_reports(
             return format_error_response(CommonErrors.invalid_parameter("keywords", "Please provide either 'keywords' for searching recent reports or 'report_number' for a specific report (e.g., 'R47175')"))
         
         # Option B: Keyword Search - search larger batch of recent reports
-        search_limit = min(250, max(sanitized_limit * 5, 50))  # Search more than requested to improve filtering
+        search_limit = 250  # largest page the API allows; title filter runs client-side
         params = {
             'format': 'json',
             'limit': search_limit
@@ -308,9 +308,16 @@ async def search_crs_reports(
                 text = f"Search Results - CRS Reports matching '{keywords}':\n\n" + "\n\n".join(formatted_reports)
                 return structured(text, "crs_report", deduplicated_reports)
             else:
-                return format_error_response(CommonErrors.data_not_found(f"No CRS reports found matching keywords: '{keywords}'"))
+                return (
+                    f"No CRS report with '{keywords}' in the title among "
+                    f"the {search_limit} most recently updated reports.\n\n"
+                    "Note: this operation only filters recent report "
+                    "TITLES -- it is not a full-text search. Try broader or "
+                    "different title words, or a specific report_number "
+                    "(e.g. 'R47175')."
+                )
         else:
-            return format_error_response(CommonErrors.data_not_found("No CRS reports available"))
+            return "No CRS reports returned by the API."
             
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
