@@ -27,6 +27,7 @@ the parse and build. Each is null when that leg did not run.
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass, field, replace
 
@@ -35,6 +36,7 @@ from mcp.server.mcpserver import Context
 from . import trace
 from .cache import CacheSettings, Resolution
 from .client import (
+    VERSION_CODE_PATTERN,
     DOWNLOAD_SECONDS,
     BillTextError,
     ResolvedBillText,
@@ -116,6 +118,15 @@ class _Legs:
 
 
 async def load_bill_text(ctx: Context, congress: int, bill_type: str, number: int, version: str | None) -> LoadedBillText:
+    if version is not None and not re.fullmatch(VERSION_CODE_PATTERN, version.lower()):
+        # Reject before the cache layer sees it: package_filename() raises
+        # ValueError on such input, which two of the three tools would report
+        # as internal_error (reviewer finding on PR #63).
+        raise BillTextError(
+            "version_not_found",
+            f"'{version}' is not a bill text version code.",
+            None,
+            "Use a GPO version code such as 'ih', 'eh', 'rs' or 'enr', or omit version.")
     store = get_store()
     settings = store.settings if store is not None else CacheSettings.from_env()
     bill_type = bill_type.lower()

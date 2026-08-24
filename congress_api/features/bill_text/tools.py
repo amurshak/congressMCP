@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import functools
 import logging
-import re
 import time
 from typing import Any, Iterable
 
@@ -13,7 +12,7 @@ from mcp.server.mcpserver import Context
 from ...mcp_app import mcp
 from . import trace
 from .client import BillTextError, govinfo_details_url
-from .index import fts_literal, has_token, normalized_query, sqlite_supports_fts5
+from .index import has_token, normalized_query, sqlite_supports_fts5
 from .models import (
     AncestorNode,
     BillSectionResponse,

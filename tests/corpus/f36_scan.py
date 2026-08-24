@@ -227,6 +227,13 @@ def _dash_forms(records: list[dict], tier: str) -> dict[str, int]:
     return dict(sorted(forms.items()))
 
 
+
+def _esc_pipes(text):
+    """Escape Markdown table pipes. Kept out of the f-string expression:
+    a backslash there is 3.12-only syntax (PEP 701) and this repo's floor
+    is Python 3.10."""
+    return text.replace("|", "\\|")
+
 def render_markdown(report: dict) -> str:
     lines = [
         "# F36 measurement -- parenthetical P.L. / U.S.C.-note cites on the amendatory subject",
@@ -278,7 +285,7 @@ def render_markdown(report: dict) -> str:
         "| # | document | unit | parenthetical | context |",
         "|---:|---|---|---|---|",
         *[f"| {n} | {x['package_id']} | {x['section_id']} | `{x['text'][:70]}` | "
-          f"…{x['context'].replace('|', '\\|')}… |"
+          f"…{_esc_pipes(x['context'])}… |"
           for n, x in enumerate(report["precision_sample"], start=1)],
         "",
         "## Instances on the F36 bill and every strict/relaxed NO-ENTRY instance elsewhere",
