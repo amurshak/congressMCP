@@ -9,6 +9,7 @@ from ..core.validators import ParameterValidator
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -258,7 +259,7 @@ async def search_house_requirements(
             lines.append(format_house_requirement_item(req))
             lines.append("")
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "requirement", requirements[:limit])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -309,7 +310,7 @@ async def get_house_requirement_details(
             return f"House requirement {requirement_number} not found."
         
         logger.info(f"Found house requirement {requirement_number}")
-        return format_house_requirement_detail(requirement)
+        return structured(format_house_requirement_detail(requirement), "requirement", [requirement])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -351,7 +352,11 @@ async def get_house_requirement_matching_communications(
             return format_error_response(CommonErrors.api_server_error(endpoint, message=data['error']))
         
         logger.info(f"Found matching communications for house requirement {requirement_number}")
-        return format_matching_communications(data)
+        matching = data.get('houseCommunications') or []
+        formatted = format_matching_communications(data)
+        if matching:
+            return structured(formatted, "communication", matching)
+        return formatted
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

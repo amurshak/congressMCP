@@ -8,6 +8,7 @@ from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -198,7 +199,7 @@ async def get_committee_details(ctx: Context, chamber: str, committee_code: str)
     if "url" in committee:
         result.append(f"\nURL: {committee['url']}")
     
-    return "\n".join(result)
+    return structured("\n".join(result), "committee", [committee])
 
 # Tools (Interactive/Parameterized Functions)
 # - get_committee_bills: Bills with limit parameter
@@ -320,7 +321,7 @@ async def get_committee_bills(
             result.append(f"URL: {url}")
         
         logger.info(f"Successfully retrieved {len(bills)} bills for committee {committee_code}")
-        return "\n".join(result)
+        return structured("\n".join(result), "bill", bills[:limit])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -420,7 +421,7 @@ async def get_committee_reports(
             result.append(f"URL: {url}")
         
         logger.info(f"Successfully retrieved {len(reports)} reports for committee {committee_code}")
-        return "\n".join(result)
+        return structured("\n".join(result), "committee_report", reports[:limit])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -512,7 +513,7 @@ async def get_committee_nominations(
             result.append(f"URL: {url}")
         
         logger.info(f"Successfully retrieved {len(nominations)} nominations for committee {committee_code}")
-        return "\n".join(result)
+        return structured("\n".join(result), "nomination", nominations[:limit])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -626,7 +627,7 @@ async def get_committee_communications(
             result.append(f"URL: {url}")
         
         logger.info(f"Successfully retrieved {len(communications)} communications for committee {committee_code}")
-        return "\n".join(result)
+        return structured("\n".join(result), "communication", communications[:limit])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -719,7 +720,7 @@ async def search_committees(
             result.append("\n" + format_committee_summary(committee))
 
         logger.info(f"Successfully found {len(committees)} committees (search='{keywords}', type='{committee_type}')")
-        return "\n".join(result)
+        return structured("\n".join(result), "committee", committees[:limit])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

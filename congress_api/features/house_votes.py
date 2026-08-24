@@ -12,6 +12,7 @@ from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import safe_congressional_request
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 
 logger = logging.getLogger(__name__)
 
@@ -431,7 +432,7 @@ async def get_house_votes_by_congress(ctx: Context, congress: int, limit: int = 
             lines.append(f"## {i}. {format_house_vote_summary(vote)}")
             lines.append("")
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "house_vote", votes)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -492,7 +493,7 @@ async def get_house_votes_by_session(ctx: Context, congress: int, session: int, 
             lines.append(f"## {i}. {format_house_vote_summary(vote)}")
             lines.append("")
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "house_vote", votes)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -544,7 +545,8 @@ async def get_house_vote_details(ctx: Context, congress: int, session: int, vote
             return f"House vote {congress}-{session}-{vote_number} not found."
         
         vote = data['houseRollCallVote']
-        return format_house_vote_detail(vote)
+        vote_dict = vote[0] if isinstance(vote, list) and vote else vote
+        return structured(format_house_vote_detail(vote), "house_vote", [vote_dict])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -611,7 +613,8 @@ async def get_house_vote_details_enhanced(ctx: Context, congress: int, session: 
 - **Last Updated**: {vote_details.get('updateDate', 'N/A')}
 """
         
-        return f"# Enhanced House Vote Details\n\n{basic_result}{enhanced_section}"
+        text = f"# Enhanced House Vote Details\n\n{basic_result}{enhanced_section}"
+        return structured(text, "house_vote", [vote_details])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

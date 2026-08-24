@@ -13,83 +13,57 @@ from ...core.exceptions import CongressionalAPIError
 from ...mcp_app import mcp
 from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import RecordsHearingsResponse, HearingSummary, RecordSummary
-from ...utils.response_converters import _extract_result_count, _extract_json
+from ...utils.response_converters import _extract_result_count, _int_or_none, structured_items_of
 
 logger = logging.getLogger(__name__)
 
 def _convert_to_structured_response(raw_response: str, operation: str) -> RecordsHearingsResponse:
-    """Convert raw string response to structured RecordsHearingsResponse."""
+    """Build the structured response; typed lists come from the impl's real items."""
     try:
-        if isinstance(raw_response, str):
-            data = _extract_json(raw_response)
-            if data is None:
-                # The underlying impls return pre-formatted markdown, not JSON, so this
-                # is the normal path for every operation, not a fallback for malformed
-                # data — it must preserve the full response, not truncate it.
-                return RecordsHearingsResponse(
-                    success=True,
-                    operation=operation,
-                    results_count=_extract_result_count(raw_response),
-                    hearings=[],
-                    records=[],
-                    summary=raw_response
-                )
-        else:
-            data = raw_response
-
-        hearings = []
-        records = []
-        results_count = 0
-
-        if isinstance(data, dict):
-            # Handle hearings
-            if 'hearings' in data:
-                for hearing_data in data.get('hearings', []):
-                    if isinstance(hearing_data, dict):
-                        hearings.append(HearingSummary(
-                            congress=hearing_data.get('congress', 0),
-                            chamber=hearing_data.get('chamber', ''),
-                            jacket_number=hearing_data.get('jacketNumber', ''),
-                            title=hearing_data.get('title', ''),
-                            committee=hearing_data.get('committee', ''),
-                            date=hearing_data.get('date'),
-                            url=hearing_data.get('url')
-                        ))
-
-            # Handle congressional records
-            if 'records' in data:
-                for record_data in data.get('records', []):
-                    if isinstance(record_data, dict):
-                        records.append(RecordSummary(
-                            volume=record_data.get('volume', 0),
-                            issue=record_data.get('issue', 0),
-                            date=record_data.get('date', ''),
-                            section=record_data.get('section', ''),
-                            title=record_data.get('title', ''),
-                            url=record_data.get('url')
-                        ))
-
-            results_count = len(hearings) + len(records)
+        kind, items = structured_items_of(raw_response)
+        if items is not None:
+            hearings, records, generic = [], [], []
+            if kind == "hearing":
+                for h in items:
+                    hearings.append(HearingSummary(
+                        jacket_number=str(h.get("jacketNumber", "")),
+                        congress=h.get("congress"),
+                        chamber=h.get("chamber"),
+                        title=h.get("title"),
+                        committee=(h.get("committees") or [{}])[0].get("name")
+                        if isinstance(h.get("committees"), list) else None,
+                        date=(h.get("dates") or [{}])[0].get("date") if isinstance(h.get("dates"), list) else None,
+                        update_date=h.get("updateDate"),
+                        url=h.get("url"),
+                    ))
+            elif kind in ("record", "daily_record", "bound_record"):
+                for r in items:
+                    records.append(RecordSummary(
+                        volume=_int_or_none(r.get("Volume") or r.get("volumeNumber") or r.get("volume")),
+                        issue=_int_or_none(r.get("Issue") or r.get("issueNumber")),
+                        session=_int_or_none(r.get("Session") or r.get("sessionNumber")),
+                        congress=_int_or_none(r.get("Congress") or r.get("congress")),
+                        date=r.get("PublishDate") or r.get("issueDate") or r.get("date"),
+                        id=str(r.get("Id")) if r.get("Id") is not None else None,
+                        url=r.get("url"),
+                    ))
+            else:
+                generic = items
+            return RecordsHearingsResponse(
+                success=True, operation=operation, results_count=len(items),
+                hearings=hearings, records=records, items=generic,
+                item_kind=kind, summary=str(raw_response))
 
         return RecordsHearingsResponse(
-            success=True,
-            operation=operation,
-            results_count=results_count,
-            hearings=hearings,
-            records=records,
-            summary=f"Found {len(hearings)} hearings and {len(records)} records"
-        )
-
+            success=True, operation=operation,
+            results_count=_extract_result_count(raw_response),
+            hearings=[], records=[], summary=str(raw_response))
     except Exception as e:
         logger.error(f"Error converting response to structured format: {e}")
         return RecordsHearingsResponse(
-            success=False,
-            operation=operation,
-            results_count=0,
-            hearings=[],
-            records=[],
-            summary=f"Error processing response: {str(e)}"
-        )
+            success=False, operation=operation, results_count=0,
+            hearings=[], records=[], summary=f"Error processing response: {str(e)}")
+
 
 async def route_records_and_hearings_operation(ctx: Context, operation: str, **kwargs) -> RecordsHearingsResponse:
     """Route operation to appropriate internal function."""
@@ -222,7 +196,7 @@ async def records_and_hearings(
     CONGRESSIONAL RECORDS (3 operations):
     • search_congressional_record/daily/bound - Search legislative records by date/volume
 
-    COMMUNICATIONS (8 operations):  
+    COMMUNICATIONS (8 operations):
     • House: search_house_communications/requirements, get_details/matching
     • Senate: search_senate_communications, get_senate_communication_details
     • Committee: get_committee_communication_details

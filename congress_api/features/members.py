@@ -7,6 +7,7 @@ from ..core.api_wrapper import DefensiveAPIWrapper, safe_congressional_request
 from ..core.congress_dates import current_congress
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 import logging
 
 logger = logging.getLogger(__name__)
@@ -163,7 +164,7 @@ async def get_member_details(ctx: Context, bioguide_id: str) -> str:
         if "deathDate" in member:
             result.append(f"Death Date: {member['deathDate']}")
         
-        return "\n".join(result)
+        return structured("\n".join(result), "member", [member])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -246,7 +247,7 @@ async def get_member_sponsored_legislation(ctx: Context, bioguide_id: str, limit
             if "url" in bill:
                 result.append(f"[View Details]({bill['url']})")
         
-        return "\n".join(result)
+        return structured("\n".join(result), "bill", legislation)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -326,7 +327,7 @@ async def get_member_cosponsored_legislation(ctx: Context, bioguide_id: str, lim
             if "url" in bill:
                 result.append(f"[View Details]({bill['url']})")
         
-        return "\n".join(result)
+        return structured("\n".join(result), "bill", legislation)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -392,7 +393,7 @@ async def get_members_by_congress(ctx: Context, congress: int, current_member: O
         for member in members:
             result.append("\n" + format_member_summary(member))
 
-        return "\n".join(result)
+        return structured("\n".join(result), "member", members)
 
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -455,7 +456,7 @@ async def get_members_by_state(ctx: Context, state_code: str, current_member: Op
         for member in members:
             result.append("\n" + format_member_summary(member))
         
-        return "\n".join(result)
+        return structured("\n".join(result), "member", members)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -517,7 +518,7 @@ async def get_members_by_district(ctx: Context, state_code: str, district: int, 
         for member in members:
             result.append("\n" + format_member_summary(member))
         
-        return "\n".join(result)
+        return structured("\n".join(result), "member", members)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -795,7 +796,7 @@ async def search_members(
         for member in filtered_members:
             result.append("\n" + format_member_summary(member))
         
-        return "\n".join(result)
+        return structured("\n".join(result), "member", filtered_members)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -911,7 +912,7 @@ async def get_members_by_congress_state_district(
         for member in filtered_members:
             result.append("\n" + format_member_summary(member))
         
-        return "\n".join(result)
+        return structured("\n".join(result), "member", filtered_members)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

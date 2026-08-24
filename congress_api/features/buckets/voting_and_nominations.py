@@ -13,85 +13,66 @@ from ...core.exceptions import CongressionalAPIError
 from ...mcp_app import mcp
 from ...core.operation_routing import validate_operation_kwargs
 from ...models.responses import VotingNominationsResponse, VoteSummary, NominationSummary
-from ...utils.response_converters import _extract_result_count, _extract_json
+from ...utils.response_converters import _extract_result_count, structured_items_of
 
 logger = logging.getLogger(__name__)
 
 def _convert_to_structured_response(raw_response: str, operation: str) -> VotingNominationsResponse:
-    """Convert raw string response to structured VotingNominationsResponse."""
+    """Build the structured response; typed lists come from the impl's real items."""
     try:
-        # Parse the raw response
-        if isinstance(raw_response, str):
-            data = _extract_json(raw_response)
-            if data is None:
-                # The underlying impls return pre-formatted markdown, not JSON, so this
-                # is the normal path for every operation, not a fallback for malformed
-                # data — it must preserve the full response, not truncate it.
-                return VotingNominationsResponse(
-                    success=True,
-                    operation=operation,
-                    results_count=_extract_result_count(raw_response),
-                    votes=[],
-                    nominations=[],
-                    summary=raw_response
-                )
-        else:
-            data = raw_response
-
-        votes = []
-        nominations = []
-        results_count = 0
-
-        if isinstance(data, dict):
-            # Handle votes
-            if 'votes' in data:
-                for vote_data in data.get('votes', []):
-                    if isinstance(vote_data, dict):
-                        votes.append(VoteSummary(
-                            vote_number=vote_data.get('voteNumber', 0),
-                            chamber=vote_data.get('chamber', ''),
-                            date=vote_data.get('date', ''),
-                            description=vote_data.get('question', ''),
-                            result=vote_data.get('result', ''),
-                            vote_counts=vote_data.get('totals', {}),
-                            url=vote_data.get('url')
-                        ))
-
-            # Handle nominations
-            if 'nominations' in data:
-                for nom_data in data.get('nominations', []):
-                    if isinstance(nom_data, dict):
-                        nominations.append(NominationSummary(
-                            nomination_number=nom_data.get('nominationNumber', ''),
-                            nominee=nom_data.get('nominee', ''),
-                            position=nom_data.get('position', ''),
-                            organization=nom_data.get('organization', ''),
-                            received_date=nom_data.get('receivedDate'),
-                            status=nom_data.get('latestAction'),
-                            url=nom_data.get('url')
-                        ))
-
-            results_count = len(votes) + len(nominations)
+        kind, items = structured_items_of(raw_response)
+        if items is not None:
+            votes, nominations = [], []
+            if kind == "house_vote":
+                for v in items:
+                    leg_type = v.get("legislationType") or ""
+                    leg_num = v.get("legislationNumber") or ""
+                    legislation = f"{leg_type} {leg_num}".strip() or None
+                    votes.append(VoteSummary(
+                        vote_number=int(v.get("rollCallNumber") or 0),
+                        congress=v.get("congress"),
+                        session=v.get("sessionNumber"),
+                        chamber="House",
+                        legislation=legislation,
+                        vote_type=v.get("voteType"),
+                        result=v.get("result"),
+                        date=v.get("startDate"),
+                        url=v.get("url"),
+                    ))
+            elif kind == "nomination":
+                for n in items:
+                    latest = n.get("latestAction") or {}
+                    latest_text = latest.get("text") if isinstance(latest, dict) else str(latest)
+                    ntype = n.get("nominationType") or {}
+                    nominees = n.get("nominees")
+                    first = nominees[0] if isinstance(nominees, list) and nominees else {}
+                    nominations.append(NominationSummary(
+                        nomination_number=str(n.get("number", "")),
+                        citation=n.get("citation"),
+                        congress=n.get("congress"),
+                        organization=n.get("organization"),
+                        is_military=ntype.get("isMilitary") if isinstance(ntype, dict) else None,
+                        nominee=(f"{first.get('firstName', '')} {first.get('lastName', '')}".strip()
+                                 or None) if first.get("firstName") else None,
+                        position=first.get("positionTitle") if isinstance(first, dict) else None,
+                        received_date=n.get("receivedDate"),
+                        latest_action=latest_text,
+                        update_date=n.get("updateDate"),
+                        url=n.get("url"),
+                    ))
+            return VotingNominationsResponse(
+                success=True, operation=operation, results_count=len(items),
+                votes=votes, nominations=nominations, summary=str(raw_response))
 
         return VotingNominationsResponse(
-            success=True,
-            operation=operation,
-            results_count=results_count,
-            votes=votes,
-            nominations=nominations,
-            summary=f"Found {len(votes)} votes and {len(nominations)} nominations"
-        )
-
+            success=True, operation=operation,
+            results_count=_extract_result_count(raw_response),
+            votes=[], nominations=[], summary=str(raw_response))
     except Exception as e:
         logger.error(f"Error converting response to structured format: {e}")
         return VotingNominationsResponse(
-            success=False,
-            operation=operation,
-            results_count=0,
-            votes=[],
-            nominations=[],
-            summary=f"Error processing response: {str(e)}"
-        )
+            success=False, operation=operation, results_count=0,
+            votes=[], nominations=[], summary=f"Error processing response: {str(e)}")
 
 async def route_voting_and_nominations_operation(ctx: Context, operation: str, **kwargs) -> VotingNominationsResponse:
     """Route operation to appropriate internal function."""

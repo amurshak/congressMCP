@@ -8,6 +8,7 @@ from ..core.validators import ParameterValidator, ValidationResult
 from ..core.api_wrapper import DefensiveAPIWrapper
 from ..core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -225,7 +226,7 @@ async def get_hearings_by_congress(ctx: Context, congress: int) -> str:
             lines.append("")
             lines.append(format_hearing_item(HearingsProcessor.clean_hearing_response(hearing_item)))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "hearing", deduplicated_hearings)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -301,7 +302,7 @@ async def get_hearings_by_congress_and_chamber(ctx: Context, congress: int, cham
             lines.append("")
             lines.append(format_hearing_item(HearingsProcessor.clean_hearing_response(hearing_item)))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "hearing", deduplicated_hearings)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -382,7 +383,8 @@ async def get_hearing_details(ctx: Context, congress: int, chamber: str, jacket_
             return f"No hearing data found for Congress {congress}, Chamber {chamber}, Jacket Number {jacket_number}."
         
         logger.info(f"Successfully retrieved hearing details for {congress}/{chamber}/{jacket_number}")
-        return format_hearing_detail(HearingsProcessor.clean_hearing_response(hearing_data))
+        cleaned_hearing = HearingsProcessor.clean_hearing_response(hearing_data)
+        return structured(format_hearing_detail(cleaned_hearing), "hearing", [cleaned_hearing])
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -613,7 +615,7 @@ async def search_hearings(
             lines.append("")
             lines.append(format_hearing_item(HearingsProcessor.clean_hearing_response(hearing_item)))
         
-        return "\n".join(lines)
+        return structured("\n".join(lines), "hearing", deduplicated_hearings)
         
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)

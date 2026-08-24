@@ -12,6 +12,7 @@ from ..core.api_wrapper import safe_congressional_request
 from ..core.validators import ParameterValidator
 from ..core.exceptions import CommonErrors, format_error_response
 from ..core.response_utils import ResponseProcessor
+from ..utils.structured import structured
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -241,7 +242,7 @@ async def get_latest_nominations(ctx: Context) -> str:
     for idx, nomination in enumerate(nominations, 1):
         lines.append(f"## {idx}. {format_nomination_item(nomination)}\n")
     
-    return "\n".join(lines)
+    return structured("\n".join(lines), "nomination", nominations)
 
 # @require_paid_access
 async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
@@ -286,7 +287,7 @@ async def get_nominations_by_congress(ctx: Context, congress: int) -> str:
     for idx, nomination in enumerate(nominations, 1):
         lines.append(f"## {idx}. {format_nomination_item(nomination)}\n")
     
-    return "\n".join(lines)
+    return structured("\n".join(lines), "nomination", nominations)
 
 # @require_paid_access
 async def get_nomination_details(ctx: Context, congress: int, nomination_number: int) -> str:
@@ -326,7 +327,7 @@ async def get_nomination_details(ctx: Context, congress: int, nomination_number:
     logger.info(f"Found nomination details for {nomination_number}, Congress {congress}")
     
     # Format and return the result
-    return format_nomination_detail(nomination)
+    return structured(format_nomination_detail(nomination), "nomination", [nomination])
 
 # @require_paid_access
 async def get_nomination_nominees(ctx: Context, congress: int, nomination_number: int, ordinal: int) -> str:
@@ -636,4 +637,4 @@ async def search_nominations(
         lines.append(f"## {i}. {format_nomination_item(nomination)}")
         lines.append("")
     
-    return "\n".join(lines)
+    return structured("\n".join(lines), "nomination", deduplicated_nominations)
