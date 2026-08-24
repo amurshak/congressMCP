@@ -174,3 +174,10 @@ def test_wrapper_raises_typed_error_with_envelope_str():
     exc = CongressionalAPIError(err)
     payload = json.loads(str(exc))["error"]
     assert payload["code"] == "data_not_found"
+
+
+def test_embedded_url_in_detail_is_stripped():
+    from congress_api.core.exceptions import _strip_url_secrets
+    v = _strip_url_secrets("Failed to fetch https://cdn.example.com/f.xml?X-Amz-Signature=tok after retry")
+    assert "X-Amz-Signature" not in v
+    assert "https://cdn.example.com/f.xml" in v and "after retry" in v

@@ -8,6 +8,7 @@ and debugging utilities across all APIs.
 import logging
 from typing import List, Optional, Dict, Any
 import json
+import re as _re_mod
 from urllib.parse import urlsplit, urlunsplit
 from dataclasses import dataclass
 from enum import Enum
@@ -54,6 +55,9 @@ class ErrorText(str):
         return obj
 
 
+_URL_RE = _re_mod.compile(r"https?://\S+")
+
+
 def _strip_url_secrets(value):
     """Spec section 9 (F22 rule): any URL reaching an error `detail` is
     stripped to scheme+host+path -- query strings can carry the api_key or
@@ -63,6 +67,8 @@ def _strip_url_secrets(value):
             parts = urlsplit(value)
             if parts.scheme and parts.netloc:
                 return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+            # URL embedded mid-sentence: strip the query of every match.
+            return _URL_RE.sub(lambda m: m.group(0).split("?", 1)[0].split("#", 1)[0], value)
         except ValueError:
             return value
     return value

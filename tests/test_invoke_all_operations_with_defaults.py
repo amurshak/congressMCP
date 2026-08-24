@@ -176,7 +176,12 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
                 f"{tool_name}::{operation} failed without a typed error: "
                 f"{getattr(result, 'summary', result)}"
             )
-            assert err.code != "internal_error", (
+            # With an always-healthy mocked network, none of these codes are
+            # legitimate: internal_error is a crash by definition, and
+            # server_error/general_* only arise from handler-local generic
+            # excepts swallowing a crash (the network cannot have failed).
+            assert err.code not in ("internal_error", "server_error",
+                                    "general_error", "general_api_failure"), (
                 f"{tool_name}::{operation} crashed: {err.message}"
             )
     elif isinstance(result, str) and result.lstrip().startswith("{"):
@@ -184,7 +189,8 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
             payload = _json.loads(result).get("error") or {}
         except ValueError:
             payload = {}
-        assert payload.get("code") != "internal_error", (
+        assert payload.get("code") not in ("internal_error", "server_error",
+                                           "general_error", "general_api_failure"), (
             f"{tool_name}::{operation} crashed: {payload.get('message')}"
         )
 
