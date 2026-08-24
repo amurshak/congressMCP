@@ -129,12 +129,19 @@ def generate_cache_key(endpoint: str, params: Dict[str, Any]) -> str:
     return f"{endpoint}?{param_str}"
 
 # Helper function for API requests
-async def make_api_request(endpoint: str, ctx: Optional[Context] = None, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+async def make_api_request(endpoint: str, ctx: Optional[Context] = None, params: Optional[Dict[str, Any]] = None,
+                            timeout: Optional[float] = None) -> Dict[str, Any]:
     """Make a request to the Congress.gov API with caching and proper error handling.
 
     `ctx` is the request's MCP Context, used by tools and templated resources.
     Static resource handlers can't declare a Context parameter under MCP SDK v2,
     so they pass `ctx=None` and the AppContext is pulled from `get_app_context()` instead.
+
+    `timeout` overrides the client's default httpx timeout for this request only
+    (issue #58: per-endpoint timeouts from DefensiveAPIWrapper were computed but
+    never reached httpx). Omitted/None keeps the client's own default -- passing
+    `timeout=None` straight to httpx would instead disable the timeout entirely,
+    so it is only forwarded when the caller supplied a value.
     """
     start_time = time.time()
 
@@ -179,8 +186,11 @@ async def make_api_request(endpoint: str, ctx: Optional[Context] = None, params:
         logger.debug(f"Making request to {endpoint}")
         if ENV != "production":  # Only log params in non-production
             logger.debug(f"Request parameters: {safe_params}")
-            
-        response = await client.get(endpoint, params=request_params)
+
+        request_kwargs = {"params": request_params}
+        if timeout is not None:
+            request_kwargs["timeout"] = timeout
+        response = await client.get(endpoint, **request_kwargs)
         response.raise_for_status()
         
         # Parse the response
@@ -222,12 +232,34 @@ async def make_api_request(endpoint: str, ctx: Optional[Context] = None, params:
         if ctx is not None:
             ctx.error(ctx_error_message)
 
-        # Return an error response with enough detail for clients
-        # We'll keep the original error message but sanitize it for logging
+        # Return an error response with enough detail for clients. Retry-After
+        # and X-RateLimit-Remaining (issue #58) let DefensiveAPIWrapper pace
+        # 429 retries off the server's own guidance instead of blind backoff.
         return {
-            "error": f"API request failed: {e.response.status_code}", 
+            "error": f"API request failed: {e.response.status_code}",
             "status_code": e.response.status_code,
-            "request_time": request_time
+            "request_time": request_time,
+            "retry_after": e.response.headers.get("Retry-After"),
+            "rate_limit_remaining": e.response.headers.get("X-RateLimit-Remaining"),
+        }
+    except httpx.TimeoutException as e:
+        request_time = time.time() - start_time
+
+        log_error_message = f"API request to {endpoint} exceeded its timeout"
+        logger.error(log_error_message)
+
+        # Must contain "timeout" -- DefensiveAPIWrapper._classify_api_error
+        # matches on it to report API_TIMEOUT instead of a generic failure.
+        ctx_error_message = f"API request timeout after {request_time:.2f}s"
+        if ENV != "production":
+            ctx_error_message += f": {str(e)}"
+
+        if ctx is not None:
+            ctx.error(ctx_error_message)
+
+        return {
+            "error": f"API request timeout for endpoint {endpoint} after {request_time:.2f}s",
+            "request_time": request_time,
         }
     except httpx.RequestError as e:
         request_time = time.time() - start_time
