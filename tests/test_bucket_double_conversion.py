@@ -27,7 +27,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 
 class FakeContext:
@@ -46,8 +46,14 @@ async def test_committee_intelligence_does_not_double_convert():
     from congress_api.features.buckets import committee_intelligence as mod
 
     raw = _fabricated_markdown(5, "# Committee Reports (5 found)")
+    # autospec=True is load-bearing, not stylistic (issue #45): a bare
+    # AsyncMock(return_value=...) has no real signature, and
+    # inspect.signature() on it crashes on Python 3.10 (the project's
+    # declared floor) inside operation_routing.validate_operation_kwargs,
+    # even though it works fine on 3.11+. Don't "simplify" this back.
     with patch("congress_api.features.committee_reports.get_latest_committee_reports",
-               new=AsyncMock(return_value=raw)):
+               autospec=True) as mock_handler:
+        mock_handler.return_value = raw
         resp = await mod.committee_intelligence(FakeContext(), operation="get_latest_committee_reports")
 
     assert resp.results_count == 5, "double-conversion bug: results_count always 0"
@@ -60,7 +66,9 @@ async def test_records_and_hearings_does_not_double_convert():
     from congress_api.features.buckets import records_and_hearings as mod
 
     raw = _fabricated_markdown(5, "Found 5 hearings")
-    with patch("congress_api.features.hearings.search_hearings", new=AsyncMock(return_value=raw)):
+    # autospec=True required on Python 3.10 -- see comment in the test above.
+    with patch("congress_api.features.hearings.search_hearings", autospec=True) as mock_handler:
+        mock_handler.return_value = raw
         resp = await mod.records_and_hearings(FakeContext(), operation="search_hearings", congress=119)
 
     assert resp.results_count == 5
@@ -73,7 +81,9 @@ async def test_research_and_professional_does_not_double_convert():
     from congress_api.features.buckets import research_and_professional as mod
 
     raw = _fabricated_markdown(5, "Found 5 reports")
-    with patch("congress_api.features.crs_reports.search_crs_reports", new=AsyncMock(return_value=raw)):
+    # autospec=True required on Python 3.10 -- see comment in the test above.
+    with patch("congress_api.features.crs_reports.search_crs_reports", autospec=True) as mock_handler:
+        mock_handler.return_value = raw
         resp = await mod.research_and_professional(FakeContext(), operation="search_crs_reports", keywords="x")
 
     assert resp.results_count == 5
@@ -86,7 +96,9 @@ async def test_voting_and_nominations_does_not_double_convert():
     from congress_api.features.buckets import voting_and_nominations as mod
 
     raw = _fabricated_markdown(5, "# Latest Nominations (5 found)")
-    with patch("congress_api.features.nominations.get_latest_nominations", new=AsyncMock(return_value=raw)):
+    # autospec=True required on Python 3.10 -- see comment in the test above.
+    with patch("congress_api.features.nominations.get_latest_nominations", autospec=True) as mock_handler:
+        mock_handler.return_value = raw
         resp = await mod.voting_and_nominations(FakeContext(), operation="get_latest_nominations")
 
     assert resp.results_count == 5
