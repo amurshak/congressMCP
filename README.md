@@ -485,6 +485,8 @@ Point a client at a source checkout by using `"command": "congressmcp"` (with th
 | `GOVINFO_API_KEY` | No | — | Optional override for GovInfo; otherwise `CONGRESS_API_KEY` is reused |
 | `ENABLE_CACHING` | No | `false` | Cache API responses in memory |
 | `CACHE_TIMEOUT` | No | `300` | Cache TTL in seconds |
+| `LOG_LEVEL` | No | `WARNING` | Logging verbosity on stderr (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `CONGRESS_API_ENV` | No | `local` | Set to `development`/`staging`/`production` to load the matching `.env.*` file; unset loads only a plain `.env`. Files never override exported variables |
 | `CONGRESSMCP_BILL_TEXT_ONLY` | No | unset | If truthy, register only the three bill-text tools (standalone bill-text server) |
 | `CONGRESSMCP_TRACE_DIR` | No | unset | If set to a directory, write one key-redacted JSONL record per bill-text tool call (debugging) |
 | `CONGRESSMCP_CACHE_DIR` | No | Platform cache path | Bill-text package cache root (persistent cache is planned; currently in-memory) |

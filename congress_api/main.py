@@ -39,13 +39,14 @@ class SensitiveInfoFilter(logging.Filter):
 def setup_logging():
     """Configure logging for the application based on environment with security considerations."""
 
-    # Determine log level based on environment
-    if ENV == "production":
+    # Determine log level based on environment. Local (end-user) installs
+    # default to WARNING: an MCP server's stderr lands in the client's logs,
+    # and DEBUG streamed full httpx wire traffic there. Set LOG_LEVEL to
+    # override (e.g. LOG_LEVEL=DEBUG for development).
+    if ENV in ("production", "staging"):
         default_level = logging.INFO
-    elif ENV == "staging":
-        default_level = logging.INFO
-    else:  # development
-        default_level = logging.DEBUG
+    else:  # local / development
+        default_level = logging.WARNING
 
     # Allow override via environment variable
     log_level_name = os.getenv("LOG_LEVEL", "")

@@ -11,53 +11,33 @@ logger = logging.getLogger(__name__)
 
 def load_environment_config():
     """
-    Load environment variables from the appropriate .env file.
-    
-    Priority:
-    1. CONGRESS_API_ENV environment variable (development, production, staging)
-    2. Heroku detection (if PORT is set, assume production)
-    3. Default to development
+    Load environment variables from a .env file, without overriding the shell.
+
+    Rules:
+    - CONGRESS_API_ENV selects an explicit environment ("production",
+      "staging", "development"): its .env.{env} file is loaded if present.
+    - Unset (the normal end-user install): environment is "local" and only a
+      plain .env at the project root is loaded, if one exists.
+    - Files never override variables already exported in the environment
+      (override=False), so `CONGRESS_API_KEY=... congressmcp` always wins.
+    - No platform auto-detection: the old Heroku PORT heuristic is gone.
     """
-    # Get the project root directory
     project_root = Path(__file__).parent.parent.parent
-    
-    # Determine environment
-    env = os.getenv('CONGRESS_API_ENV')
-    
-    if not env:
-        # Auto-detect environment
-        if os.getenv('PORT'):  # Heroku sets PORT
-            env = 'production'
-        else:
-            env = 'development'
-    
-    env = env.lower()
-    
-    # Load the appropriate .env file
-    if env == "production":
-        # In production, we expect environment variables to be set by the deployment platform
-        # But we can still try to load from .env.production as a fallback
-        env_file = project_root / ".env.production"
+
+    env = (os.getenv('CONGRESS_API_ENV') or '').lower().strip()
+
+    if env:
+        env_file = project_root / f".env.{env}"
         if env_file.exists():
-            logger.info(f"Loading production environment from: {env_file}")
-            load_dotenv(env_file, override=True)
-    elif env == "staging":
-        env_file = project_root / ".env.staging"
+            logger.info(f"Loading {env} environment from: {env_file}")
+            load_dotenv(env_file, override=False)
+    else:
+        env = 'local'
+        env_file = project_root / ".env"
         if env_file.exists():
-            logger.info(f"Loading staging environment from: {env_file}")
-            load_dotenv(env_file, override=True)
-    else:  # development is the default
-        env_file = project_root / ".env.development"
-        if env_file.exists():
-            logger.info(f"Loading development environment from: {env_file}")
-            load_dotenv(env_file, override=True)
-        else:
-            # Fallback to .env
-            fallback_env = project_root / ".env"
-            if fallback_env.exists():
-                logger.info(f"Fallback: Loading environment from: {fallback_env}")
-                load_dotenv(fallback_env, override=True)
-    
+            logger.info(f"Loading environment from: {env_file}")
+            load_dotenv(env_file, override=False)
+
     logger.info(f"Environment: {env}")
     return env
 
