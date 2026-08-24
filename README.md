@@ -529,7 +529,7 @@ congressmcp cache clear --yes   # exit 0; without --yes in a non-interactive she
 
 - **"command not found: uvx"** in a GUI client (Claude Desktop, Zed, LM Studio, JetBrains): use the absolute path from `which uvx` (macOS/Linux) or `where uvx` (Windows) as the `command`.
 - **Windows**: if a client can't spawn `uvx` directly, use `"command": "cmd", "args": ["/c", "uvx", "congressmcp"]`.
-- **First start is slow**: `uvx` downloads and caches the package on first run; subsequent starts are fast. Pin a version with `uvx congressmcp@2.1.0` if you want reproducibility.
+- **First start is slow**: `uvx` downloads and caches the package on first run; subsequent starts are fast. Pin a version with `uvx congressmcp@2.2.0` if you want reproducibility.
 - **401 / 403 from the API**: the key is missing or wrong. Confirm it works with `curl "https://api.congress.gov/v3/bill?api_key=YOUR_KEY&limit=1"`.
 - **Tools missing in the client**: most clients need a restart or an explicit MCP reload after editing config.
 
