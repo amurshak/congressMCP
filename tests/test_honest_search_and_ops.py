@@ -120,8 +120,10 @@ async def test_member_votes_rejects_entity_xml():
         async def get(self, url):
             return FakeResp()
 
+    vote = {"houseRollCallVote":
+            {"sourceDataURL": "https://clerk.house.gov/evs/2025/roll100.xml"}}
     with patch.object(mod, "safe_congressional_request",
-                      AsyncMock(return_value={"houseRollCallVote": {"sourceDataURL": "https://clerk.house.gov/evs/2025/roll100.xml"}})), \
+                      AsyncMock(return_value=vote)), \
             patch("httpx.AsyncClient", FakeClient):
         out = await mod.get_house_vote_member_votes(FakeContext(), congress=119,
                                                     session=1, vote_number=100)
