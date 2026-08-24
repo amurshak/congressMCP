@@ -124,7 +124,18 @@ async def bills(
     • Relationships: get_bill_related_bills, get_bill_amendments
     • Legislative Process: get_bill_actions, get_bill_committees, get_bill_cosponsors
     • Date-Based: get_bills_by_date_range
-    
+
+    REQUIRED PARAMETERS (the schema marks every parameter optional because
+    one shared schema covers every operation -- these operations fail
+    without the values below):
+    • congress + bill_type + bill_number (or bill_id, which is parsed into
+      those three) -- get_bill_details, get_bill_titles, get_bill_subjects,
+      get_bill_text, get_bill_text_versions, get_bill_summaries,
+      get_bill_related_bills, get_bill_amendments, get_bill_actions,
+      get_bill_committees, get_bill_cosponsors
+    • fromDateTime -- get_bills_by_date_range
+    (search_bills, get_bills, get_recent_bills need none of the above)
+
     Args:
         operation: Specific operation to perform (see list above)
         bill_id: Flexible bill reference (e.g., 'HR 1234', 'H.R. 1234, 118th Congress', 'hr1234-118')

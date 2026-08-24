@@ -126,6 +126,13 @@ async def research_and_professional(
     • search_crs_reports - CRS reports: exact report_number lookup, or a
       title filter over the 250 most recently updated reports (not full-text)
 
+    REQUIRED PARAMETERS (the schema marks every parameter optional because
+    one shared schema covers every operation -- these operations fail
+    without the values below):
+    • keywords -- search_congresses
+    • keywords or report_number (at least one) -- search_crs_reports
+    (get_congress_info, get_congress_info_enhanced need none of the above)
+
     Key params: operation, congress, keywords, report_number, start_year, end_year
     Returns professional-grade research data with enhanced analytics and historical insights.
     """

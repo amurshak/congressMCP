@@ -95,7 +95,16 @@ async def amendments(
     
     CONTENT OPERATIONS:
     - get_amendment_text: Full amendment text and purpose
-    
+
+    REQUIRED PARAMETERS (the schema marks every parameter optional because
+    one shared schema covers every operation -- these operations fail
+    without the values below):
+    • congress + amendment_type + amendment_number -- get_amendment_details,
+      get_amendment_sponsors, get_amendment_actions, get_amendment_amendments,
+      get_amendment_text (get_amendment_text also requires congress >= 117;
+      text isn't available for earlier Congresses)
+    (get_amendments, search_amendments need none of the above)
+
     Args:
         operation: Specific operation to perform (see list above)
         congress: Congress number (118 for current, 119 for next)
