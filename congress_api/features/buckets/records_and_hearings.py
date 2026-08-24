@@ -196,7 +196,7 @@ async def records_and_hearings(
     CONGRESSIONAL RECORDS (3 operations):
     • search_congressional_record/daily/bound - Search legislative records by date/volume
 
-    COMMUNICATIONS (8 operations):  
+    COMMUNICATIONS (8 operations):
     • House: search_house_communications/requirements, get_details/matching
     • Senate: search_senate_communications, get_senate_communication_details
     • Committee: get_committee_communication_details
