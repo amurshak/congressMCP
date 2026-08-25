@@ -286,8 +286,20 @@ def install_log_redaction() -> None:
     _log_redaction_installed = True
 
 
-def write(tool: str, kwargs: dict[str, Any], response: Any, duration_ms: float) -> None:
-    """Append one JSONL record. Never raises -- tracing must not break a tool call."""
+def write(
+    tool: str,
+    kwargs: dict[str, Any],
+    response: Any,
+    duration_ms: float,
+    flow: dict[str, Any] | None = None,
+) -> None:
+    """Append one JSONL record. Never raises -- tracing must not break a tool call.
+
+    ``flow`` (govinfo-search-spec §2 trace addendum) carries decision-flow
+    visibility a final response cannot: for search_bills, the assembled
+    upstream query, the upstream outcome, the canary firing and its branch,
+    and any fallback demotion with its trigger class -- so adjudication can
+    attribute which §6.4 row fired instead of inferring it."""
     directory = trace_dir()
     if directory is None:
         return
@@ -299,6 +311,8 @@ def write(tool: str, kwargs: dict[str, Any], response: Any, duration_ms: float) 
         "duration_ms": duration_ms,
         "source": _source.get(),
     }
+    if flow is not None:
+        record["flow"] = flow
     try:
         line = redact(json.dumps(record, default=str, ensure_ascii=False))
         directory.mkdir(parents=True, exist_ok=True)

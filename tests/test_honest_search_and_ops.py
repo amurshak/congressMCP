@@ -134,25 +134,61 @@ async def test_member_votes_rejects_entity_xml():
 # #54: honest keyword search
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
-async def test_search_bills_miss_names_window_and_alternative():
-    from congress_api.features.buckets.bills import api as mod
-    bills = [{"title": "Post Office Naming Act", "policyArea": {"name": "Government"},
-              "type": "HR", "number": str(i), "congress": 119} for i in range(30)]
-    with patch.object(mod, "fetch_bill_data", AsyncMock(return_value={"bills": bills})):
-        out = await mod.search_bills(FakeContext(), keywords="climate", congress=119, limit=5)
-    assert "No match for 'climate'" in out
-    assert "most recently updated bills" in out
-    assert "search_bill_text" in out
+# search_bills left the recency window for GovInfo corpus search
+# (govinfo-search-spec section 6); #66's honest-window behavior becomes the
+# GovInfo-down FALLBACK, where its window-naming assertions are re-pinned
+# (tests/test_govinfo_search_failure_flow.py). The corpus-path equivalents
+# of the two original assertions live here: a miss is a readable zero, and
+# exactly one bounded upstream fetch happens per call.
+
+@pytest.fixture(autouse=True)
+def _keyed(monkeypatch):
+    """Full-suite isolation: whichever test file imports congress_api first
+    fixes api_config.API_KEY for the whole process, and a keyless import
+    order would turn every corpus-path test into api_key_missing. Pin a key
+    at the client's resolution point; the keyless F31 test overrides it."""
+    from congress_api.features.bill_text import client as _client_mod
+    monkeypatch.delenv("GOVINFO_API_KEY", raising=False)
+    monkeypatch.setattr(_client_mod, "API_KEY", "test-key-govinfo-search")
+
+
+class _FakeSearchResponse:
+    status_code = 200
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
 
 
 @pytest.mark.asyncio
-async def test_search_bills_fetches_max_page():
+async def test_search_bills_miss_is_a_readable_corpus_zero():
+    import json
     from congress_api.features.buckets.bills import api as mod
-    mock = AsyncMock(return_value={"bills": []})
-    with patch.object(mod, "fetch_bill_data", mock):
+    empty = _FakeSearchResponse({"count": 0, "results": [],
+                                 "offsetMark": None})
+    with patch.object(mod, "govinfo_search_post",
+                      AsyncMock(return_value=empty)):
+        out = json.loads(await mod.search_bills(
+            FakeContext(), keywords="climate", congress=119, limit=5))
+    assert out["search_source"] == "govinfo_fulltext"
+    assert out["results_count"] == 0 and out["results"] == []
+    diag = out["query_diagnostics"]
+    assert "BILLS" in diag["corpus"] and "climate" in diag["upstream_query"]
+
+
+@pytest.mark.asyncio
+async def test_search_bills_makes_one_bounded_corpus_fetch():
+    from congress_api.features.buckets.bills import api as mod
+    mock = AsyncMock(return_value=_FakeSearchResponse(
+        {"count": 0, "results": [], "offsetMark": None}))
+    with patch.object(mod, "govinfo_search_post", mock):
         await mod.search_bills(FakeContext(), keywords="x", limit=5)
-    assert mock.call_args.kwargs["limit"] == 250
+    assert mock.await_count == 1                       # one fetch per call
+    body = mock.call_args.args[0]
+    assert body["pageSize"] == 15                      # min(3*limit, 300)
+    assert body["sorts"] == [{"field": "score", "sortOrder": "DESC"}]
 
 
 @pytest.mark.asyncio

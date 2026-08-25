@@ -294,21 +294,20 @@ async def get_bills_api_usage_guide() -> str:
 ### **1. Direct Bill Lookup**
 **Best for**: Known bill numbers
 ```
-search_bills("HR 1", congress=119)
-search_bills("S 2025", congress=118)
+get_bill_details(bill_id="HR 1, 119th Congress")
+search_bills("congress:119 billtype:hr docnumber:1")
 ```
-- Use exact bill format: "HR 1", "S 1234"
-- Include Congress number for precision
-- Fastest method for specific bills
+- For a known bill number use get_bill_details with bill_id
+- The fielded search_bills form returns exactly that bill's versions
 
-### **2. Keyword Search**
-**Best for**: Topic-based research
+### **2. Keyword Search (full-text corpus)**
+**Best for**: Topic- or name-based research
 ```
-search_bills("infrastructure", congress=119, limit=20)
+search_bills("infrastructure permitting", congress=119, limit=20)
 search_bills("climate change", bill_type="hr")
 ```
-- Use specific keywords for better results
-- Searches bill titles and policy areas
+- Searches the FULL TEXT of every bill version (GovInfo BILLS corpus)
+- Words are ANDed; do NOT quote bill names (use title:"..." for exact titles)
 - Combine with Congress/type filters
 
 ### **3. Targeted Filtering**
@@ -337,8 +336,9 @@ search_bills("healthcare", congress=119, bill_type="hr", limit=10)
 ### **Limits & Sorting**
 - **Default Limit**: 10 results (good starting point)
 - **Research**: 20-50 results for comprehensive review
-- **Default Sort**: updateDate+desc (most recent first)
-- **Historical**: updateDate+asc for chronological order
+- **search_bills**: relevance-ranked; no sort parameter (walk
+  next_page_token for more)
+- **get_bills**: updateDate+desc (most recent first) or updateDate+asc
 
 ## Effective Research Workflows
 

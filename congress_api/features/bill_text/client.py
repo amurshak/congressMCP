@@ -393,6 +393,37 @@ async def govinfo_search_versions(congress: int, bill_type: str, number: int) ->
     return list(by_code.values())
 
 
+def govinfo_api_key() -> str:
+    """Resolve the GovInfo key by this client's one rule: GOVINFO_API_KEY
+    overrides the shared api.data.gov key (CONGRESS_API_KEY). Returns "" when
+    neither is configured -- callers decide what keyless means (F31: the
+    corpus-search path must answer api_key_missing without sending anything).
+    """
+    return os.getenv("GOVINFO_API_KEY") or API_KEY or ""
+
+
+async def govinfo_search_post(
+    body: dict[str, Any], *, client: httpx.AsyncClient | None = None
+) -> httpx.Response:
+    """POST a GovInfo /search request through this module's keyed transport:
+    X-Api-Key header (never key-in-query), bounded 429/503 backoff, key sent
+    only to api.govinfo.gov. Returns the raw httpx.Response -- status
+    classification (200/429/500/...) is the caller's concern, so the
+    search_bills failure flow can read exactly the row it landed on.
+
+    ``client`` lets tests (and callers already holding one) inject a
+    transport; an injected client is not closed here.
+    """
+    api_key = govinfo_api_key()
+    url = f"{GOVINFO_BASE_URL}/search"
+    if client is not None:
+        return await _govinfo_request(client, "POST", url, api_key, json_body=body)
+    async with httpx.AsyncClient(
+        timeout=httpx.Timeout(30.0, connect=10.0), follow_redirects=False
+    ) as owned:
+        return await _govinfo_request(owned, "POST", url, api_key, json_body=body)
+
+
 async def congress_text_versions(ctx: Context, congress: int, bill_type: str, number: int) -> list[TextVersion]:
     # Go through make_api_request rather than app_ctx.client directly (#15/F21):
     # the wrapper carries the JSON-decode guard -- a congress.gov 200 with an HTML
@@ -499,13 +530,16 @@ async def _govinfo_request(
     url: str,
     api_key: str,
     stream: bool = False,
+    json_body: dict[str, Any] | None = None,
 ) -> httpx.Response:
     """Request with bounded 429/503 backoff, sending the key as an X-Api-Key
-    header (never a logged query param) and only to api.govinfo.gov."""
+    header (never a logged query param) and only to api.govinfo.gov.
+    ``json_body`` rides along for POST endpoints (/search); GET callers are
+    unchanged."""
     delay = 1.0
     last_response = None
     for _ in range(4):
-        response = await _follow_with_key(client, method, url, api_key, stream=stream)
+        response = await _follow_with_key(client, method, url, api_key, stream=stream, json_body=json_body)
         if response.status_code not in {429, 503}:
             return response
         await response.aclose()
@@ -524,17 +558,19 @@ async def _follow_with_key(
     api_key: str,
     stream: bool = False,
     max_redirects: int = 5,
+    json_body: dict[str, Any] | None = None,
 ) -> httpx.Response:
     current = url
     for _ in range(max_redirects + 1):
         headers = {"X-Api-Key": api_key} if api_key and _is_govinfo_host(current) else None
-        request = client.build_request(method, current, headers=headers)
+        request = client.build_request(method, current, headers=headers, json=json_body)
         response = await client.send(request, stream=stream)
         if response.status_code in {301, 302, 303, 307, 308} and response.headers.get("location"):
             location = str(httpx.URL(current).join(response.headers["location"]))
             await response.aclose()
             if response.status_code == 303:
                 method = "GET"
+                json_body = None
             current = location
             continue
         return response

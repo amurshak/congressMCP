@@ -102,6 +102,7 @@ async def bills(
     sort: Optional[str] = None,
     format: Optional[str] = None,
     offset: Optional[int] = None,
+    page_token: Optional[str] = None,
     # Date filtering
     fromDateTime: Optional[str] = None,
     toDateTime: Optional[str] = None,
@@ -127,6 +128,61 @@ async def bills(
     • Legislative Process: get_bill_actions, get_bill_committees, get_bill_cosponsors
     • Date-Based: get_bills_by_date_range
 
+    SEARCH_BILLS (GovInfo full-text corpus search):
+    search_bills searches the full text of congressional bills -- every
+    version of every bill in the GovInfo BILLS collection -- ranked by
+    relevance. Parameters: keywords (required), congress, bill_type, limit,
+    page_token, fromDateTime, toDateTime. It does NOT take
+    offset/sort/format.
+    - Matching semantics: words are ANDed -- every term must appear in
+      the SAME document, so each added word strictly shrinks the result
+      set and can never grow it. Start with the distinctive minimum: the
+      fewest words that name the thing, and add terms only to cut a set
+      that came back too large. Do NOT add words describing the topic,
+      category, or what the bill does -- that is the natural way to
+      phrase a search and the usual cause of a starved result. Worked
+      example: "Radiation Exposure Compensation Act amendments
+      downwinders" returns 1 bill; dropping the two description words
+      returns 26, including the enacted vehicle. A small count means the
+      terms rarely co-occur, NOT that few such bills exist -- re-query
+      narrower before concluding anything. Synonyms do NOT broaden here:
+      unlike search_bill_text, which ORs its queries array and rewards
+      adding alternate phrasings, an added synonym on this path
+      intersects and discards.
+    - Do NOT quote bill names (quoted phrases measured to miss title
+      text); title:"..." / shorttitle:"..." for exact titles; OR / NOT
+      available; field operators pass through.
+    - keywords is required: blank or whitespace-only keywords are rejected
+      (invalid_parameters), never sent.
+    - Version discovery: each hit fronts the most authoritative matched
+      version (package_id, version, date_issued) and carries
+      matched_versions -- ONLY the versions whose text matched this query,
+      not the bill's complete version set. For a specific bill's COMPLETE
+      version set, call search_bills with fielded terms and no text words,
+      e.g. keywords="congress:119 billtype:s docnumber:1071" -- that
+      returns exactly the bill's versions. A pinned version that does not
+      exist still answers version_not_available (bill-text tools).
+    - Count semantics: total_version_matches counts matching VERSION
+      PACKAGES upstream and can exceed the number of distinct bills;
+      results_count counts the bills actually returned in this page.
+    - Pagination: pass next_page_token back verbatim as page_token; null
+      means the result set is exhausted. Pages can legally run short of
+      limit (version-heavy pages dedup below it). A bill whose version
+      records straddle a page boundary can rarely reappear on the next
+      page with the same identity -- dedup by congress/bill_type/
+      bill_number if walking pages.
+    - Fallback: when search_source is "recency_window_fallback", GovInfo
+      was unavailable (read fallback_trigger) and results are a
+      title/policy-area filter over the most recently updated bills, NOT
+      the corpus -- a zero there is not evidence a bill does not exist;
+      the window metadata says what was scanned.
+    - Time-bounding: fromDateTime/toDateTime bound the VERSION'S
+      PUBLICATION DATE on the corpus path (inclusive both ends; either
+      side may be given alone; ISO date or datetime, datetimes truncated
+      to the date) -- NOT congress.gov's update date. In fallback mode
+      the same bounds filter updateDate over the window instead, and the
+      response says so.
+
     REQUIRED PARAMETERS (the schema marks every parameter optional because
     one shared schema covers every operation -- these operations fail
     without the values below):
@@ -140,7 +196,8 @@ async def bills(
       'HR 1234' still needs an explicit congress or the call fails the
       same as if bill_id were omitted entirely.
     • fromDateTime -- get_bills_by_date_range
-    (search_bills, get_bills, get_recent_bills need none of the above)
+    • keywords -- search_bills (see SEARCH_BILLS above)
+    (get_bills, get_recent_bills need none of the above)
 
     Args:
         operation: Specific operation to perform (see list above)
@@ -148,13 +205,19 @@ async def bills(
                  Parsed to populate bill_type and bill_number always, and
                  congress only if the reference embeds one -- pass congress
                  explicitly otherwise
-        keywords: Search keywords for content and metadata
+        keywords: search_bills: required full-text query (see
+                  SEARCH_BILLS above for matching semantics)
         congress: Congress number (118 for current, 119 for next)
         bill_type: hr, s, hjres, sjres, hconres, sconres, hres, sres
         bill_number: Specific bill number within type and congress
         limit: Results limit (max 250 for API compliance)
-        sort: updateDate+desc (newest first) or updateDate+asc
-        fromDateTime/toDateTime: Date range (YYYY-MM-DDTHH:MM:SSZ)
+        page_token: search_bills only -- opaque pagination cursor from a
+                    previous response's next_page_token, passed back verbatim
+        sort: updateDate+desc (newest first) or updateDate+asc (not for
+              search_bills, which is relevance-ranked)
+        fromDateTime/toDateTime: Date range (YYYY-MM-DDTHH:MM:SSZ;
+              search_bills: inclusive bounds on version publication date,
+              see SEARCH_BILLS above)
         
     Returns:
         Formatted results specific to requested operation
@@ -208,6 +271,7 @@ async def bills(
             'sort': sort,
             'format': format,
             'offset': offset,
+            'page_token': page_token,
             'fromDateTime': fromDateTime,
             'toDateTime': toDateTime,
             'days_back': days_back
