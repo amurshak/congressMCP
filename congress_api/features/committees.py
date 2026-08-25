@@ -495,7 +495,11 @@ async def get_committee_nominations(
             url = nomination.get("url", "No URL available")
             update_date = nomination.get("updateDate", "Unknown")
             
-            # Get nominees
+            # Get nominees. The committee-level listing doesn't carry a
+            # `nominees` array with firstName/lastName -- that shape only
+            # appears on the nomination detail endpoint. Here the nominee's
+            # name and position come embedded in `description` instead, so
+            # read that; omit the line entirely rather than claim "Unknown".
             nominees = nomination.get("nominees", [])
             nominee_names = []
             for nominee in nominees:
@@ -504,11 +508,14 @@ async def get_committee_nominations(
                 full_name = f"{first_name} {last_name}".strip()
                 if full_name:
                     nominee_names.append(full_name)
-            
-            nominee_text = ", ".join(nominee_names) if nominee_names else "Unknown nominees"
-            
+
+            description = nomination.get("description")
+
             result.append(f"\n**Nomination {number}** (Congress {congress})")
-            result.append(f"Nominees: {nominee_text}")
+            if nominee_names:
+                result.append(f"Nominees: {', '.join(nominee_names)}")
+            elif description:
+                result.append(f"Description: {description}")
             result.append(f"Updated: {update_date}")
             result.append(f"URL: {url}")
         
