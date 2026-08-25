@@ -10,6 +10,8 @@ from .client_handler import make_api_request
 from .exceptions import APIErrorResponse, CongressionalAPIError
 from .retry_timing import parse_retry_after
 
+logger = logging.getLogger(__name__)
+
 @dataclass
 class APIEndpointConfig:
     timeout: float = 10.0; retry_count: int = 1; retry_delay: float = 1.0; max_retry_delay: float = 5.0
@@ -45,13 +47,17 @@ def _retry_after_seconds(error: Exception, status: Optional[int]) -> Optional[fl
 def _next_delay(retry_after: Optional[float], fallback_delay: float, cap: float) -> float:
     """Seconds to sleep before the next retry.
 
-    Uses `retry_after` (already resolved by `_retry_after_seconds`, already
-    known to be <= cap -- see the give-up branch in safe_api_request) when
-    given; otherwise falls back to exponential backoff with jitter, capped at
-    the endpoint's max_retry_delay.
+    Uses `retry_after` (already resolved by `_retry_after_seconds`) when
+    given, capped at the endpoint's max_retry_delay so a server asking for an
+    hour-scale wait can't stall a tool call for anywhere near that long;
+    otherwise falls back to exponential backoff with jitter, capped the same
+    way. Per spec (documentation/fulltext/03-data-sources.md's rate-limits
+    section): "respect Retry-After on both 429 and 503, capped at a maximum
+    wait" -- capped-and-retried, not abandoned, even when the header asks for
+    more than the cap.
     """
     if retry_after is not None:
-        return retry_after
+        return min(retry_after, cap)
     return min(fallback_delay + random.uniform(0, 0.25), cap)
 
 
@@ -123,11 +129,10 @@ class DefensiveAPIWrapper:
                 # Congress.gov exactly when the key was already being throttled.
                 retry_after = _retry_after_seconds(e, status)
                 if retry_after is not None and retry_after > config.max_retry_delay:
-                    # The server wants longer than we're willing to block a
-                    # tool call for. Sleeping the capped value anyway would
-                    # just spend the remaining attempts hitting the same
-                    # still-throttled key again, so give up now instead.
-                    break
+                    logger.warning(
+                        "Congress.gov asked for a %.0fs wait on %s (429/503); "
+                        "capping the retry sleep at %.0fs per endpoint config.",
+                        retry_after, endpoint, config.max_retry_delay)
                 await asyncio.sleep(_next_delay(retry_after, retry_delay, config.max_retry_delay))
                 retry_delay = min(retry_delay * config.backoff_multiplier, config.max_retry_delay)
         

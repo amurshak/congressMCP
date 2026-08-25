@@ -189,10 +189,12 @@ async def make_api_request(endpoint: str, ctx: Optional[Context] = None, params:
 
         request_kwargs = {"params": request_params}
         if timeout is not None:
-            # A bare float would override connect/write/pool too, loosening
-            # the 5s connect timeout the client was built with (line ~90).
-            # Only the read timeout is meant to vary per endpoint.
-            request_kwargs["timeout"] = httpx.Timeout(timeout, connect=5.0)
+            # A bare float would set connect/write/pool to it too, loosening
+            # the 5s connect timeout the client was built with (line ~90) and
+            # tying write/pool to a value meant to vary per-endpoint for
+            # reads. Only the read timeout is meant to vary; connect/write/
+            # pool stay at the client's own defaults (10.0/10.0, line ~90).
+            request_kwargs["timeout"] = httpx.Timeout(connect=5.0, read=timeout, write=10.0, pool=10.0)
         response = await client.get(endpoint, **request_kwargs)
         response.raise_for_status()
         

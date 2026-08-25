@@ -30,7 +30,7 @@ def parse_retry_after(value: Optional[str]) -> Optional[float]:
         return None
     try:
         seconds = float(value)
-    except ValueError:
+    except (TypeError, ValueError):
         try:
             seconds = (parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()
         except (TypeError, ValueError):

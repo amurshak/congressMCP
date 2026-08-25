@@ -57,24 +57,28 @@ async def test_429_sleeps_for_retry_after_seconds():
 
 
 @pytest.mark.asyncio
-async def test_429_retry_after_beyond_cap_gives_up_instead_of_retrying():
-    """A Retry-After longer than the endpoint's max_retry_delay means the key
-    is throttled well past what we're willing to block a tool call for.
-    Sleeping the capped value anyway would just spend the remaining retries
-    hitting the same still-throttled key again, so give up on the first
-    failure instead of retrying at all."""
+async def test_429_retry_after_beyond_cap_is_capped_not_abandoned():
+    """A Retry-After longer than the endpoint's max_retry_delay is still
+    honored, just capped -- per spec (documentation/fulltext/03-data-
+    sources.md's rate-limits section): "respect Retry-After on both 429 and
+    503, capped at a maximum wait." Capped-and-retried, not abandoned."""
     from congress_api.core import api_wrapper as mod
     from congress_api.core.exceptions import CongressionalAPIError
 
+    sleep_calls = []
+
+    async def fake_sleep(seconds):
+        sleep_calls.append(seconds)
+
     mock = AsyncMock(return_value=_rate_limited(retry_after="120"))
     with patch.object(mod, "make_api_request", mock), \
-            patch.object(mod.asyncio, "sleep", AsyncMock()) as sleep_mock:
+            patch.object(mod.asyncio, "sleep", fake_sleep):
         with pytest.raises(CongressionalAPIError) as ei:
             await mod.safe_congressional_request("/bill/119", FakeContext(), {},
                                                  endpoint_type="default")  # max_retry_delay=5.0
 
-    assert mock.await_count == 1
-    sleep_mock.assert_not_awaited()
+    assert mock.await_count == 2  # 1 initial + 1 retry (default retry_count=1)
+    assert sleep_calls == [5.0]  # capped, not the raw 120s
     assert ei.value.error_response.error_code == "RATE_LIMIT_EXCEEDED"
 
 
@@ -103,6 +107,16 @@ async def test_429_without_retry_after_falls_back_to_backoff_with_jitter():
     # Later steps grow (backoff_multiplier=2.0) up to the 5.0s cap.
     assert sleep_calls[-1] <= 5.0
     assert sleep_calls[0] <= sleep_calls[-1]
+
+
+def test_next_delay_backoff_clamp_actually_fires():
+    """A direct check that the exponential-backoff branch's min(..., cap) is
+    load-bearing -- 'bills' (retry_count=3) never grows past 4.25s so the
+    wrapper-level test above passes whether or not the clamp exists."""
+    from congress_api.core.api_wrapper import _next_delay
+
+    assert _next_delay(None, fallback_delay=10.0, cap=5.0) == 5.0
+    assert _next_delay(None, fallback_delay=1.0, cap=5.0) <= 5.0
 
 
 @pytest.mark.asyncio
@@ -240,11 +254,15 @@ async def test_make_api_request_forwards_timeout_kwarg_to_httpx():
                                     {"limit": 5}, timeout=8.0)
 
     # A bare float would also loosen the 5s connect timeout the client was
-    # built with; only the read/write/pool legs should track the override.
+    # built with and tie write/pool to a value meant to vary per-endpoint
+    # for reads; only the read leg should track the override.
     import httpx
     sent_timeout = fake_client.get.await_args.kwargs["timeout"]
-    assert sent_timeout == httpx.Timeout(8.0, connect=5.0)
+    assert sent_timeout == httpx.Timeout(connect=5.0, read=8.0, write=10.0, pool=10.0)
     assert sent_timeout.connect == 5.0
+    assert sent_timeout.read == 8.0
+    assert sent_timeout.write == 10.0
+    assert sent_timeout.pool == 10.0
 
 
 @pytest.mark.asyncio
