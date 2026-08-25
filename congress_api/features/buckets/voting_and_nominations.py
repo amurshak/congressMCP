@@ -197,6 +197,19 @@ async def voting_and_nominations(
     • search_nominations, get_latest_nominations, get_nomination_details
     • get_nomination_actions/committees/hearings/nominees, get_nominations_by_congress
 
+    REQUIRED PARAMETERS (the schema marks every parameter optional because
+    one shared schema covers every operation -- these operations fail
+    without the values below):
+    • congress -- get_house_votes_by_congress, get_nominations_by_congress
+    • congress + session -- get_house_votes_by_session
+    • congress + session + vote_number -- get_house_vote_details(_enhanced),
+      get_house_vote_member_votes(_xml)
+    • congress + nomination_number -- get_nomination_details,
+      get_nomination_actions, get_nomination_committees,
+      get_nomination_hearings
+    • congress + nomination_number + ordinal -- get_nomination_nominees
+    (search_nominations, get_latest_nominations need none of the above)
+
     Key params: operation, congress, session, vote_number, keywords, nomination_number
     Returns structured vote/nomination data with member details and legislative actions.
     """
