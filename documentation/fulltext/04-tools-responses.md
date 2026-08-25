@@ -174,7 +174,10 @@ Present on **hits, TOC nodes, and section-response children**. The highest-value
     //   bill_not_found       — congress.gov 404; definitive, GovInfo fallback NOT consulted
     //   congress_unavailable — 5xx / non-JSON 200 / network; recoverable → triggers GovInfo fallback
     //   govinfo_unavailable  — GovInfo fetch failed definitively (incl. redirect-chain exhaustion, F22)
-    //   version_not_available — bill exists, requested version does not (lists available)
+    //   version_not_available — bill exists, WELL-FORMED requested version does not (lists available)
+    //   version_not_found     — the version string is malformed, not a version code at all
+    //                           (pre-network guard at the shared load path; F38 ruling 2026-08-25 —
+    //                           deliberate split: malformed vs absent demand different remediations)
     //   internal_error       — a genuine server fault; NOT a masked upstream/decode failure (F21/F22)
     //   govinfo_key_rejected — a key WAS sent and GovInfo returned 401. A keyless server must NOT wear this code (F31): "existing key rejected" sends the operator hunting a stale key that does not exist. Missing key is its own code (api_key_missing-shaped) naming the variables to set
     "message": "S. 1071 exists but has no 'ih' version.",
@@ -198,6 +201,8 @@ It also closes the iteration loop §7 opens: §7 instructs the model to pass sev
 `cache.version_hit` are separate — version resolution can hit the network while the index is cached.
 
 ### `timing` — server-measured, on all three tools
+
+> **Amendment A7 (2026-08-25, maintainer): `timing` is emitted only when `CONGRESSMCP_VERBOSE` is set in the server environment.** What the spec said: `timing` ships on every response (A2, and A6's split restored in PR 2). What changed: it is now env-gated, absent by default. Why: a real consumer session weighed the telemetry blocks and the maintainer adopted the narrow version of its finding — `timing` is the only block that is **purely performance and never load-bearing for correctness** (six null fields on every warm hit), while `cache`, `version_resolution*`, and the disclosure notes are diagnostic-on-failure and stay always-on, because a failure that may not reproduce is worth their tokens on first occurrence. The consumer itself retracted its broader verbose-flag proposal on exactly this reasoning; §4's always-on telemetry decision otherwise **stands un-reopened**. A2's rationale (self-instrumenting tool) is preserved behind the env var, which is where an SRE lives anyway.
 
 > **Amendment A2 (intentional, PR 1).** Added because the calling model is often the only harness and cannot see call durations; it was inferring latency from gaps between `version_resolved_at` stamps, which also include its own token generation. Server-side timing makes the tool self-instrumenting.
 

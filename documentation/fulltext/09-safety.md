@@ -12,6 +12,10 @@
 
 ---
 
+## Fixture secrets are fake by construction — a fourth channel (2026-08-25)
+
+**Authored files are a leak channel no runtime check reaches.** The §17 harness needed a "fake" API key fixture and used a real-shaped string — which was the maintainer's live api.data.gov credential, committed at three sites in `tests/test_e2e_harness.py`, published upstream in PR #44, and proven live 2026-08-25 when it authenticated against GovInfo. Every F15-family defense (log redaction, envelope stripping, trace key-absence assertions) watches *runtime output*; none of them can see a secret typed into a tracked file. **F39** (§18) carries the remediation: rotation (the only remedy once published — rewrite reaches no clone, fork, release, or cache), fixture replacement, and a standing guard test. **The rule going forward: any secret-shaped string in a tracked file must be fake by construction** — visibly so (e.g. a `FAKE`-prefixed or single-repeated-character pattern of valid shape), enforced by a tree-scan test, because a real-shaped fixture eventually *is* real. **And measured 2026-08-25: for this provider the channel has no remediation** — api.data.gov keys cannot be revoked (a new-key signup leaves the old key authenticating; open upstream issue; re-confirmed live by this session post-signup), so a leaked key is leaked permanently and prevention is the only control. Write fixtures as if rotation does not exist, because here it does not. **And do not delegate this to a managed scanner:** GitGuardian ran on this repo and produced a **false negative** on the very key in scope (F39) while catching an unrelated one — so the fourth channel's guard must be a repo-local tree scan you control and test for non-vacuity, not a trusted external service. A commercial scanner's silence is not evidence of a clean tree; only a guard whose catch you have proven is.
+
 ## Process side effects — a third channel nothing else covers
 
 **The coverage map has three channels, and only two are tested:**

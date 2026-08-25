@@ -340,7 +340,7 @@ def test_codex_config_and_argv_name_no_credential(tmp_path):
     toml_path = write_codex_mcp_config(tmp_path, spec)
     text = toml_path.read_text()
     assert "command" in text and "${" not in text
-    fake = "ZEirgEryNcncMKowiNBW8Uqv6Z6xMh6Tvd6uQyoa"
+    fake = "FakeFakeFakeFakeFakeFakeFakeFakeFake0000"
     # The clean surface passes both audits.
     assert_config_carries_no_secret(toml_path, [fake])
     assert_argv_carries_no_secret(codex_config_overrides(spec), [fake])
@@ -381,7 +381,7 @@ SHIM = REPO / "tests" / "e2e" / "spawn_server.py"
 def test_secrets_reach_artifacts_as_a_path_never_a_value(tmp_path):
     from run_suite import write_codex_mcp_config
 
-    fake = "ZEirgEryNcncMKowiNBW8Uqv6Z6xMh6Tvd6uQyoa"
+    fake = "FakeFakeFakeFakeFakeFakeFakeFakeFake0000"
     secrets = tmp_path / "secrets.env"
     secrets.write_text(f"CONGRESS_API_KEY={fake}\n")
     spec = codex_server_spec(tmp_path / "trace", True, secrets_file=secrets,
@@ -449,7 +449,7 @@ def _run_shim(args, env=None):
 
 
 def test_shim_refuses_a_group_or_world_readable_secrets_file(tmp_path):
-    fake = "ZEirgEryNcncMKowiNBW8Uqv6Z6xMh6Tvd6uQyoa"
+    fake = "FakeFakeFakeFakeFakeFakeFakeFakeFake0000"
     secrets = tmp_path / "secrets.env"
     secrets.write_text(f"CONGRESS_API_KEY={fake}\n")
     secrets.chmod(0o644)

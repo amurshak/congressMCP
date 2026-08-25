@@ -51,6 +51,7 @@ initialize_mcp_features()
 class _FakeResponse:
     status_code = 200
     text = "{}"
+    headers = {}
 
     def raise_for_status(self):
         pass
@@ -166,7 +167,13 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
     success=True markdown, which is what the old assertion checked."""
     import json as _json
     ctx = _make_fake_ctx()
-    with patch.object(httpx.AsyncClient, "get", return_value=_FakeResponse()):
+    # get covers the congress.gov paths; post/send cover the GovInfo
+    # /search POST (search_bills' corpus path funnels through the keyed
+    # client's build_request+send). All three must be mocked so no
+    # operation can reach the live network from this test.
+    with patch.object(httpx.AsyncClient, "get", return_value=_FakeResponse()), \
+            patch.object(httpx.AsyncClient, "post", return_value=_FakeResponse()), \
+            patch.object(httpx.AsyncClient, "send", return_value=_FakeResponse()):
         result = await tool_fn(ctx, **kwargs)
 
     if hasattr(result, "success"):

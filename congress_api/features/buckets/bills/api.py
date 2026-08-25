@@ -5,18 +5,34 @@ This module provides the public API for bills operations that map directly
 to Congress.gov endpoints while maintaining enhancement capabilities.
 """
 
-from typing import Optional
+from typing import Any, Optional
+import json
 import logging
+import time
+
+import httpx
 from mcp.server.mcpserver import Context
 
 # Import our modular components
+from . import govinfo_search
 from .helpers import fetch_bill_data, build_bill_endpoint, validate_api_parameters
 from .processors import BillsDataProcessor
 from .formatters import BillsFormatter
 
+# The corpus search reuses the keyed, backoff-wrapped GovInfo transport,
+# and the trace mechanism binds this tool (govinfo-search-spec §2 addendum).
+from ...bill_text import trace
+from ...bill_text.client import govinfo_api_key, govinfo_search_post
+
 # Import existing reliability framework
 from ....core.validators import ParameterValidator
-from ....core.exceptions import CommonErrors, format_error_response, CongressionalAPIError
+from ....core.exceptions import (
+    APIErrorResponse,
+    CommonErrors,
+    CongressionalAPIError,
+    ErrorType,
+    format_error_response,
+)
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -114,98 +130,201 @@ async def get_bills(
 async def search_bills(
     ctx: Context,
     keywords: Optional[str] = None,
-    format: str = "json",
-    offset: Optional[int] = None,
-    limit: int = 10,
     congress: Optional[int] = None,
     bill_type: Optional[str] = None,
+    limit: int = 10,
+    page_token: Optional[str] = None,
     fromDateTime: Optional[str] = None,
-    toDateTime: Optional[str] = None,
-    sort: str = "updateDate+desc"
+    toDateTime: Optional[str] = None
 ) -> str:
     """
-    Enhanced /bill endpoint with optional keyword filtering.
-    Maps to Congress.gov API + optional client-side keyword search.
-
-    This function provides the same core API access as get_bills() but adds
-    optional client-side keyword filtering for enhanced search capabilities.
+    Full-text search over the GovInfo BILLS corpus -- every version of
+    every congressional bill -- ranked by relevance (govinfo-search-spec
+    section 6). Replaces the D17/D18 recency-window filter: the query runs
+    against the corpus, not a page of recently-updated bills.
 
     Args:
         ctx: Context for API requests
-        keywords: Optional keywords for client-side filtering
-        format: Response format ('json' or 'xml')
-        offset: Starting record (0-based pagination)
-        limit: Maximum number of results (max 250)
-        congress: Optional Congress number
-        bill_type: Optional bill type
-        fromDateTime: Start date filter (YYYY-MM-DDTHH:MM:SSZ)
-        toDateTime: End date filter (YYYY-MM-DDTHH:MM:SSZ)
-        sort: Sort order ('updateDate+asc' or 'updateDate+desc')
+        keywords: Required search text, passed to GovInfo verbatim. Words
+            are ANDed; do not quote bill names (title:"..."/shorttitle:"..."
+            are the exact-title forms); OR/NOT and field operators pass
+            through. Blank keywords are rejected.
+        congress: Optional congress scope (positive integer, validated here)
+        bill_type: Optional bill type scope (hr, s, hjres, sjres, hconres,
+            sconres, hres, sres)
+        limit: Output cap in BILLS (clamps with advisory wording)
+        page_token: Opaque cursor from a previous response's
+            next_page_token, passed back verbatim
+        fromDateTime/toDateTime: Optional inclusive bounds on the VERSION
+            PUBLICATION DATE (Q10) -- ISO date or datetime, datetimes
+            truncated to the date; either side may be given alone. In
+            fallback mode the same bounds filter updateDate instead, and
+            the response says so.
 
     Returns:
-        Formatted bills list or error message
+        JSON envelope (str): search_source, results (bill hits fronting the
+        most authoritative matched version, with matched_versions),
+        results_count, total_version_matches, next_page_token, and
+        corpus-level query_diagnostics on a zero. Errors return the
+        section-9 error envelope.
     """
+    started = time.perf_counter()
+    # §2 trace addendum: which 6.4 row fired, attributable from the trace
+    # alone. The key never appears here (the query carries no secret by
+    # construction; trace.write redacts known key values regardless).
+    flow = {"upstream_query": None, "outcome": None, "canary": None,
+            "fallback_trigger": None}
+    caller_args = {"keywords": keywords, "congress": congress,
+                   "bill_type": bill_type, "limit": limit,
+                   "page_token": page_token, "fromDateTime": fromDateTime,
+                   "toDateTime": toDateTime}
+
+    def _traced(result: str) -> str:
+        if trace.enabled():
+            trace.write(
+                "search_bills", caller_args, result,
+                round((time.perf_counter() - started) * 1000, 1), flow=flow)
+        return result
+
     try:
-        # If no keywords provided, use core API function
-        if not keywords:
-            return await get_bills(
-                ctx=ctx,
-                format=format,
-                offset=offset,
-                limit=limit,
-                fromDateTime=fromDateTime,
-                toDateTime=toDateTime,
-                sort=sort,
-                congress=congress,
-                bill_type=bill_type
-            )
+        validated_keywords = govinfo_search.validate_keywords(keywords)
+        congress_value = govinfo_search.validate_congress(congress)
+        bill_type_value = govinfo_search.validate_bill_type(bill_type)
+        limit_value, request_note = govinfo_search.clamp_limit(limit)
+        from_date = govinfo_search.validate_date_bound(
+            "fromDateTime", fromDateTime)
+        to_date = govinfo_search.validate_date_bound(
+            "toDateTime", toDateTime)
+        govinfo_search.validate_date_order(from_date, to_date)
 
-        # Client-side filter: fetch the largest page the API allows so the
-        # keyword match sees as many recently-updated bills as possible.
-        search_limit = 250
+        state = govinfo_search.default_page_state()
+        if page_token is not None:
+            decoded = govinfo_search.decode_page_token(page_token)
+            if decoded is None:
+                # An undecodable token cannot produce an offsetMark to send,
+                # so it is answered directly -- same code the canary path
+                # gives a malformed-but-decodable token (section 6.4).
+                error = APIErrorResponse(
+                    error_type=ErrorType.VALIDATION,
+                    message=(
+                        "page_token could not be decoded. Tokens are opaque "
+                        "and must be passed back verbatim from a previous "
+                        "response's next_page_token."
+                    ),
+                    suggestions=[
+                        "Re-run the original query without page_token, then "
+                        "walk next_page_token verbatim page by page"
+                    ],
+                    error_code="govinfo_query_error",
+                    details={"parameter": "page_token"},
+                )
+                flow["outcome"] = "page_token_undecodable"
+                return _traced(format_error_response(error))
+            state = decoded
 
-        # Core API call
-        response = await fetch_bill_data(
-            ctx=ctx,
-            congress=congress,
-            bill_type=bill_type,
-            format=format,
-            offset=offset,
-            limit=search_limit,
-            fromDateTime=fromDateTime,
-            toDateTime=toDateTime,
-            sort=sort
+        query = govinfo_search.build_query(
+            validated_keywords, congress_value, bill_type_value,
+            from_date=from_date, to_date=to_date)
+        flow["upstream_query"] = query
+        body = govinfo_search.build_search_body(
+            query, limit_value, state["offsetMark"])
+
+        # ---- Failure flow (spec 6.4) ----
+        # Keyless: F31 -- api_key_missing, the operator must act. Nothing
+        # is sent and the fallback does NOT fire.
+        if not govinfo_api_key():
+            flow["outcome"] = "keyless"
+            return _traced(
+                format_error_response(govinfo_search.keyless_error()))
+
+        try:
+            response = await govinfo_search_post(body)
+        except httpx.HTTPError as exc:
+            # Network unreachable / timeout: no canary (it cannot answer a
+            # transport failure); labeled fallback.
+            flow["outcome"] = f"transport_error:{type(exc).__name__}"
+            flow["fallback_trigger"] = "govinfo_unreachable"
+            return _traced(await _recency_window_fallback(
+                ctx, validated_keywords, congress_value, bill_type_value,
+                limit_value, trigger="govinfo_unreachable",
+                trigger_detail=type(exc).__name__,
+                from_date=from_date, to_date=to_date))
+
+        if response.status_code == 429:
+            # Spending quota to confirm quota is self-defeating: no canary.
+            flow["outcome"] = "http_429"
+            flow["fallback_trigger"] = "govinfo_rate_limited"
+            return _traced(await _recency_window_fallback(
+                ctx, validated_keywords, congress_value, bill_type_value,
+                limit_value, trigger="govinfo_rate_limited",
+                from_date=from_date, to_date=to_date))
+
+        if response.status_code in (401, 403):
+            # With a key configured this is key rejection: operator-
+            # actionable, so no fallback (F31's sibling rule).
+            flow["outcome"] = f"http_{response.status_code}"
+            return _traced(format_error_response(
+                govinfo_search.key_rejected_error(response.status_code)))
+
+        if response.status_code != 200:
+            # The 500 family -- also what a malformed request returns, with
+            # an identical body (measured 2026-08-24). The canary
+            # disambiguates: one server-built constant query, known valid,
+            # zero caller input.
+            flow["outcome"] = f"http_{response.status_code}"
+            canary_ok = False
+            try:
+                canary = await govinfo_search_post(
+                    govinfo_search.canary_body())
+                canary_ok = canary.status_code == 200
+                canary_result = f"http_{canary.status_code}"
+            except httpx.HTTPError as exc:
+                canary_ok = False
+                canary_result = f"transport_error:{type(exc).__name__}"
+            flow["canary"] = {
+                "fired": True,
+                "result": canary_result,
+                "branch": "query_error" if canary_ok else "fallback",
+            }
+            if canary_ok:
+                # Caller's input implicated; no fallback.
+                return _traced(format_error_response(
+                    govinfo_search.query_error(
+                        response.status_code,
+                        page_token_supplied=page_token is not None)))
+            # Outage confirmed.
+            flow["fallback_trigger"] = "govinfo_search_error"
+            return _traced(await _recency_window_fallback(
+                ctx, validated_keywords, congress_value, bill_type_value,
+                limit_value, trigger="govinfo_search_error",
+                trigger_detail=(
+                    f"HTTP {response.status_code}; canary also failed"),
+                from_date=from_date, to_date=to_date))
+
+        data = response.json()
+        records = data.get("results") or []
+        count = int(data.get("count") or 0)
+        bills, consumed, page_exhausted = govinfo_search.paginate_records(
+            records, state["skip"], limit_value)
+        next_token, _ = govinfo_search.compute_next_token(
+            count=count,
+            prior_consumed=state["records_consumed"],
+            prior_skip=state["skip"],
+            consumed_now=consumed,
+            page_exhausted=page_exhausted,
+            request_cursor=state["offsetMark"],
+            response_cursor=data.get("offsetMark"),
         )
-
-        # Handle API errors
-        if "error" in response:
-            return str(response["error"])
-
-        # Extract bills for processing
-        bills = BillsDataProcessor.extract_bills_from_response(response)
-
-        # Apply keyword filtering
-        filtered_bills = await BillsDataProcessor.filter_by_keywords(bills, keywords, limit)
-
-        if not filtered_bills:
-            scope = f" in Congress {congress}" if congress else ""
-            return (
-                f"No match for '{keywords}' in the titles or policy areas of "
-                f"the {len(bills)} most recently updated bills{scope}.\n\n"
-                "Note: this operation only filters recently updated bills by "
-                "title/policy area -- it is not a full-text or historical "
-                "search. For text inside a bill use the search_bill_text "
-                "tool; for subject browsing use get_bill_subjects."
-            )
-
-        # Update response with filtered bills
-        response["bills"] = filtered_bills
-
-        # Format and return
-        return BillsFormatter.format_bills_list(
-            response,
-            f"Bills matching '{keywords}' (title/policy-area filter over "
-            f"the {len(bills)} most recently updated)")
+        flow["outcome"] = "http_200"
+        return _traced(json.dumps(govinfo_search.build_corpus_response(
+            bills,
+            total_version_matches=count,
+            upstream_query=query,
+            congress=congress_value,
+            bill_type=bill_type_value,
+            next_page_token=next_token,
+            request_note=request_note,
+        ), indent=2))
 
     except CongressionalAPIError as e:
         return format_error_response(e.error_response)
@@ -213,6 +332,143 @@ async def search_bills(
         logger.error(f"Error in search_bills: {str(e)}")
         error_response = CommonErrors.api_server_error("search_bills")
         return format_error_response(error_response)
+
+
+def _window_hit(bill: dict) -> dict:
+    """A recency-window bill mapped onto the same identity fields corpus
+    hits carry, so a consumer reads one hit shape from either source."""
+    raw_number = bill.get("number")
+    try:
+        number = int(str(raw_number))
+    except (TypeError, ValueError):
+        number = raw_number
+    bill_type = str(bill.get("type") or "").lower() or None
+    latest = bill.get("latestAction")
+    return {
+        "bill": f"{str(bill.get('type') or '?').upper()} {raw_number}",
+        "congress": bill.get("congress"),
+        "bill_type": bill_type,
+        "bill_number": number,
+        "title": bill.get("title"),
+        "latest_action": latest.get("text") if isinstance(latest, dict) else None,
+        "update_date": bill.get("updateDate"),
+        "url": bill.get("url"),
+    }
+
+
+def _update_date_in_bounds(update_date: Any,
+                           from_date: Optional[str],
+                           to_date: Optional[str]) -> bool:
+    """Inclusive bound check on a window row's updateDate (date part).
+    A row without an updateDate cannot establish membership under bounds
+    and is excluded."""
+    day = str(update_date or "")[:10]
+    if not day:
+        return False
+    if from_date is not None and day < from_date:
+        return False
+    if to_date is not None and day > to_date:
+        return False
+    return True
+
+
+async def _recency_window_fallback(
+    ctx: Context,
+    keywords: str,
+    congress: Optional[int],
+    bill_type: Optional[str],
+    limit: int,
+    trigger: str,
+    trigger_detail: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+) -> str:
+    """#66's honest window wearing its fallback labels (spec 6.4): the
+    250-row updateDate-desc page, title/policy-area filtered, with
+    search_source: recency_window_fallback, the trigger class, and the
+    window honesty metadata (bills_scanned / oldest updateDate /
+    window_truncated) -- so a fallback zero is structurally
+    distinguishable from a corpus zero, and both are distinguishable from
+    an error (the three-zeros rule)."""
+    scope = f" in Congress {congress}" if congress else ""
+    response = await fetch_bill_data(
+        ctx=ctx, congress=congress, bill_type=bill_type, format="json",
+        limit=250, sort="updateDate+desc")
+    if "error" in response:
+        # An errored fallback is an ERROR, never an empty result set.
+        return format_error_response(APIErrorResponse(
+            error_type=ErrorType.SERVER_ERROR,
+            message=(
+                f"GovInfo corpus search failed ({trigger}) and the "
+                "congress.gov recency-window fallback also failed."
+            ),
+            suggestions=["Retry later; both upstream sources errored"],
+            error_code=trigger,
+            details={"trigger_detail": trigger_detail,
+                     "fallback_error": str(response.get("error"))[:300]},
+        ))
+    bills = BillsDataProcessor.extract_bills_from_response(response)
+    bounded = from_date is not None or to_date is not None
+    if bounded:
+        # Q10 semantic shift, named below: the corpus path bounds the
+        # version's PUBLICATION date; the window only carries congress.gov
+        # updateDate, so the same bounds filter that instead.
+        candidate_rows = [b for b in bills if isinstance(b, dict)
+                          and _update_date_in_bounds(
+                              b.get("updateDate"), from_date, to_date)]
+    else:
+        candidate_rows = bills
+    filtered = await BillsDataProcessor.filter_by_keywords(
+        candidate_rows, keywords, limit)
+    dates = [str(b.get("updateDate")) for b in bills
+             if isinstance(b, dict) and b.get("updateDate")]
+    if filtered:
+        message = (
+            f"Title/policy-area filter over the {len(bills)} most recently "
+            f"updated bills{scope}. GovInfo full-text search was "
+            f"unavailable ({trigger}), so this is the recency window, not "
+            "the corpus -- older bills are invisible here; retry later for "
+            "corpus search."
+        )
+    else:
+        message = (
+            f"No match for '{keywords}' in the titles or policy areas of "
+            f"the {len(bills)} most recently updated bills{scope}. GovInfo "
+            f"full-text search was unavailable ({trigger}); this fallback "
+            "only filters recently updated bills by title/policy area -- "
+            "it is not a full-text or historical search, so this is NOT "
+            "evidence the bill does not exist. Retry later for corpus "
+            "search; for text inside a known bill use search_bill_text; "
+            "for subject browsing use get_bill_subjects."
+        )
+    if bounded:
+        bounds_text = (
+            f" Date bounds [{from_date or '...'} .. {to_date or '...'}] "
+            "were applied to congress.gov updateDate (last update) over "
+            "the window rows -- NOT the version publication date the "
+            "corpus path bounds."
+        )
+        message += bounds_text
+    payload = {
+        "search_source": "recency_window_fallback",
+        "fallback_trigger": trigger,
+        "results_count": len(filtered),
+        "results": [_window_hit(b) for b in filtered
+                    if isinstance(b, dict)],
+        "window": {
+            "bills_scanned": len(bills),
+            "oldest_update_date": min(dates) if dates else None,
+            "window_truncated": len(bills) >= 250,
+        },
+        "message": message,
+        "next_page_token": None,
+    }
+    if bounded:
+        payload["date_bounds"] = {"from": from_date, "to": to_date,
+                                  "applied_to": "updateDate"}
+    if trigger_detail:
+        payload["fallback_detail"] = trigger_detail
+    return json.dumps(payload, indent=2)
 
 
 async def get_recent_bills(
