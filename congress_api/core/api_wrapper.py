@@ -2,11 +2,15 @@
 
 import asyncio
 import logging
+import random
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, replace
 from mcp.server.mcpserver import Context
 from .client_handler import make_api_request
 from .exceptions import APIErrorResponse, CongressionalAPIError
+from .retry_timing import parse_retry_after
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class APIEndpointConfig:
@@ -14,10 +18,47 @@ class APIEndpointConfig:
     backoff_multiplier: float = 2.0; sanitize_params: bool = True; remove_empty_params: bool = True
 
 class _HTTPStatusFailure(Exception):
-    """Internal: carries the HTTP status from make_api_request's error dict."""
-    def __init__(self, status_code, message):
+    """Internal: carries the HTTP status (and, for 429/503, the Retry-After /
+    X-RateLimit-Remaining headers) from make_api_request's error dict."""
+    def __init__(self, status_code, message, retry_after=None, rate_limit_remaining=None):
         self.status_code = status_code
+        self.retry_after = retry_after
+        self.rate_limit_remaining = rate_limit_remaining
         super().__init__(f"API Error ({status_code}): {message}")
+
+
+# Statuses where the server may tell us exactly how long to wait, same set
+# the GovInfo client (features/bill_text/client.py) already backs off on.
+_RETRY_AFTER_STATUSES = frozenset({429, 503})
+
+
+def _retry_after_seconds(error: Exception, status: Optional[int]) -> Optional[float]:
+    """The usable Retry-After delay for this failure, or None.
+
+    None means either the status doesn't carry Retry-After semantics, or the
+    header was absent/unusable -- parse_retry_after already rejects negative,
+    zero, and non-finite values, so a caller never has to re-check those.
+    """
+    if status not in _RETRY_AFTER_STATUSES:
+        return None
+    return parse_retry_after(getattr(error, "retry_after", None))
+
+
+def _next_delay(retry_after: Optional[float], fallback_delay: float, cap: float) -> float:
+    """Seconds to sleep before the next retry.
+
+    Uses `retry_after` (already resolved by `_retry_after_seconds`) when
+    given, capped at the endpoint's max_retry_delay so a server asking for an
+    hour-scale wait can't stall a tool call for anywhere near that long;
+    otherwise falls back to exponential backoff with jitter, capped the same
+    way. Per spec (documentation/fulltext/03-data-sources.md's rate-limits
+    section): "respect Retry-After on both 429 and 503, capped at a maximum
+    wait" -- capped-and-retried, not abandoned, even when the header asks for
+    more than the cap.
+    """
+    if retry_after is not None:
+        return min(retry_after, cap)
+    return min(fallback_delay + random.uniform(0, 0.25), cap)
 
 
 class DefensiveAPIWrapper:
@@ -66,17 +107,15 @@ class DefensiveAPIWrapper:
         
         sanitized_params = DefensiveAPIWrapper._sanitize_parameters(params, config)
         last_error = None; retry_delay = config.retry_delay
-        
+
         for attempt in range(config.retry_count + 1):
             try:
-                if attempt > 0:
-                    await asyncio.sleep(retry_delay)
-                    retry_delay = min(retry_delay * config.backoff_multiplier, config.max_retry_delay)
-                
-                response = await make_api_request(endpoint, ctx, sanitized_params)
+                response = await make_api_request(endpoint, ctx, sanitized_params, timeout=config.timeout)
                 if isinstance(response, dict) and 'error' in response:
                     raise _HTTPStatusFailure(response.get('status_code'),
-                                             response.get('error', 'Unknown API error'))
+                                             response.get('error', 'Unknown API error'),
+                                             retry_after=response.get('retry_after'),
+                                             rate_limit_remaining=response.get('rate_limit_remaining'))
                 return response
             except Exception as e:
                 last_error = e
@@ -84,6 +123,18 @@ class DefensiveAPIWrapper:
                 status = getattr(e, "status_code", None)
                 if status in (400, 404): break
                 if status is None and any(x in str(e).lower() for x in ["404", "not found", "400", "bad request"]): break
+                if attempt >= config.retry_count: break
+                # 429/503: honor Retry-After instead of retrying immediately
+                # (issue #58) -- that's what was multiplying requests against
+                # Congress.gov exactly when the key was already being throttled.
+                retry_after = _retry_after_seconds(e, status)
+                if retry_after is not None and retry_after > config.max_retry_delay:
+                    logger.warning(
+                        "Congress.gov asked for a %.0fs wait on %s (429/503); "
+                        "capping the retry sleep at %.0fs per endpoint config.",
+                        retry_after, endpoint, config.max_retry_delay)
+                await asyncio.sleep(_next_delay(retry_after, retry_delay, config.max_retry_delay))
+                retry_delay = min(retry_delay * config.backoff_multiplier, config.max_retry_delay)
         
         error_response = DefensiveAPIWrapper._format_api_error(endpoint, last_error, config.retry_count)
         # Raise the *typed* error so handlers can report not-found / bad-request
@@ -117,7 +168,16 @@ class DefensiveAPIWrapper:
             return APIErrorResponse("validation", f"Congress.gov rejected the request to {endpoint} (400).",
                                     ["Check parameter names, formats and ranges"], "INVALID_PARAMETERS")
         if status == 429:
-            return APIErrorResponse("rate_limit", f"Congress.gov rate limit hit on {endpoint} (429).",
+            message = f"Congress.gov rate limit hit on {endpoint} (429)."
+            remaining = getattr(error, "rate_limit_remaining", None)
+            if remaining is not None:
+                try:
+                    remaining_int = int(remaining)
+                except (TypeError, ValueError):
+                    remaining_int = None
+                if remaining_int is not None and remaining_int <= 0:
+                    message += f" X-RateLimit-Remaining: {remaining_int}."
+            return APIErrorResponse("rate_limit", message,
                                     ["Wait a minute and retry", "Reduce request volume"], "RATE_LIMIT_EXCEEDED")
         if isinstance(status, int) and status >= 500:
             return APIErrorResponse("server_error", f"Congress.gov returned {status} for {endpoint}.",
