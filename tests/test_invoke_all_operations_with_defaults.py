@@ -18,6 +18,20 @@ every request path funnels through regardless of which of the many
 `safe_*_request`/`make_api_request` local import aliases a given handler
 uses -- so every operation gets a uniformly empty-but-valid JSON response
 without needing per-operation response fixtures.
+
+Issue #69 follow-up: for bucket tools, one schema is shared across every
+operation, so every parameter is marked optional even when a specific
+operation genuinely requires it. When schema defaults trip a parameter-
+shaped validation error (invalid_parameter and the handful of dedicated
+invalid_*_type/congress_too_old_for_text codes), this test also asserts
+that the required parameter is actually named in the tool's own docstring
+-- the only channel available to tell a caller before it tries. Coverage
+caveat: several bills-bucket detail operations (get_bill_titles,
+get_bill_subjects, get_bill_text, etc.) return a bare prose string on
+error rather than the section-9 envelope, so this check -- like the
+crash check above it -- only reaches them via the JSON-string branch,
+and not at all when the error is prose. Only get_bill_details and
+get_bill_actions in that family are actually envelope-shaped today.
 """
 import inspect
 import os
@@ -148,6 +162,23 @@ def _list_operations():
 
 _OPERATIONS = _list_operations()
 
+# Issue #69: a handful of error codes name the offending parameter in the
+# code itself rather than via the generic invalid_parameter -> detail.parameter
+# channel. invalid_bill_type (congress_api/features/buckets/bills/api.py) and
+# invalid_communication_type (congress_api/features/house_communications.py)
+# go through the CommonErrors.* helpers of the same name in
+# congress_api/core/exceptions.py; invalid_amendment_type and
+# congress_too_old_for_text are both inline APIErrorResponse(...) constructions
+# in congress_api/features/buckets/amendments/api.py (CommonErrors also
+# defines an invalid_amendment_type helper, but nothing calls it). Map each
+# code straight to the parameter a bucket docstring must name.
+_CODE_TO_PARAM = {
+    "invalid_bill_type": "bill_type",
+    "invalid_amendment_type": "amendment_type",
+    "invalid_communication_type": "communication_type",
+    "congress_too_old_for_text": "congress",
+}
+
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -176,6 +207,8 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
             patch.object(httpx.AsyncClient, "send", return_value=_FakeResponse()):
         result = await tool_fn(ctx, **kwargs)
 
+    code = None
+    detail = None
     if hasattr(result, "success"):
         if result.success is False:
             err = getattr(result, "error", None)
@@ -191,6 +224,8 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
                                     "general_error", "general_api_failure"), (
                 f"{tool_name}::{operation} crashed: {err.message}"
             )
+            code = err.code
+            detail = err.detail
     elif isinstance(result, str) and result.lstrip().startswith("{"):
         try:
             payload = _json.loads(result).get("error") or {}
@@ -200,6 +235,52 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
                                            "general_error", "general_api_failure"), (
             f"{tool_name}::{operation} crashed: {payload.get('message')}"
         )
+        code = payload.get("code")
+        detail = payload.get("detail")
+
+    # Issue #69: a bucket's shared schema marks every parameter optional,
+    # so when schema defaults trip a parameter-shaped validation error, the
+    # only place a caller could have learned that parameter was required is
+    # the tool's own docstring. Assert it's actually named there.
+    missing_param = _CODE_TO_PARAM.get(code)
+    if missing_param is None and code == "invalid_parameter" and detail:
+        missing_param = detail.get("parameter")
+    if missing_param is not None:
+        doc = tool_fn.__doc__ or ""
+        # Bucket docstrings carry a "REQUIRED PARAMETERS" section listing
+        # exactly which operations need which params (issue #69), always
+        # followed by an "Args:" or "Key params:" line. Bound the check to
+        # that section -- start AND end -- so a stray mention of the same
+        # word in the trailing Args:/Key params: summary (which pre-dates
+        # this fix and isn't per-operation) can't paper over a missing or
+        # edited-away entry in the actual required-params list. Fall back to
+        # the whole docstring for flat tools, which have no such section.
+        start_marker = "REQUIRED PARAMETERS"
+        if start_marker in doc:
+            start = doc.index(start_marker)
+            end_positions = [doc.find(m, start) for m in ("Args:", "Key params:")]
+            end_positions = [p for p in end_positions if p != -1]
+            end = min(end_positions) if end_positions else len(doc)
+            required_section = doc[start:end]
+        else:
+            required_section = doc
+        if code == "congress_too_old_for_text":
+            assert missing_param in required_section, (
+                f"{tool_name}::{operation} rejected schema defaults because "
+                f"the dummy congress value is out of the supported range, "
+                f"but the {tool_name} tool's docstring never names "
+                f"'{missing_param}' as required in the first place -- a "
+                f"caller has no way to learn it needs a real congress value "
+                f"at all (issue #69)."
+            )
+        else:
+            assert missing_param in required_section, (
+                f"{tool_name}::{operation} rejected schema defaults with an "
+                f"invalid '{missing_param}', but the {tool_name} tool's "
+                f"docstring never names '{missing_param}' as required -- a "
+                f"caller reading the schema has no way to learn that "
+                f"beforehand (issue #69)."
+            )
 
 
 def test_operations_were_discovered():
@@ -210,3 +291,29 @@ def test_operations_were_discovered():
         f"expected ~96 (tool, operation) pairs, found {len(_OPERATIONS)} -- "
         "audit_tool_schemas' dispatch parsing may have regressed"
     )
+
+
+# Every bucket tool with a required-but-schema-optional parameter (issue #69).
+# The per-operation check above only fires for the subset of these that a
+# schema-defaults call happens to trip an error for -- it can't detect the
+# heading disappearing from a bucket entirely (e.g. a docstring rewrite that
+# drops the section wholesale), since without the marker it falls back to
+# scanning the whole docstring, and each bucket's pre-existing "Key params:"/
+# "Args:" trailer already happens to mention most of these words anyway.
+# This is a blunt backstop for exactly that gap.
+_BUCKETS_WITH_REQUIRED_PARAMS = (
+    "bills", "amendments", "records_and_hearings", "committee_intelligence",
+    "research_and_professional", "voting_and_nominations", "treaties_and_summaries",
+)
+
+
+def test_bucket_docstrings_have_required_parameters_section():
+    tools = {t.name: t.fn for t in mcp._tool_manager.list_tools()}
+    for name in _BUCKETS_WITH_REQUIRED_PARAMS:
+        doc = tools[name].__doc__ or ""
+        assert "REQUIRED PARAMETERS" in doc, (
+            f"{name}'s docstring lost its REQUIRED PARAMETERS section -- "
+            f"the per-operation check above falls back to scanning the "
+            f"whole docstring when this heading is missing, which is too "
+            f"weak to catch that on its own (issue #69)."
+        )

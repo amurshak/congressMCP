@@ -213,6 +213,22 @@ async def records_and_hearings(
     HEARINGS (5 operations):
     • search_hearings, get_hearings_by_congress/chamber, get_hearing_details/content
 
+    REQUIRED PARAMETERS (the schema marks every parameter optional because
+    one shared schema covers every operation -- these operations fail
+    without the values below):
+    • congress -- get_hearings_by_congress
+    • congress + chamber -- get_hearings_by_congress_and_chamber
+    • congress + chamber + jacket_number -- get_hearing_details,
+      get_hearing_content
+    • congress + communication_type + communication_number --
+      get_senate_communication_details, get_house_communication_details
+    • congress + chamber + communication_type + communication_number --
+      get_committee_communication_details
+    • requirement_number -- get_house_requirement_details,
+      get_house_requirement_matching_communications
+    (search_congressional_record/daily/bound and every other search_*
+    operation need none of the above)
+
     Key params: operation, year/month/day, keywords, congress, chamber, jacket_number
     Returns structured record/hearing data with full text content and metadata.
     """

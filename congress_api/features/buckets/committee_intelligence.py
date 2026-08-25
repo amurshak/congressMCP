@@ -216,6 +216,24 @@ async def committee_intelligence(
     • get_latest/by_congress/by_chamber/by_committee, get_meeting_details
     • search_committee_meetings - Process intelligence with scheduling data
 
+    REQUIRED PARAMETERS (the schema marks every parameter optional because
+    one shared schema covers every operation -- these operations fail
+    without the values below):
+    • congress -- get_committee_reports_by_congress,
+      get_committee_prints_by_congress, get_committee_meetings_by_congress
+    • congress + chamber -- get_committee_prints_by_congress_and_chamber,
+      get_committee_meetings_by_congress_and_chamber
+    • congress + report_type -- get_committee_reports_by_congress_and_type
+    • congress + report_type + report_number -- get_committee_report_details,
+      get_committee_report_text_versions, get_committee_report_content
+    • congress + chamber + jacket_number -- get_committee_print_details,
+      get_committee_print_text_versions
+    • congress + chamber + committee_code --
+      get_committee_meetings_by_committee
+    • congress + chamber + event_id -- get_committee_meeting_details
+    (get_latest_committee_reports/prints/meetings and every search_*
+    operation need none of the above)
+
     Key params: operation, congress, chamber, committee_code, report_type, event_id
     Returns structured committee data with enhanced metadata and content chunking.
     """
