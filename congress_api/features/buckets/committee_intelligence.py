@@ -228,7 +228,8 @@ async def committee_intelligence(
       get_committee_report_text_versions, get_committee_report_content
     • congress + chamber + jacket_number -- get_committee_print_details,
       get_committee_print_text_versions
-    • congress + chamber + committee_code -- get_committee_meetings_by_committee
+    • congress + chamber + committee_code --
+      get_committee_meetings_by_committee
     • congress + chamber + event_id -- get_committee_meeting_details
     (get_latest_committee_reports/prints/meetings and every search_*
     operation need none of the above)

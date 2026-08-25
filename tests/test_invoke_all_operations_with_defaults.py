@@ -25,7 +25,13 @@ operation genuinely requires it. When schema defaults trip a parameter-
 shaped validation error (invalid_parameter and the handful of dedicated
 invalid_*_type/congress_too_old_for_text codes), this test also asserts
 that the required parameter is actually named in the tool's own docstring
--- the only channel available to tell a caller before it tries.
+-- the only channel available to tell a caller before it tries. Coverage
+caveat: several bills-bucket detail operations (get_bill_titles,
+get_bill_subjects, get_bill_text, etc.) return a bare prose string on
+error rather than the section-9 envelope, so this check -- like the
+crash check above it -- only reaches them via the JSON-string branch,
+and not at all when the error is prose. Only get_bill_details and
+get_bill_actions in that family are actually envelope-shaped today.
 """
 import inspect
 import os
@@ -157,8 +163,11 @@ _OPERATIONS = _list_operations()
 
 # Issue #69: a handful of error codes name the offending parameter in the
 # code itself rather than via the generic invalid_parameter -> detail.parameter
-# channel (see congress_api/core/exceptions.py's dedicated CommonErrors.*
-# helpers). Map each straight to the parameter a bucket docstring must name.
+# channel: invalid_bill_type/invalid_amendment_type/invalid_communication_type
+# come from dedicated CommonErrors.* helpers (congress_api/core/exceptions.py);
+# congress_too_old_for_text is a domain-specific inline check in
+# congress_api/features/buckets/amendments/api.py with no such helper. Map
+# each straight to the parameter a bucket docstring must name.
 _CODE_TO_PARAM = {
     "invalid_bill_type": "bill_type",
     "invalid_amendment_type": "amendment_type",
@@ -228,13 +237,31 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
         missing_param = detail.get("parameter")
     if missing_param is not None:
         doc = tool_fn.__doc__ or ""
-        assert missing_param in doc, (
-            f"{tool_name}::{operation} rejected schema defaults with an "
-            f"invalid '{missing_param}', but the {tool_name} tool's "
-            f"docstring never names '{missing_param}' as required -- a "
-            f"caller reading the schema has no way to learn that "
-            f"beforehand (issue #69)."
-        )
+        # Bucket docstrings carry a "REQUIRED PARAMETERS" section listing
+        # exactly which operations need which params (issue #69). Anchor the
+        # check there when it exists so a stray mention of the parameter name
+        # elsewhere in the docstring (e.g. a generic Args: line) can't paper
+        # over a missing entry for THIS operation; fall back to the whole
+        # docstring for flat tools, which have no such section.
+        marker = "REQUIRED PARAMETERS"
+        required_section = doc[doc.index(marker):] if marker in doc else doc
+        if code == "congress_too_old_for_text":
+            assert missing_param in required_section, (
+                f"{tool_name}::{operation} rejected schema defaults because "
+                f"the dummy congress value is out of the supported range, "
+                f"but the {tool_name} tool's docstring never names "
+                f"'{missing_param}' as required in the first place -- a "
+                f"caller has no way to learn it needs a real congress value "
+                f"at all (issue #69)."
+            )
+        else:
+            assert missing_param in required_section, (
+                f"{tool_name}::{operation} rejected schema defaults with an "
+                f"invalid '{missing_param}', but the {tool_name} tool's "
+                f"docstring never names '{missing_param}' as required -- a "
+                f"caller reading the schema has no way to learn that "
+                f"beforehand (issue #69)."
+            )
 
 
 def test_operations_were_discovered():

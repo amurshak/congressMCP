@@ -218,7 +218,8 @@ async def records_and_hearings(
     without the values below):
     • congress -- get_hearings_by_congress
     • congress + chamber -- get_hearings_by_congress_and_chamber
-    • congress + chamber + jacket_number -- get_hearing_details, get_hearing_content
+    • congress + chamber + jacket_number -- get_hearing_details,
+      get_hearing_content
     • congress + communication_type + communication_number --
       get_senate_communication_details, get_house_communication_details
     • congress + chamber + communication_type + communication_number --
