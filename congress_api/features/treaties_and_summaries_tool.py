@@ -88,7 +88,14 @@ async def treaties_and_summaries(
     
     SUMMARIES:
     - search_summaries: Search bill summaries by keywords and congress
-    
+
+    REQUIRED PARAMETERS (the schema marks every parameter optional because
+    one shared schema covers every operation -- these operations fail
+    without the values below):
+    • congress + treaty_number -- get_treaty_actions, get_treaty_committees,
+      get_treaty_text
+    (search_treaties, search_summaries need none of the above)
+
     Args:
         operation: Specific operation to perform (see list above)
         congress: Congress number (118 for current, 119 for next)
