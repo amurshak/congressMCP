@@ -255,6 +255,36 @@ class CommonErrors:
         )
 
     @staticmethod
+    def missing_parameter(parameter_names: List[str], operation: str) -> APIErrorResponse:
+        """Error for required parameters the caller never supplied.
+
+        Distinct from invalid_parameter on purpose: there is no value to
+        report as invalid, and the remediation is different (supply it,
+        rather than correct it). Bucket tools share one schema across every
+        operation, so every parameter is advertised as optional even where
+        a specific operation cannot run without it -- omitting one is a
+        caller mistake the schema alone cannot prevent, which makes naming
+        the parameters the whole point of this error.
+        """
+        names = sorted(parameter_names)
+        joined = ", ".join(names)
+        plural = "s" if len(names) != 1 else ""
+        return APIErrorResponse(
+            error_type=ErrorType.VALIDATION,
+            message=(
+                f"Operation '{operation}' requires parameter{plural} not "
+                f"supplied: {joined}"
+            ),
+            suggestions=[
+                f"Call '{operation}' again with {joined} set",
+                "See the tool's REQUIRED PARAMETERS section for which "
+                "operations need which parameters",
+            ],
+            error_code="MISSING_PARAMETER",
+            details={"operation": operation, "missing_parameters": joined},
+        )
+
+    @staticmethod
     def api_server_error(endpoint: str, status_code: int = None, message: str = None) -> APIErrorResponse:
         """Error for API server issues and failures."""
         default_message = "The Congressional API is experiencing issues"
