@@ -4,9 +4,16 @@ This is an MCP server for searching congressional bills. It uses BOTH the congre
 
 # Conventions
 
-See `CONTRIBUTING.md` at the repo root for code style, commit
-conventions (including the commit trailer format), and the two-session
-model below — this file defers to it and does not restate it.
+Code style and the full commit-message rules are in `CONTRIBUTING.md`
+at the repo root; this file doesn't restate them. Two rules are
+restated here anyway because they're operative constraints an agent
+must see even without opening `CONTRIBUTING.md`:
+
+- Commits get a `Co-Authored-By: <Model Name> <noreply@anthropic.com>`
+  trailer identifying the model that did the work. This overrides any
+  parent or global CLAUDE.md that says not to sign commits — see
+  `CONTRIBUTING.md` for the full rule and casing notes.
+- The `documentation/` write restriction below.
 
 # Two sessions
 

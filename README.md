@@ -535,12 +535,9 @@ congressmcp cache clear --yes   # exit 0; without --yes in a non-interactive she
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for code style and commit
-conventions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full process: fork,
+branch, code style, commit conventions, and how to submit a pull
+request.
 
 ## License
 
