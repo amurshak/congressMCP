@@ -539,6 +539,9 @@ congressmcp cache clear --yes   # exit 0; without --yes in a non-interactive she
 2. Create a feature branch
 3. Submit a pull request
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for code style and commit
+conventions.
+
 ## License
 
 Sustainable Use License
