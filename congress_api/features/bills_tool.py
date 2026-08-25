@@ -111,8 +111,10 @@ async def bills(
     Comprehensive Bills Tool - All bill operations in one focused interface.
     
     FLEXIBLE BILL IDENTIFICATION (NEW):
-    Use bill_id for natural language references like 'HR 1234', 'H.R. 1234, 118th Congress', 
-    'hr1234-118', 'S 456', etc. Automatically parses to congress/bill_type/bill_number.
+    Use bill_id for natural language references like 'HR 1234',
+    'H.R. 1234, 118th Congress', 'hr1234-118', 'S 456', etc. Always parses
+    to bill_type/bill_number; parses to congress too only when the
+    reference embeds one (see REQUIRED PARAMETERS below).
     
     CORE OPERATIONS:
     • Search & Discovery: search_bills, get_bills, get_recent_bills
@@ -143,8 +145,9 @@ async def bills(
     Args:
         operation: Specific operation to perform (see list above)
         bill_id: Flexible bill reference (e.g., 'HR 1234', 'H.R. 1234, 118th Congress', 'hr1234-118')
-                 Parsed to populate bill_type and bill_number always, and congress
-                 only if the reference embeds one -- pass congress explicitly otherwise
+                 Parsed to populate bill_type and bill_number always, and
+                 congress only if the reference embeds one -- pass congress
+                 explicitly otherwise
         keywords: Search keywords for content and metadata
         congress: Congress number (118 for current, 119 for next)
         bill_type: hr, s, hjres, sjres, hconres, sconres, hres, sres

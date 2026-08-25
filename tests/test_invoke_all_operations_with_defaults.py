@@ -163,11 +163,14 @@ _OPERATIONS = _list_operations()
 
 # Issue #69: a handful of error codes name the offending parameter in the
 # code itself rather than via the generic invalid_parameter -> detail.parameter
-# channel: invalid_bill_type/invalid_amendment_type/invalid_communication_type
-# come from dedicated CommonErrors.* helpers (congress_api/core/exceptions.py);
-# congress_too_old_for_text is a domain-specific inline check in
-# congress_api/features/buckets/amendments/api.py with no such helper. Map
-# each straight to the parameter a bucket docstring must name.
+# channel. invalid_bill_type (congress_api/features/buckets/bills/api.py) and
+# invalid_communication_type (congress_api/features/house_communications.py)
+# go through the CommonErrors.* helpers of the same name in
+# congress_api/core/exceptions.py; invalid_amendment_type and
+# congress_too_old_for_text are both inline APIErrorResponse(...) constructions
+# in congress_api/features/buckets/amendments/api.py (CommonErrors also
+# defines an invalid_amendment_type helper, but nothing calls it). Map each
+# code straight to the parameter a bucket docstring must name.
 _CODE_TO_PARAM = {
     "invalid_bill_type": "bill_type",
     "invalid_amendment_type": "amendment_type",
@@ -238,13 +241,22 @@ async def test_operation_invocable_with_schema_defaults(tool_name, operation, to
     if missing_param is not None:
         doc = tool_fn.__doc__ or ""
         # Bucket docstrings carry a "REQUIRED PARAMETERS" section listing
-        # exactly which operations need which params (issue #69). Anchor the
-        # check there when it exists so a stray mention of the parameter name
-        # elsewhere in the docstring (e.g. a generic Args: line) can't paper
-        # over a missing entry for THIS operation; fall back to the whole
-        # docstring for flat tools, which have no such section.
-        marker = "REQUIRED PARAMETERS"
-        required_section = doc[doc.index(marker):] if marker in doc else doc
+        # exactly which operations need which params (issue #69), always
+        # followed by an "Args:" or "Key params:" line. Bound the check to
+        # that section -- start AND end -- so a stray mention of the same
+        # word in the trailing Args:/Key params: summary (which pre-dates
+        # this fix and isn't per-operation) can't paper over a missing or
+        # edited-away entry in the actual required-params list. Fall back to
+        # the whole docstring for flat tools, which have no such section.
+        start_marker = "REQUIRED PARAMETERS"
+        if start_marker in doc:
+            start = doc.index(start_marker)
+            end_positions = [doc.find(m, start) for m in ("Args:", "Key params:")]
+            end_positions = [p for p in end_positions if p != -1]
+            end = min(end_positions) if end_positions else len(doc)
+            required_section = doc[start:end]
+        else:
+            required_section = doc
         if code == "congress_too_old_for_text":
             assert missing_param in required_section, (
                 f"{tool_name}::{operation} rejected schema defaults because "
@@ -272,3 +284,29 @@ def test_operations_were_discovered():
         f"expected ~96 (tool, operation) pairs, found {len(_OPERATIONS)} -- "
         "audit_tool_schemas' dispatch parsing may have regressed"
     )
+
+
+# Every bucket tool with a required-but-schema-optional parameter (issue #69).
+# The per-operation check above only fires for the subset of these that a
+# schema-defaults call happens to trip an error for -- it can't detect the
+# heading disappearing from a bucket entirely (e.g. a docstring rewrite that
+# drops the section wholesale), since without the marker it falls back to
+# scanning the whole docstring, and each bucket's pre-existing "Key params:"/
+# "Args:" trailer already happens to mention most of these words anyway.
+# This is a blunt backstop for exactly that gap.
+_BUCKETS_WITH_REQUIRED_PARAMS = (
+    "bills", "amendments", "records_and_hearings", "committee_intelligence",
+    "research_and_professional", "voting_and_nominations", "treaties_and_summaries",
+)
+
+
+def test_bucket_docstrings_have_required_parameters_section():
+    tools = {t.name: t.fn for t in mcp._tool_manager.list_tools()}
+    for name in _BUCKETS_WITH_REQUIRED_PARAMS:
+        doc = tools[name].__doc__ or ""
+        assert "REQUIRED PARAMETERS" in doc, (
+            f"{name}'s docstring lost its REQUIRED PARAMETERS section -- "
+            f"the per-operation check above falls back to scanning the "
+            f"whole docstring when this heading is missing, which is too "
+            f"weak to catch that on its own (issue #69)."
+        )
