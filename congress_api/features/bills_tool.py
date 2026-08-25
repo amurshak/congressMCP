@@ -128,18 +128,23 @@ async def bills(
     REQUIRED PARAMETERS (the schema marks every parameter optional because
     one shared schema covers every operation -- these operations fail
     without the values below):
-    • congress + bill_type + bill_number (or bill_id, which is parsed into
-      those three) -- get_bill_details, get_bill_titles, get_bill_subjects,
-      get_bill_text, get_bill_text_versions, get_bill_summaries,
-      get_bill_related_bills, get_bill_amendments, get_bill_actions,
-      get_bill_committees, get_bill_cosponsors
+    • congress + bill_type + bill_number -- get_bill_details,
+      get_bill_titles, get_bill_subjects, get_bill_text,
+      get_bill_text_versions, get_bill_summaries, get_bill_related_bills,
+      get_bill_amendments, get_bill_actions, get_bill_committees,
+      get_bill_cosponsors. bill_id can substitute for bill_type +
+      bill_number, but only supplies congress itself when the reference
+      embeds one ('hr1234-118', 'HR 1234, 118th Congress') -- a bare
+      'HR 1234' still needs an explicit congress or the call fails the
+      same as if bill_id were omitted entirely.
     • fromDateTime -- get_bills_by_date_range
     (search_bills, get_bills, get_recent_bills need none of the above)
 
     Args:
         operation: Specific operation to perform (see list above)
         bill_id: Flexible bill reference (e.g., 'HR 1234', 'H.R. 1234, 118th Congress', 'hr1234-118')
-                 Automatically parsed to populate congress, bill_type, bill_number
+                 Parsed to populate bill_type and bill_number always, and congress
+                 only if the reference embeds one -- pass congress explicitly otherwise
         keywords: Search keywords for content and metadata
         congress: Congress number (118 for current, 119 for next)
         bill_type: hr, s, hjres, sjres, hconres, sconres, hres, sres
@@ -152,10 +157,12 @@ async def bills(
         Formatted results specific to requested operation
         
     Examples:
-        Using flexible bill_id:
-        {"operation": "get_bill_details", "bill_id": "HR 1234"}
-        {"operation": "get_bill_details", "bill_id": "H.R. 1234, 118th Congress"}  
+        Using flexible bill_id (congress embedded in the reference itself):
+        {"operation": "get_bill_details", "bill_id": "H.R. 1234, 118th Congress"}
         {"operation": "get_bill_details", "bill_id": "hr1234-118"}
+
+        bill_id without an embedded congress still needs one explicitly:
+        {"operation": "get_bill_details", "bill_id": "HR 1234", "congress": 118}
         
         Traditional parameters still work:
         {"operation": "get_bill_details", "congress": 118, "bill_type": "hr", "bill_number": 1234}
