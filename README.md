@@ -535,9 +535,7 @@ congressmcp cache clear --yes   # exit 0; without --yes in a non-interactive she
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full process: fork,
-branch, code style, commit conventions, and how to submit a pull
-request.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full process: fork, branch, code style, commit conventions, and how to submit a pull request.
 
 ## License
 
