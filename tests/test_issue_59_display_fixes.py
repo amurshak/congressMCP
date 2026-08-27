@@ -79,7 +79,8 @@ def test_format_hearing_item_shows_joint_not_nochamber():
     # Assert on the Chamber line specifically -- the fixture's own URL
     # legitimately contains "nochamber" in lowercase, so a bare
     # "NoChamber" absence check would pass even if the raw token leaked.
-    chamber_line = next(l for l in out.splitlines() if l.startswith("Chamber:"))
+    lines = out.splitlines()
+    chamber_line = next(line for line in lines if line.startswith("Chamber:"))
     assert chamber_line == "Chamber: Joint (nochamber)"
 
 
@@ -93,7 +94,8 @@ def test_format_hearing_detail_shows_joint_not_nochamber():
         "updateDate": "2026-08-21T02:06:42Z",
     }
     out = format_hearing_detail(hearing)
-    chamber_line = next(l for l in out.splitlines() if l.startswith("Chamber:"))
+    lines = out.splitlines()
+    chamber_line = next(line for line in lines if line.startswith("Chamber:"))
     assert chamber_line == "Chamber: Joint (nochamber)"
 
 
