@@ -196,3 +196,86 @@ async def test_committee_nominations_omits_line_when_no_nominee_info():
     assert "Unknown nominees" not in out
     assert "Nominees:" not in out
     assert "Description:" not in out
+
+
+@pytest.mark.asyncio
+async def test_committee_nominations_empty_nominees_list_uses_description():
+    # An empty `nominees: []` (present but empty) must behave the same as
+    # a missing key -- fall back to `description`, not print "Unknown".
+    page = {
+        "nominations": [
+            {
+                "citation": "PN3-1",
+                "congress": 119,
+                "number": 3,
+                "nominees": [],
+                "description": "A real nominee description.",
+                "updateDate": "2026-01-01",
+                "url": "u",
+            },
+        ],
+        "pagination": {"count": 1},
+    }
+
+    async def _se(endpoint, ctx, params=None):
+        return page
+
+    with patch.object(committees, "safe_committees_request", new=_se):
+        out = await committees.get_committee_nominations(
+            FakeContext(), committee_code="ssju00", limit=1)
+
+    assert "Description: A real nominee description." in out
+
+
+@pytest.mark.asyncio
+async def test_committee_nominations_tolerates_non_dict_nominee_entries():
+    page = {
+        "nominations": [
+            {
+                "citation": "PN4-1",
+                "congress": 119,
+                "number": 4,
+                "nominees": ["not-a-dict"],
+                "description": "Fallback description.",
+                "updateDate": "2026-01-01",
+                "url": "u",
+            },
+        ],
+        "pagination": {"count": 1},
+    }
+
+    async def _se(endpoint, ctx, params=None):
+        return page
+
+    with patch.object(committees, "safe_committees_request", new=_se):
+        out = await committees.get_committee_nominations(
+            FakeContext(), committee_code="ssju00", limit=1)
+
+    assert "Description: Fallback description." in out
+
+
+@pytest.mark.asyncio
+async def test_committee_nominations_whitespace_only_description_omitted():
+    page = {
+        "nominations": [
+            {
+                "citation": "PN5-1",
+                "congress": 119,
+                "number": 5,
+                "description": "   ",
+                "updateDate": "2026-01-01",
+                "url": "u",
+            },
+        ],
+        "pagination": {"count": 1},
+    }
+
+    async def _se(endpoint, ctx, params=None):
+        return page
+
+    with patch.object(committees, "safe_committees_request", new=_se):
+        out = await committees.get_committee_nominations(
+            FakeContext(), committee_code="ssju00", limit=1)
+
+    assert "Description:" not in out
+    assert "Nominees:" not in out

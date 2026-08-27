@@ -503,13 +503,15 @@ async def get_committee_nominations(
             nominees = nomination.get("nominees", [])
             nominee_names = []
             for nominee in nominees:
+                if not isinstance(nominee, dict):
+                    continue
                 first_name = nominee.get("firstName", "")
                 last_name = nominee.get("lastName", "")
                 full_name = f"{first_name} {last_name}".strip()
                 if full_name:
                     nominee_names.append(full_name)
 
-            description = nomination.get("description")
+            description = (nomination.get("description") or "").strip()
 
             result.append(f"\n**Nomination {number}** (Congress {congress})")
             if nominee_names:
