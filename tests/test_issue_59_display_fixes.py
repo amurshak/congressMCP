@@ -33,7 +33,14 @@ class FakeContext:
 # --- Hearing chamber display ---
 
 def test_display_chamber_maps_nochamber_to_joint():
-    assert _display_chamber("NoChamber") == "Joint"
+    assert _display_chamber("NoChamber") == "Joint (nochamber)"
+
+
+def test_display_chamber_is_case_insensitive():
+    # The API uses lowercase "nochamber" in URLs/path params and the
+    # mixed-case "NoChamber" in JSON payload values -- both must map.
+    assert _display_chamber("nochamber") == "Joint (nochamber)"
+    assert _display_chamber("NOCHAMBER") == "Joint (nochamber)"
 
 
 def test_display_chamber_passes_through_known_values():
@@ -46,6 +53,19 @@ def test_display_chamber_defaults_missing_to_na():
     assert _display_chamber("") == "N/A"
 
 
+def test_display_chamber_keeps_nochamber_valid_for_round_trip():
+    # A client that copies the displayed chamber value back into
+    # get_hearings_by_congress_and_chamber/get_hearing_details must still
+    # find a value ParameterValidator.validate_chamber() accepts.
+    from congress_api.core.validators import ParameterValidator
+
+    displayed = _display_chamber("NoChamber")
+    assert "nochamber" in displayed.lower()
+    result = ParameterValidator.validate_chamber(
+        "nochamber", allow_nochamber=True)
+    assert result.is_valid
+
+
 def test_format_hearing_item_shows_joint_not_nochamber():
     hearing = {
         "chamber": "NoChamber",
@@ -55,8 +75,12 @@ def test_format_hearing_item_shows_joint_not_nochamber():
         "url": "https://api.congress.gov/v3/hearing/119/nochamber/61499",
     }
     out = format_hearing_item(hearing)
-    assert "Chamber: Joint" in out
-    assert "NoChamber" not in out
+    assert "Chamber: Joint (nochamber)" in out
+    # Assert on the Chamber line specifically -- the fixture's own URL
+    # legitimately contains "nochamber" in lowercase, so a bare
+    # "NoChamber" absence check would pass even if the raw token leaked.
+    chamber_line = next(l for l in out.splitlines() if l.startswith("Chamber:"))
+    assert chamber_line == "Chamber: Joint (nochamber)"
 
 
 def test_format_hearing_detail_shows_joint_not_nochamber():
@@ -69,8 +93,8 @@ def test_format_hearing_detail_shows_joint_not_nochamber():
         "updateDate": "2026-08-21T02:06:42Z",
     }
     out = format_hearing_detail(hearing)
-    assert "Chamber: Joint" in out
-    assert "NoChamber" not in out
+    chamber_line = next(l for l in out.splitlines() if l.startswith("Chamber:"))
+    assert chamber_line == "Chamber: Joint (nochamber)"
 
 
 def test_format_hearing_item_still_shows_house_and_senate():

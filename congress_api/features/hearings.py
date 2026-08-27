@@ -20,11 +20,15 @@ def _display_chamber(chamber: Optional[str]) -> str:
     """Render a hearing's chamber value for display.
 
     Congress.gov returns the literal token "NoChamber" for hearings held
-    by joint (chamber-agnostic) committees -- show "Joint" instead of
-    leaking that internal API token to users.
+    by joint (chamber-agnostic) committees. Show "Joint" so that reads
+    clearly, but keep "nochamber" visible too -- it's the exact value
+    ParameterValidator.validate_chamber() accepts for
+    get_hearings_by_congress_and_chamber/get_hearing_details, and a
+    client copying "Joint" alone back into those tools would get
+    rejected.
     """
-    if chamber == "NoChamber":
-        return "Joint"
+    if isinstance(chamber, str) and chamber.strip().lower() == "nochamber":
+        return "Joint (nochamber)"
     return chamber or "N/A"
 
 def format_hearing_item(hearing_item: Dict[str, Any]) -> str:
