@@ -1,7 +1,7 @@
 """
 AGENTS.md and .claude/CLAUDE.md exist so that different tools find the
-same conventions under the filename each one looks for. They must stay
-byte-identical, or a session that only auto-loads one of them silently
+same conventions under the filename each one looks for. Their contents
+must match, or a session that only auto-loads one of them silently
 sees different (or missing) rules than a session that auto-loads the
 other -- the exact drift issue #46 was filed to fix. See CONTRIBUTING.md
 ("Keeping AGENTS.md and .claude/CLAUDE.md in sync") for why this is a
@@ -17,11 +17,11 @@ def test_agents_md_matches_claude_md():
     agents_md = REPO_ROOT / "AGENTS.md"
     claude_md = REPO_ROOT / ".claude" / "CLAUDE.md"
 
-    agents_text = agents_md.read_text()
-    claude_text = claude_md.read_text()
+    agents_text = agents_md.read_text(encoding="utf-8")
+    claude_text = claude_md.read_text(encoding="utf-8")
 
     assert agents_text == claude_text, (
         "AGENTS.md and .claude/CLAUDE.md have drifted apart. Keep them "
-        "byte-identical -- copy one over the other -- and see "
-        "CONTRIBUTING.md for why both files exist."
+        "in sync -- copy one over the other -- and see CONTRIBUTING.md "
+        "for why both files exist."
     )

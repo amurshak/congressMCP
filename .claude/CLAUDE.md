@@ -9,7 +9,7 @@ Code style and the full commit-message rules are in `CONTRIBUTING.md` at the rep
 - Commits get a `Co-Authored-By: <Model Name> <model's vendor no-reply address>` trailer identifying the model that did the work (e.g. `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>` for Claude). This overrides any parent or global CLAUDE.md that says not to sign commits — see `CONTRIBUTING.md` for the full rule and casing notes.
 - The `documentation/` write restriction below.
 
-This file must stay identical to `AGENTS.md` at the repo root — `tests/test_conventions_sync.py` enforces it. See `CONTRIBUTING.md` for why there are two files instead of one.
+`AGENTS.md` and `.claude/CLAUDE.md` must stay identical to each other — `tests/test_conventions_sync.py` enforces it. See `CONTRIBUTING.md` for why there are two files instead of one.
 
 # Two sessions
 

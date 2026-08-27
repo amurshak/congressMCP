@@ -7,11 +7,12 @@ Markdown in this repo is not hard-wrapped: one line per paragraph, long lines ar
 ## Development
 
 ```bash
-uv run ruff check .                  # lint
-uv run python -m pytest tests/ -v    # tests
+uv run ruff check .                                          # lint
+uv run python -m pytest tests/ --continue-on-collection-errors  # tests
+python tests/check_known_failures.py                         # the actual CI gate
 ```
 
-Both should pass, or fail only on pre-existing issues unrelated to your change — note any such failures in your PR description rather than silently working around them. As of this writing both commands have substantial pre-existing failures on a clean `master` checkout; if you're unsure whether a failure is yours, check whether it reproduces there first.
+`ruff check` and the plain `pytest tests/` currently do not pass clean on `master` — see `tests/KNOWN_FAILURES.md`. `check_known_failures.py` is what CI actually runs (`.github/workflows/test.yml`): it fails if the set of failing tests grows (a regression) *or* shrinks (something was fixed but `KNOWN_FAILURES.md` wasn't updated to match) — a one-way ratchet would rot back into the problem it exists to solve. If you fix a pre-existing failure, update `KNOWN_FAILURES.md` in the same PR; if you're unsure whether a failure is pre-existing, check whether it reproduces on a clean `master` checkout.
 
 ## Code style
 
