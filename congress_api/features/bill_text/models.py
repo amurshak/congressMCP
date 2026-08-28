@@ -2,9 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import BaseModel, Field
+
+# The amends kind vocabulary -- ONE source of truth (F40). The extractor
+# (parser.Unit.amends) guards its emissions against AMENDS_KINDS, and every
+# response model that carries amends types the field as AmendsKind, so the
+# two cannot drift: a kind added on one side without the other fails loudly
+# at extraction or enumeration, never by silently discarding a whole wire
+# response. Vocabulary per spec §6 A8: "usc" (a U.S. Code section's own
+# text), "usc_note" (note-codified law -- material set out UNDER a section;
+# the cite carries the printed designation verbatim), "public_law" (P.L.
+# and Statutes-at-Large forms).
+AmendsKind = Literal["usc", "usc_note", "public_law"]
+AMENDS_KINDS: "tuple[str, ...]" = get_args(AmendsKind)
 
 
 class AncestorNode(BaseModel):
@@ -17,7 +29,7 @@ class AmendsTarget(BaseModel):
     # `amends` resolves U.S. Code and Public Law citations, never named Acts. The
     # kind discriminator means a consumer never parses `cite` syntax to know what
     # kind of target it holds (same reasoning as node_kind in §5).
-    kind: Literal["usc", "public_law"]
+    kind: AmendsKind
     cite: str
 
 

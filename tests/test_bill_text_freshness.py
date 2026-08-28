@@ -338,7 +338,10 @@ async def test_cache_disabled_never_caches_resolution(govinfo, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_timing_split_and_cache_block_on_the_wire(govinfo):
+async def test_timing_split_and_cache_block_on_the_wire(govinfo, monkeypatch):
+    # A7: the wire-level timing block is env-gated; this test asserts the
+    # VERBOSE shape (the gate itself is covered in test_bill_text_timing_gate).
+    monkeypatch.setenv("CONGRESSMCP_VERBOSE", "1")
     cold = await tools_mod.get_bill_toc(None, congress=119, bill_type="s", number=1071, depth=1)
     assert cold["version_resolution"] == "fresh"
     assert cold["cache"] == {"index_hit": False, "version_hit": False}

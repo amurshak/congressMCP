@@ -4,7 +4,12 @@
     python -m tests.corpus.f36_scan --extra path/to/BILLS-119hr10115ih.xml
     BILL_TEXT_CORPUS_CACHE=... python -m tests.corpus.f36_scan --out runs/f36/<ts>
 
-MEASUREMENT ONLY -- the fix is post-PR-2 and lands with F35. This scan counts
+Originally MEASUREMENT ONLY (pre-fix); as of the A8 fix (2026-08-27) this is
+also the ACCEPTANCE instrument -- re-run against the archived input, the
+strict no-entry and partial sets must drain (set-based, per the work order).
+The only fix-time change to the instrument is the A8 note-form membership
+predicate (_usc_note_satisfied); instance identity (unit + parenthetical
+text) is untouched, so before/after sets remain comparable. This scan counts
 the class F36 names: amendatory units whose verb-hugged SUBJECT carries a
 parenthetical Public Law N-M / N U.S.C. M note citation and whose `amends`
 carries no entry for it. The live miss is
@@ -147,6 +152,18 @@ def instances(text: str) -> list[dict]:
     return found
 
 
+def _usc_note_satisfied(bare_cite: str, amends_cites: "set[str]") -> bool:
+    """A8 instrument update (2026-08-27, with the fix): the contract emits a
+    note cite as its own kind with the printed designation in the cite --
+    "42 U.S.C. 2210 note" / "... note prec." -- so a note INSTANCE (recorded
+    here in bare "T U.S.C. S" form, unchanged for before/after set identity)
+    is satisfied only by a note-form amends cite. A bare `usc` emission does
+    NOT satisfy it: that would be the wrong-kind extraction A8's discriminator
+    exists to forbid (fetch-this-section would retrieve the wrong law)."""
+    prefix = bare_cite + " note"
+    return any(a == prefix or a.startswith(prefix + " ") for a in amends_cites)
+
+
 def scan_unit(unit) -> dict | None:
     """Per-unit record, or None when the unit has no parenthetical cite at all."""
     text = operative_text(unit)
@@ -156,8 +173,14 @@ def scan_unit(unit) -> dict | None:
     amends = {a["cite"] for a in unit.amends}
     for i in inst:
         cites = [c for c in (i["pl"], i["usc_note"]) if c]
-        i["in_amends"] = [c for c in cites if c in amends]
-        i["missing"] = [c for c in cites if c not in amends]
+
+        def _ok(c: str) -> bool:
+            if c == i["usc_note"]:
+                return _usc_note_satisfied(c, amends)
+            return c in amends
+
+        i["in_amends"] = [c for c in cites if _ok(c)]
+        i["missing"] = [c for c in cites if not _ok(c)]
         i["shape"] = ("pl+usc_note" if i["pl"] and i["usc_note"]
                       else "pl" if i["pl"] else "usc_note")
         i["no_entry"] = bool(i["missing"]) and not i["in_amends"]

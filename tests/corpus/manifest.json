@@ -150,6 +150,27 @@
       "category": "reported-house",
       "note": "FY2026 NDAA as reported in the House. Paired with the already-cached BILLS-119hr3838eh so the corpus carries a CONFIRMED two-version pair of the same bill -- 693 shared section ids, 15 of which differ in text. Grounds S17's E3 (version disambiguation), which previously presupposed an enrolled version that does not exist: govinfo lists ih, rh, eh only.",
       "sha256": "58c47cbe2fb7e3ecfa3e1639e75f8ecd50f62b91790d251046d732af93dec405"
+    },
+    {
+      "package_id": "BILLS-119hr1362ih",
+      "version": "ih",
+      "category": "f36-regression",
+      "note": "RECA amendment, note-first parenthetical order -- A8 consumer differential fixture (must not regress)",
+      "sha256": "5716d26dff01a5f9cadb10e03735dd0ca9e35da4e1d58796f45c51d2bf996a2a"
+    },
+    {
+      "package_id": "BILLS-119hr7672ih",
+      "version": "ih",
+      "category": "f36-regression",
+      "note": "RECA amendment, P.L.-first parenthetical order -- the clean F36 repro (A8 must-extract fixture)",
+      "sha256": "c4c6bbdd2d059ce55b95e3a071fa5d8b831fe7c0674e6c6a7bd06ab256649d38"
+    },
+    {
+      "package_id": "BILLS-119hr4631ih",
+      "version": "ih",
+      "category": "f36-regression",
+      "note": "St. Louis RECA Readjustment Act -- measured A6-interposed shape ('as added by section 100204 of Public Law 119-21' between trailer and verb); work-order/A8 conflict reported 2026-08-27",
+      "sha256": "34042c1da48fcc1bb80f30383044f84fa72a27ac2eedf511d09aac0aca24bc29"
     }
   ]
 }

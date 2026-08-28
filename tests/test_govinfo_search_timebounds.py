@@ -116,7 +116,10 @@ async def test_search_bills_sends_range_and_truncates_datetime():
         await mod.search_bills(FakeContext(), keywords="RECA", congress=119,
                                fromDateTime="2025-07-23T08:00:00Z",
                                toDateTime="2025-07-23")
-    body = post.call_args.args[0]
+    # The MAIN query is the first call -- a zero total now legitimately
+    # fires Q12 leave-one-out probes after it (which drop constraints by
+    # design), so the last call is no longer the query under test.
+    body = post.call_args_list[0].args[0]
     assert body["query"].endswith(
         "publishdate:range(2025-07-23,2025-07-23)")
 

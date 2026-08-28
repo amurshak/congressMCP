@@ -205,6 +205,8 @@ This belongs in the tool description too. §6 directs consumers to `is_amendator
 
 ### `amends` — three accepted citation forms, all verb-gated
 
+*(A8, 2026-08-26, adds a fourth: statutory-note cites — `N U.S.C. M note` — from the amendatory subject's parenthetical, plus the parenthetical-extraction contract for the existing P.L. and U.S.C. forms. See the A8 block under the shape ruling below.)*
+
 > **Amendment A1 (intentional, PR 1).** This section originally pinned `amends` to the longhand form alone. Measured against live enrolled text, that fires well on defense bills and is nearly blind to reconciliation bills, which amend named Acts cited in U.S. Code shorthand: **NDAA 328/807 amendatory units populated; 119hr1 only 14/293**, where longhand appears 39x but shorthand appears 373x. Since §13 selects hr1 *precisely for* amendatory density, 14/293 defeated the fixture's purpose. Not silent drift — a spec-calibration miss the implementation corrected.
 
 Populated from **either** form, both resolving to a U.S. Code target. Results are a **list**, de-duplicated and sorted. Empty list when nothing matches.
@@ -314,7 +316,7 @@ Note that the clean case exists too (Atomic Energy Defense Act: 41 mentions, 1 p
 
 ### Public Law / Statutes-at-Large targets — APPROVED with one open denominator (V15)
 
-**Invariant, amended:** `amends` resolves **U.S. Code and Public Law citations, never named Acts.** Still one sentence a consumer can reason about, which was the test.
+**Invariant, amended:** `amends` resolves **U.S. Code and Public Law citations, never named Acts.** Still one sentence a consumer can reason about, which was the test. *(Amended again by A8, 2026-08-26: statutory-note citations join as a third `kind` — the restated invariant is in the A8 block below.)*
 
 **V15 result.** NDAA `enr` + 119hr1 `enr`, 48 P.L.-amending units: ~88% carry an explicit `P.L.`/`Stat.` cite, 5–13% named-Act only, 0–7% back-reference only, and **zero sections mix an explicit cite with a short form among their own clauses.** That last figure is the IRC signature — `S:70401` carrying both forms inside one section is what refused the IRC — and its absence is the reason this clears where the IRC did not.
 
@@ -371,6 +373,32 @@ Sorted by `(kind, cite)`, de-duplicated on the pair. Empty list when nothing mat
 #### P.L. and Statutes-at-Large name the same enactment twice
 
 `P.L. 119-38; 139 Stat. 656` is one target cited two ways. **Prefer the P.L. form.** Emit a `Stat.` cite only where no P.L. form accompanies it in the same citation instance, and never both. `kind` is `public_law` for either form; the distinction is in the `cite` string.
+
+> **Amendment A8 (F36 fix contract, 2026-08-26) — parenthetical subject citations extract, and statutory-note cites get their own `kind`.** The measured hole: when the amendatory subject is a named Act or a section of one, drafters attach the resolving citations in a parenthetical — *"Section 5A of the Radiation Exposure Compensation Act (Public Law 101–426; 42 U.S.C. 2210 note)… is amended—"* — and the extractor emitted nothing. This is the dominant shape on single-statute amendment bills, NDAAs, and omnibus appropriations: **830 strict-hugged no-entry instances plus 70 partial across 689 amendatory units** (~10% of the corpus's 6,615 amendatory units), shapes `pl+usc_note` 550 / `usc_note` 236 / `pl` 44, and every missed P.L. is en-dash (594/594) — the miss class is the real-world P.L. typography itself (F36 measurement, `runs/f36/2026-08-22T173903Z/`). This does **not** reopen "named Acts are never resolved": the *name* is still never resolved; the explicit citations physically present in the amendatory sentence are.
+>
+> **Extraction contract.** When a parenthetical citation trailer sits on the amendatory subject and the verb hug binds it to a recognized amendatory verb — the same strict-tier hug the F36 scan measured — every citation in the parenthetical's semicolon-separated list is extracted into `amends`, per the form rules below. The A6 class (an interposed clause between subject and verb) stays out of scope: those 79 units are a separate defect, reported beside the F36 populations, and are not acceptance debt here.
+>
+> **Per-form rules, from the hand-coded sub-shapes** (20/20 positive, `runs/f36/2026-08-22T173903Z/precision-hand-coding.md`):
+>
+> - `Public Law N–M` → `{"kind": "public_law", "cite": "P.L. N-M"}`. En-dash and hyphen source forms both accepted; the `cite` string normalizes to the ASCII-hyphen form already in use. A `division N of Public Law …` prefix extracts the P.L. itself; the division qualifier is not carried — the consumer holds the sentence, and decomposed qualifiers are the speculative structure this section already declined.
+> - `N U.S.C. M note` (including `note prec.`) → `{"kind": "usc_note", "cite": "N U.S.C. M note"}` — the printed note designation preserved verbatim in the `cite` (`note`, `note prec.`).
+> - A U.S.C. cite in the parenthetical **without** a note designation (the Act is classified to the section proper) → plain `kind: "usc"`, as today.
+> - `Stat.` cites follow the standing rule unchanged: accompanied by a P.L. form in the same citation instance, not emitted; alone, emitted as `public_law` with the `Stat.` string.
+>
+> **Why `usc_note` is a `kind` and not a `usc` entry with "note" in the string.** A note cite does not resolve to the section's own text: RECA is *set out as a note under* 42 U.S.C. 2210, and the text at 2210 itself is a different statute. A consumer that treats a `usc` entry as "fetch this section" — the reasonable reading the discriminator exists to license — would retrieve the wrong law while the schema said it was right. And distinguishing the two by parsing the cite string is exactly the objection that rejected the flat mixed-string list. Third kind, `cite` verbatim, dedup on `(kind, cite)` unchanged.
+>
+> **Both kinds emit when both are present.** `(Public Law 101–426; 42 U.S.C. 2210 note)` yields two entries. This is deliberately not the Stat. rule: P.L.-vs-Stat. is one document in two reporters, one strictly less retrievable; a P.L. and a note cite are two independent retrieval paths with different consumer affordances, and `amends` is "citations *found*." Suppressing either would re-manufacture the ambiguity the discriminator kills.
+>
+> **Order independence is part of the contract.** The consumer differential that corroborated F36 isolated order as the variable: `(42 U.S.C. 2210 note; Public Law 101–426)` extracted the P.L. while `(Public Law 101–426; 42 U.S.C. 2210 note)` extracted nothing. Post-fix, the emitted set for a parenthetical is invariant under permutation of its semicolon-separated citations. HR 1362 §2 (note-first — works today, must not regress), HR 7672 §3, and HR 4631 §2 (P.L.-first — must extract) are the regression fixtures, enrolled if not already in the corpus; the mechanism hypothesis to check before writing any new pattern is recorded at the F36 entry (`14-defect-priority.md`).
+>
+> **Precision discipline: V13 binds any new pattern.** The verb hug is required — the 14 identical-shape parentheticals in `119hr10115ih` S:9/S:11/S:12 (non-amendatory sections, and definitions inside an amendatory unit) are the planted negatives and must stay at zero. The scan's not-hugged (2,330) and provenance (200) instances stay non-emitting. Post-fix, a fresh n=20 hand-coded sample of newly emitted entries, seed recorded, labeled as coded by a coder with project history; any false positive blocks.
+>
+> **Invariant, restated:** `amends` resolves **U.S. Code, U.S. Code statutory-note, and Public Law citations — never named Acts.** Still one sentence a consumer can reason about. The coherence invariant (`amends != []` ⟹ `is_amendatory == true`) is preserved by the hug requirement.
+>
+> **Ratified at adjudication, 2026-08-27:** the trailer pass also captures an `et seq.` subject cite — `(12 U.S.C. 411 et seq.) is amended` — emitting the **head-of-range** as plain `usc`. The range qualifier is not carried: the same accepted narrowing as the division-of-P.L. prefix, and the head of range is the resolvable anchor (hand-coded positive in the post-fix sample). The `N U.S.C. note prec. M` order variant — designation *before* the number — remains a known, unmeasured recall gap, recorded at the F36 entry with no contract claim either way. **A second uncovered form is F41 (2026-08-27): structural-unit citations — part/subtitle/chapter/title targets with no section number — return `[]`; measurement preregistered at the register, schema question (likely a fourth `kind` via the F40 single-source vocabulary) gated on it.**
+>
+> Acceptance is set-based at the work order — `14-defect-priority.md`, "Work order — F35 + F36 (2026-08-26)"; **discharged 2026-08-27, closure at the F36 entry.** The `extraction_status` design question was gated on the post-fix residual measurement and is **RULED 2026-08-27: declined** — measurement and rationale at the F36 entry.
+
 
 ---
 
