@@ -771,6 +771,150 @@ def test_a5_is_amendatory_verb_set_is_superset_of_the_gate():
         assert u.amends == [{"kind": "public_law", "cite": "P.L. 119-38"}], verb
 
 
+def _amends_of(text: str) -> list[dict]:
+    return Unit("S:1", [], None, [Segment("operative", text)]).amends
+
+
+def test_a8_parenthetical_trailer_extracts_all_cites_order_independent():
+    # A8 / F36: the consumer differential isolated ORDER as the variable --
+    # P.L.-left-of-USC extracted nothing (the "note" trailer breaks the USC
+    # hug and prose sits between the P.L. and the verb) while note-first
+    # extracted the P.L. Post-fix the emitted set is invariant under
+    # permutation of the parenthetical's semicolon-separated citations, and
+    # BOTH kinds emit when both are present (two independent retrieval paths).
+    # The three consumer regression sentences:
+    #   HR 4631 §2 / HR 7672 §3 (P.L.-first -- must extract) and
+    #   HR 1362 §2 (note-first -- must not regress).
+    pl_first = _amends_of(
+        "Section 5A of the Radiation Exposure Compensation Act "
+        "(Public Law 101–426; 42 U.S.C. 2210 note) is amended—"
+    )
+    note_first = _amends_of(
+        "The Radiation Exposure Compensation Act "
+        "(42 U.S.C. 2210 note; Public Law 101–426) is amended—"
+    )
+    expected = [
+        {"kind": "public_law", "cite": "P.L. 101-426"},
+        {"kind": "usc_note", "cite": "42 U.S.C. 2210 note"},
+    ]
+    assert pl_first == expected
+    assert note_first == expected
+
+
+def test_a8_usc_note_is_its_own_kind_with_printed_designation_verbatim():
+    # A note cite resolves to material set out UNDER the section, not the
+    # section's own text; a consumer treating a `usc` entry as "fetch this
+    # section" would retrieve the wrong law. Third kind; "note" / "note prec."
+    # preserved in the cite.
+    assert _amends_of(
+        "Section 883 of the Act (Public Law 114–328; 10 U.S.C. 4292 note prec.) is amended—"
+    ) == [
+        {"kind": "public_law", "cite": "P.L. 114-328"},
+        {"kind": "usc_note", "cite": "10 U.S.C. 4292 note prec."},
+    ]
+    # A parenthetical USC cite WITHOUT a note designation stays plain "usc".
+    assert _amends_of(
+        "Section 608 of the Act (division N of Public Law 115–31; "
+        "131 Stat. 833; 50 U.S.C. 3315) is amended."
+    ) == [
+        # division-of-P.L. extracts the P.L. itself (qualifier not carried);
+        # the same-instance Stat. is absorbed, per the standing rule.
+        {"kind": "public_law", "cite": "P.L. 115-31"},
+        {"kind": "usc", "cite": "50 U.S.C. 3315"},
+    ]
+
+
+def test_a8_en_dash_and_hyphen_pl_forms_both_accepted_in_trailer():
+    # The F36 measurement: every missed P.L. was en-dash (594/594) -- the miss
+    # class was the real-world P.L. typography itself. Both source forms
+    # normalize to the ASCII-hyphen cite.
+    for dash in ("-", "–"):
+        assert _amends_of(
+            f"Section 2 of the Act (Public Law 118{dash}159; 10 U.S.C. 113 note) is amended."
+        ) == [
+            {"kind": "public_law", "cite": "P.L. 118-159"},
+            {"kind": "usc_note", "cite": "10 U.S.C. 113 note"},
+        ], repr(dash)
+
+
+def test_a8_standalone_stat_in_trailer_emits_only_without_pl_companion():
+    # Standing Stat. rule, unchanged inside the trailer: absorbed beside a
+    # P.L. in the same instance; alone, emitted as public_law.
+    assert _amends_of("The Act of June 8, 1940 (54 Stat. 249) is amended.") == [
+        {"kind": "public_law", "cite": "54 Stat. 249"},
+    ]
+    # Across the paren boundary too: "Public Law 119-38 (139 Stat. 656)" is one
+    # instance -- the P.L. absorbs it; the trailer pass must not re-emit.
+    assert _amends_of(
+        "Section 5 of Public Law 119-38 (139 Stat. 656) is amended by striking subsection (b)."
+    ) == [{"kind": "public_law", "cite": "P.L. 119-38"}]
+
+
+def test_a8_verb_hug_still_required_planted_negative_shapes_stay_silent():
+    # V13 binds the new pattern: the identical parenthetical in non-amendatory
+    # position (hr10115 S:9/S:11/S:12 -- claims language, definitions) must not
+    # fire. Non-amendatory units are [] by construction; a definition inside an
+    # AMENDATORY unit is the sharper case: the unit has a hugged amendment
+    # elsewhere, and the definition's un-hugged parenthetical must still not
+    # contribute its cites.
+    unit = Unit("S:12", [], None, [Segment(
+        "operative",
+        "Section 6 of title 99, United States Code, is amended by striking X. "
+        "In this section, the term claim means a claim under the Radiation "
+        "Exposure Compensation Act (Public Law 101–426; 42 U.S.C. 2210 note) "
+        "submitted before the deadline.",
+    )])
+    assert unit.is_amendatory
+    assert unit.amends == [{"kind": "usc", "cite": "99 U.S.C. 6"}]
+    # Wholly non-amendatory unit: [] regardless of the parenthetical.
+    silent = Unit("S:9", [], None, [Segment(
+        "operative",
+        "A claim submitted under the Radiation Exposure Compensation Act "
+        "(Public Law 101–426; 42 U.S.C. 2210 note) shall be paid from the Fund.",
+    )])
+    assert not silent.is_amendatory
+    assert silent.amends == []
+
+
+def test_a8_provenance_chain_parenthetical_stays_excluded():
+    # The S:1106 chain shape, now with the intervener's cites in a hugged
+    # trailer: "as most recently amended by ... (P.L. ...; Stat. ...), is
+    # amended" -- the trailer hugs the verb but sits in a provenance clause.
+    assert _amends_of(
+        "Section 2405(a) of the Act, as most recently amended by section 145(a) "
+        "of the National Defense Authorization Act for Fiscal Year 2025 "
+        "(Public Law 118–159; 138 Stat. 2000), is amended by striking the second sentence."
+    ) == []
+
+
+def test_a8_quoted_segment_cites_stay_excluded_from_trailer_pass():
+    # §6: quoted material is the language being inserted, not the target.
+    unit = Unit("S:1", [], None, [
+        Segment("operative",
+                "Section 5601 of title 14, United States Code, is amended by "
+                "inserting the following:"),
+        Segment("quoted",
+                "The Safety Act (Public Law 101–999; 42 U.S.C. 9999 note) is amended."),
+    ])
+    assert unit.amends == [{"kind": "usc", "cite": "14 U.S.C. 5601"}]
+
+
+def test_a8_oversized_parenthetical_body_does_not_extract():
+    # The 240-char body cap: an unbalanced ")" deep in a unit must not let a
+    # pseudo-parenthetical sweep unrelated cites into hugging range.
+    filler = "background prose that is not a citation list " * 8  # > 240 chars
+    assert _amends_of(
+        f"(Public Law 101–426; {filler}) is amended."
+    ) == []
+
+
+def test_a8_designator_parens_inside_trailer_body_are_tolerated():
+    # One nesting level admits citation designators inside the body.
+    assert _amends_of(
+        "Section 4(a) of the Act (42 U.S.C. 300(a) note) is amended."
+    ) == [{"kind": "usc_note", "cite": "42 U.S.C. 300 note"}]
+
+
 def test_v18_is_amendatory_is_verb_only_quote_alone_does_not_fire():
     # V18: the quote branch is dropped. A quoted segment with no amendatory verb -- an
     # appropriations account heading, a short title, a defined term -- is NOT amendatory.
@@ -914,6 +1058,100 @@ def test_subdivision_emits_spec_prefix_codes_not_element_names():
     ids = [u.section_id for u in parsed.units]
     assert "S:1/SS:(a)" in ids and "S:1/SS:(b)" in ids
     assert "S:2/PARA:(1)" in ids and "S:2/PARA:(2)" in ids
+
+
+def test_f35_structural_child_display_text_begins_with_document_enum():
+    # F35 (§5 ruling): an amendatory bill is its enumeration -- cross-references
+    # address text BY DESIGNATOR, and the parser erased the designator from the
+    # emitted text while its own ids depend on it. The display text of every
+    # structural unit below section level begins with its enum exactly as the
+    # document writes it, followed by its header where present.
+    filler = ("word " * 1000).strip()
+    xml = (
+        b"<bill><legis-body><section><enum>12</enum>"
+        b"<header>Authorization of appropriations</header>"
+        b"<text>Intro text.</text>"
+        + f"<subsection><enum>(e)</enum><header>Grants</header><text>{filler}</text></subsection>".encode()
+        + f"<subsection><enum>(f)</enum><header>Reports</header><text>{filler}</text></subsection>".encode()
+        + f"<subsection><enum>(g)</enum><text>Amounts under subsection (e) remain available. {filler}</text></subsection>".encode()
+        + b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119hr10115ih", "ih", None)
+    by_id = {u.section_id: u for u in parsed.units}
+    # Enum first, then header, then body -- delimiters preserved.
+    assert by_id["S:12/SS:(e)"].display_text.startswith("(e) Grants")
+    assert by_id["S:12/SS:(f)"].display_text.startswith("(f) Reports")
+    # Headerless child: the enum still leads, joined into the first block.
+    assert by_id["S:12/SS:(g)"].display_text.startswith(
+        "(g) Amounts under subsection (e) remain available.")
+    # The acceptance property: the (g)->(e) cross-reference is checkable from
+    # the emitted text alone -- "(e)" appears as a designator in (e)'s own text.
+    assert "(e)" in by_id["S:12/SS:(e)"].display_text
+    # The id keeps the normalized identity; header field stays clean typography.
+    assert by_id["S:12/SS:(e)"].header == "Grants"
+    # byte_length counts the rendered enum (rendering change, hence the
+    # SCHEMA_VERSION bump).
+    assert by_id["S:12/SS:(e)"].byte_length == len(
+        by_id["S:12/SS:(e)"].display_text.encode("utf-8"))
+
+
+def test_f35_designators_render_in_flowing_text_of_unsubdivided_section():
+    # The hr10115 §12 shape: the section sits under the byte cap, so its
+    # subsections are FLOWING TEXT of one unit, not child units -- and the
+    # ruling covers them there too (the acceptance section). Nested paragraph
+    # designators render as well.
+    xml = (
+        b"<bill><legis-body><section><enum>12</enum>"
+        b"<header>Grants</header>"
+        b"<subsection><enum>(e)</enum><header>Authorization</header>"
+        b"<text>There are authorized sums.</text></subsection>"
+        b"<subsection><enum>(f)</enum><header>Definitions</header>"
+        b"<paragraph><enum>(1)</enum><header>Qualified individual</header>"
+        b"<text>The term means an individual.</text></paragraph>"
+        b"</subsection>"
+        b"<subsection><enum>(g)</enum><text>As defined in section 12(e) of this Act.</text></subsection>"
+        b"</section></legis-body></bill>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119hr10115ih", "ih", None)
+    (unit,) = [u for u in parsed.units if u.section_id == "S:12"]
+    text = unit.display_text
+    assert "(e) Authorization" in text
+    assert "(f) Definitions" in text
+    assert "(1) Qualified individual" in text
+    assert "(g) As defined in section 12(e)" in text
+    # The acceptance property, in-unit: the (g)->(e) reference and the (e)
+    # designator are both present in one response.
+    assert text.index("(e) Authorization") < text.index("section 12(e)")
+
+
+def test_f35_synthetic_and_chunk_units_are_unchanged():
+    # Synthetic units have no document enum to render; a byte chunk enumerates
+    # nothing. Neither gains a prefix.
+    xml = (
+        b"<resolution><preamble>"
+        b"<whereas><text>Whereas the finding stands;</text></whereas>"
+        b"</preamble><resolution-body>"
+        b"<section><enum>1</enum><text>Resolved text.</text></section>"
+        b"</resolution-body></resolution>"
+    )
+    parsed = parse_bill_xml(xml, "BILLS-119hres1ih", "ih", None)
+    pre = next(u for u in parsed.units if u.section_id.startswith("PRE:"))
+    assert pre.display_text.startswith("Whereas")
+    # A chunk of a subdivided child keeps the enum only where the child's own
+    # text begins (clipped into CHUNK:1), never copied onto every chunk.
+    filler = ("word " * 4000).strip()
+    xml2 = (
+        b"<bill><legis-body><section><enum>1</enum><header>Big</header>"
+        + f"<subsection><enum>(a)</enum><header>Huge</header><text>{filler}</text></subsection>".encode()
+        + f"<subsection><enum>(b)</enum><text>small</text></subsection>".encode()
+        + b"</section></legis-body></bill>"
+    )
+    parsed2 = parse_bill_xml(xml2, "BILLS-119s1071enr", "enr", None)
+    chunks = [u for u in parsed2.units if "/SS:(a)/CHUNK:" in u.section_id]
+    assert len(chunks) >= 2
+    assert chunks[0].display_text.startswith("(a) Huge")
+    for later in chunks[1:]:
+        assert not later.display_text.startswith("(a)")
 
 
 def test_no_addressable_unit_emitted_from_inside_quoted_block():
@@ -1141,6 +1379,8 @@ def test_search_aggregates_matching_segments_to_one_unit_hit():
 
 @pytest.mark.asyncio
 async def test_tool_wrappers_build_responses_without_network(monkeypatch):
+    # A7: timing is env-gated on the wire; assert the verbose shape here.
+    monkeypatch.setenv("CONGRESSMCP_VERBOSE", "1")
     # Exercises the tools.py envelope + response-model construction for all three
     # tools (the layer above the parser/index). Guards against duplicate-keyword
     # envelope regressions such as version_resolution_note being passed twice.

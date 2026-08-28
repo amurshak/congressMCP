@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import os
 import time
 from typing import Any, Iterable
 
@@ -103,6 +104,26 @@ def _capability_error() -> dict[str, Any] | None:
         {"python": sys.version.split()[0], "sqlite": sqlite3.sqlite_version},
         "Use a Python build linked against SQLite with FTS5 enabled.",
     )
+
+
+def _timing_enabled() -> bool:
+    """A7 (fulltext §4): the timing block is emitted only when
+    CONGRESSMCP_VERBOSE is set to any non-empty value in the server
+    environment. It is the one telemetry block that is purely performance and
+    never load-bearing for correctness; cache, version_resolution*,
+    and the diagnostic-on-failure notes stay always-on. Read per call, so a
+    long-lived server (or a test) picks up the environment as it stands."""
+    return bool(os.environ.get("CONGRESSMCP_VERBOSE"))
+
+
+def _dump(response: Any) -> dict[str, Any]:
+    """model_dump with the A7 gate applied: the timing key is dropped -- not
+    nulled -- when CONGRESSMCP_VERBOSE is unset, so an ungated response is
+    byte-identical to the pre-A7 shape minus the key."""
+    data = response.model_dump()
+    if not _timing_enabled():
+        data.pop("timing", None)
+    return data
 
 
 def _timing(loaded: LoadedBillText, started: float, search_ms: float | None = None) -> Timing:
@@ -253,7 +274,9 @@ async def search_bill_text(
 
     If "quoted" appears in match_contexts, the hit may include language the bill is removing,
     even when "operative" also appears; presence of "quoted" governs. Each amends entry is
-    {kind: "usc"|"public_law", cite}. amends is a convenience, never a complete list of what a
+    {kind: "usc"|"usc_note"|"public_law", cite}; "usc_note" targets note-codified law --
+    material set out UNDER the cited section, not the section's own text -- with the printed
+    note designation verbatim in the cite. amends is a convenience, never a complete list of what a
     section amends: it resolves no named Acts (including the IRC by bare section number), no
     chapter- or title-level amendments, and no non-U.S. Code targets. A NON-EMPTY amends can
     still be short -- a populated list is not evidence it is the whole list, and nothing
@@ -312,7 +335,7 @@ async def search_bill_text(
                 for hit in ranked
             ],
         )
-        return response.model_dump()
+        return _dump(response)
     except BillTextError as exc:
         return _error(exc.code, exc.message, exc.detail, exc.remediation)
     except ValueError as exc:
@@ -383,7 +406,9 @@ async def get_bill_section(
     is_amendatory is true, quoted language in text is matter the section INSERTS INTO or
     STRIKES FROM existing law -- an instruction to change another statute, not a freestanding
     requirement of this bill -- so present it as an amendment to the cited target, not as the
-    bill's own rule. Each amends entry is {kind: "usc"|"public_law", cite}. amends is citations
+    bill's own rule. Each amends entry is {kind: "usc"|"usc_note"|"public_law", cite};
+    "usc_note" targets note-codified law (material set out UNDER the cited section), the
+    printed note designation verbatim in the cite. amends is citations
     found, never a complete list: it resolves no named Acts, no chapter- or title-level
     amendments, and no non-U.S. Code targets, so a non-empty list can still be short. A
     heading-plus-children-descriptors response (subtree too large for max_bytes) reports the
@@ -466,7 +491,7 @@ async def get_bill_section(
             if children
             else None
         )
-        return BillSectionResponse(
+        return _dump(BillSectionResponse(
             **_envelope(loaded),
             version_resolution_note=loaded.resolved.version_resolution_note,
             request_note=_merge_notes(note),
@@ -489,7 +514,7 @@ async def get_bill_section(
             subtree_byte_length=subtree_len,
             truncated=truncated,
             children=child_payload,
-        ).model_dump()
+        ))
     except BillTextError as exc:
         return _error(exc.code, exc.message, exc.detail, exc.remediation)
     except Exception as exc:
@@ -562,7 +587,7 @@ async def get_bill_toc(
             )
         if hidden_note:
             notes.append(hidden_note)
-        return BillTocResponse(
+        return _dump(BillTocResponse(
             **_envelope(loaded),
             version_resolution_note=loaded.resolved.version_resolution_note,
             timing=_timing(loaded, started),
@@ -572,7 +597,7 @@ async def get_bill_toc(
             toc_truncated=node_capped or list_truncated or hidden_note is not None,
             toc_note=" ".join(notes) or None,
             toc=toc,
-        ).model_dump()
+        ))
     except BillTextError as exc:
         return _error(exc.code, exc.message, exc.detail, exc.remediation)
     except Exception as exc:
@@ -610,7 +635,7 @@ def _container_response(
         # Descriptor-only: the heading is not an indexed unit and carries no stored
         # value; false / [] is the heading's own state, like byte_length 0 below.
         is_amendatory, amends = False, []
-    return BillSectionResponse(
+    return _dump(BillSectionResponse(
         **_envelope(loaded),
         version_resolution_note=loaded.resolved.version_resolution_note,
         request_note=_merge_notes(note),
@@ -629,7 +654,7 @@ def _container_response(
         subtree_byte_length=subtree_len,
         truncated=truncated,
         children=children,
-    ).model_dump()
+    ))
 
 
 class _Container:

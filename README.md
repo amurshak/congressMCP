@@ -512,6 +512,7 @@ Point a client at a source checkout by using `"command": "congressmcp"` (with th
 | `CONGRESS_API_ENV` | No | `local` | Set to `development`/`staging`/`production` to load the matching `.env.*` file; unset loads only a plain `.env`. Files never override exported variables |
 | `CONGRESSMCP_BILL_TEXT_ONLY` | No | unset | If truthy, register only the three bill-text tools (standalone bill-text server) |
 | `CONGRESSMCP_TRACE_DIR` | No | unset | If set to a directory, write one key-redacted JSONL record per bill-text tool call (debugging) |
+| `CONGRESSMCP_VERBOSE` | No | unset | If set to any non-empty value, bill-text tool responses include the server-measured `timing` block; unset, the block is omitted (diagnostic blocks such as `cache` and `version_resolution*` are always on) |
 | `CONGRESSMCP_CACHE_DIR` | No | Platform cache path (see [Full Bill Text Search](#full-bill-text-search)) | Bill-text package cache root |
 | `CONGRESSMCP_CACHE_MAX_BYTES` | No | `524288000` | Bill-text cache cap (500 MB); LRU eviction after each index write |
 | `CONGRESSMCP_CACHE_ENABLED` | No | `true` | `false` disables the persistent cache: every call re-fetches and re-parses the full document |

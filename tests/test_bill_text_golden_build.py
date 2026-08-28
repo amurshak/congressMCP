@@ -34,6 +34,12 @@ GOLDEN_INPUTS = (
     ("bill_text_trimmed.xml", "BILLS-119s1071enr", "enr", "2025-12-19T03:11:48Z"),
     ("hres_trimmed.xml", "BILLS-119hres1ih", "ih", "2025-01-03T00:00:00Z"),
     ("hres_preamble_trimmed.xml", "BILLS-119hres2ih", "ih", "2025-01-03T00:00:00Z"),
+    # F35/F36 (2026-08-27): the three fixtures above exercise neither a
+    # subdivided section (F35's enum rendering) nor a parenthetical citation
+    # trailer (F36's amends extraction) -- measured during the fix: the digest
+    # did NOT move on either change, a blind spot in this instrument. This
+    # fixture makes both properties visible to the golden build.
+    ("f35_f36_trimmed.xml", "BILLS-119hr9999ih", "ih", "2025-01-03T00:00:00Z"),
 )
 
 

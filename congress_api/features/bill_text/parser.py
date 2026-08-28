@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 
 from .client import BillTextError
-from .models import AncestorNode
+from .models import AMENDS_KINDS, AncestorNode
 
 
 MAX_UNIT_BYTES = 8_000
@@ -21,6 +21,18 @@ STRUCTURE_TYPES = {
     "subsection": "SS",
 }
 FALLBACK_CHAIN = ["subsection", "paragraph", "subparagraph", "clause"]
+# F35 (§5 ruling): the document's structural levels below section whose enum
+# renders in display text -- the full descending chain, not only the four
+# levels _subdivide can carve into child units, because the ruling covers the
+# TEXT of every structural unit ("(e)", "(2)", "(F)") wherever it renders:
+# hr10115's §12 sits under the byte cap, so its subsections are flowing text
+# of one unit, and the acceptance requires their designators there too.
+# A tuple, not a set: it is a RENDERING_SYMBOLS digest input, and a set's repr
+# order varies with string-hash randomization.
+SUBSTRUCTURE_ENUM_NAMES = (
+    "subsection", "paragraph", "subparagraph", "clause",
+    "subclause", "item", "subitem",
+)
 # Qualified-id codes for the subdivision chain (spec §5). `PARA`/`SUBP`/`CL` are
 # real document enums; a byte-bounded cut is NOT an enumeration of anything and is
 # addressed `CHUNK:{n}` instead, in a namespace that cannot be mistaken for a bill
@@ -210,6 +222,91 @@ AMENDS_STAT_RE = re.compile(
     + _HUG,
     re.IGNORECASE,
 )
+# A8 (F36): the parenthetical citation trailer on the amendatory subject --
+# "Section 5A of the Radiation Exposure Compensation Act (Public Law 101–426;
+# 42 U.S.C. 2210 note) is amended--". The per-cite hug above structurally
+# reaches only the RIGHTMOST citation of a semicolon-separated parenthetical
+# list (anything left of it has prose/digits between itself and the verb), and
+# a "note" designation breaks even that -- which is why P.L.-left-of-USC
+# extracted nothing while note-first extracted the P.L. (the F36 consumer
+# differential; mechanism check 2026-08-27 falsified the span-claiming
+# hypothesis recorded at the F36 entry). The A8 contract: when the verb hug
+# binds the parenthetical's closing paren, EVERY citation in the parenthetical
+# extracts, order-independent. The hug is established once, at the trailer
+# level; the inner forms below therefore carry no hug of their own -- they are
+# reachable only through a hugged trailer, so V13's gate is not weakened.
+# One nesting level inside the body admits citation designators ("(42 U.S.C.
+# 300(a) note)"); the body caps at 240 chars and never crosses a block
+# boundary, so an unbalanced ")" deep in a unit cannot manufacture a giant
+# pseudo-parenthetical that sweeps unrelated cites into hugging range.
+AMENDS_PAREN_TRAILER_RE = re.compile(
+    r"\((?P<body>(?:[^()\n]|\([^()\n]*\))*)\)" + _HUG,
+    re.IGNORECASE,
+)
+_PAREN_BODY_MAX_CHARS = 240
+# Inner forms: identical citation shapes to the hugged patterns above, minus
+# the hug (see the trailer comment). The P.L. form keeps the same-instance
+# "; N Stat. M" absorption so the standing Stat. rule is unchanged inside the
+# parenthetical: a Stat. cite accompanied by a P.L. in the same instance is
+# not separately emitted; alone, it emits as public_law.
+_PAREN_PL_RE = re.compile(
+    r"\b(?:Public\s+Law|Pub\.?\s*L\.?|P\.?\s*L\.?)\s*\.?\s*"
+    r"(\d+)[-‐-―](\d+)"
+    r"(?:[\s;(]*\d+\s+Stat\.\s*\d+\)?)?",
+    re.IGNORECASE,
+)
+# USC inside the trailer, with an optional statutory-note designation. A note
+# cite resolves to material SET OUT UNDER the section, not the section's own
+# text, so it emits as its own kind (`usc_note`) with the printed designation
+# ("note" / "note prec.") verbatim in the cite -- A8's discriminator rationale.
+_PAREN_USC_RE = re.compile(
+    r"\b(\d+)\s+U\.?\s?S\.?\s?C\.?\s+"
+    rf"(\d+[A-Za-z]*(?:[{_SECTION_DASH}]\d+[A-Za-z]*)?)"
+    r"(?:\([0-9A-Za-z]+\))*"
+    r"(?:\s+(note(?:\s+prec\.)?))?",
+    re.IGNORECASE,
+)
+_PAREN_STAT_RE = re.compile(r"\b(\d+)\s+Stat\.\s+(\d+)", re.IGNORECASE)
+# "Section 5 of Public Law 119-38 (139 Stat. 656) is amended": the P.L. sits
+# OUTSIDE the parenthetical and the Stat. inside it are one citation instance
+# -- the direct P.L. pass absorbs the parenthesized Stat., and the trailer
+# pass must not re-emit it as a standalone public_law. Detected by a P.L. form
+# ending immediately before the trailer's opening paren.
+_PL_BEFORE_PAREN_RE = re.compile(
+    r"(?:Public\s+Law|Pub\.?\s*L\.?|P\.?\s*L\.?)\s*\.?\s*\d+[-‐-―]\d+\s*$",
+    re.IGNORECASE,
+)
+
+
+def _paren_trailer_cites(body: str, pl_precedes: bool = False) -> "set[tuple[str, str]]":
+    """(kind, cite) pairs for every citation in one hugged parenthetical body.
+
+    ``pl_precedes`` marks a P.L. form directly before the opening paren; a
+    Stat. cite LEADING the body is then that P.L.'s same-instance companion
+    (the standing absorb rule, across the paren boundary) and is not emitted.
+    """
+    found: set[tuple[str, str]] = set()
+    pl_spans: list[tuple[int, int]] = []
+    for match in _PAREN_PL_RE.finditer(body):
+        found.add(("public_law", f"P.L. {match.group(1)}-{match.group(2)}"))
+        pl_spans.append((match.start(), match.end()))
+    for match in _PAREN_USC_RE.finditer(body):
+        section = _normalize_section_dash(match.group(2))
+        note = match.group(3)
+        if note:
+            designation = " ".join(note.lower().split())
+            found.add(("usc_note", f"{match.group(1)} U.S.C. {section} {designation}"))
+        else:
+            found.add(("usc", f"{match.group(1)} U.S.C. {section}"))
+    for match in _PAREN_STAT_RE.finditer(body):
+        if any(start <= match.start() < end for start, end in pl_spans):
+            continue
+        if pl_precedes and not body[:match.start()].strip():
+            continue
+        found.add(("public_law", f"{match.group(1)} Stat. {match.group(2)}"))
+    return found
+
+
 # A citation reached via an "as [added|amended] by ..." clause is an intervening
 # amender / provenance note, not the amendment target. Repro S:1106: the verb hugs
 # the LAST cite in a chain -- "(Public Law 109-234), as added by ... (P.L. 110-417),
@@ -287,8 +384,8 @@ class Unit:
         # Scan operative text only: a cite inside a quoted segment is part of the
         # language being *inserted*, not the target being amended (spec §6 --
         # exclude quoted material structurally, not by proximity). Returns objects
-        # {kind, cite}: kind is "usc" or "public_law", never a named Act. Sorted by
-        # (kind, cite), de-duplicated on the pair.
+        # {kind, cite}: kind is "usc", "usc_note", or "public_law" (A8), never a
+        # named Act. Sorted by (kind, cite), de-duplicated on the pair.
         #
         # A5 structural post-condition: `amends != [] ⟹ is_amendatory == true`.
         # Enforced here by construction so no citation form -- present or future --
@@ -329,6 +426,30 @@ class Unit:
             if _is_provenance_cite(operative_text, match.start()):
                 continue
             found.add(("public_law", f"{match.group(1)} Stat. {match.group(2)}"))
+        # A8 (F36): a verb-hugged parenthetical trailer extracts EVERY citation
+        # in its semicolon-separated list, order-independent -- the per-cite
+        # passes above reach only the rightmost cite of such a list. The hug and
+        # the provenance exclusion apply once, at the trailer; dedup on
+        # (kind, cite) absorbs the overlap with the direct passes.
+        for match in AMENDS_PAREN_TRAILER_RE.finditer(operative_text):
+            body = match.group("body")
+            if len(body) > _PAREN_BODY_MAX_CHARS:
+                continue
+            if _is_provenance_cite(operative_text, match.start()):
+                continue
+            pl_precedes = bool(_PL_BEFORE_PAREN_RE.search(
+                operative_text, 0, match.start()))
+            found.update(_paren_trailer_cites(body, pl_precedes))
+        # F40 guard, at the single choke point every pass feeds: a kind
+        # outside the shared vocabulary (models.AMENDS_KINDS) fails HERE,
+        # loudly, at extraction -- never downstream, where the response
+        # models would reject it and discard the entire wire response.
+        unknown = {kind for kind, _ in found if kind not in AMENDS_KINDS}
+        if unknown:
+            raise ValueError(
+                f"amends kind(s) {sorted(unknown)} outside the shared "
+                f"vocabulary {AMENDS_KINDS}; widen models.AmendsKind and "
+                "this emission together (F40)")
         return [{"kind": kind, "cite": cite} for kind, cite in sorted(found)]
 
 
@@ -601,6 +722,9 @@ class _Chunker:
         else:
             self.units.extend(byte_split_unit(unit))
 
+    # F35 note: child units get their "(e) Header..." designator prefix from
+    # extract_segments (SUBSTRUCTURE_ENUM_NAMES), the same path that renders
+    # designators for subdivisions flowing inside an un-subdivided section.
     def _subdivide(self, elem: ET.Element, path: list[AncestorNode]) -> tuple[str | None, list[Unit]]:
         for child_name in FALLBACK_CHAIN:
             # Path 3 of the carve-out: a struck subsection/paragraph inside a live
@@ -627,6 +751,9 @@ class _Chunker:
                 enum = base_enum if sibling_counts[base_enum] == 1 else f"{base_enum}#{sibling_counts[base_enum]}"
                 node = AncestorNode(type=typ, enum=enum, header=direct_text(child, "header"))
                 child_id = "/".join([*(f"{item.type}:{item.enum}" for item in path), f"{node.type}:{node.enum}"])
+                # F35: no prefix call here -- extract_segments renders the
+                # child's enum itself (the same path that covers subdivisions
+                # flowing inside an un-subdivided section's text).
                 child_unit = Unit(child_id, path, node.header, extract_segments(child, node.header))
                 if child_unit.byte_length > MAX_UNIT_BYTES:
                     units.extend(byte_split_unit(child_unit))
@@ -727,6 +854,27 @@ def _chunk_unit(unit: Unit, idx: int, pieces: list[tuple[str, str]]) -> Unit:
         header=unit.header,
         segments=segments,
     )
+
+
+def prefix_enum_segments(segments: list[Segment], enum: str | None) -> list[Segment]:
+    """F35 (§5 designator-rendering ruling): an amendatory bill is its
+    enumeration -- cross-references, redesignation clauses, and quoted
+    amendments address text BY DESIGNATOR, yet the enum lived in the id, the
+    TOC, and the child descriptors while being erased from the emitted text,
+    making a 12(g)->12(e) cross-reference uncheckable from tool output.
+
+    Prepend the document's own enum (RAW typography, not normalize_enum's id
+    form) to a structural sub-section-level element's first segment, so its
+    text begins "(e) Header..." / "(2) The Secretary...". Joining INTO the
+    first segment (rather than emitting an enum-only segment) keeps the enum
+    on the same line as what it designates -- a separate segment would render
+    as its own block across the "\\n\\n" join. Synthetic and chunk units are
+    unchanged (no enum to render); unit.header and the id are untouched. An
+    empty element stays empty -- there is nothing for an enum to designate."""
+    if not enum or not segments:
+        return segments
+    first = segments[0]
+    return [Segment(first.context, f"{enum} {first.text}", inline=first.inline)] + segments[1:]
 
 
 def extract_own_segments(elem: ET.Element, header: str | None, subdivided_tag: str | None) -> list[Segment]:
@@ -857,7 +1005,19 @@ def extract_segments(elem: ET.Element, unit_header: str | None, in_quote: bool =
         text = element_text(elem)
         if text:
             segments.append(Segment(context, text))
-    return coalesce_segments(segments)
+    segments = coalesce_segments(segments)
+    # F35: a structural unit below section level begins with its enum exactly
+    # as the document writes it, followed by its header where present --
+    # applied here, at the element whose segments these are, so the designator
+    # renders identically whether the unit becomes an addressable child
+    # (_subdivide) or flows inside its section's text (the hr10115 §12 shape).
+    # The element_text fallback above already carries the enum when it fired
+    # (it excludes nothing), so an exact-duplicate prefix is skipped.
+    if not in_quote and name in SUBSTRUCTURE_ENUM_NAMES:
+        enum = direct_text(elem, "enum")
+        if enum and not (segments and segments[0].text.startswith(enum)):
+            segments = prefix_enum_segments(segments, enum)
+    return segments
 
 
 def coalesce_segments(segments: list[Segment]) -> list[Segment]:

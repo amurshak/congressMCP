@@ -518,6 +518,8 @@ async def test_service_cache_disabled_never_touches_disk(tmp_path, monkeypatch, 
 
 @pytest.mark.asyncio
 async def test_envelope_reports_index_hit_and_null_parse_ms(monkeypatch):
+    # A7: timing is env-gated on the wire; assert the verbose shape here.
+    monkeypatch.setenv("CONGRESSMCP_VERBOSE", "1")
     parsed = parsed_fixture()
     loaded = LoadedBillText(
         resolved=ResolvedBillText(PACKAGE_ID, "enr", "2026-08-21T00:00:00Z", None, LAST_MODIFIED, None),

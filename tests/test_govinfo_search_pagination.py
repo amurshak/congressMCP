@@ -257,9 +257,11 @@ def test_search_bills_signature_dropped_window_params():
     from congress_api.features.buckets.bills import search_bills
     params = set(inspect.signature(search_bills).parameters)
     # fromDateTime/toDateTime were removed with the window and RESTORED by
-    # Q10 (publishdate:range mapping); offset/sort/format stay gone.
+    # Q10 (publishdate:range mapping); snippet_fetch added by Addendum 4
+    # item 1 (Q11); offset/sort/format stay gone.
     assert params == {"ctx", "keywords", "congress", "bill_type", "limit",
-                      "page_token", "fromDateTime", "toDateTime"}
+                      "page_token", "fromDateTime", "toDateTime",
+                      "snippet_fetch"}
 
 
 @pytest.mark.asyncio

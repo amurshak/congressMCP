@@ -107,6 +107,8 @@ async def bills(
     fromDateTime: Optional[str] = None,
     toDateTime: Optional[str] = None,
     days_back: Optional[int] = None,
+    # search_bills only: Q11 snippet warming budget
+    snippet_fetch: Optional[int] = None,
 ) -> str:
     """
     Comprehensive Bills Tool - All bill operations in one focused interface.
@@ -132,7 +134,7 @@ async def bills(
     search_bills searches the full text of congressional bills -- every
     version of every bill in the GovInfo BILLS collection -- ranked by
     relevance. Parameters: keywords (required), congress, bill_type, limit,
-    page_token, fromDateTime, toDateTime. It does NOT take
+    page_token, fromDateTime, toDateTime, snippet_fetch. It does NOT take
     offset/sort/format.
     - Matching semantics: words are ANDed -- every term must appear in
       the SAME document, so each added word strictly shrinks the result
@@ -145,13 +147,41 @@ async def bills(
       downwinders" returns 1 bill; dropping the two description words
       returns 26, including the enacted vehicle. A small count means the
       terms rarely co-occur, NOT that few such bills exist -- re-query
-      narrower before concluding anything. Synonyms do NOT broaden here:
+      broader (drop words) before concluding anything. Synonyms do NOT
+      broaden here:
       unlike search_bill_text, which ORs its queries array and rewards
       adding alternate phrasings, an added synonym on this path
       intersects and discards.
     - Do NOT quote bill names (quoted phrases measured to miss title
       text); title:"..." / shorttitle:"..." for exact titles; OR / NOT
-      available; field operators pass through.
+      available.
+    - Fielded operators -- the full supported set, each measured live
+      (value form exactly as measured): congress:119; billtype:hr (hr s
+      hjres sjres hconres sconres hres sres); docnumber:4631;
+      billversion:enr (a version code); chamber:house / chamber:senate;
+      member:schumer (member last name); memberparty:r (single party
+      letter); memberstate:mo (two-letter state code);
+      committee:judiciary (a committee-name word);
+      actiondate:2025-01-03 (YYYY-MM-DD); publishdate:2025-07-23
+      (YYYY-MM-DD -- the fromDateTime/toDateTime parameters are the
+      range form); isprivate:false and isappropriation:false (boolean);
+      uscodecitation:"42 U.S.C. 2210"; statutecitation:"133 Stat. 1198";
+      plawcitation:"Public Law 101-426" (the three citation fields take
+      the quoted citation string). field:range(a,b) works on date
+      fields. A field name NOT on this list is a query error upstream
+      (measured HTTP 500, the malformed-request family) -- the tool
+      answers govinfo_query_error, so do not invent field names.
+      NOTE TRAP: uscodecitation matches the CODE SECTION, not notes
+      published under it. A note-codified Act (RECA at 42 U.S.C. 2210
+      note) does NOT match uscodecitation:"42 U.S.C. 2210" -- that
+      returns the section's own bills. Measured in Congress 119: that
+      query returns 7 bills, ZERO of them RECA (all Price-Anderson /
+      nuclear-energy bills amending the section proper), while
+      plawcitation:"Public Law 101-426" returns the 7-bill RECA answer
+      set. The two citation fields silently DISAGREE about the same
+      statute with no signal to try the other: for a note-codified Act
+      use plawcitation:"Public Law NNN-NNN"; when both forms exist,
+      prefer plawcitation.
     - keywords is required: blank or whitespace-only keywords are rejected
       (invalid_parameters), never sent.
     - Version discovery: each hit fronts the most authoritative matched
@@ -171,6 +201,42 @@ async def bills(
       records straddle a page boundary can rarely reappear on the next
       page with the same identity -- dedup by congress/bill_type/
       bill_number if walking pages.
+    - Snippets: a hit whose fronted version package is already in the
+      local bill-text cache carries snippet_status and snippet, localized
+      from the cached text per-term (zero network). snippet_fetch: N
+      (default 0, hard cap 5) additionally downloads and enrolls the top-N
+      UNCACHED hits in rank order so they get snippets too. Three states:
+      snippet_status "localized" with a snippet object; "not_localized"
+      with snippet null (the cached text was searched and the terms did
+      not match locally -- the upstream match still stands, the local
+      stemming just missed it); BOTH fields absent means localization was
+      not attempted (uncached with no fetch budget). Every snippet object
+      carries the matched unit's section_id and match_contexts, and
+      "quoted" governs: a snippet drawn from quoted material is language
+      the bill is inserting or striking -- delimited in the snippet text
+      -- NOT what current law says.
+    - Diagnostics: a starved result diagnoses itself. When the query has
+      2+ text terms and total_version_matches < 10, the response carries
+      diagnostics.term_ladder: the query re-run with text terms chopped
+      from the right, one per rung, down to a single term. Each rung
+      lists the terms kept and the upstream count, so the rung where the
+      count jumps names the term that starved the query -- and each rung
+      is itself the broader re-query to take. A final rung with terms []
+      is the constraints-only count: the size of the universe the
+      fielded/scope constraints allow, the ladder's denominator. Caveat:
+      right-chopping isolates trailing added words (the usual failure);
+      when the rare term sits FIRST, every rung stays small down to the
+      single-term rung -- which is the correct reading: the core term is
+      rare. A small count can be a CORRECT answer -- the ladder is
+      evidence for judging a result, not a verdict against it. On a
+      zero-total query carrying droppable constraints (fielded
+      operators, congress/bill_type scope, date bounds), the response
+      carries diagnostics.leave_one_out: the query re-run omitting one
+      constraint per probe -- the omission that restores hits names the
+      dead constraint (e.g. a version the bill never had). A probe that
+      errors reports count null with status "probe_failed", never 0.
+      Absence of diagnostics means it did not fire, never that it ran
+      and found nothing.
     - Fallback: when search_source is "recency_window_fallback", GovInfo
       was unavailable (read fallback_trigger) and results are a
       title/policy-area filter over the most recently updated bills, NOT
@@ -213,6 +279,8 @@ async def bills(
         limit: Results limit (max 250 for API compliance)
         page_token: search_bills only -- opaque pagination cursor from a
                     previous response's next_page_token, passed back verbatim
+        snippet_fetch: search_bills only -- Q11 warming budget: download and
+                    enroll up to N uncached hits (cap 5) for local snippets
         sort: updateDate+desc (newest first) or updateDate+asc (not for
               search_bills, which is relevance-ranked)
         fromDateTime/toDateTime: Date range (YYYY-MM-DDTHH:MM:SSZ;
@@ -274,7 +342,8 @@ async def bills(
             'page_token': page_token,
             'fromDateTime': fromDateTime,
             'toDateTime': toDateTime,
-            'days_back': days_back
+            'days_back': days_back,
+            'snippet_fetch': snippet_fetch
         }.items():
             if param_value is not None:
                 operation_kwargs[param_name] = param_value
