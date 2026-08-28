@@ -16,10 +16,25 @@ logger.setLevel(logging.DEBUG)
 
 # --- Formatting Helpers ---
 
+def _display_chamber(chamber: Optional[str]) -> str:
+    """Render a hearing's chamber value for display.
+
+    Congress.gov returns the literal token "NoChamber" for hearings held
+    by joint (chamber-agnostic) committees. Show "Joint" so that reads
+    clearly, but keep "nochamber" visible too -- it's the exact value
+    ParameterValidator.validate_chamber() accepts for
+    get_hearings_by_congress_and_chamber/get_hearing_details, and a
+    client copying "Joint" alone back into those tools would get
+    rejected.
+    """
+    if isinstance(chamber, str) and chamber.strip().lower() == "nochamber":
+        return "Joint (nochamber)"
+    return chamber or "N/A"
+
 def format_hearing_item(hearing_item: Dict[str, Any]) -> str:
     """Formats a single hearing item for display in a list."""
     lines = [
-        f"Chamber: {hearing_item.get('chamber', 'N/A')}",
+        f"Chamber: {_display_chamber(hearing_item.get('chamber'))}",
         f"Congress: {hearing_item.get('congress', 'N/A')}",
         f"Jacket Number: {hearing_item.get('jacketNumber', 'N/A')}",
         f"Update Date: {hearing_item.get('updateDate', 'N/A')}",
@@ -31,7 +46,7 @@ def format_hearing_detail(hearing_item: Dict[str, Any]) -> str:
     """Formats detailed information for a single hearing."""
     lines = [
         f"Title: {hearing_item.get('title', 'N/A')}",
-        f"Chamber: {hearing_item.get('chamber', 'N/A')}",
+        f"Chamber: {_display_chamber(hearing_item.get('chamber'))}",
         f"Congress: {hearing_item.get('congress', 'N/A')}",
         f"Citation: {hearing_item.get('citation', 'N/A')}",
         f"Jacket Number: {hearing_item.get('jacketNumber', 'N/A')}",
