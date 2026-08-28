@@ -1,8 +1,6 @@
 # What this is
 
-This is an MCP server for searching congressional bills. It uses BOTH the congress.gov and govinfo.gov APIs to do this.
-
-The primary target for this server is individual user desktop use via stdio. The rate limits for the upstream APIs are: congress.gov: 20,000/hr, govinfo.gov: 36,000/hr. These are independent rate limits for two hosts, even though they share the same key. The practical implication of this is that API calls are essentially free - no individual user is going to exhaust them.
+This is an MCP server for searching congressional bills. It uses BOTH the congress.gov and govinfo.gov APIs to do this. 
 
 # Conventions
 
